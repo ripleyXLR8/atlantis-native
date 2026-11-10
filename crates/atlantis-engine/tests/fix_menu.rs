@@ -171,7 +171,7 @@ fn each_place_reads_its_own_fix() {
             let ctx = format!("{var} {fixes:?}");
             assert_eq!(e.music_through_ring(), !is(MusicLoop), "{ctx}");
             assert_eq!(e.head_overlay_drawn(), is(HeadOverlay), "{ctx}");
-            assert_eq!(e.head_rest_key_fix(), is(HeadFirstFrame), "{ctx}");
+            assert_eq!(e.cinema_sound_fix(), is(CinemaSound), "{ctx}");
             let bar = e.bar_state();
             assert_eq!(bar.slide_out_fix, is(BarSlideOut), "{ctx}");
             assert_eq!(bar.pickup_fix, is(PickupIcon), "{ctx}");

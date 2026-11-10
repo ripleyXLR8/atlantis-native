@@ -555,7 +555,6 @@ impl BugFix {
             BugFix::MusicLoop => "Music: seamless loops",
             BugFix::CinemaSound => "Cinematics: the sound of the second",
             BugFix::HeadOverlay => "Faces: the guards' coif, the pilot's scarf",
-            BugFix::HeadFirstFrame => "Faces: the lower face's first frame",
             BugFix::BarSlideOut => "Inventory: icons left as the bar hides",
             BugFix::PickupIcon => "Inventory: a new object's icon",
             BugFix::MenuRecords => "Menus: each its own click areas",
@@ -591,11 +590,6 @@ impl BugFix {
                 "The original draws the overlay of some talking heads",
                 "where the next copy of the picture erases it: the",
                 "guards' coif and the pilot's scarf are never seen.",
-            ],
-            BugFix::HeadFirstFrame => &[
-                "On the first frame of each loop of some talking heads",
-                "(Meljanz, Actyon, Servage, the Queen, Gimbas), the",
-                "original draws the 3D lower face away from the face.",
             ],
             BugFix::BarSlideOut => &[
                 "When the inventory bar is scrolled, the original",

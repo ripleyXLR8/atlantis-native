@@ -934,6 +934,7 @@ impl Scripts {
             chosen = self.dialog.subject_menu(e, perso, &sujs).await;
             if e.should_abort() {
                 e.section_play = false;
+                e.escape_request = false;
                 end_follower_talk(e);
                 return;
             }
@@ -972,6 +973,9 @@ impl Scripts {
             _ => {}
         }
         e.section_play = false;
+        // FUN_00425828's end puts 0x00496124 and the menu request back
+        // (0x00425be5, 0x00425bef).
+        e.escape_request = false;
         e.vars.set("clicperso", 0);
         end_follower_talk(e);
     }
@@ -1132,6 +1136,9 @@ impl Scripts {
                         line_idx += 1;
                         e.vars.set("clicperso", 0);
                         if out.escape_skip {
+                            // The skip block also sets 0x00496124 = 1 and
+                            // clears the menu request (0x00428baf, 0x00428bc3).
+                            e.escape_request = false;
                             i = con_escape_skip(&sec.items, i + 1, &mut line_idx);
                             continue;
                         }

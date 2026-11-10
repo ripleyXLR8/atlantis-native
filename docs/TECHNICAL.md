@@ -44,13 +44,27 @@ plays; a music track starts at volume 0 and fades up; the sound menu's OK
 also sets the level the music next climbs back to; a fresh start has the
 original's volumes (master 127, music, effects and voices 110).
 
+Escape pressed in a loop of the original that does not end on it, the
+turn before a move and the subject menu, is kept as the original keeps
+it, its run flag cleared and the menu requested (`Engine::escape_request`):
+the turn ends its approach there, the move's video then shows its first
+frame only, and after the subject menu (whose guests are then no longer
+drawn) the next voice-only line, narration or video stops at once; the
+game-over narration's Escape is gated by the bar request and bow mode as
+every other; the place sprites go on moving under the subject menu.
+
 The 3D talking heads are in `crates/atlantis-engine/src/head/`: the dialog
 video leaves the speaker's mouth empty, and the line player draws a
 textured 3D lower face there every frame, posed by the head animation at
 the video's frame and shaped by the line's lip-sync track at the voice's
 time (`mod.rs`: animation, camera, tree walk, culling and projection;
 `raster.rs`: the original's span rasteriser, flat, affine and perspective
-texture fills). The files (`.3DC` meshes, `.3DA` animations and mouth
+texture fills). As in the original, the line player builds frame 0 of
+each loop of the video (the first of the line) and does not show it, so
+the rest pose some head animations hold there (Meljanz, Actyon, Servage,
+the Queen, Gimbas) is never seen and the line opens on frame 1; an
+earlier `fix_head_first_frame` drew that frame with frame 1's pose, and
+a `settings.ini` line for it is now ignored. The files (`.3DC` meshes, `.3DA` animations and mouth
 shapes, `.S3D` tables and cameras, `.SYC` lip-sync tracks, `.3DM` texture
 maps) are parsed in `crates/atlantis-data/src/head.rs`. The arithmetic is
 the original's, operation for operation (32-bit fixed point, x87 doubles
@@ -106,7 +120,6 @@ its executable's language:
 | `fix_music_loop` | all | `Engine::music_play_track` | the music loops seamlessly (the original's streaming ring has audible seams; read at each track start) |
 | `fix_cinema_sound` | all | `Engine::play_transition_video` | a cinematic plays its own sound when the sound of the cinematic before it still plays, which stops (the original's NewSound poller sees the value 1 still playing and starts nothing, so the second film is silent: CINEM053's sound outlasts its film by a second and CINEM058 follows it in five sections) |
 | `fix_head_overlay` | all | `dialog/mod.rs`, the SPF overlay | the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it) |
-| `fix_head_first_frame` | all | `DialogHead::set_rest_key_fix` | the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose) |
 | `fix_bar_slide_out` | all | `ui::bar::slide_out_record_drawn` | the inventory bar's slide-out draws no icon once the slots are at y 506 (the original reads the y of a record from 9 on past its 9-entry slot table, so a scrolled bar leaves 1 to 4 rows of those icons at the bottom of the screen) |
 | `fix_pickup_icon` | all | `ui::bar::slot_x` | after a pick-up the new object's icon is drawn in its slot (the original draws it 7 pixels left, in the hold loop and the slide-out, until the next slide-in) |
 | `fix_menu_records` | all | `Engine::menu_table` | each menu keeps its own click records, from zero at every visit (the original keeps one record table for the whole session, with 16 records per menu in the May 1997 English and French builds and 20 in the others: in those two builds the sound menu's last two records spill over the ARE YOU SURE ? menu's and move its left ornament off screen for the session, and in every build the LOAD scrollbar's knob, hidden by a visit with 11 checkpoints or fewer, stays hidden on the later visits) |
@@ -131,7 +144,7 @@ original game (the tests run each fix alone where the data shows it:
 `tests/spanish_italian_cd.rs`, `tests/fix_menu.rs`, which also checks
 which fixes each edition lists). Each place a fix changes reads it
 through one `Engine` method (`music_through_ring`, `head_overlay_drawn`,
-`head_rest_key_fix`, `bar_state`, `menus_own_records`,
+`cinema_sound_fix`, `bar_state`, `menus_own_records`,
 `keep_fifth_name`, `snakes_first_run_fix`, `hexa_forces_402`,
 `loadmusik_track_by_track`, `sharp_s_as_ss`, `current_disc_copy`,
 `menu_rules`, `chinese_row_fix`): `tests/fix_menu.rs` sets each fix

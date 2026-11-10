@@ -1331,3 +1331,182 @@ fn game_over_screen_plays_the_narrator() {
     assert!(best > 50, "{best} subtitle pixels");
     assert!(last.iter().all(|&p| p == 0), "the screen cleared");
 }
+
+/// A talking head's UBB frame 0 is built and not presented
+/// (`FUN_0042ee88` @ 0x0042f5e8..0x0042f5f5): up to the step where the
+/// voice starts (after frames 0 and 1), one picture of the line is shown,
+/// frame 1's; frame 0 never replaces the screen as it stood.
+#[test]
+fn head_frame_zero_is_not_presented() {
+    use atlantis_engine::DialogPresenter;
+    let Some(g) = game("head_frame_zero_is_not_presented") else {
+        return;
+    };
+    let shown = Rc::new(RefCell::new(BTreeSet::new()));
+    let s2 = shown.clone();
+    let started = Rc::new(std::cell::Cell::new(false));
+    let st2 = started.clone();
+    let mut voice = false;
+    with_new_game(
+        g,
+        Default::default(),
+        move |mut e, s| {
+            Box::pin(async move {
+                let line = first_line(&s, 1);
+                let perso = resolve_speaker_perso(&line.speaker);
+                e.sys.screen.borrow_mut().fill(0x1234);
+                st2.set(true);
+                let mut d = Dialogs::new();
+                d.play_line(&mut e, &request(1, line, perso)).await;
+            })
+        },
+        move |h, ev| {
+            if !started.get() || voice {
+                return;
+            }
+            voice = ev.contains(&Event::Voice("WAV\\ATA0001A.APC".into()));
+            let s = h.sys.screen.borrow();
+            if s.iter().any(|&p| p != 0x1234) {
+                s2.borrow_mut().insert(md5_hex(
+                    &s.iter().flat_map(|p| p.to_le_bytes()).collect::<Vec<_>>(),
+                ));
+            }
+        },
+    );
+    assert_eq!(shown.borrow().len(), 1, "pictures shown before the voice");
+}
+
+/// Escape in the subject menu (`FUN_0041a298` polled by `FUN_004261a0`)
+/// clears 0x00496124 and sets the menu request; the menu goes on until a
+/// click. The next voice-only line (`FUN_00430258`, waiting only while
+/// 0x00496124 is 1) then stops after one poll and puts the flags back.
+#[test]
+fn escape_in_the_subject_menu_cuts_the_next_voice_only_line() {
+    use atlantis_engine::DialogPresenter;
+    let Some(g) = game("escape_in_the_subject_menu_cuts_the_next_voice_only_line") else {
+        return;
+    };
+    let phase = Rc::new(std::cell::Cell::new(0u32));
+    let p2 = phase.clone();
+    let got = Rc::new(RefCell::new(Vec::new()));
+    let g2 = got.clone();
+    let (mut steps, mut after) = (0, 0usize);
+    let ev = with_new_game(
+        g,
+        Default::default(),
+        move |mut e, s| {
+            Box::pin(async move {
+                let mut d = Dialogs::new();
+                p2.set(1);
+                d.subject_menu(&mut e, 600, &[1, 5]).await;
+                g2.borrow_mut().push(e.escape_request);
+                p2.set(2);
+                let line = first_line(&s, 2);
+                let perso = resolve_speaker_perso(&line.speaker);
+                d.play_line(&mut e, &request(2, line, perso)).await;
+                g2.borrow_mut().push(e.escape_request);
+            })
+        },
+        |h, ev| match phase.get() {
+            1 => {
+                steps += 1;
+                if steps == 5 {
+                    h.sys
+                        .push_input(Input::KeyDown(atlantis_engine::sys::Key::Escape));
+                } else if steps == 10 {
+                    h.click(10, 10);
+                }
+            }
+            2 if !ev.iter().any(|e| matches!(e, Event::LinePlayed { .. })) => after += 1,
+            _ => {}
+        },
+    );
+    assert_eq!(*got.borrow(), [true, false]);
+    assert_eq!(line_played(&ev), vec![(None, 0, true, 1)]);
+    assert!(after <= 5, "{after} frames of the line");
+}
+
+/// The game-over wait's Escape is gated by the bar request (and bow
+/// mode), which a right press during an earlier line toggled
+/// (`FUN_0041a298` @ 0x0041a3e8..0x0041a3f8): with it set, Escape does not
+/// end the narration.
+#[test]
+fn game_over_escape_is_gated_by_the_bar_request() {
+    use atlantis_engine::DialogPresenter;
+    for bar in [false, true] {
+        let Some(g) = game("game_over_escape_is_gated_by_the_bar_request") else {
+            return;
+        };
+        let (mut escaped, mut after) = (false, 0usize);
+        with_new_game(
+            g,
+            Default::default(),
+            move |mut e, _| {
+                Box::pin(async move {
+                    e.bar.request = bar;
+                    let req = atlantis_engine::scripts::GameOverRequest {
+                        section: 45,
+                        n: 2,
+                        narrator: Some(("Young Seth had failed.".into(), 'C')),
+                    };
+                    let mut d = Dialogs::new();
+                    d.game_over(&mut e, &req).await;
+                })
+            },
+            |h, ev| {
+                if escaped {
+                    after += 1;
+                } else if ev.contains(&Event::Voice("WAV\\ATA0045C.APC".into())) {
+                    h.sys
+                        .push_input(Input::KeyDown(atlantis_engine::sys::Key::Escape));
+                    escaped = true;
+                }
+            },
+        );
+        assert!(escaped);
+        if bar {
+            assert!(after > 30, "{after} frames after Escape");
+        } else {
+            assert!(after <= 5, "{after} frames after Escape");
+        }
+    }
+}
+
+/// A left and a right press in the same poll: `FUN_0041a298` returns on
+/// the left one (0x0041a2b5), so the bar request does not toggle.
+#[test]
+fn left_and_right_press_in_one_poll_keep_the_bar_request() {
+    use atlantis_engine::DialogPresenter;
+    let Some(g) = game("left_and_right_press_in_one_poll_keep_the_bar_request") else {
+        return;
+    };
+    let got = Rc::new(std::cell::Cell::new(None));
+    let g2 = got.clone();
+    let mut pressed = false;
+    with_new_game(
+        g,
+        Default::default(),
+        move |mut e, s| {
+            Box::pin(async move {
+                let line = first_line(&s, 1);
+                let perso = resolve_speaker_perso(&line.speaker);
+                let mut d = Dialogs::new();
+                d.play_line(&mut e, &request(1, line, perso)).await;
+                g2.set(Some(e.bar.request));
+            })
+        },
+        move |h, ev| {
+            if !pressed && ev.contains(&Event::Voice("WAV\\ATA0001A.APC".into())) {
+                for button in [MouseButton::Right, MouseButton::Left] {
+                    h.sys.push_input(Input::MouseDown {
+                        button,
+                        x: 10,
+                        y: 10,
+                    });
+                }
+                pressed = true;
+            }
+        },
+    );
+    assert_eq!(got.get(), Some(false));
+}

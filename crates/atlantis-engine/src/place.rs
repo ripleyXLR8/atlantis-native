@@ -15,10 +15,9 @@ use atlantis_data::sprite_list::{npc_click_rects, npc_row_matches};
 use atlantis_data::wam::{CentrePos, Transition};
 
 use crate::engine::{Engine, Event};
-use crate::enhancements::BugFix;
 use crate::music::apc_pcm;
 use crate::sys::{Input, MouseButton};
-use crate::turn::{transition_turn, TURN_END_FOV_DEG};
+use crate::turn::{TransitionTurn, TURN_END_FOV_DEG};
 use crate::video_skip::{VideoSkipRun, VideoSkipState};
 use crate::warp::{Warp, PANO_W, SCREEN_H, SCREEN_W, WARP_FOV_DEG};
 
@@ -339,6 +338,10 @@ impl Engine {
                 self.sys.hd_video.borrow_mut().t = 1.0;
             }
             self.turn_double_click.flag = false;
+            // The video puts 0x00496124 and the menu request back; without
+            // it (a double click) the port does the same, and does not take
+            // the original's place loop on with them cleared.
+            self.escape_request = false;
         }
         // A sub-WAM swaps the area when (src, dst) crosses into another WAM
         // (FUN_00422ad0). The place id stays the one being left: the
@@ -369,7 +372,7 @@ impl Engine {
         if !self.warp_loaded {
             return;
         }
-        let (frames, _, _) = transition_turn(
+        let mut turn = TransitionTurn::new(
             Warp::exe_pi(),
             self.warp.alpha(),
             self.warp.beta(),
@@ -377,27 +380,25 @@ impl Engine {
             src_beta,
             self.zoom || self.vars.get("zoom") != 0,
         );
-        for f in frames {
+        let mut first = true;
+        loop {
             if self.sys.should_quit() {
                 break;
             }
-            // The messages FUN_0041a298 pumps (0x00421670 / 0x00421a5a): a
-            // left press here can be the second of a double click whose
-            // first ended the warp loop (TurnDoubleClick, 0x00496118). The
-            // menu request 0x00496138 the turn's poll can set is not
-            // modelled.
-            while let Some(ev) = self.sys.poll_event() {
-                if let Input::MouseDown {
-                    button: MouseButton::Left,
-                    x,
-                    y,
-                } = ev
-                {
-                    let now = self.sys.millis();
-                    let mode = self.cursor_state.mode;
-                    self.turn_double_click.press(now, x, y, mode, false);
-                }
+            // The messages FUN_0041a298 pumps after each frame (0x00421670 /
+            // 0x00421a5a): a left press here can be the second of a double
+            // click whose first ended the warp loop (TurnDoubleClick,
+            // 0x00496118); a right press toggles the bar request; Escape
+            // (no talking head, bow mode, bar request or object in hand)
+            // clears 0x00496124 and sets the menu request, which ends
+            // phase 1 and then the move's video at its first frame.
+            if !first {
+                self.turn_poll();
             }
+            first = false;
+            let Some(f) = turn.next_frame(!self.escape_request) else {
+                break;
+            };
             if f.fov_set {
                 self.warp.set_hfov(f.fov);
             }
@@ -422,6 +423,49 @@ impl Engine {
         self.warp.set_hfov(TURN_END_FOV_DEG);
         self.zoom = false;
         self.vars.set("zoom", 0);
+    }
+
+    /// The turn's input poll (`FUN_0041a298` after each turn frame).
+    fn turn_poll(&mut self) {
+        let (mut left, mut right, mut escape) = (None, false, false);
+        while let Some(ev) = self.sys.poll_event() {
+            match ev {
+                Input::MouseDown {
+                    button: MouseButton::Left,
+                    x,
+                    y,
+                } => {
+                    let now = self.sys.millis();
+                    let mode = self.cursor_state.mode;
+                    let menu = self.escape_request;
+                    self.turn_double_click.press(now, x, y, mode, menu);
+                    left = Some((x, y));
+                }
+                Input::MouseDown {
+                    button: MouseButton::Right,
+                    ..
+                } => right = true,
+                Input::KeyDown(crate::sys::Key::Escape) => escape = true,
+                _ => {}
+            }
+        }
+        // A left press ends the poll before the rest (0x0041a2b5).
+        if left.is_some() {
+            return;
+        }
+        if right {
+            self.bar.right_pressed(self.section_play, self.escape_request);
+        }
+        if escape && self.escape_gate_open() {
+            self.escape_request = true;
+        }
+    }
+
+    /// Escape clears 0x00496124 (`FUN_0041a298` @ 0x0041a3e8..0x0041a419)
+    /// when no talking head plays (0x00496188, never in these loops) and
+    /// bow mode, the bar request and OBJETENMAIN are all 0.
+    pub(crate) fn escape_gate_open(&self) -> bool {
+        !self.bow_mode && !self.bar.request && self.vars.get("objetenmain") == 0
     }
 
     /// A video of `UBB_VUE\` (`playTransitionVideo`, `FUN_0041bc74`):
@@ -490,7 +534,7 @@ impl Engine {
         // NewSound entries that the departure sections play.
         if places.is_none() {
             let apc = format!("WAV\\{}", with_ext(&name, "APC"));
-            if self.enhancements().fix(BugFix::CinemaSound) && self.music.new_sound_last == 1 {
+            if self.cinema_sound_fix() && self.music.new_sound_last == 1 {
                 self.music.new_sound_playing = false;
             }
             self.vars.set("newsound", 1);
@@ -513,6 +557,15 @@ impl Engine {
             bar_request: self.bar.request,
             ..VideoSkipState::default()
         });
+        // An Escape of the turn or the subject menu left 0x00496124 = 0:
+        // the loop (`while 0x00496124 != 0`, 0x0041bd75) does not run, and
+        // its exit presents the frame decoded before it, the first
+        // (0x0041be4a), with the menu request still set.
+        if self.escape_request {
+            run.s.keep_running = false;
+            run.s.menu_request = true;
+            run.stop_after_frame = true;
+        }
         let (w, h) = (hnm.width(), hnm.height());
         // The composite of the frame on screen, while it has overlays.
         let mut overlay: Option<Vec<u16>> = None;
@@ -668,6 +721,7 @@ impl Engine {
             hnm.frame_mut().copy_from_slice(&c);
         }
         let fade = run.finish(frame_ms == CINEMA_FRAME_MS, &mut self.bar);
+        self.escape_request = false;
         if fade && self.music.new_sound_active() {
             self.music.fade_out_new_sound(self.effects_volume());
         }
@@ -1096,6 +1150,131 @@ mod move_video_skip_tests {
             } else {
                 assert_eq!(got, (true, 1.0));
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod escape_tests {
+    use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
+
+    use crate::engine::Event;
+    use crate::sys::{Input, Key, MouseButton};
+    use crate::test_support::with_engine;
+    use crate::turn::{transition_turn, TransitionTurn};
+    use crate::warp::Warp;
+
+    /// The turn frame by frame: with 0x00496124 set all along, the frames
+    /// of `transition_turn`; cleared after the first frame, phase 1 ends
+    /// there and the five frames of phase 2 follow.
+    #[test]
+    fn turn_phase_one_ends_with_the_run_flag() {
+        let pi = Warp::exe_pi();
+        let (all, _, _) = transition_turn(pi, 0.0, 0.0, 2.5, 0.3, false);
+        assert!(all.len() > 7, "{} frames", all.len());
+        let mut t = TransitionTurn::new(pi, 0.0, 0.0, 2.5, 0.3, false);
+        let first = t.next_frame(true).unwrap();
+        assert_eq!(first, all[0]);
+        let mut n = 1;
+        while t.next_frame(false).is_some() {
+            n += 1;
+        }
+        assert_eq!(n, 6);
+    }
+
+    /// Escape during a move's turn (`FUN_0041a298` from `FUN_004212cc`)
+    /// clears 0x00496124: the video loop does not run and its exit shows
+    /// the first frame only (0x0041bd75, 0x0041be4a), then the flags are
+    /// back.
+    #[test]
+    fn escape_in_the_turn_cuts_the_move_video() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let armed = Rc::new(Cell::new(0u32));
+        let a2 = armed.clone();
+        let ran = with_engine(
+            "escape_in_the_turn_cuts_the_move_video",
+            move |mut e| async move {
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let dest = e
+                    .place()
+                    .and_then(|p| p.transitions.iter().find(|t| !t.video.is_empty()))
+                    .map(|t| t.dst_place)
+                    .expect("a move with a video from the first place");
+                a2.set(1);
+                e.execute_transition(dest).await;
+                let frames = trace.borrow().iter().find_map(|ev| match ev {
+                    Event::Video { frames, .. } => Some(*frames),
+                    _ => None,
+                });
+                *g2.borrow_mut() = Some((frames, e.escape_request));
+            },
+            move |sys, _| {
+                let n = armed.get();
+                if n > 0 {
+                    armed.set(n + 1);
+                    if n == 2 {
+                        sys.push_input(Input::KeyDown(Key::Escape));
+                    }
+                }
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((Some(1), false)));
+        }
+    }
+
+    /// The subject menu steps the place sprites on every frame
+    /// (`FUN_004261a0` @ 0x0042622b), and an Escape there sets the menu
+    /// request (the guests are no longer drawn) without ending it.
+    #[test]
+    fn subject_menu_steps_the_sprites_and_takes_escape() {
+        use crate::scripts::DialogPresenter;
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let armed = Rc::new(Cell::new(0u32));
+        let a2 = armed.clone();
+        let ran = with_engine(
+            "subject_menu_steps_the_sprites_and_takes_escape",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let t0 = e.sprite_anim_tick;
+                a2.set(1);
+                let mut d = crate::Dialogs::new();
+                d.subject_menu(&mut e, 600, &[1, 5]).await;
+                *g2.borrow_mut() = Some((e.sprite_anim_tick > t0 + 10, e.escape_request));
+            },
+            move |sys, _| {
+                let n = armed.get();
+                if n > 0 {
+                    armed.set(n + 1);
+                    if n == 20 {
+                        sys.push_input(Input::KeyDown(Key::Escape));
+                    } else if n == 40 {
+                        sys.push_input(Input::MouseDown {
+                            button: MouseButton::Left,
+                            x: 10,
+                            y: 10,
+                        });
+                    } else if n == 41 {
+                        sys.push_input(Input::MouseUp {
+                            button: MouseButton::Left,
+                            x: 10,
+                            y: 10,
+                        });
+                    }
+                }
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, true)));
         }
     }
 }

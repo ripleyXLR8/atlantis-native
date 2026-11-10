@@ -395,8 +395,8 @@ pub struct DialogHead {
 
     frames: i32,
     frame: i32,
-    /// Enhancement (minor bug fixes): frame 0 of the head animation is
-    /// drawn with frame 1's pose (see [`DialogHead::set_rest_key_fix`]).
+    /// Frame 0 of the head animation drawn with frame 1's pose (see
+    /// [`DialogHead::set_rest_key_fix`]).
     rest_key_fix: bool,
     idx: usize,
     next: i32,
@@ -779,6 +779,9 @@ impl DialogHead {
     /// the 3D lower face is drawn up to 35 pixels away from the video's face
     /// for that one frame. With the fix, frame 0 is drawn with frame 1's
     /// pose, which every loop's last frame also matches in those files.
+    /// The line player does not use it: the original never presents UBB
+    /// frame 0 of a talking head (`FUN_0042ee88` @ 0x0042f5e8..0x0042f5f5),
+    /// so that rest pose is computed, never seen.
     pub fn set_rest_key_fix(&mut self, on: bool) {
         self.rest_key_fix = on;
     }

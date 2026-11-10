@@ -578,12 +578,9 @@ impl Dialogs {
         let head = match l.dial_row {
             Some(row) if talking_head && full_screen_ubb && (2..=5).contains(&l.cam) => {
                 let syc = format!("ATA{:04}{}.SYC", l.section, l.letter);
-                let mut head = self.load_head(e, row, l.cam, &syc).await;
-                if let Some(h) = head.as_mut() {
-                    // The rest pose of some head animations at frame 0
-                    // (an original bug, fixed as an enhancement).
-                    h.set_rest_key_fix(e.head_rest_key_fix());
-                }
+                // Frame 0 of some head animations is a rest pose; the
+                // original never presents that frame (draw_frame).
+                let head = self.load_head(e, row, l.cam, &syc).await;
                 if head.is_none() {
                     // A head file is missing (lines without a .SYC never get
                     // here: they are played voice-only).
@@ -615,6 +612,7 @@ impl Dialogs {
             head_time0: None,
             head_ended: false,
             head_cut: false,
+            hidden: false,
         };
 
         // The line lasts as long as its voice (FUN_0042ee88 / FUN_00430258):
@@ -690,9 +688,10 @@ impl Dialogs {
                     e.sys.frame().await;
                     let fi = poll_input(e);
                     // FUN_0041a298 in both line loops: a right press sets
-                    // 0x00496120 and toggles the bar request.
-                    if fi.right_press {
-                        e.bar.right_pressed(e.section_play, false);
+                    // 0x00496120 and toggles the bar request; a left press
+                    // in the same poll returns first (0x0041a2b5).
+                    if fi.right_press && !fi.left_press {
+                        e.bar.right_pressed(e.section_play, e.escape_request);
                     }
                     // The bar request as the right presses left it.
                     escape_poll.bar_request = e.bar.request;
@@ -704,10 +703,22 @@ impl Dialogs {
                         out.escape = escape && escape_poll.talking_head;
                         break;
                     }
+                    // The voice-only players wait only while 0x00496124 is
+                    // 1 (0x00430586): an Escape of the subject menu cleared
+                    // it, so the line stops after one poll. The talking
+                    // head's loop does not read it.
+                    if !player.talking_head && e.escape_request {
+                        break;
+                    }
                 }
                 if let Some(v) = voice {
                     e.sys.mixer.stop(v);
                     out.voice = true;
+                    // The voice-only players end by putting 0x00496124 and
+                    // the menu request back (0x004305b7, 0x004305c1).
+                    if !player.talking_head {
+                        e.escape_request = false;
+                    }
                     if l.cam == 0 {
                         e.music.unduck(None);
                         e.bar.voice_line_ended(); // 0x004305cb
@@ -783,6 +794,10 @@ impl Dialogs {
                 return None;
             }
             {
+                // FUN_004261a0 steps the place sprites on every frame
+                // (FUN_00425304 @ 0x0042622b) before the panorama
+                // (0x00426285).
+                e.animate_sprites();
                 let mut frame = vec![0u16; N];
                 if e.warp_loaded {
                     e.warp.render(&e.warp_surface, &mut frame);
@@ -805,13 +820,24 @@ impl Dialogs {
                 }
                 // FUN_004261a0 @ 0x00426393: FUN_0042bc58, the guests not
                 // hidden (FUN_00425828 hides all but the clicked one for a
-                // follower).
-                e.draw_guests(&mut frame, None);
+                // follower); none once an Escape set the menu request
+                // 0x00496138.
+                if !e.escape_request {
+                    e.draw_guests(&mut frame, None);
+                }
                 Self::draw_arrow(e, &mut frame);
                 e.sys.screen.borrow_mut().copy_from_slice(&frame);
             }
             e.sys.frame().await;
             let fi = poll_input(e);
+            // FUN_0041a298 (0x00426389): Escape clears 0x00496124 and sets
+            // the menu request (no talking head, bow mode, bar request or
+            // object in hand); the menu goes on until a left click
+            // (0x004259b6..0x004259cc), and the next voice-only line,
+            // narration or video stops at once.
+            if fi.escape && !fi.left_press && e.escape_gate_open() {
+                e.escape_request = true;
+            }
             if fi.left_press || e.sys.buttons().0 {
                 let (mx, my) = e.sys.mouse();
                 drain(e).await;
@@ -892,10 +918,17 @@ impl Dialogs {
 
         // The narrator's voice: wait for it, or hold the image 5 s without
         // it (game_over_wait_ends). FUN_0041a298 polls with the flags of the
-        // moment (0x00496188, the talking head, is 0 here).
+        // moment (0x00496188, the talking head, is 0 here): bow mode and the
+        // bar request a right press during an earlier line toggled gate
+        // Escape (0x0041a3e8..0x0041a3f8), and an Escape of the subject
+        // menu has already cleared 0x00496124.
         let mut skip = VideoSkipState {
             object_in_hand: e.vars.get("objetenmain") != 0,
             section_play: e.section_play,
+            bow_mode: e.bow_mode,
+            bar_request: e.bar.request,
+            keep_running: !e.escape_request,
+            menu_request: e.escape_request,
             ..VideoSkipState::default()
         };
         if let Some((pcm, apc)) = voice {
@@ -947,6 +980,8 @@ impl Dialogs {
                 e.sys.frame().await;
             }
         }
+        e.bar.request = skip.bar_request;
+        e.escape_request = false;
         // @ 0x00426bc2: the screen is cleared to black.
         e.sys.screen.borrow_mut().fill(0);
         e.sys.frame().await;
@@ -1007,6 +1042,12 @@ struct LinePlayer {
     /// The lip-sync ended before the voice started: `FUN_0042ee88` leaves
     /// its loop before drawing (0x0042f47b..0x0042f48c -> 0x0042f6e3).
     head_cut: bool,
+    /// The composite is UBB frame 0 of a talking head's loop, which
+    /// `FUN_0042ee88` builds and does not present (0x0042f5e8..0x0042f5f5:
+    /// the presenter FUN_0041afd0 is skipped at frame index 0 in a line
+    /// with lip-sync, the only kind its loop plays): the screen keeps the
+    /// frame before it, the line's first frame shows frame 1.
+    hidden: bool,
     /// The kept screen had an HD layer, which still stands for it.
     kept_hd: bool,
     /// The HD picture of the line (the port's HD mode).
@@ -1235,7 +1276,8 @@ impl LinePlayer {
                 };
                 composite_spf_frame(spf, k, &mut self.composite, w, h);
             }
-            if let Some(tile) = hd_now {
+            self.hidden = self.talking_head && frame_index == 0;
+            if let (Some(tile), false) = (hd_now, self.hidden) {
                 self.draw_hd(e, tile, frame_index as i32, ended_before, head_t);
             }
             // The given object (0x0049619c): its OBJETS1.SPR icon, drawn by
@@ -1253,6 +1295,9 @@ impl LinePlayer {
             self.shown += 1;
         }
 
+        if self.hidden && self.ubb.is_some() {
+            return;
+        }
         let mut screen = e.sys.screen.borrow_mut();
         if let Some(ubb) = &self.ubb {
             let (w, h) = (ubb.width(), ubb.height());

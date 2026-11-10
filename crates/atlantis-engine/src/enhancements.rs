@@ -37,13 +37,6 @@ pub enum BugFix {
     /// the locked surface, which the back-buffer copy then overwrites
     /// (`FUN_0042ee88` @ 0x0042f57e), so it is never seen.
     HeadOverlay,
-    /// Frame 0 of a talking head's animation is drawn with frame 1's pose.
-    /// Off, as the original, the first key of each track, a rest pose in
-    /// some `*A.3DA` files (Meljanz, Actyon, Servage, the Queen, Gimbas):
-    /// the 3D lower face is drawn up to 35 pixels away from the video's
-    /// face on the first frame of each loop
-    /// ([`crate::head::DialogHead::set_rest_key_fix`]).
-    HeadFirstFrame,
     /// The inventory bar's slide-out draws no icon once the slots are at
     /// y 506. Off, as the original (`FUN_0042c59c` @ 0x0042c643 reads the
     /// y of a record from 9 on past the 9-entry slot table), a scrolled
@@ -152,11 +145,10 @@ pub enum BugFix {
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 18] = [
+    pub const ALL: [BugFix; 17] = [
         BugFix::MusicLoop,
         BugFix::CinemaSound,
         BugFix::HeadOverlay,
-        BugFix::HeadFirstFrame,
         BugFix::BarSlideOut,
         BugFix::PickupIcon,
         BugFix::MenuRecords,
@@ -179,7 +171,6 @@ impl BugFix {
             BugFix::MusicLoop => "fix_music_loop",
             BugFix::CinemaSound => "fix_cinema_sound",
             BugFix::HeadOverlay => "fix_head_overlay",
-            BugFix::HeadFirstFrame => "fix_head_first_frame",
             BugFix::BarSlideOut => "fix_bar_slide_out",
             BugFix::PickupIcon => "fix_pickup_icon",
             BugFix::MenuRecords => "fix_menu_records",

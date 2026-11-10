@@ -360,9 +360,6 @@ change an entry; Escape, F10 or O close it. Its entries:
   - **Faces: the guards' coif, the pilot's scarf**: the original draws
     the overlay of these talking heads where the next copy of the
     picture erases it, so it is never seen.
-  - **Faces: the lower face's first frame**: on the first frame of each
-    loop of some talking heads (Meljanz, Actyon, Servage, the Queen,
-    Gimbas) the original draws the 3D lower face away from the face.
   - **Inventory: icons left as the bar hides**: with the inventory bar
     scrolled, the original leaves rows of icons at the bottom of the
     screen as the bar slides away.
@@ -844,7 +841,7 @@ The same folder holds `settings.ini`: the options of the game's menus
 127, 110, 110 and 110 at first as in the original, which also keeps
 them in each checkpoint and sets them again when one is loaded) and the [enhancements](TECHNICAL.md#enhancements), one `name = on|off` line
 each: one per bug fix (`fix_music_loop`, `fix_cinema_sound`, `fix_head_overlay`,
-`fix_head_first_frame`, `fix_bar_slide_out`, `fix_pickup_icon`,
+`fix_bar_slide_out`, `fix_pickup_icon`,
 `fix_menu_records`, `fix_fifth_player`, `fix_snakes_first_win`,
 `fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
 `fix_disc_revision`, `fix_menu_line_width`, `fix_chinese_rows`,
@@ -907,8 +904,7 @@ not kept, erase saves you no longer need.
 - The [enhancements](TECHNICAL.md#enhancements) on by default: the music loops
   seamlessly; a cinematic that follows another whose sound still plays
   has its own sound (the original plays it silent); the SPF overlays of some talking heads are drawn over the
-  head; the 3D mouth of some talking heads no longer jumps on the first
-  frame of each loop of the video; on the German CD, the `ß` that the
+  head; on the German CD, the `ß` that the
   LOAD list's fonts lack is drawn as "ss" (the original leaves a gap);
   on the Dutch CD, the credits text and the player-name fonts are disc
   1's whatever the disc (the original shows disc 2's older revision while

@@ -229,6 +229,13 @@ pub struct Engine {
     pub abort: Option<Abort>,
     /// A CON section plays from a click (0x00496170).
     pub section_play: bool,
+    /// An Escape that `FUN_0041a298` saw in a loop that does not end on it
+    /// (the turn before a move's video, the subject menu) left 0x00496124
+    /// = 0 and the menu request 0x00496138 = 1 (@ 0x0041a419..0x0041a423):
+    /// the next loop that runs only while 0x00496124 is 1 (a video, a
+    /// voice-only line, the game-over wait) stops at once and puts both
+    /// back; the end of a conversation puts them back too (0x00425be5).
+    pub escape_request: bool,
     /// A script Vue= named a place the WAM does not have: the variable VUE
     /// reads it until the next place change.
     pub vue_override: Option<i32>,
@@ -419,6 +426,7 @@ impl Engine {
             music,
             abort: None,
             section_play: false,
+            escape_request: false,
             vue_override: None,
             inventory: Vec::new(),
             bar_first: 0,
@@ -583,10 +591,10 @@ impl Engine {
         self.enhancements().fix(BugFix::HeadOverlay)
     }
 
-    /// Frame 0 of a talking head's animation drawn with frame 1's pose
-    /// ([`BugFix::HeadFirstFrame`]).
-    pub fn head_rest_key_fix(&self) -> bool {
-        self.enhancements().fix(BugFix::HeadFirstFrame)
+    /// A cinematic's own sound starts over the sound of the cinematic
+    /// before it ([`BugFix::CinemaSound`]).
+    pub fn cinema_sound_fix(&self) -> bool {
+        self.enhancements().fix(BugFix::CinemaSound)
     }
 
     /// Each menu with its own click records ([`BugFix::MenuRecords`]).
