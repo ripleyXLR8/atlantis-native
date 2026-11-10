@@ -20,3 +20,9 @@ crates/atlantis4-script/tests/table_order.rs, so that tables iterate in
 PUC-Rio Lua 5.1.4's order: see PATCHES below.
 
 PATCHES
+
+1. src/vm/table.rs, src/vm/execute.rs: `SETLIST` growing the array part
+   rebuilds the hash part as PUC-Rio's `luaH_resizearray` does (it calls
+   `resize`, which reinserts the hash nodes from last to first). rilua
+   only extended the array, so constructors whose last item is a call
+   (most nested layouts) iterated in another order.

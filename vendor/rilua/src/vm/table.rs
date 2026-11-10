@@ -293,10 +293,19 @@ impl Table {
     /// Matches PUC-Rio's `luaH_resizearray` for the SETLIST case: the
     /// array is pre-allocated to the exact number of entries being
     /// written, avoiding a rehash that would round up to a power of 2.
-    pub(crate) fn ensure_array_capacity(&mut self, min_size: usize) {
+    /// Like `luaH_resizearray` (`resize(L, t, nasize, sizenode(t))`), the
+    /// hash part is rebuilt at its current size, which reinserts its nodes
+    /// and so sets the order `next` walks them in.
+    pub(crate) fn ensure_array_capacity(
+        &mut self,
+        min_size: usize,
+        strings: &Arena<LuaString>,
+    ) -> LuaResult<()> {
         if min_size > self.array.len() {
-            self.array.resize(min_size, Val::Nil);
+            let hash_size = self.nodes.len();
+            return self.resize(min_size, hash_size, strings);
         }
+        Ok(())
     }
 
     /// Returns the number of hash nodes (including free slots).

@@ -2076,7 +2076,7 @@ pub fn execute(state: &mut LuaState) -> LuaResult<()> {
                     // up to a power of 2.
                     if let Some(table) = state.gc.tables.get_mut(table_ref) {
                         let mem_before = table.estimated_memory();
-                        table.ensure_array_capacity(last);
+                        table.ensure_array_capacity(last, &state.gc.string_arena)?;
                         let mem_after = table.estimated_memory();
                         if mem_after > mem_before {
                             state.gc.gc_state.total_bytes += mem_after - mem_before;
