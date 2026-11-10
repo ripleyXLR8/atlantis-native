@@ -4064,6 +4064,17 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   tests no turn or pending move (@ 0x00431648..0x00431671); the turn
   waits while the bag is open and goes on after. 0.6.0 ignored the button
   then.
+- WarpRes (`Atlantis3.cfg`, the options' texture size) chooses every
+  folder the original's path builders choose by it, testing 1024 exactly:
+  the cube `warp\Warp1024\` (@ 0x00415a30), the place animations
+  `spw\SPW1024\` (@ 0x004164c0), and `HNM800\` for the cinematics
+  (`hnm\` @ 0x00416880, `loc\hnm\` @ 0x00416c60), the dialogs' body
+  videos (`hnmdial\` @ 0x00417280) and the travel videos (`hnmtraj\`
+  @ 0x00417670), else `Warp512`, `SPW512`, `HNM640`
+  (`travel::warp_folder`, `spw_folder`, `hnm_folder`). GOG.com ships only
+  the latter, so with 1024 the port, like the original, shows the cube's
+  debug colours and finds no place animation, film or travel video;
+  0.6.0 switched only the transition sprites (`tests/warp_res.rs`).
 
 ## Tests
 

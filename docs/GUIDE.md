@@ -694,6 +694,12 @@ depth change applies when the menu is left, as in the original: the
 window takes the new size (in full screen the picture is scaled to the
 screen).
 
+The texture size 1024 makes the game look for its 1024-pixel panoramas
+and place animations and its 800-pixel videos, as the original does;
+GOG.com's release has none of them, so with it the panoramas show plain
+colours, the place animations, cinematics, dialog films and travel
+videos are missing, as in the original. Keep 512.
+
 The saves (`save/game<player>_<number>.sav` with their thumbnails, as the
 original names them) and `Atlantis3.cfg` (the options) are kept in the
 `atlantis3` folder of the per-user data folder (see
