@@ -4080,6 +4080,11 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   the desktop (`a2::utc_offset_now`), the browser's on the web, for the
   menu's saves and the scripts' quick saves (`SAVE=n`) alike, one writer
   for both. 0.6.0 wrote UTC, and `01/01/01 00:00:00` in a quick save.
+- `Atlantis3.cfg`'s `Time` counters grow as the original's writer
+  (@ 0x00408f80) makes them: the start page's player chooses the counter
+  (@ 0x00452000, counting the time so far to the previous one), and each
+  write adds the whole seconds played since the last. 0.6.0 wrote them
+  back unchanged.
 
 ## Tests
 

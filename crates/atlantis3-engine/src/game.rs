@@ -294,6 +294,11 @@ pub struct Game {
     saves_written: Vec<String>,
     /// The clock of the saves' `DateAndTime`, in seconds since 1970.
     pub unix_time: fn() -> i64,
+    /// `Atlantis3.cfg`'s play-time counter in use (@ 0x00789bf0: the
+    /// player slot chosen on the start page less one, −1 none until then)
+    /// and the clock's time it last counted from (@ 0x00789b58).
+    play_slot: Option<usize>,
+    play_mark: f64,
     /// The local time zone's offset from UTC at that time, in seconds:
     /// the saves are stamped in local time (`_strdate` / `_strtime`). The
     /// apps give the system's; 0 (UTC) by default.
@@ -483,6 +488,8 @@ impl Game {
             save_dir: None,
             saves_written: Vec::new(),
             unix_time: pages::system_unix_time,
+            play_slot: None,
+            play_mark: 0.0,
             utc_offset: || 0,
             quit: false,
             not_ported: Vec::new(),

@@ -318,7 +318,10 @@ impl Game {
                 Event::Command(c) => self.run_command(&String::from_utf8_lossy(&c)),
                 Event::WriteCfg => self.write_cfg(),
                 Event::Exists(..) => {}
-                Event::Player(n) => self.player = n,
+                Event::Player(n) => {
+                    self.player = n;
+                    self.play_time_slot(n);
+                }
                 Event::NewGame => {
                     self.page_left();
                     self.new_game();
@@ -496,9 +499,36 @@ impl Game {
         self.look_last = None;
     }
 
+    /// The play time since the last mark added to the counter in use,
+    /// in whole seconds (`__ftol` of the clock's difference; the second
+    /// read's difference, 0x00789d30, is 0), and the mark restarted
+    /// (@ 0x0040945f..0x00409505, @ 0x004520e3..0x0045218b).
+    fn play_time_count(&mut self) {
+        if let Some(k) = self.play_slot {
+            let t = &mut self.startup.config.time[k];
+            *t = t.wrapping_add((self.now - self.play_mark) as i32);
+        }
+        self.play_mark = self.now;
+    }
+
+    /// The start page's player `n` (1..5) chosen (@ 0x00452000): the time
+    /// played so far counted to the previous player's counter, then
+    /// counter `n` − 1 in use from now.
+    fn play_time_slot(&mut self, n: i32) {
+        self.play_time_count();
+        self.play_slot = usize::try_from(n - 1).ok().filter(|&k| k < 5);
+    }
+
+    /// `Atlantis3.cfg`'s text as its writer makes it (@ 0x00408f80): the
+    /// play time counted first.
+    pub(super) fn cfg_text(&mut self) -> Vec<u8> {
+        self.play_time_count();
+        self.startup.config.write(&self.startup.install_language)
+    }
+
     /// `Atlantis3.cfg` written (@ 0x00408f80) where the app asked.
     fn write_cfg(&mut self) {
-        let data = self.startup.config.write(&self.startup.install_language);
+        let data = self.cfg_text();
         if let Some(p) = &self.menus.cfg_path {
             if let Err(e) = std::fs::write(p, &data) {
                 log::warn!("{}: {e}", p.display());
@@ -553,6 +583,33 @@ mod tests {
     fn game() -> Option<Game> {
         let dir = atlantis3_data::testing::install_dir()?;
         Game::new(atlantis3_data::A3Files::open_dir(&dir).ok()?.0).ok()
+    }
+
+    /// `Atlantis3.cfg`'s `Time` counters (@ 0x00408f80, @ 0x00452000):
+    /// none counts before a player is chosen; then the chosen player's
+    /// grows by the whole seconds played at each write, and choosing
+    /// another player counts the time so far to the previous one.
+    #[test]
+    fn the_play_time_counters_grow_as_the_original() {
+        let Some(mut g) = game() else {
+            return;
+        };
+        g.startup.config.time = [0; 5];
+        g.now = 10.0;
+        g.cfg_text();
+        assert_eq!(g.startup.config.time, [0; 5]);
+        g.now = 20.0;
+        g.menu_events(vec![Event::Player(2)]);
+        g.now = 95.7;
+        let text = g.cfg_text();
+        assert_eq!(g.startup.config.time, [0, 75, 0, 0, 0]);
+        assert!(String::from_utf8_lossy(&text).contains("0 75 0 0 0"));
+        g.now = 100.2;
+        g.menu_events(vec![Event::Player(4)]);
+        assert_eq!(g.startup.config.time, [0, 79, 0, 0, 0]);
+        g.now = 130.0;
+        g.cfg_text();
+        assert_eq!(g.startup.config.time, [0, 79, 0, 29, 0]);
     }
 
     /// The saves' `DateAndTime` (@ 0x00459ee0, `_strdate` / `_strtime`):
