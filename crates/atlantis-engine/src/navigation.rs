@@ -196,6 +196,57 @@ impl Engine {
         }
     }
 
+    /// The zone (`FUN_00422bb0`) and the character (`FUN_00422d5c`) under
+    /// the pointer at the view as it stands.
+    pub(crate) fn pointer_targets(&mut self) -> (u32, u32) {
+        let (Some(vue), true) = (self.current_place_id, self.warp_loaded) else {
+            return (0, 0);
+        };
+        let Some(place) = self.current_place.and_then(|i| self.wam.places.get(i)) else {
+            return (0, 0);
+        };
+        let (px, py) = self
+            .warp
+            .screen_to_panorama(self.pointer.pos.0, self.pointer.pos.1);
+        let (px, py) = (i32::from(px as i16), i32::from(py as i16));
+        let perso = npc_hit_test(
+            &self.wam.npcs,
+            &self.npc_rects,
+            &self.sprite_list,
+            vue,
+            px,
+            py,
+        );
+        (u32::from(place.hit_test(px as i16, py as i16)), perso)
+    }
+
+    /// `FUN_0041afd0`'s cursor, for a still frame it presents outside the
+    /// warp loop (the voice-only line, `FUN_00430258` @ 0x00430550): with
+    /// 0x004960c0, GAMEOVER, bow mode, 0x00496188, the bar request, the
+    /// menu request, 0x00496154 and 0x0049616c all 0
+    /// (0x0041afe8..0x0041b050), one step of `FUN_00422fcc` over what is
+    /// under the pointer, the sprite to draw at the pointer.
+    pub(crate) fn still_frame_cursor(&mut self) -> Option<(usize, (i32, i32))> {
+        if self.bow_mode
+            || self.vars.get("gameover") != 0
+            || self.bar.request
+            || self.escape_request
+        {
+            return None;
+        }
+        let (zone, perso) = self.pointer_targets();
+        let input = WarpCursorInput {
+            zone,
+            id: perso,
+            held: self.vars.get("objetenmain").max(0) as u32,
+            hidden: false,
+            edge_scroll: false,
+            id_rule: self.game.exe.build.cursor_id_rule,
+        };
+        let sprite = warp_cursor_step(&mut self.cursor_state, &input).sprite;
+        usize::try_from(sprite).ok().map(|s| (s, self.pointer.pos))
+    }
+
     /// The warp loop `FUN_0041bfa0`: the view until a click. Returns the
     /// zone clicked (0 for none) or [`WARP_ABORT`].
     pub async fn handle_warp(&mut self, hooks: &mut dyn ScriptHooks) -> u32 {
@@ -235,8 +286,7 @@ impl Engine {
             // Each frame starts by clearing the double-click flag
             // (0x0041c04a).
             self.turn_double_click.flag = false;
-            self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
-                                      // This frame's relative motion (x right, y down).
+            // This frame's relative motion (x right, y down).
             let (motion_x, motion_y) = self.sys.take_mouse_relative();
             // A press edge (FUN_0042e624): a held button is no click.
             let mut clicked = fi.left_press;
@@ -250,44 +300,8 @@ impl Engine {
 
             // The zone and the character under the pointer: a character
             // takes priority over the zone underneath it.
-            action = 0;
-            let mut centre_perso = 0u32;
-            if let (Some(vue), true) = (self.current_place_id, self.warp_loaded) {
-                if let Some(place) = self.current_place.and_then(|i| self.wam.places.get(i)) {
-                    let (px, py) = self
-                        .warp
-                        .screen_to_panorama(self.pointer.pos.0, self.pointer.pos.1);
-                    let (px, py) = (i32::from(px as i16), i32::from(py as i16));
-                    centre_perso = npc_hit_test(
-                        &self.wam.npcs,
-                        &self.npc_rects,
-                        &self.sprite_list,
-                        vue,
-                        px,
-                        py,
-                    );
-                    action = u32::from(place.hit_test(px as i16, py as i16));
-                }
-            }
-
-            // The cursor (FUN_00422fcc): talk (NPC) > navigate (zone) >
-            // nothing; with an object in hand, its animation over the icon.
-            // Step 10 of FUN_0041bfa0 (0x0041c4b4) and its helper
-            // FUN_0041afd0 (0x0041b00e) skip it in bow mode (0x00496164):
-            // its animation state does not advance.
-            let now = self.sys.millis();
-            if !self.bow_mode && (self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms) {
-                self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
-                let input = WarpCursorInput {
-                    zone: action,
-                    id: centre_perso,
-                    held: self.vars.get("objetenmain").max(0) as u32,
-                    hidden: false,
-                    edge_scroll: false,
-                    id_rule,
-                };
-                self.cursor_shown = warp_cursor_step(&mut self.cursor_state, &input).sprite;
-            }
+            let (zone, centre_perso) = self.pointer_targets();
+            action = zone;
 
             // A click on a character or an object (FUN_004278a0): ids
             // 0x100..0x1ff are objects, from 0x200 the conversation; no move.
@@ -354,6 +368,37 @@ impl Engine {
             if self.should_abort() {
                 action = WARP_ABORT;
                 exit = true;
+            }
+            // The poll that read the click is the last call but two of the
+            // original's pass (0x0041c5f2); the bow step and FUN_00432178
+            // follow it, and the click ends the loop at the next loop head
+            // (0x0041c028..0x0041c041): no clock update, cursor step, timer
+            // scan, sprite step or drawing comes between the click and its
+            // handling. (The port's pass starts with that poll.)
+            if left_pressed && !exit {
+                self.poll_new_sound().await;
+                self.ambient_frame();
+                break;
+            }
+            self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
+
+            // The cursor (FUN_00422fcc): talk (NPC) > navigate (zone) >
+            // nothing; with an object in hand, its animation over the icon.
+            // Step 10 of FUN_0041bfa0 (0x0041c4b4) and its helper
+            // FUN_0041afd0 (0x0041b00e) skip it in bow mode (0x00496164):
+            // its animation state does not advance.
+            let now = self.sys.millis();
+            if !self.bow_mode && (self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms) {
+                self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
+                let input = WarpCursorInput {
+                    zone: action,
+                    id: centre_perso,
+                    held: self.vars.get("objetenmain").max(0) as u32,
+                    hidden: false,
+                    edge_scroll: false,
+                    id_rule,
+                };
+                self.cursor_shown = warp_cursor_step(&mut self.cursor_state, &input).sprite;
             }
 
             // A right click opens the inventory bar (FUN_0041a298 toggles
@@ -437,13 +482,15 @@ impl Engine {
             // The view: FUN_0041bfa0 steps 2..5. The stored angles first
             // take F5 / F6 (turn) and F8 / F7 (tilt) with the left button
             // up (FUN_0041a298 at the end of the previous frame); the port
-            // adds the arrow keys, which the original's view ignores, as
-            // the same keys: left F5, right F6, up F7, down F8 (a larger
-            // beta looks down).
+            // adds the arrow keys (Enhancements::arrow_keys), which the
+            // original's view ignores, as the same keys: left F5, right F6,
+            // up F7, down F8 (a larger beta looks down).
             let (mut alpha, mut beta) = (self.warp.alpha(), self.warp.beta());
             if !self.sys.buttons().0 {
-                let held =
-                    |f: u8, arrow: Key| self.sys.key_held(Key::F(f)) || self.sys.key_held(arrow);
+                let arrows = self.enhancements().arrow_keys;
+                let held = |f: u8, arrow: Key| {
+                    self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow))
+                };
                 if held(5, Key::Left) {
                     alpha = (f64::from(alpha) + VIEW_KEY_STEP) as f32;
                 }
@@ -810,5 +857,135 @@ mod tests {
             "the timers saw time1 = {} after Time1=0",
             seen[0]
         );
+    }
+
+    struct ClickPass {
+        timers: Rc<Cell<u32>>,
+        at_click: Rc<Cell<Option<u32>>>,
+    }
+
+    impl ScriptHooks for ClickPass {
+        fn warp_frame<'a>(&'a mut self, _e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.timers.set(self.timers.get() + 1);
+            ready(false)
+        }
+
+        fn zone_click<'a>(&'a mut self, _e: &'a mut Engine, _z: u32) -> HookFuture<'a, ()> {
+            if self.at_click.get().is_none() {
+                self.at_click.set(Some(self.timers.get()));
+            }
+            ready(())
+        }
+    }
+
+    /// The poll that reads a left click ends the original's pass (the bow
+    /// step and FUN_00432178 follow it) and the loop at its head
+    /// (0x0041c028): no timer scan (FUN_0042be3c @ 0x0041c369) runs
+    /// between the click and its handling.
+    #[test]
+    fn no_timer_pass_between_a_click_and_its_handling() {
+        let timers = Rc::new(Cell::new(0u32));
+        let at_click = Rc::new(Cell::new(None));
+        let pushed = Rc::new(Cell::new(None::<u32>));
+        let (t2, a2, t3, a3, p2) = (
+            timers.clone(),
+            at_click.clone(),
+            timers.clone(),
+            at_click.clone(),
+            pushed.clone(),
+        );
+        let mut locked_for = 0u64;
+        let ran = with_engine(
+            "no_timer_pass_between_a_click_and_its_handling",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                let mut hooks = ClickPass {
+                    timers: t2,
+                    at_click: a2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _f| {
+                if a3.get().is_some() {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                if p2.get().is_some() {
+                    locked_for += 1;
+                    if locked_for == 2 {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    return;
+                }
+                locked_for = if sys.mouse_locked() {
+                    locked_for + 1
+                } else {
+                    0
+                };
+                if locked_for == 10 {
+                    p2.set(Some(t3.get()));
+                    button(sys, MouseButton::Left, true);
+                    locked_for = 0;
+                }
+            },
+        );
+        if ran {
+            assert_eq!(at_click.get().unwrap() - pushed.get().unwrap(), 0);
+        }
+    }
+
+    /// The view's alpha after the warp loop of place 1, with the left
+    /// arrow held for 20 frames (`press`), under `x`.
+    fn alpha_after_left_arrow(x: crate::enhancements::Enhancements, press: bool) -> Option<f32> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let mut locked = 0u64;
+        let ran = with_engine(
+            "arrow_keys_turn_the_view_unless_original",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.set_enhancements(x);
+                e.next_place_id = Some(1);
+                let mut hooks = crate::hooks::NoScripts;
+                e.game_step(&mut hooks).await;
+                g2.set(Some(e.warp.alpha()));
+            },
+            move |sys, _| {
+                locked = if sys.mouse_locked() {
+                    locked + 1
+                } else {
+                    locked
+                };
+                if locked == 5 && press {
+                    sys.push_input(Input::KeyDown(Key::Left));
+                } else if locked == 25 {
+                    sys.push_input(Input::KeyUp(Key::Left));
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// The arrow keys turn the view as F5..F8 by default
+    /// (`Enhancements::arrow_keys`, a port convenience); with `--original`
+    /// they do not, as the original's poll reads F5..F8 only
+    /// (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba).
+    #[test]
+    fn arrow_keys_turn_the_view_unless_original() {
+        use crate::enhancements::Enhancements;
+        let Some(still) = alpha_after_left_arrow(Enhancements::default(), false) else {
+            return;
+        };
+        let turned = alpha_after_left_arrow(Enhancements::default(), true).unwrap();
+        let original = alpha_after_left_arrow(Enhancements::original(), true).unwrap();
+        let original_still = alpha_after_left_arrow(Enhancements::original(), false).unwrap();
+        assert_ne!(turned, still);
+        assert_eq!(original, original_still);
     }
 }

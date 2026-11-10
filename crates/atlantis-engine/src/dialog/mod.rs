@@ -597,6 +597,7 @@ impl Dialogs {
         let mut player = LinePlayer {
             talking_head,
             voice_off_step: l.voice_off && !talking_head,
+            still_cursor: None,
             kept_screen: l.keep_screen.then(|| e.sys.screen.borrow().clone()),
             kept_hd: l.keep_screen && e.sys.hd_shown(),
             hd: LineHd::default(),
@@ -668,6 +669,12 @@ impl Dialogs {
                 // start it at once.
                 if !(player.ubb.is_some() && talking_head) {
                     start_voice(e, &mut voice);
+                }
+                // FUN_00430258 presents its still frame through FUN_0041afd0,
+                // which steps the warp cursor over what is under the pointer
+                // and draws it (off0 / off1 present without it).
+                if l.voice_off && !talking_head {
+                    player.still_cursor = e.still_frame_cursor();
                 }
                 loop {
                     if e.should_abort() {
@@ -1018,6 +1025,9 @@ pub fn off1_screen(ix_buffers: &[u16]) -> Vec<u16> {
 struct LinePlayer {
     talking_head: bool,
     voice_off_step: bool,
+    /// The cursor `FUN_00430258`'s one present (FUN_0041afd0 @ 0x00430550)
+    /// leaves on its still frame: a CURSEURS.SPR sprite and where.
+    still_cursor: Option<(usize, (i32, i32))>,
     /// off0: the screen as it stood, the subtitle's background; off1: the
     /// screen buffer, once the voice has loaded.
     kept_screen: Option<Vec<u16>>,
@@ -1340,6 +1350,12 @@ impl LinePlayer {
         }
         let under = (e.sys.hd_tile().is_some() && !sub_lines.is_empty()).then(|| bg.clone());
         font.draw_subtitles(&mut bg, SCREEN_W, SCREEN_H, sub_lines, 0);
+        if let Some(spr) = self
+            .still_cursor
+            .and_then(|(i, p)| e.cursor_sprites.get(i).map(|s| (s, p)))
+        {
+            spr.0.draw(&mut bg, SCREEN_W, SCREEN_H, spr.1 .0, spr.1 .1);
+        }
         if let Some(under) = under {
             record_subtitles(e, font, &under, &bg, sub_lines, 0, 0);
         }
@@ -1915,5 +1931,99 @@ mod japanese_tests {
         let (n, most) = played(2, false, "CHAPI001.CON", &en);
         assert_eq!(n, 0);
         assert!(most[0] < 15, "{most:?}");
+    }
+}
+
+#[cfg(test)]
+mod still_cursor_tests {
+    use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
+
+    use super::*;
+    use crate::con_script::ConItem;
+    use crate::scripts::{resolve_speaker_perso, DialogPresenter, LineRequest, Scripts};
+    use crate::test_support::{button, with_engine};
+
+    /// The screen of the voice-only line CHAPI001 /2 A (`[Seth,off]`,
+    /// `FUN_00430258`) with the pointer over a navigation zone of place 1;
+    /// `bar` the bar request at the start.
+    fn off_line_screen(bar: bool) -> Option<Vec<u16>> {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let armed = Rc::new(Cell::new(0u32));
+        let a2 = armed.clone();
+        let shot = Rc::new(RefCell::new(None));
+        let s2 = shot.clone();
+        let ran = with_engine(
+            "voice_only_still_frame_carries_the_cursor",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let at = (0..48)
+                    .flat_map(|j| (0..64).map(move |i| (i * 10, j * 10)))
+                    .find(|&p| {
+                        e.pointer.pos = p;
+                        (1..0x200).contains(&e.pointer_targets().0)
+                    })
+                    .expect("a navigation zone in place 1");
+                e.pointer.pos = at;
+                e.bar.request = bar;
+                e.load_cursor_sprites().await;
+                let sec = s.script.sections().iter().find(|x| x.id == 2).cloned();
+                let line = sec
+                    .and_then(|x| {
+                        x.items.into_iter().find_map(|i| match i {
+                            ConItem::Line(l) => Some(l),
+                            _ => None,
+                        })
+                    })
+                    .expect("CHAPI001 /2");
+                let req = LineRequest {
+                    section: 2,
+                    letter: 'A',
+                    perso: resolve_speaker_perso(&line.speaker),
+                    line,
+                    interactive: false,
+                    inc_perso: 0,
+                };
+                a2.set(1);
+                let mut d = Dialogs::new();
+                d.play_line(&mut e, &req).await;
+                *g2.borrow_mut() = Some(());
+            },
+            move |sys, _| {
+                let n = armed.get();
+                if n > 0 {
+                    armed.set(n + 1);
+                    if n == 10 {
+                        *s2.borrow_mut() = Some(sys.screen.borrow().clone());
+                        button(sys, crate::sys::MouseButton::Left, true);
+                    } else if n == 11 {
+                        button(sys, crate::sys::MouseButton::Left, false);
+                    }
+                }
+            },
+        );
+        if !ran {
+            return None;
+        }
+        assert!(got.borrow().is_some());
+        shot.take()
+    }
+
+    /// `FUN_00430258` presents its still frame once through `FUN_0041afd0`
+    /// (@ 0x00430550), which draws the warp cursor over what is under the
+    /// pointer (here a navigation zone) unless the bar request (or another
+    /// of its flags) is set.
+    #[test]
+    fn voice_only_still_frame_carries_the_cursor() {
+        let Some(with) = off_line_screen(false) else {
+            return;
+        };
+        let without = off_line_screen(true).unwrap();
+        assert_ne!(with, without);
     }
 }

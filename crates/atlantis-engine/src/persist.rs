@@ -311,6 +311,7 @@ impl Settings {
                 ("minor_bug_fixes", Some(b), _) => all_fixes = Some(b),
                 ("restored_content", Some(b), _) => s.enhancements.restored_content = b,
                 ("ui_ux", Some(b), _) => s.enhancements.ui_ux = b,
+                ("arrow_keys", Some(b), _) => s.enhancements.arrow_keys = b,
                 ("hd_sharpen", Some(b), _) => s.hd.sharpen = b,
                 ("hd_sharp_subtitles", Some(b), _) => s.hd.sharp_subtitles = b,
                 ("hd_widescreen", Some(b), _) => s.hd.widescreen = b,
@@ -342,9 +343,9 @@ impl Settings {
              volume_voices = {}\n\
              # Enhancements: where the port may differ from the original game\n\
              # Bug fixes (off: as the original; options menu, F10, \"Choose the\n\
-             # bug fixes...\"): the music loops seamlessly; the talking heads'\n\
-             # overlay (the guards' coif, the pilot's scarf); the lower face's\n\
-             # first frame; no icons left as the inventory bar slides out; a\n\
+             # bug fixes...\"): the music loops seamlessly; the second\n\
+             # cinematic's sound; the talking heads' overlay (the guards' coif,\n\
+             # the pilot's scarf); no icons left as the inventory bar slides out; a\n\
              # picked-up object's icon in its slot; each menu its own click\n\
              # areas; OK on the fifth player; the snakes puzzle's false first\n\
              # win; and those of some builds: the hexagon puzzle's pieces (1997\n\
@@ -356,6 +357,8 @@ impl Settings {
              # Content the original never shows, interface changes\n\
              restored_content = {}\n\
              ui_ux = {}\n\
+             # The arrow keys turn the view (off: F5..F8 only, as the original)\n\
+             arrow_keys = {}\n\
              # The music tracks LoadMusik copied (hexadecimal bit set)\n\
              music_on_disk = {:x}\n\
              # The port's graphics (options menu, F10): original or hd\n\
@@ -386,6 +389,7 @@ impl Settings {
                 .join("\n"),
             b(self.enhancements.restored_content),
             b(self.enhancements.ui_ux),
+            b(self.enhancements.arrow_keys),
             self.music_on_disk,
             self.graphics.name(),
             self.hd.panorama.name(),

@@ -454,7 +454,8 @@ impl Engine {
             return;
         }
         if right {
-            self.bar.right_pressed(self.section_play, self.escape_request);
+            self.bar
+                .right_pressed(self.section_play, self.escape_request);
         }
         if escape && self.escape_gate_open() {
             self.escape_request = true;

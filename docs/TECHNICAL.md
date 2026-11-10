@@ -52,6 +52,11 @@ frame only, and after the subject menu (whose guests are then no longer
 drawn) the next voice-only line, narration or video stops at once; the
 game-over narration's Escape is gated by the bar request and bow mode as
 every other; the place sprites go on moving under the subject menu.
+A click in the view ends the warp loop as the original's next loop head
+does: no clock update, cursor step, timer scan or sprite step comes
+between the click and its handling. The still frame of a voice-only line
+(`[Seth,off]`) carries the warp cursor over what is under the pointer,
+as the original's one present of it does (`Engine::still_frame_cursor`).
 
 The 3D talking heads are in `crates/atlantis-engine/src/head/`: the dialog
 video leaves the speaker's mouth empty, and the line player draws a
@@ -106,6 +111,7 @@ with three groups, those of the ScummVM port:
 | `fixes` (`BugFixes`) | all on | the fixes of minor bugs of the original, each its own switch (`BugFix`, below) |
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and May 1997 English and French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
+| `arrow_keys` | on | the arrow keys turn the view as F5 to F8 do in the warp loop (the original's input poll reads F5 to F8 only); off with `--original` |
 
 The bug fixes, each with its `settings.ini` key; the last seven fix a
 bug of some games only (`BugFix::applies`: the build's tables, and for

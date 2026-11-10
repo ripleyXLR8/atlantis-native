@@ -1206,6 +1206,7 @@ mod tests {
         fixes: BugFixes::ALL,
         restored_content: false,
         ui_ux: false,
+        arrow_keys: true,
     };
     const HD_OPTS: HdOptions = HdOptions {
         panorama: PanoFilter::Bicubic,

@@ -460,6 +460,10 @@ pub struct Enhancements {
     ///   (`FUN_0042ee88` @ 0x0042f036) is not shown; the line is skipped
     ///   either way.
     pub ui_ux: bool,
+    /// The arrow keys turn the view as F5..F8 do (default on, a port
+    /// convenience as Atlantis II's); off, as the original, whose input
+    /// poll (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba) reads F5..F8 only.
+    pub arrow_keys: bool,
 }
 
 impl Default for Enhancements {
@@ -468,6 +472,7 @@ impl Default for Enhancements {
             fixes: BugFixes::ALL,
             restored_content: false,
             ui_ux: false,
+            arrow_keys: true,
         }
     }
 }
@@ -479,6 +484,7 @@ impl Enhancements {
             fixes: BugFixes::NONE,
             restored_content: false,
             ui_ux: false,
+            arrow_keys: false,
         }
     }
 
@@ -534,6 +540,7 @@ impl Enhancements {
             after.restored_content,
         );
         x.ui_ux = pick(self.ui_ux, before.ui_ux, after.ui_ux);
+        x.arrow_keys = pick(self.arrow_keys, before.arrow_keys, after.arrow_keys);
         x
     }
 }
