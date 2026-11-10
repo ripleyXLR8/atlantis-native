@@ -676,7 +676,7 @@ Native with Shift held or with `--launcher`).
 | Mouse | turns the view; in the menus, the inventory and the puzzle screens, moves the game's pointer |
 | Left click | goes, takes, uses, talks; the next dialog line; in the menus, chooses |
 | Right click | opens or closes the inventory; closes the subject menu |
-| Escape | the game's menu in the view (save, load, volumes, options, quit; its Back button returns to the game); skips a cinematic, ends a travel video, leaves the puzzle screens that the original lets it leave (the tower's map, the unicorn, the game boy, the jewel case, the skull); on the credits, quits |
+| Escape | the game's menu in the view (save, load, volumes, options, quit; its Back button returns to the game); skips a cinematic, ends a travel video, leaves the puzzle screens that the original lets it leave (the tower's map, the unicorn, the game boy, the jewel case, the skull); on the credits, quits. Like every key (Alt+Enter too), not while a puzzle's animation holds the controls (a throw of the spinning top or of a stone, a corridor door, the fisherman's scale, the demon's turn in the tower), as in the original |
 | Space | skips a cinematic |
 | Alt+Enter or F11 | full screen on and off (kept in `Atlantis3.cfg`, as the original keeps it) |
 | F12 | a screenshot of the game's picture (desktop only) |

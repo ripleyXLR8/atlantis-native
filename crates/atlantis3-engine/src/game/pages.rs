@@ -194,6 +194,14 @@ impl Game {
     /// the game boy, the jewel case and the skull stop
     /// ([`Game::escape_screen`]).
     pub fn escape(&mut self) {
+        // The keyboard callback handles no key while a puzzle freezes the
+        // input (@ 0x0042ab20: the byte 0x00789d56 set → `ret`): no aim
+        // stored, no Escape handler, so no menu opens during the spinning
+        // top, a corridor door, the merchant's stone or capture, the
+        // tiger's stone, the fisherman's scale or the tower's demon turn.
+        if self.keys_frozen() {
+            return;
+        }
         // The keyboard callback stores the camera's angles at every Escape
         // press, whatever the mode (@ 0x0042ac35: 0x004408e0 into
         // 0x0077e648 / 0x0078111c), then runs the Escape handler.
@@ -252,6 +260,13 @@ impl Game {
         if self.mode == Mode::Menu {
             self.menus.release();
         }
+    }
+
+    /// Whether the keyboard callback ignores every key (@ 0x0042ab20:
+    /// the input freeze byte 0x00789d56, set by a puzzle's animation):
+    /// Escape ([`Game::escape`]) and Alt+Enter do nothing then.
+    pub fn keys_frozen(&self) -> bool {
+        self.puzzles.freeze
     }
 
     /// A menu frame (loop mode 6, @ 0x004591a0): the menus' frame on the

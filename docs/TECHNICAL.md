@@ -4029,6 +4029,17 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   again by every WAM load (@ 0x00409d80), and no pointer (its start
   resets the cursor); 0.6.0 showed the panorama with a pointer
   (`tests/board_remote.rs`).
+- No key works while a puzzle freezes the input: the keyboard callback
+  (@ 0x0042ab20) returns at once while the byte 0x00789d56 is set
+  (`Game::keys_frozen`), so Escape and Alt+Enter do nothing during the
+  spinning top's throw, a corridor door, the merchant's stone and
+  captures, the tiger's stone, the fisherman's scale and the tower's
+  demon turn (the unicorn's start sets and clears it within the start).
+  In 0.6.0 Escape opened the menu there, and a load or a new game from
+  it left the freeze set, every click ignored. The original's load
+  (@ 0x00459e70) and new game do not clear the byte or the camera lock
+  (0x0077b8ac), and the port does not either: with the menu closed to a
+  frozen game, neither is reached (`tests/escape_freeze.rs`).
 
 ## Tests
 
