@@ -552,16 +552,12 @@ impl Scripts {
                     e.vars.set(key, value);
                     e.poll_new_sound().await;
                 }
-                // StopSound: the NewSound sample stops, whatever N.
+                // StopSound: the NewSound sample stops, whatever N but 0.
                 // FUN_0042b290 also clears the poller's playing flag
                 // 0x00772912 (@ 0x0042b2d8) but not the last value
                 // 0x006cd87c, so the next non-zero NewSound starts, the same
                 // value included.
-                "stopsound" => {
-                    e.vars.set("newsound", 0);
-                    e.music.stop_new_sound();
-                    e.music.new_sound_playing = false;
-                }
+                "stopsound" => e.stop_sound_command(),
                 // ArcMagique=N: the magic-bow animation (@ 0x0042aa09), then
                 // the store.
                 "arcmagique" => {

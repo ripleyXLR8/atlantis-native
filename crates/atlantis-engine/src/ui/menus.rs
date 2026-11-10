@@ -607,10 +607,8 @@ impl Engine {
         }
         self.wait_buttons_up().await;
         if commit {
-            for t in 0..4 {
-                self.settings.volumes[t] = menu_volume_from_knob(self.son_knob_x[t]);
-            }
-            self.apply_volumes();
+            let volumes = self.son_knob_x.map(menu_volume_from_knob);
+            self.commit_sound_volumes(volumes);
             self.save_settings();
         }
     }
@@ -896,6 +894,9 @@ impl Engine {
             skip.menu_request = i.menu_request;
         }
         if self.music.handle_set && self.music.open_track != 22 {
+            // The branch stops the NewSound sample (FUN_0042b290 @
+            // 0x0041a863, after the ambient stop), then fades the music out.
+            self.stop_sound_command();
             // The same branch clears the input flags (0x0041a8b1..0x0041a8e3).
             skip.bar_request = false;
             skip.menu_request = false;

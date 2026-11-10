@@ -131,11 +131,22 @@ impl Engine {
     /// ambient sounds and NewSound, the voices' volume.
     pub(crate) fn apply_volumes(&mut self) {
         let v = self.settings.volumes;
-        let scale = |x: u8| (u32::from(x.min(127)) * 255 / 127) as u8;
+        let scale = crate::persist::mixer_volume;
         self.sys.mixer.set_master(scale(v[0]));
         self.music.with_fade(|f| f.vol = v[1]);
         self.ambient.effects_volume = v[2];
         self.voice_volume = scale(v[3]);
+    }
+
+    /// The sound menu's OK (`FUN_0041d5f4` @ 0x0041d7e2..0x0041d8af): the
+    /// four volumes applied, and the music volume also stored in 0x006ce124
+    /// (@ 0x0041d83d), the level the next fade up climbs to, so leaving the
+    /// in-game menu raises the music to the new volume.
+    pub(crate) fn commit_sound_volumes(&mut self, volumes: [u8; 4]) {
+        self.settings.volumes = volumes;
+        self.apply_volumes();
+        self.music
+            .with_fade(|f| f.up_target = i32::from(volumes[1]));
     }
 
     /// `FUN_0042d6b8`, from the chapter change `FUN_00427634` (0x0042765f):

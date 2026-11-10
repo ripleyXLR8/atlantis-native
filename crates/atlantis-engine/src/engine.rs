@@ -391,8 +391,8 @@ impl Engine {
         let clock_epoch = Rc::new(Cell::new(sys.millis()));
         // FUN_004320bc draws from timeGetTime - 0x00bcb5b8 (FUN_00451d0c).
         ambient.set_clock(spinning_clock(clock_sys, clock_epoch.clone()));
-        // The effects volume 0x00495e73 at full scale.
-        ambient.effects_volume = 127;
+        // The effects volume 0x00495e73 as at start-up.
+        ambient.effects_volume = crate::persist::DEFAULT_VOLUMES[2];
         let ambient_out = MixerAmbientOutput::new(sys.mixer.clone());
         let music = Music::new(&sys);
         let menu_records = crate::ui::layout::MenuRecordTable::new(usize::from(
@@ -438,7 +438,7 @@ impl Engine {
             menu_records,
             cinema_captions: None,
             channel_test_voice: None,
-            voice_volume: 255,
+            voice_volume: crate::persist::mixer_volume(crate::persist::DEFAULT_VOLUMES[3]),
             players: Players::new(b"#New Player"),
             player: 0,
             saves: Rc::new(MemStore::new()),

@@ -15,6 +15,7 @@ use atlantis_data::sprite_list::{npc_click_rects, npc_row_matches};
 use atlantis_data::wam::{CentrePos, Transition};
 
 use crate::engine::{Engine, Event};
+use crate::enhancements::BugFix;
 use crate::music::apc_pcm;
 use crate::sys::{Input, MouseButton};
 use crate::turn::{transition_turn, TURN_END_FOV_DEG};
@@ -477,21 +478,23 @@ impl Engine {
         }
         // The same-name sound of a cinematic or a start-up video (e.g.
         // WAV\CINEM020.APC for CINEM020.HNM): the Cinema= handler names
-        // 0x007728c7 "cinem" + N + ".apc" and sets NEWSOUND = 1
-        // (FUN_0042a100 @ 0x0042a7c0..0x0042a881, poller FUN_00432a64). A
-        // move's video (FUN_00423ad8) opens no sound: the transition-named
-        // APCs are NewSound entries that the departure sections play.
+        // 0x007728c7 "cinem" + N + ".apc", sets 0x00496190 = 1 and NEWSOUND
+        // = 1 and runs the poller FUN_00432a64 (FUN_0042a100 @
+        // 0x0042a7c0..0x0042a8e6), which takes that name. So, as any
+        // NewSound: another value playing is stopped; a missing file stops
+        // nothing more and clears NEWSOUND; and a cinematic's sound still
+        // playing (value 1 again) is left to end, the new one not started
+        // (its end, seen by a later poll, clears NEWSOUND), unless
+        // BugFix::CinemaSound starts the new one. A move's video
+        // (FUN_00423ad8) opens no sound: the transition-named APCs are
+        // NewSound entries that the departure sections play.
         if places.is_none() {
             let apc = format!("WAV\\{}", with_ext(&name, "APC"));
-            if self.game.big.contains(&apc) {
-                if let Some(pcm) = self.read(&apc).await.and_then(|d| apc_pcm(&d)) {
-                    self.music.start_new_sound(pcm);
-                    self.music.new_sound_last = 1;
-                    self.music.new_sound_playing = true;
-                    self.vars.set("newsound", 1);
-                    self.emit(Event::NewSound(1, apc));
-                }
+            if self.enhancements().fix(BugFix::CinemaSound) && self.music.new_sound_last == 1 {
+                self.music.new_sound_playing = false;
             }
+            self.vars.set("newsound", 1);
+            self.poll_new_sound_named(Some(apc)).await;
         }
 
         let start = self.sys.millis();
@@ -602,6 +605,10 @@ impl Engine {
                         // FUN_00432758.
                         if !first {
                             self.ambient_video_frame();
+                            // The NewSound poller after the decode
+                            // (0x0041bdcb): a sound that ends during the
+                            // film clears NEWSOUND then.
+                            self.poll_new_sound().await;
                         }
                         first = false;
                         spf_frame += 1;
@@ -873,6 +880,12 @@ impl Engine {
     /// `FUN_00432a64`, the NewSound poller. The loop flag 0x00496194 is 0
     /// in the image and never written, so a sound plays once.
     pub async fn poll_new_sound(&mut self) {
+        self.poll_new_sound_named(None).await;
+    }
+
+    /// The poller; `cinema` is the cinematic's sound the Cinema= handler
+    /// names while 0x00496190 is 1 (in place of the table's entry).
+    async fn poll_new_sound_named(&mut self, cinema: Option<String>) {
         let value = self.vars.get("newsound");
         if value == 0 {
             return; // 1: nothing is stopped
@@ -892,11 +905,16 @@ impl Engine {
             }
             return;
         }
-        // 5: wav\ + entry `value` of the table at 0x00496224.
-        let Some(name) = usize::try_from(value)
-            .ok()
-            .and_then(|v| self.game.exe.newsound_names.get(v))
-            .cloned()
+        // 5: wav\ + entry `value` of the table at 0x00496224, or the
+        // cinematic's name.
+        let Some(name) = cinema
+            .map(|c| c.trim_start_matches("WAV\\").to_string())
+            .or_else(|| {
+                usize::try_from(value)
+                    .ok()
+                    .and_then(|v| self.game.exe.newsound_names.get(v))
+                    .cloned()
+            })
         else {
             log::warn!("newsound={value} out of the table");
             self.vars.set("newsound", 0);
@@ -914,7 +932,7 @@ impl Engine {
             self.vars.set("newsound", 0);
             return;
         };
-        self.music.start_new_sound(pcm);
+        self.music.start_new_sound(pcm, self.effects_volume());
         self.music.new_sound_playing = true;
         self.music.new_sound_last = value;
         self.emit(Event::NewSound(value, name));

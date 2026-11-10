@@ -35,7 +35,7 @@ use crate::con_script::script::latin1_bytes;
 use crate::engine::{Engine, Event};
 use crate::head::{head_paths, texture_paths, DialogHead};
 use crate::hooks::HookFuture;
-use crate::music::apc_pcm;
+use crate::music::voice_pcm;
 use crate::scripts::{DialogPresenter, GameOverRequest, LineOutcome, LineRequest};
 use crate::subtitles::{
     player_font, system_font, BitmapBreaker, BitmapFont, FontFace, SubtitleFont, Subtitler,
@@ -644,7 +644,7 @@ impl Dialogs {
         }
         let apc = format!("WAV\\ATA{:04}{}.APC", l.section, l.letter);
         let pcm = if e.game.big.contains(&apc) {
-            e.read(&apc).await.and_then(|d| apc_pcm(&d))
+            e.read(&apc).await.and_then(|d| voice_pcm(&d))
         } else {
             None
         };
@@ -837,7 +837,7 @@ impl Dialogs {
             Some((_, letter)) => {
                 let apc = format!("WAV\\{}", game_over_voice_name(req.section, *letter));
                 let pcm = if e.game.big.contains(&apc) {
-                    e.read(&apc).await.and_then(|d| apc_pcm(&d))
+                    e.read(&apc).await.and_then(|d| voice_pcm(&d))
                 } else {
                     None
                 };
@@ -1396,13 +1396,13 @@ mod off1_tests {
         for v in [0u32, 22050, 0, 0, 0] {
             apc.extend(v.to_le_bytes());
         }
-        assert!(apc_pcm(&apc).is_some());
+        assert!(voice_pcm(&apc).is_some());
         let mut magic = apc.clone();
         magic[7] = b'X';
-        assert!(apc_pcm(&magic).is_none());
+        assert!(voice_pcm(&magic).is_none());
         let mut version = apc.clone();
         version[11] = b'1';
-        assert!(apc_pcm(&version).is_none());
+        assert!(voice_pcm(&version).is_none());
     }
 
     struct Seen {

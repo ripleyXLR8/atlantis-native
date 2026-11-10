@@ -553,6 +553,7 @@ impl BugFix {
     pub fn label(self) -> &'static str {
         match self {
             BugFix::MusicLoop => "Music: seamless loops",
+            BugFix::CinemaSound => "Cinematics: the sound of the second",
             BugFix::HeadOverlay => "Faces: the guards' coif, the pilot's scarf",
             BugFix::HeadFirstFrame => "Faces: the lower face's first frame",
             BugFix::BarSlideOut => "Inventory: icons left as the bar hides",
@@ -580,6 +581,11 @@ impl BugFix {
                 "The original streams the music through a ring that",
                 "its refills do not always keep ahead of: stale",
                 "fragments of sound are heard in the music.",
+            ],
+            BugFix::CinemaSound => &[
+                "When a cinematic's sound outlasts its film and",
+                "another cinematic follows, the original leaves the",
+                "first sound to end and plays the second film silent.",
             ],
             BugFix::HeadOverlay => &[
                 "The original draws the overlay of some talking heads",

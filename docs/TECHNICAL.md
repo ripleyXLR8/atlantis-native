@@ -34,6 +34,16 @@ composited over the panorama, the voices, the subtitles
 (`subtitles.rs`), the subject menu, the error box of a head that cannot be
 opened and the game-over screen.
 
+The sounds follow the original's few samples (`music.rs`, `place.rs`): the
+voices play on its one voice sample, at the 22050 Hz it is set to at
+start-up whatever a file's header says (ten silent lines say 44100 Hz and
+so last twice as long); NewSound and a cinematic's own sound go through
+its NewSound poller (also run at every frame of a video), at the effects
+volume, so a cinematic whose sound does not open stops the NewSound that
+plays; a music track starts at volume 0 and fades up; the sound menu's OK
+also sets the level the music next climbs back to; a fresh start has the
+original's volumes (master 127, music, effects and voices 110).
+
 The 3D talking heads are in `crates/atlantis-engine/src/head/`: the dialog
 video leaves the speaker's mouth empty, and the line player draws a
 textured 3D lower face there every frame, posed by the head animation at
@@ -94,6 +104,7 @@ its executable's language:
 | Fix (`settings.ini` key) | Builds | Where in the code | What it changes |
 |---|---|---|---|
 | `fix_music_loop` | all | `Engine::music_play_track` | the music loops seamlessly (the original's streaming ring has audible seams; read at each track start) |
+| `fix_cinema_sound` | all | `Engine::play_transition_video` | a cinematic plays its own sound when the sound of the cinematic before it still plays, which stops (the original's NewSound poller sees the value 1 still playing and starts nothing, so the second film is silent: CINEM053's sound outlasts its film by a second and CINEM058 follows it in five sections) |
 | `fix_head_overlay` | all | `dialog/mod.rs`, the SPF overlay | the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it) |
 | `fix_head_first_frame` | all | `DialogHead::set_rest_key_fix` | the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose) |
 | `fix_bar_slide_out` | all | `ui::bar::slide_out_record_drawn` | the inventory bar's slide-out draws no icon once the slots are at y 506 (the original reads the y of a record from 9 on past its 9-entry slot table, so a scrolled bar leaves 1 to 4 rows of those icons at the bottom of the screen) |

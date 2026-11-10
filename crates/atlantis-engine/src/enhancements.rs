@@ -24,6 +24,14 @@ pub enum BugFix {
     /// the sound driver's play position runs ahead of the refills. Read at
     /// each track start.
     MusicLoop,
+    /// A cinematic plays its own sound when the sound of the cinematic
+    /// before it still plays: that one stops. Off, as the original
+    /// (`FUN_0042a100` @ 0x0042a865..0x0042a8e6, the NewSound poller
+    /// `FUN_00432a64`): the value 1 is still the one playing, so the new
+    /// sound is not started, and the end of the old one clears NEWSOUND;
+    /// the second cinematic is silent (CINEM053.APC outlasts its film by a
+    /// second and is followed by CINEM058 in five sections).
+    CinemaSound,
     /// The dialog SPF overlay (the guards' coif, the pilot's scarf) is
     /// drawn over the talking head. Off, as the original, it is drawn into
     /// the locked surface, which the back-buffer copy then overwrites
@@ -144,8 +152,9 @@ pub enum BugFix {
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 17] = [
+    pub const ALL: [BugFix; 18] = [
         BugFix::MusicLoop,
+        BugFix::CinemaSound,
         BugFix::HeadOverlay,
         BugFix::HeadFirstFrame,
         BugFix::BarSlideOut,
@@ -168,6 +177,7 @@ impl BugFix {
     pub fn key(self) -> &'static str {
         match self {
             BugFix::MusicLoop => "fix_music_loop",
+            BugFix::CinemaSound => "fix_cinema_sound",
             BugFix::HeadOverlay => "fix_head_overlay",
             BugFix::HeadFirstFrame => "fix_head_first_frame",
             BugFix::BarSlideOut => "fix_bar_slide_out",

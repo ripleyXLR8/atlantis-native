@@ -354,6 +354,9 @@ change an entry; Escape, F10 or O close it. Its entries:
   - **Music: seamless loops**: the original streams the music through a
     ring its refills do not always keep ahead of, and stale fragments of
     sound are heard in it.
+  - **Cinematics: the sound of the second**: when a cinematic's sound
+    outlasts its film and another cinematic follows, the original lets
+    the first sound end and plays the second film silent.
   - **Faces: the guards' coif, the pilot's scarf**: the original draws
     the overlay of these talking heads where the next copy of the
     picture erases it, so it is never seen.
@@ -838,9 +841,9 @@ store typed names in capitals.
 
 The same folder holds `settings.ini`: the options of the game's menus
 (subtitles, OMNI 3D mode, the master, music, effects and voices volumes,
-which the original also keeps in each checkpoint and sets again when one
-is loaded) and the [enhancements](TECHNICAL.md#enhancements), one `name = on|off` line
-each: one per bug fix (`fix_music_loop`, `fix_head_overlay`,
+127, 110, 110 and 110 at first as in the original, which also keeps
+them in each checkpoint and sets them again when one is loaded) and the [enhancements](TECHNICAL.md#enhancements), one `name = on|off` line
+each: one per bug fix (`fix_music_loop`, `fix_cinema_sound`, `fix_head_overlay`,
 `fix_head_first_frame`, `fix_bar_slide_out`, `fix_pickup_icon`,
 `fix_menu_records`, `fix_fifth_player`, `fix_snakes_first_win`,
 `fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
@@ -902,7 +905,8 @@ not kept, erase saves you no longer need.
 - The engine runs at a steady 60 steps per second; the original's loops
   run as fast as the machine allows.
 - The [enhancements](TECHNICAL.md#enhancements) on by default: the music loops
-  seamlessly; the SPF overlays of some talking heads are drawn over the
+  seamlessly; a cinematic that follows another whose sound still plays
+  has its own sound (the original plays it silent); the SPF overlays of some talking heads are drawn over the
   head; the 3D mouth of some talking heads no longer jumps on the first
   frame of each loop of the video; on the German CD, the `ß` that the
   LOAD list's fonts lack is drawn as "ss" (the original leaves a gap);

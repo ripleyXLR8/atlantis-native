@@ -185,6 +185,17 @@ impl Graphics {
     }
 }
 
+/// The volumes at start-up, before the sound menu's OK or a checkpoint
+/// writes them: master 0x7f, music, effects and voices 0x6e (the data
+/// bytes at 0x00495e70 and 0x00495e72..0x00495e74; atlantis-cd-en-714240
+/// sets the voice sample to 0x6e at start-up, @ 0x00430e82).
+pub const DEFAULT_VOLUMES: [u8; 4] = [0x7f, 0x6e, 0x6e, 0x6e];
+
+/// A volume 0..127 of the original on the mixer's 0..255 scale.
+pub fn mixer_volume(x: u8) -> u8 {
+    (u32::from(x.min(127)) * 255 / 127) as u8
+}
+
 /// The options of the original's menus, and the port's enhancements.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
@@ -194,7 +205,8 @@ pub struct Settings {
     /// (y - prevY); MODE 1, the original's default, inverts it.
     pub omni3d_mode2: bool,
     /// Master, music, effects and voices volumes, 0..127 (0x00495e70,
-    /// 0x00495e72..0x00495e74).
+    /// 0x00495e72..0x00495e74); a fresh start has the original's
+    /// [`DEFAULT_VOLUMES`].
     pub volumes: [u8; 4],
     pub enhancements: Enhancements,
     /// The music tracks the original would find copied in its install
@@ -215,7 +227,7 @@ impl Default for Settings {
         Settings {
             subtitles: true,
             omni3d_mode2: false,
-            volumes: [127; 4],
+            volumes: DEFAULT_VOLUMES,
             enhancements: Enhancements::default(),
             music_on_disk: 0,
             graphics: Graphics::Original,
