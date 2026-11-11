@@ -162,6 +162,14 @@ pub struct Node {
     pub validation_sound: Option<String>,
     pub volume_sound: f32,
     pub state: State,
+    /// A checkbox's state (`+0x564`, @ 0x004dc7d0): 0 active, 1 unactive,
+    /// 2 active disabled, 3 unactive disabled, each showing only its own
+    /// layout. `[INFERRED]` the constructor's 1.
+    pub check: u8,
+    /// A checkbox's `unactivationSound` (`+0x584`).
+    pub unactivation_sound: Option<String>,
+    /// The rotation about z set by a rotation animation, degrees.
+    pub rotation: f32,
     pressed: bool,
     released: bool,
     // Texts.
@@ -226,6 +234,9 @@ impl Node {
             validation_sound: None,
             volume_sound: 1.0,
             state: State::Up,
+            check: 1,
+            unactivation_sound: None,
+            rotation: 0.0,
             pressed: false,
             released: false,
             markup: Vec::new(),
@@ -252,8 +263,17 @@ impl Node {
         }
     }
 
-    /// The layout shown for the button's state (@ 0x004e4810).
+    /// The layout shown for the button's state (@ 0x004e4810), or the
+    /// checkbox's (@ 0x004dc7d0: only the state's own layout).
     pub fn state_layout(&self) -> Option<Id> {
+        if self.class == Class::Checkbox {
+            return match self.check {
+                0 => self.up,
+                1 => self.down,
+                2 => self.disabled,
+                _ => self.roll_over,
+            };
+        }
         match self.state {
             State::Up => self.up,
             State::Down => self.down.or(self.up),
@@ -275,11 +295,27 @@ pub struct Gui {
     pub nodes: Vec<Node>,
     pub text_format: Option<Vec<u8>>,
     pub numbers: HashMap<String, f64>,
+    /// The string globals of [`STRING_GLOBALS`] the file set.
+    pub strings: HashMap<String, Vec<u8>>,
 }
 
 /// The number globals the screens' loaders read after running a file
 /// (`InventoryObject.lua`'s `dragThreshold`, @ 0x0054e540).
-pub const NUMBER_GLOBALS: [&str; 1] = ["dragThreshold"];
+pub const NUMBER_GLOBALS: [&str; 2] = ["dragThreshold", "slideTranslation"];
+
+/// The string globals the menus' loaders read (`musicPath` of the menus,
+/// the options' test sounds, `RotationAnim.lua`'s sounds; 0x00549580).
+pub const STRING_GLOBALS: [&str; 9] = [
+    "musicPath",
+    "dialogTestPath",
+    "videoTestPath",
+    "landscapeCloseSound",
+    "landscapeRotateSound",
+    "landscapeOpenSound",
+    "portraitCloseSound",
+    "portraitRotateSound",
+    "portraitOpenSound",
+];
 
 /// What draws a sprite's content.
 pub trait Painter {
@@ -599,8 +635,9 @@ impl Builder {
                 }
                 self.add_child(id, c);
                 // `setUpLayout` @ 0x004e4ce0: a `Pixel` button of user size
-                // (1, 1) takes its up layout's size.
-                if key == "upLayout" {
+                // (1, 1) takes its up layout's size; a checkbox its active
+                // layout's (`[INFERRED]`, the same pattern @ 0x004dcac8).
+                if key == "upLayout" || key == "activeLayout" {
                     let n = &self.nodes[id];
                     if !n.size_percent && n.size[0] == 1.0 && n.size[1] == 1.0 {
                         let up = &self.nodes[c];
@@ -618,6 +655,7 @@ impl Builder {
             "enable" => n.enabled = matches!(v, GuiValue::Bool(true)),
             "clickPassThrough" => n.click_pass_through = matches!(v, GuiValue::Bool(true)),
             "validationSound" | "activationSound" => n.validation_sound = string(v),
+            "unactivationSound" => n.unactivation_sound = string(v),
             "volumeSound" => n.volume_sound = num(v) as f32,
             "text" if class.is_text() => {
                 n.markup = match v {
@@ -642,6 +680,10 @@ impl Builder {
                     "duration" => a.duration = num(v) as f32,
                     "startValue" if class == Class::ColorAnim => a.start_value = colour4(v),
                     "endValue" if class == Class::ColorAnim => a.end_value = colour4(v),
+                    // A rotation: axis x, y, z then the angle in degrees
+                    // (0x004c0a30); the data's axis is always z.
+                    "startValue" if class == Class::RotationAnim => a.start_value = rotation4(v),
+                    "endValue" if class == Class::RotationAnim => a.end_value = rotation4(v),
                     "startValue" => a.start_value = pad(vec3(v, [0.0; 3])),
                     "endValue" => a.end_value = pad(vec3(v, [0.0; 3])),
                     "curve" => {
@@ -739,12 +781,18 @@ impl Gui {
         }));
         let engine: EngineRef = builder.clone();
         let mut numbers = HashMap::new();
+        let mut strings = HashMap::new();
         let text_format = {
             let mut state = GuiState::new(&engine, Options::default()).ok()?;
             state.run_file(file.as_bytes());
             for g in NUMBER_GLOBALS {
                 if let Ok(Some(BootValue::Num(x))) = state.read(g) {
                     numbers.insert(g.to_string(), x);
+                }
+            }
+            for g in STRING_GLOBALS {
+                if let Ok(Some(BootValue::Str(x))) = state.read(g) {
+                    strings.insert(g.to_string(), x);
                 }
             }
             match state.read("textFormat") {
@@ -759,6 +807,7 @@ impl Gui {
             nodes: b.nodes,
             text_format,
             numbers,
+            strings,
         };
         // An animation's `layout` names its target.
         for i in 0..gui.nodes.len() {
@@ -812,6 +861,29 @@ impl Gui {
         n.scroll_deadline = now + f64::from(n.auto_scroll_delay);
     }
 
+    /// A string global of the file ([`STRING_GLOBALS`]), as text.
+    pub fn string(&self, name: &str) -> Option<String> {
+        self.strings
+            .get(name)
+            .map(|b| b.iter().map(|&c| char::from(c)).collect())
+    }
+
+    /// Moves `child` to the end of `parent`'s children (`addChild`).
+    pub fn reparent(&mut self, child: Id, parent: Id) {
+        if let Some(old) = self.nodes[child].parent {
+            self.nodes[old].children.retain(|&x| x != child);
+        }
+        self.nodes[child].parent = Some(parent);
+        self.nodes[parent].children.push(child);
+    }
+
+    /// The tree roots of the file (its top-level layouts), in order.
+    pub fn roots(&self) -> Vec<Id> {
+        (0..self.nodes.len())
+            .filter(|&i| self.nodes[i].parent.is_none() && !self.nodes[i].class.is_anim())
+            .collect()
+    }
+
     /// Binds an animation to the layout it drives.
     pub fn bind(&mut self, anim: Id, target: Id) {
         self.nodes[anim].target = Some(target);
@@ -845,6 +917,7 @@ impl Gui {
             Class::AnchorAnim => self.nodes[t].anchor = [v[0], v[1], v[2]],
             Class::PositionAnim => self.nodes[t].position = [v[0], v[1], v[2]],
             Class::ColorAnim => self.nodes[t].colour = v.map(|x| x as u8),
+            Class::RotationAnim => self.nodes[t].rotation = v[3],
             _ => {}
         }
     }
@@ -1009,7 +1082,7 @@ impl Gui {
         if !n.visible {
             return;
         }
-        if n.class == Class::Button {
+        if matches!(n.class, Class::Button | Class::Checkbox) {
             out.push(root);
         }
         for &c in &n.children {
@@ -1031,11 +1104,15 @@ impl Gui {
         for &b in bs.iter().rev() {
             if self.hit(b, x, y, width, height) {
                 let n = &mut self.nodes[b];
-                if n.enabled {
+                if n.enabled && n.class == Class::Button {
                     n.pressed = true;
                     n.state = State::Down;
                 }
-                return !n.click_pass_through;
+                // `clickPassThrough`: not consumed, the buttons under it
+                // get the press too.
+                if !n.click_pass_through {
+                    return true;
+                }
             }
         }
         false
@@ -1051,7 +1128,7 @@ impl Gui {
         for &b in bs.iter().rev() {
             let inside = self.hit(b, x, y, width, height);
             let n = &mut self.nodes[b];
-            if !n.enabled {
+            if !n.enabled || n.class == Class::Checkbox {
                 continue;
             }
             if n.pressed {
@@ -1091,10 +1168,24 @@ impl Gui {
         let mut result = (false, None);
         for &b in bs.iter().rev() {
             if self.hit(b, x, y, width, height) {
-                let n = &self.nodes[b];
-                let valid = n.enabled && n.released;
-                result = (!n.click_pass_through, valid.then_some(b));
-                break;
+                let n = &mut self.nodes[b];
+                let through = n.click_pass_through;
+                let valid = if n.class == Class::Checkbox {
+                    // 0x004dd070: a release inside toggles it, whatever
+                    // its state and wherever the press was: active (0)
+                    // becomes unactive (1), any other state active.
+                    n.check = if n.check == 0 { 1 } else { 0 };
+                    true
+                } else {
+                    n.enabled && n.released
+                };
+                if valid && (result.1.is_none() || !through) {
+                    result.1 = Some(b);
+                }
+                if !through {
+                    result.0 = true;
+                    break;
+                }
             }
         }
         for n in &mut self.nodes {
@@ -1167,7 +1258,10 @@ impl Gui {
         match n.class {
             Class::Sprite => {
                 if !painter.video(self, id, out, width, height, rect) {
-                    if let Some(pic) = n.image.as_deref().and_then(|p| painter.picture(p)) {
+                    let pic = n.image.as_deref().and_then(|p| painter.picture(p));
+                    if let (Some(pic), true) = (pic, n.rotation != 0.0) {
+                        draw_rotated(out, width, height, pic, rect, n.rotation, tint);
+                    } else if let Some(pic) = pic {
                         let r = if n.size_percent {
                             rect
                         } else {
@@ -1237,6 +1331,7 @@ impl Gui {
         n.anchor.map(f32::to_bits).hash(h);
         n.position.map(f32::to_bits).hash(h);
         n.colour.hash(h);
+        (n.check, n.rotation.to_bits()).hash(h);
         (&n.image, n.state, n.scroll_offset.to_bits(), &n.markup).hash(h);
         n.block.is_some().hash(h);
         for &c in &n.children {
@@ -1276,6 +1371,80 @@ fn scroll(n: &mut Node, now: f64) {
         };
         n.scroll_offset = (p * f64::from(content - frame)) as f32;
     }
+}
+
+/// A picture over `rect` turned by `degrees` about its centre (a rotation
+/// animation's layout): each pixel whose centre falls in the turned
+/// rectangle takes the picture's bilinear sample there. `[INFERRED]` the
+/// sense (a positive angle turns x toward y, clockwise on the y-down
+/// screen) and GL's sampling of a turned quad.
+pub fn draw_rotated(
+    out: &mut [u32],
+    width: u32,
+    height: u32,
+    pic: &Picture,
+    rect: Rect,
+    degrees: f32,
+    tint: [u8; 4],
+) {
+    let (cx, cy) = (rect.left + rect.width / 2.0, rect.top + rect.height / 2.0);
+    let a = f64::from(degrees).to_radians();
+    let (s, c) = (libm::sin(a), libm::cos(a));
+    let (hw, hh) = (rect.width / 2.0, rect.height / 2.0);
+    let r = (hw * hw + hh * hh).sqrt();
+    let i0 = ((cx - r).floor().max(0.0)) as i64;
+    let i1 = ((cx + r).ceil() as i64).min(i64::from(width));
+    let j0 = ((cy - r).floor().max(0.0)) as i64;
+    let j1 = ((cy + r).ceil() as i64).min(i64::from(height));
+    if rect.width <= 0.0 || rect.height <= 0.0 {
+        return;
+    }
+    let (pw, ph) = (f64::from(pic.width), f64::from(pic.height));
+    for j in j0..j1 {
+        for i in i0..i1 {
+            let (dx, dy) = (i as f64 + 0.5 - cx, j as f64 + 0.5 - cy);
+            // Back to the unturned rectangle.
+            let (u, v) = (c * dx + s * dy, -s * dx + c * dy);
+            if u.abs() > hw || v.abs() > hh {
+                continue;
+            }
+            let tx = (u + hw) / rect.width * pw - 0.5;
+            let ty = (v + hh) / rect.height * ph - 0.5;
+            let (x0, y0) = (tx.floor(), ty.floor());
+            let (fx, fy) = (tx - x0, ty - y0);
+            let tap = |x: f64, y: f64| pic.texel_clamped(x as i64, y as i64);
+            let q = [
+                tap(x0, y0),
+                tap(x0 + 1.0, y0),
+                tap(x0, y0 + 1.0),
+                tap(x0 + 1.0, y0 + 1.0),
+            ];
+            let px: [u8; 4] = std::array::from_fn(|k| {
+                let top = f64::from(q[0][k]) * (1.0 - fx) + f64::from(q[1][k]) * fx;
+                let bot = f64::from(q[2][k]) * (1.0 - fx) + f64::from(q[3][k]) * fx;
+                (top * (1.0 - fy) + bot * fy).round() as u8
+            });
+            let o = j as usize * width as usize + i as usize;
+            out[o] = crate::sprite::blend(out[o], modulate(px, tint));
+        }
+    }
+}
+
+/// A rotation value (`{x, y, z, angle}`): the angle in the fourth place.
+fn rotation4(v: &GuiValue) -> [f32; 4] {
+    let GuiValue::Table(t) = v else {
+        return [0.0; 4];
+    };
+    let mut out = [0f32; 4];
+    for (k, x) in t {
+        if let (GuiKey::Index(i), GuiValue::Num(x)) = (k, x) {
+            let i = *i as usize;
+            if (1..=4).contains(&i) {
+                out[i - 1] = *x as f32;
+            }
+        }
+    }
+    out
 }
 
 /// The pixels whose centre is in `rect`: columns, rows.
