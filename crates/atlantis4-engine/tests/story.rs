@@ -589,7 +589,10 @@ impl Player {
         };
         for p in points {
             let q = cam.project(*p);
-            if !(q[2] < 1.0) || !q[0].is_finite() || !q[1].is_finite() {
+            if q[2].partial_cmp(&1.0) != Some(std::cmp::Ordering::Less)
+                || !q[0].is_finite()
+                || !q[1].is_finite()
+            {
                 continue;
             }
             let (x, y) = (q[0] as i32, H as i32 - q[1] as i32);
@@ -664,7 +667,7 @@ impl Player {
                 let pitch = -55.0 + pi as f32 * 2.0;
                 let cam = atlantis4_engine::Camera::new(fov, W, H, yaw, pitch);
                 let q = cam.project(p);
-                if !(q[2] < 1.0) {
+                if q[2].partial_cmp(&1.0) != Some(std::cmp::Ordering::Less) {
                     continue;
                 }
                 let d = (q[0] - W as f32 / 2.0).powi(2) + (q[1] - H as f32 / 2.0).powi(2);
