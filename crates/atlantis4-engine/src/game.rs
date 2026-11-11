@@ -15,10 +15,16 @@
 //! movie's start to its end or skip, the music cut meanwhile), and the
 //! sounds ([`crate::sound`]): `PlayMusic`, `PlaySound`, `StopSound` with
 //! `OnSoundStopped`, the node change's stop of the `PlaySound` sounds, and
-//! `AddToBag`'s notification sound. Every other binding is logged and does
-//! nothing (dialogs, inventory, documents, diary and saves belong to later
-//! milestones); `Selected` answers `false` (empty inventory) and
-//! `ObjectCount` 0.
+//! `AddToBag`'s notification sound; the inventory ([`crate::inventory`]:
+//! `AddToBag`, `AddToBagWithoutNotification`, both `RemoveFromBag`,
+//! `Selected`, `ObjectCount`, `TestObjectLimit`, the notification), the
+//! documents ([`crate::documents`]: `AddDocument`, `ShowDocument`,
+//! `HideDocument` with `OnDocumentClosed`), `LoadSprite` /
+//! `UnloadSprite`, and the screens that show them ([`crate::screens`]:
+//! the HUD's inventory button, the inventory menu, the shown document).
+//! The save's text is built ([`crate::savexml`]) but not written (M4).
+//! Every other binding is logged and does nothing (dialogs belong to the
+//! dialog work).
 
 use std::collections::HashMap;
 
@@ -29,10 +35,13 @@ use atlantis4_script::tolua::Binding;
 use atlantis4_script::{normalise_path, Call, Engine, ErrorSite, Event, Reply, SavedGlobal, Value};
 
 use crate::camera::fov_for_height;
+use crate::documents::{Diary, Documents, PuzzleTimer};
+use crate::inventory::Inventory;
 use crate::markers::sprite_path;
 use crate::movie::{self, Click, Movie, MovieCue};
 use crate::package::Picture;
 use crate::render::{render, Coverage, Weights};
+use crate::screens::{NoText, Screens, TextDraw};
 use crate::sound::{SoundEvent, Sounds};
 use crate::sprite::{self, cursor_corner, CURSOR_PATH};
 use crate::warp::{Warp, WarpNote};
@@ -82,6 +91,29 @@ pub struct Game {
     pub clock_us: Option<Box<dyn Fn() -> u64>>,
     /// The sound manager and the game's sound objects.
     pub sounds: Sounds,
+    /// The install's language (`lang.ini`).
+    pub lang: String,
+    pub inventory: Inventory,
+    pub documents: Documents,
+    pub diary: Diary,
+    pub puzzle_timer: PuzzleTimer,
+    /// The screens' layouts, read at their first use.
+    pub(crate) screens: Option<Screens>,
+    /// The text of the GUI (the dialog work's glyphs; nothing until then).
+    pub text: Box<dyn TextDraw>,
+    /// Callbacks the GUI raised (`OnDocumentClosed`, …), to run in order.
+    pub(crate) callbacks: Vec<(String, Vec<Value>)>,
+    /// The current node's path as `ChangeWarp` gave it (`WarpName`).
+    pub(crate) warp_name: Vec<u8>,
+    /// `SetInventoryAvatar`'s picture name (the avatar is a 1 × 1 button
+    /// without picture in this game's `Inventory.lua`).
+    pub avatar: Option<String>,
+    /// The last save's file name and text (not written to disk yet).
+    pub last_save: Option<(String, Vec<u8>)>,
+    /// The GUI layers are drawn (the HUD, the inventory menu, the shown
+    /// document, the notification); off, a frame is the warp, the
+    /// markers, a movie and the cursor only.
+    pub draw_gui: bool,
 }
 
 /// A PNG as RGBA.
@@ -137,6 +169,18 @@ impl Game {
         let lang = files.lang_ini().unwrap_or_else(|| "en".to_string());
         Game {
             sounds: Sounds::new(&lang),
+            lang: lang.clone(),
+            inventory: Inventory::default(),
+            documents: Documents::default(),
+            diary: Diary::default(),
+            puzzle_timer: PuzzleTimer::default(),
+            screens: None,
+            text: Box::new(NoText),
+            callbacks: Vec::new(),
+            warp_name: Vec::new(),
+            avatar: None,
+            last_save: None,
+            draw_gui: true,
             files,
             table,
             warp: None,
@@ -317,6 +361,10 @@ impl Game {
                     .hash(&mut h);
             }
         }
+        self.draw_gui.hash(&mut h);
+        if self.draw_gui {
+            self.gui_key(&mut h);
+        }
         if let Some(m) = &self.movie {
             (&m.path, m.skip_shown, m.skip_pressed).hash(&mut h);
             m.sprite
@@ -382,12 +430,21 @@ impl Game {
                 sprites.get(&sprite_path(i, false)).and_then(Option::as_ref)
             });
         }
+        // The HUD (`inGame`: the sprites, the inventory button) under the
+        // movie's layouts, which `InGame.lua` declares after it.
+        if self.draw_gui {
+            self.draw_hud(out, width, height);
+        }
         if self.movie.is_some() {
             let [bg, up, down] = self.movie_pictures();
             let get = |p: &str| self.sprites.get(p).and_then(Option::as_ref);
             if let Some(m) = &self.movie {
                 m.draw(out, width, height, get(&bg), get(&up), get(&down));
             }
+        }
+        // The inventory menu (and the shown document), the notification.
+        if self.draw_gui {
+            self.draw_menu(out, width, height, pointer);
         }
         if let Some((x, y)) = pointer {
             self.load_sprite(CURSOR_PATH);
@@ -541,15 +598,23 @@ impl Engine for Game {
                 self.fov = (call.num(0) * f64::from(std::f32::consts::PI) / 180.0) as f32;
             }
             Binding::Selected => {
-                log::info!("Selected({name}): no inventory yet, false");
-                return Reply::Bool(false);
+                self.gui();
+                return Reply::Bool(self.inventory.is_selected(&name));
             }
             Binding::PlayMovie => {
                 let sound = text(call.str(1));
                 self.play_movie(&name, &sound);
             }
-            Binding::TestObjectLimit => return Reply::Bool(false),
-            Binding::ObjectCount => return Reply::Num(0.0),
+            Binding::TestObjectLimit => {
+                self.gui();
+                // `count(name) >= n`, unsigned (@ 0x0057fa50).
+                let n = call.num(1) as u32;
+                return Reply::Bool(self.inventory.count(&name) as u32 >= n);
+            }
+            Binding::ObjectCount => {
+                self.gui();
+                return Reply::Num(self.inventory.count(&name) as f64);
+            }
             Binding::PrintDebugMessage => log::info!("PrintDebugMessage: {name}"),
             Binding::PlayMusic => {
                 let path = text(Some(&normalise_path(call.str(0).unwrap_or_default())));
@@ -561,13 +626,35 @@ impl Engine for Game {
                     .play_sound(&self.files, &name, &path, int(call.num(1)));
             }
             Binding::StopSound => self.sounds.stop_sound(&name),
-            Binding::AddToBag => {
-                // The notification's sound (@ 0x00528706); the inventory
-                // and the notification text come later.
-                log::info!("AddToBag({name}): no inventory yet");
-                self.sounds
-                    .play_free_sound(&self.files, "Sounds/SFX/N_prendre.wav", 1.0);
+            Binding::AddToBag => self.add_to_bag(&name, true),
+            Binding::AddToBagWithoutNotification => self.add_to_bag(&name, false),
+            Binding::RemoveFromBag => {
+                self.gui();
+                if self.inventory.remove_named(&name).is_none() {
+                    log::info!("RemoveFromBag({name}): not in the bag");
+                }
             }
+            Binding::RemoveSelectedFromBag => {
+                self.gui();
+                let gone = self.inventory.remove_selected();
+                log::info!("RemoveFromBag(): {gone:?}");
+            }
+            Binding::AddDocument => {
+                self.gui();
+                if !self.documents.add(&name) {
+                    log::warn!("AddDocument({name}): no free slot, dropped");
+                }
+            }
+            Binding::ShowDocument => self.show_document(&name, 0),
+            Binding::HideDocument => self.hide_document(),
+            Binding::LoadSprite => self.gui().load_sprite(&name),
+            Binding::UnloadSprite => self.gui().unload_sprite(&name),
+            Binding::SetInventoryAvatar => {
+                log::info!("SetInventoryAvatar({name})");
+                self.avatar = Some(name);
+            }
+            // Empty in the original (@ 0x0057e030, 0x0057df60).
+            Binding::ClearImportantDocuments | Binding::SetImportantDocument => {}
             other => log::info!("{other:?}({name}): not done in the warp view yet"),
         }
         Reply::None
@@ -601,11 +688,7 @@ impl Engine for Game {
     }
 
     fn save_game(&mut self, file: &[u8], globals: &[SavedGlobal]) {
-        log::info!(
-            "SaveGame({}): {} globals, not written (saves are M4)",
-            text(Some(file)),
-            globals.len()
-        );
+        self.build_save(&text(Some(file)), globals);
     }
 
     /// The new scene (`0x00526c70` @ 0x0052703c..0x00527265, then the XML
@@ -616,6 +699,7 @@ impl Engine for Game {
         // Step 4 of the node change: the `PlaySound` sounds stop.
         self.sounds.leave_node();
         let name = text(Some(path));
+        self.warp_name = path.to_vec();
         self.view.reset_limits();
         self.fov = fov_for_height(self.height);
         self.warp = None;
@@ -634,7 +718,9 @@ impl Engine for Game {
     }
 
     fn take_callbacks(&mut self) -> Vec<(String, Vec<Value>)> {
-        self.sound_callbacks()
+        let mut out = self.sound_callbacks();
+        out.extend(self.gui_callbacks());
+        out
     }
 
     fn event(&mut self, event: &Event<'_>) {

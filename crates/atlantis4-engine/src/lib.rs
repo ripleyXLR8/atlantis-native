@@ -22,17 +22,27 @@
 //! - [`layout`]: the GUI layouts' sizes and positions;
 //! - [`movie`]: video sprites, `PlayMovie`'s full-screen movie and its
 //!   skip button;
+//! - [`layout_tree`]: a layout file's tree, places and pictures;
+//! - [`inventory`], [`documents`]: the inventory and its selection, the
+//!   documents browser and the shown document, the diary and the puzzle
+//!   timer, with their save elements ([`savexml`]);
+//! - [`screens`]: the HUD, the inventory menu, the shown document and
+//!   the object notification;
 //! - [`game`]: the bindings' engine side for the scripts.
 //!
-//! Not here yet: sounds, dialogs, the inventory and the rest of the GUI.
+//! Not here yet: dialogs, menus, saves on disk.
 
 #![forbid(unsafe_code)]
 
 pub mod camera;
 pub mod cube;
+pub mod documents;
 pub mod frame_anim;
 pub mod game;
+mod game_gui;
+pub mod inventory;
 pub mod layout;
+pub mod layout_tree;
 pub mod markers;
 pub mod movie;
 pub mod node;
@@ -40,6 +50,8 @@ pub mod oalmix;
 pub mod package;
 pub mod pick;
 pub mod render;
+pub mod savexml;
+pub mod screens;
 pub mod sound;
 pub mod sprite;
 pub mod view;

@@ -61,9 +61,11 @@ fn frame(game: &Rc<RefCell<Game>>, pointer: Option<(f64, f64)>) -> Vec<u32> {
 }
 
 /// The intro at a few times (the skip button shown for the last two),
-/// then the first node after it at a few views and animation times.
-fn frames(dir: &std::path::Path) -> Vec<String> {
+/// then the first node after it at a few views and animation times; with
+/// or without the GUI layers (the HUD's inventory button).
+fn frames(dir: &std::path::Path, gui: bool) -> Vec<String> {
     let (game, _script) = boot(dir);
+    game.borrow_mut().draw_gui = gui;
     let mut got = Vec::new();
     for (t, skip) in [
         (T0, false),
@@ -108,10 +110,31 @@ const FRAMES: [&str; 9] = [
     "f3142f3814917bbaa81e6ecd6d2f0169",
 ];
 
+/// [`FRAMES`] with the GUI layers: the intro's background covers the HUD;
+/// on the node the inventory button is in the bottom-right corner (its
+/// pixels alone differ, `tests/inventory.rs`).
+const FRAMES_GUI: [&str; 9] = [
+    "da9b9d4ba328fe4168416a42f330a43a",
+    "b18ddbd8e4c10c8dfce32fbb52ec413d",
+    "e1232bfb30a8764204cc2715111f5ec6",
+    "979ab99de75d6ba52d8e251c1bd11695",
+    "5ec63269b483d4e16b8b4cadf92296c5",
+    "3dc397ea2de73422ada7be1c9e192757",
+    "22d6839048df6ecbdc0403288e7049ac",
+    "1f376a7fccc9048dc8bbf18d107d14af",
+    "7fbb984d084eed57d6606e5288738832",
+];
+
+#[test]
+fn the_frames_with_the_gui_are_the_plain_codes() {
+    let Some(dir) = install() else { return };
+    assert_eq!(frames(&dir, true), FRAMES_GUI);
+}
+
 #[test]
 fn the_frames_are_the_plain_codes() {
     let Some(dir) = install() else { return };
-    let got = frames(&dir);
+    let got = frames(&dir, false);
     if std::env::var_os("A4_PRINT_FRAMES").is_some() {
         for h in &got {
             println!("    \"{h}\",");
