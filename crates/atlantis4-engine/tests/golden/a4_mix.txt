@@ -1,0 +1,69 @@
+# a4_mix.txt - produced by tools/audio/audio_mix_golden.py (Unicorn 2, unmodified DLL code)
+# DLL atlantis4-gog-en-wrap_oal.dll = wrap_oal.dll 2.2.0.5, MD5 d494267bc169604fac5e3679b9a97fed
+# entry points run: alcOpenDevice, alcCreateContext, alcMakeContextCurrent, alGen*, alBufferData,
+#   alSourceQueueBuffers/Unqueue, alSourcef, alSourcePlay/Stop, mixer @ 0x10028e40 (ctx, out, bytes, 0x1103)
+# stubs: Win32 heap/sync, CoCreateInstance -> fake IDirectSound (primary 44100/2/16, speaker config 4,
+#   DSCAPS flags 0 unless noted), timeSetEvent recorded, waveOut recorded; x87 CW 0x027f at each entry
+# output: int16 L,R; hash = first 16 hex of SHA-256 of the int16 LE output; model = wrapmix_model.py
+# device: dsound path, then DSCAPS_EMULDRIVER path
+emuldriver=0 name='Generic Software' dev_rate=44100 dev_ch=2 dev_fmt=0x1103 ctx_rate=44100 ctx_ch=2 ctx_fmt=0x1103
+  dsound buffers (flags, bytes) [('0x1', 0), ('0x18000', 65536)] timer period=25ms callback=0x100211c0 waveOut None
+  reverb room (ctx+0x3c) -10000 mB
+emuldriver=1 name='Generic Software Compatibility Mode' dev_rate=44100 dev_ch=2 dev_fmt=0x1103 ctx_rate=44100 ctx_ch=2 ctx_fmt=0x1103
+  dsound buffers (flags, bytes) [] timer None waveOut [('write', 11024), ('write', 11024), ('write', 11024), ('write', 11024)]
+  reverb room (ctx+0x3c) -10000 mB
+# gains: AL_GAIN -> dry target L R (float bits) for a mono and a stereo source at the listener
+ch=1 gain=0x3f800000 1.0 -> 0x3f350529 0x3f350529 model=equal
+ch=1 gain=0x3f4ccccd 0.800000011920929 -> 0x3f10d0ed 0x3f10d0ed model=equal
+ch=1 gain=0x3f19999a 0.6000000238418579 -> 0x3ed93964 0x3ed93964 model=equal
+ch=1 gain=0x3eccccce 0.40000003576278687 -> 0x3e90d0ee 0x3e90d0ee model=equal
+ch=1 gain=0x3e4ccccf 0.20000003278255463 -> 0x3e10d0ef 0x3e10d0ef model=equal
+ch=1 gain=0x33000000 2.9802322387695312e-08 -> 0x32b50529 0x32b50529 model=equal
+ch=1 gain=0x00000000 0.0 -> 0x00000000 0x00000000 model=equal
+ch=1 gain=0x3f000000 0.5 -> 0x3eb50529 0x3eb50529 model=equal
+ch=1 gain=0x3e800000 0.25 -> 0x3e350529 0x3e350529 model=equal
+ch=1 gain=0x3dcccccd 0.10000000149011612 -> 0x3d90d0ed 0x3d90d0ed model=equal
+ch=2 gain=0x3f800000 1.0 -> 0x3f800000 0x3f800000 model=equal
+ch=2 gain=0x3f4ccccd 0.800000011920929 -> 0x3f4ccccd 0x3f4ccccd model=equal
+ch=2 gain=0x3f19999a 0.6000000238418579 -> 0x3f19999a 0x3f19999a model=equal
+ch=2 gain=0x3eccccce 0.40000003576278687 -> 0x3eccccce 0x3eccccce model=equal
+ch=2 gain=0x3e4ccccf 0.20000003278255463 -> 0x3e4ccccf 0x3e4ccccf model=equal
+ch=2 gain=0x33000000 2.9802322387695312e-08 -> 0x33000000 0x33000000 model=equal
+ch=2 gain=0x00000000 0.0 -> 0x00000000 0x00000000 model=equal
+ch=2 gain=0x3f000000 0.5 -> 0x3f000000 0x3f000000 model=equal
+ch=2 gain=0x3e800000 0.25 -> 0x3e800000 0x3e800000 model=equal
+ch=2 gain=0x3dcccccd 0.10000000149011612 -> 0x3dcccccd 0x3dcccccd model=equal
+# ramp: mono DC 16384, gain 1, one call of 600 frames: (first frame, L) at each change
+changes [(0, 0), (31, 724), (63, 1448), (95, 2172), (127, 2896), (159, 3620), (191, 4344), (223, 5068), (255, 5792), (287, 6516), (319, 7240), (351, 7964), (383, 8688), (415, 9413), (447, 10137), (479, 10861), (511, 11585)] model=equal
+# ramp split by the call size: same source, calls of 200 frames
+changes [(0, 0), (31, 724), (63, 1448), (95, 2172), (127, 2896), (159, 3620), (191, 4344), (231, 4797), (263, 5249), (295, 5702), (327, 6154), (359, 6607), (391, 7059), (431, 7342), (463, 7625), (495, 7908), (527, 8191), (559, 8474), (591, 8756), (631, 8933), (663, 9110), (695, 9287), (727, 9463), (759, 9640), (791, 9817)] model=equal
+# impulses: mono buffer, 16384 at frame 1000, -32768 at 1010, 32767 at 1011, gain 1, after the ramp
+rate=44100 step=16384 nonzero(L)=[(1000, 11585), (1010, -23171), (1011, 23169)] model=equal
+rate=22050 step=8192 nonzero(L)=[(1999, 5792), (2000, 11585), (2001, 5792), (2019, -11586), (2020, -23171), (2021, -1), (2022, 23169), (2023, 11584)] model=equal
+rate=48000 step=17832 nonzero(L)=[(918, 1527), (919, 9034), (928, -22448), (929, 20760)] model=equal
+rate=11025 step=4096 nonzero(L)=[(3997, 2896), (3998, 5792), (3999, 8688), (4000, 11585), (4001, 8688), (4002, 5792), (4003, 2896), (4037, -5793), (4038, -11586), (4039, -17378), (4040, -23171), (4041, -11586), (4042, -1), (4043, 11584), (4044, 23169), (4045, 17377), (4046, 11584), (4047, 5791)] model=equal
+rate=32000 step=11888 nonzero(L)=[(1377, 1527), (1378, 9933), (1379, 4830), (1391, -6721), (1392, -22448), (1393, 11177), (1394, 12353)] model=equal
+# sweeps 20 Hz..Nyquist, 8820 frames, calls of 1102 frames (25 ms): rate ch gain -> frames hash
+sweep rate=22050 ch=1 gain=1.0 frames=19836 hash=6f495590e450a116 model=equal
+sweep rate=22050 ch=1 gain=0.800000011920929 frames=19836 hash=9b2ab702011b07a5 model=equal
+sweep rate=22050 ch=2 gain=1.0 frames=19836 hash=9565743802f4132b model=equal
+sweep rate=22050 ch=2 gain=0.800000011920929 frames=19836 hash=8ad0e78ae332c3d9 model=equal
+sweep rate=44100 ch=1 gain=1.0 frames=11020 hash=f798189a3ca781da model=equal
+sweep rate=44100 ch=1 gain=0.800000011920929 frames=11020 hash=7ea6451636a1bfe2 model=equal
+sweep rate=44100 ch=2 gain=1.0 frames=11020 hash=3ddbe12c0bd8d35c model=equal
+sweep rate=44100 ch=2 gain=0.800000011920929 frames=11020 hash=4fc678c11d7403da model=equal
+sweep rate=48000 ch=1 gain=1.0 frames=9918 hash=30b725984007e3e7 model=equal
+sweep rate=48000 ch=1 gain=0.800000011920929 frames=9918 hash=39a19f1c52262305 model=equal
+sweep rate=48000 ch=2 gain=1.0 frames=9918 hash=7ca688b66e085a61 model=equal
+sweep rate=48000 ch=2 gain=0.800000011920929 frames=9918 hash=96fa88e5895d6a93 model=equal
+# full-scale squares (period 64 frames), three sources together, gain 1: clipping
+squares frames=5510 clipped_hi=4212 clipped_lo=4162 hash=9140477efd9c40db model=equal
+# stream: stereo, 4 x 11025-frame buffers, unqueue + alBufferData + queue between 1102-frame calls (TeMusic pattern)
+stream frames=132240 hash=39201448a3026d4f equal_to_gain_times_input_from_frame_1102=True end_frame=110250 model=equal
+# buffer end: A (600 x 10000) then B (600 x 20000) queued, then A queued alone again (stale padding)
+A alone: L[0:3]=[7071, 7071, 7071] L[596:606]=[7071, 7071, 7071, 7071, 14142, 14142, 14142, 14142, 0, 0] last_nonzero_frame=603 model=equal
+# explicit alSourceStop between calls, then alSourcePlay: the gains restart from 0 (ramp)
+after stop+play: L[0:3]=[0, 0, 0] L[31:33]=[441, 441] model=equal
+# random cases: 1-3 sources, mono/stereo, 11025..48000 Hz, 1-3 queued buffers, random gains, starts and
+#   gain changes between calls of 1..1500 frames; count of int16 samples compared and differing
+random cases=200 samples=1694098 differing=0 cases_with_difference=0

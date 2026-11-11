@@ -11,10 +11,13 @@
 //! Done here: `PutObject`, `RemoveObject`, `StartAnimation`,
 //! `StartAnimationPart`, `SetMarker`, `LookAt`, `SetViewAngleXLimits`,
 //! `SetViewAngleYLimits`, `SetFOV`, `ChangeWarp`, `PlayMovie` (the
-//! picture side; its sound is handed over as [`MovieCue`]s). Every other
-//! binding is logged and does nothing (sounds, dialogs, inventory,
-//! documents, diary and saves belong to later milestones); `Selected`
-//! answers `false` (empty inventory) and `ObjectCount` 0.
+//! picture side; its sound is handed over as [`MovieCue`]s), and the
+//! sounds ([`crate::sound`]): `PlayMusic`, `PlaySound`, `StopSound` with
+//! `OnSoundStopped`, the node change's stop of the `PlaySound` sounds, and
+//! `AddToBag`'s notification sound. Every other binding is logged and does
+//! nothing (dialogs, inventory, documents, diary and saves belong to later
+//! milestones); `Selected` answers `false` (empty inventory) and
+//! `ObjectCount` 0.
 
 use std::collections::HashMap;
 
@@ -22,13 +25,14 @@ use atlantis4_data::image::decode_png;
 use atlantis4_data::video::RgbTable;
 use atlantis4_data::{A4Files, WarpPath};
 use atlantis4_script::tolua::Binding;
-use atlantis4_script::{Call, Engine, ErrorSite, Event, Reply, SavedGlobal};
+use atlantis4_script::{normalise_path, Call, Engine, ErrorSite, Event, Reply, SavedGlobal, Value};
 
 use crate::camera::fov_for_height;
 use crate::markers::sprite_path;
 use crate::movie::{self, Click, Movie, MovieCue};
 use crate::package::Picture;
 use crate::render::{render, Coverage, Weights};
+use crate::sound::{SoundEvent, Sounds};
 use crate::sprite::{self, cursor_corner, CURSOR_PATH};
 use crate::warp::{Warp, WarpNote};
 use crate::View;
@@ -73,6 +77,8 @@ pub struct Game {
     /// The engine clock read at a binding call, in µs (`play()` reads the
     /// clock itself, @ 0x004f592b); `None`: the frame's time, `now_ms`.
     pub clock_us: Option<Box<dyn Fn() -> u64>>,
+    /// The sound manager and the game's sound objects.
+    pub sounds: Sounds,
 }
 
 /// A PNG as RGBA.
@@ -82,12 +88,16 @@ fn png_rgba(data: &[u8]) -> Option<Picture> {
         4 => img.pixels,
         3 => img
             .pixels
-            .as_chunks::<3>().0.iter()
+            .as_chunks::<3>()
+            .0
+            .iter()
             .flat_map(|c| [c[0], c[1], c[2], 255])
             .collect(),
         2 => img
             .pixels
-            .as_chunks::<2>().0.iter()
+            .as_chunks::<2>()
+            .0
+            .iter()
             .flat_map(|c| [c[0], c[0], c[0], c[1]])
             .collect(),
         _ => img.pixels.iter().flat_map(|&g| [g, g, g, 255]).collect(),
@@ -111,16 +121,19 @@ fn int(x: f64) -> i32 {
 
 impl Game {
     pub fn new(files: A4Files, height: u32) -> Game {
-        let table = files
-            .read(atlantis4_data::exe::EXE_NAME)
-            .and_then(|exe| match RgbTable::from_exe(&exe) {
+        let table = files.read(atlantis4_data::exe::EXE_NAME).and_then(|exe| {
+            match RgbTable::from_exe(&exe) {
                 Ok(t) => Some(t),
                 Err(e) => {
                     log::warn!("no video colour table: {e}");
                     None
                 }
-            });
+            }
+        });
+        // The language of the voices and of the localised sounds.
+        let lang = files.lang_ini().unwrap_or_else(|| "en".to_string());
         Game {
+            sounds: Sounds::new(&lang),
             files,
             table,
             warp: None,
@@ -277,7 +290,13 @@ impl Game {
             if let Some(b) = &self.background {
                 out.copy_from_slice(&b.pixels);
             }
-            w.draw_layers(&cam, self.table.as_ref(), out, &mut self.cover, self.weights);
+            w.draw_layers(
+                &cam,
+                self.table.as_ref(),
+                out,
+                &mut self.cover,
+                self.weights,
+            );
         } else {
             out.fill(0);
         }
@@ -318,9 +337,9 @@ impl Game {
                 WarpNote::NoMarkerTarget(name) => {
                     log::warn!("SetMarker: no exit or animation {name}")
                 }
-                WarpNote::UnknownMarker(n, name) => log::warn!(
-                    "[TeWarp3::configMarker: Unknown marker {n} on animation : {name}"
-                ),
+                WarpNote::UnknownMarker(n, name) => {
+                    log::warn!("[TeWarp3::configMarker: Unknown marker {n} on animation : {name}")
+                }
             }
         }
     }
@@ -329,6 +348,8 @@ impl Game {
     /// finished (for `OnAnimationFinished(name)`).
     pub fn update(&mut self, now_ms: f64) -> Vec<String> {
         self.now_ms = now_ms;
+        // `TeSoundManager::update` runs first in the frame (@ 0x0057c160).
+        self.sounds.update(&self.files, now_ms);
         self.warp
             .as_mut()
             .map(|w| w.update(now_ms))
@@ -352,7 +373,43 @@ impl Game {
         }
     }
 
-    fn with_warp(&mut self, what: &str, f: impl FnOnce(&mut Warp, &A4Files, f64) -> Result<(), WarpNote>) {
+    /// The Lua callbacks the sounds' signals raised (`OnSoundStopped`),
+    /// to run in this order; the viewer calls it after [`Game::update`].
+    pub fn sound_callbacks(&mut self) -> Vec<(String, Vec<Value>)> {
+        let mut out = Vec::new();
+        for e in self.sounds.take_events() {
+            match e {
+                SoundEvent::SoundStopped(name) => out.push((
+                    "OnSoundStopped".to_string(),
+                    vec![Value::Str(name.into_bytes())],
+                )),
+                // The dialog bar's end of line (`Dialog2::onVoiceStopped`)
+                // comes with the dialogs.
+                SoundEvent::VoiceStopped => log::info!("voice stopped"),
+            }
+        }
+        out
+    }
+
+    /// A cut-scene starts (`PlayMovie`'s worker @ 0x005232b0): the music
+    /// stops and the movie's sound file, if any, plays on the `video`
+    /// channel. For the movie player.
+    pub fn movie_started(&mut self, sound: Option<&str>) {
+        self.sounds.start_movie(&self.files, sound);
+    }
+
+    /// The cut-scene ends or is skipped (@ 0x00524740): its sound stops and
+    /// the music restarts from its beginning; `OnMovieFinished` follows
+    /// (the movie player's).
+    pub fn movie_finished(&mut self) {
+        self.sounds.end_movie(&self.files);
+    }
+
+    fn with_warp(
+        &mut self,
+        what: &str,
+        f: impl FnOnce(&mut Warp, &A4Files, f64) -> Result<(), WarpNote>,
+    ) {
         let now = self.now_ms;
         match self.warp.as_mut() {
             Some(w) => Self::note(f(w, &self.files, now)),
@@ -371,7 +428,9 @@ impl Engine for Game {
             Binding::ChangeWarp => return Reply::Warp,
             Binding::PutObject => {
                 let clickable = call.flag(1);
-                self.with_warp("PutObject", |w, f, now| w.put_object(f, &name, clickable, now));
+                self.with_warp("PutObject", |w, f, now| {
+                    w.put_object(f, &name, clickable, now)
+                });
             }
             Binding::RemoveObject => {
                 if let Some(w) = self.warp.as_mut() {
@@ -424,6 +483,23 @@ impl Engine for Game {
             Binding::TestObjectLimit => return Reply::Bool(false),
             Binding::ObjectCount => return Reply::Num(0.0),
             Binding::PrintDebugMessage => log::info!("PrintDebugMessage: {name}"),
+            Binding::PlayMusic => {
+                let path = text(Some(&normalise_path(call.str(0).unwrap_or_default())));
+                self.sounds.play_music(&self.files, &path);
+            }
+            Binding::PlaySound => {
+                let path = text(Some(&normalise_path(call.str(0).unwrap_or_default())));
+                self.sounds
+                    .play_sound(&self.files, &name, &path, int(call.num(1)));
+            }
+            Binding::StopSound => self.sounds.stop_sound(&name),
+            Binding::AddToBag => {
+                // The notification's sound (@ 0x00528706); the inventory
+                // and the notification text come later.
+                log::info!("AddToBag({name}): no inventory yet");
+                self.sounds
+                    .play_free_sound(&self.files, "Sounds/SFX/N_prendre.wav", 1.0);
+            }
             other => log::info!("{other:?}({name}): not done in the warp view yet"),
         }
         Reply::None
@@ -469,6 +545,8 @@ impl Engine for Game {
     /// the definition, the node's background, objects, animations, exits
     /// and markers, the global marker flag.
     fn enter_scene(&mut self, path: &[u8]) {
+        // Step 4 of the node change: the `PlaySound` sounds stop.
+        self.sounds.leave_node();
         let name = text(Some(path));
         self.view.reset_limits();
         self.fov = fov_for_height(self.height);
@@ -485,6 +563,10 @@ impl Engine for Game {
             }
             Err(e) => log::warn!("ChangeWarp({name}): {e}"),
         }
+    }
+
+    fn take_callbacks(&mut self) -> Vec<(String, Vec<Value>)> {
+        self.sound_callbacks()
     }
 
     fn event(&mut self, event: &Event<'_>) {

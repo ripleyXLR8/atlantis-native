@@ -39,6 +39,7 @@ pub mod scene;
 pub mod testing;
 pub mod texts;
 pub mod video;
+pub mod vorbis;
 pub mod wpa;
 pub mod xml;
 

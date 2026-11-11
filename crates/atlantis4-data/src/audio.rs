@@ -2,10 +2,8 @@
 //! sound tracks) and RIFF WAVE (eleven effects).
 //!
 //! The original decodes Vorbis with libvorbis 1.2.0 (file +0x1f6764) and
-//! plays through OpenAL. Here Vorbis is decoded by the `lewton` crate,
-//! trimmed to the stream's end as libvorbis trims it; its samples are not
-//! compared with libvorbis's yet (Vorbis decoding is floating point: they
-//! will match within a tolerance, not to the bit).
+//! plays through OpenAL. Vorbis is decoded here by [`crate::vorbis`], a
+//! port of that decoder that gives the game's samples bit for bit.
 
 /// A whole decoded Vorbis stream.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,30 +26,12 @@ impl std::fmt::Display for AudioError {
 
 impl std::error::Error for AudioError {}
 
-/// An Ogg Vorbis file, decoded whole.
+/// An Ogg Vorbis file, decoded whole, as the game's `ov_read` loop gives it.
 pub fn decode_vorbis(data: &[u8]) -> Result<Decoded, AudioError> {
-    let err = |e: lewton::VorbisError| AudioError(format!("Vorbis: {e}"));
-    let mut r =
-        lewton::inside_ogg::OggStreamReader::new(std::io::Cursor::new(data)).map_err(err)?;
-    let channels = r.ident_hdr.audio_channels;
-    let sample_rate = r.ident_hdr.audio_sample_rate;
-    let mut samples = Vec::new();
-    while let Some(p) = r.read_dec_packet_itl().map_err(err)? {
-        samples.extend(p);
-    }
-    // The last page's granule position is the stream's length in samples
-    // per channel: the end of the last packet beyond it is not part of the
-    // sound (Vorbis I specification, A.2; libvorbis's `ov_read` stops
-    // there). `lewton` does not trim it.
-    if let Some(end) = r.get_last_absgp() {
-        let len = usize::try_from(end)
-            .ok()
-            .and_then(|e| e.checked_mul(usize::from(channels)))
-            .unwrap_or(usize::MAX);
-        samples.truncate(len);
-    }
+    let (channels, sample_rate, samples) =
+        crate::vorbis::decode(data).map_err(|e| AudioError(e.to_string()))?;
     Ok(Decoded {
-        channels,
+        channels: channels as u8,
         sample_rate,
         samples,
     })

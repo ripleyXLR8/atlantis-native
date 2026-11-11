@@ -16,8 +16,12 @@
 //! screen (the intro at a new game) over a black background: while it
 //! runs the view does not turn and clicks go to the movie's buttons (a
 //! click shows or hides the skip button at the top right, a click on it
-//! ends the movie), and its end calls `OnMovieFinished`. Sounds, dialogs
-//! and the inventory are not there yet (logged).
+//! ends the movie), and its end calls `OnMovieFinished`. The sounds play
+//! as the original mixes them (`atlantis4_engine::sound`, `oalmix`): the
+//! music, the node's `PlaySound` sounds and ambiences, `OnSoundStopped`,
+//! the `AddToBag` notification; the device is asked for 44,100 Hz, else the mix is resampled linearly
+//! to its rate (outside the exact part, like Windows' own audio engine
+//! after OpenAL). Dialogs and the inventory are not there yet (logged).
 
 use std::cell::RefCell;
 use std::num::NonZeroU32;
@@ -45,6 +49,8 @@ const FRAME: Duration = Duration::from_millis(33);
 
 struct Viewer {
     game: Rc<RefCell<Game>>,
+    /// The sound output, kept alive.
+    _audio: Option<cpal::Stream>,
     script: Script,
     start: Instant,
     window: Option<Rc<Window>>,
@@ -67,6 +73,14 @@ impl Viewer {
     fn tick(&mut self) {
         let now = self.now_ms();
         let finished = self.game.borrow_mut().update(now);
+        // `TeSoundManager::update` ran first in the frame: its signals'
+        // callbacks (`OnSoundStopped`) come before the animations'.
+        let sounds = self.game.borrow_mut().sound_callbacks();
+        for (name, args) in sounds {
+            if let Err(e) = self.script.callback(&name, &args) {
+                log::error!("{e}");
+            }
+        }
         for name in finished {
             let arg = [Value::Str(name.into_bytes())];
             if let Err(e) = self.script.callback("OnAnimationFinished", &arg) {
@@ -237,6 +251,58 @@ fn clock_us(start: Instant) -> u64 {
     u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX)
 }
 
+/// The sound output: the 44,100 Hz stereo mix to the device, as is when
+/// the device runs at 44,100 Hz, else linearly resampled.
+fn start_sound(core: atlantis4_engine::sound::Core) -> Option<cpal::Stream> {
+    const RATE: u32 = atlantis4_engine::oalmix::RATE;
+    // Resampler state: source frames not yet used, position in them.
+    let mut src: Vec<i16> = Vec::new();
+    let mut pos = 0f64;
+    crate::audio_out::start_with_rate(
+        move |out, rate, channels| {
+            let channels = channels.max(1);
+            let frames = out.len() / channels;
+            let mut core = core.lock().unwrap_or_else(|e| e.into_inner());
+            let put = |o: &mut [f32], l: f32, r: f32| {
+                if channels == 1 {
+                    o[0] = (l + r) / 2.0;
+                } else {
+                    o[0] = l;
+                    o[1] = r;
+                    o[2..].fill(0.0);
+                }
+            };
+            if rate == RATE {
+                let mut buf = vec![0i16; 2 * frames];
+                core.pull(&mut buf);
+                for (o, s) in out.chunks_exact_mut(channels).zip(buf.as_chunks::<2>().0) {
+                    put(o, f32::from(s[0]) / 32768.0, f32::from(s[1]) / 32768.0);
+                }
+                return;
+            }
+            let step = f64::from(RATE) / f64::from(rate);
+            for o in out.chunks_exact_mut(channels) {
+                let i = pos as usize;
+                while src.len() < 2 * (i + 2) {
+                    let mut more = vec![0i16; 2 * 256];
+                    core.pull(&mut more);
+                    src.extend(more);
+                }
+                let f = (pos - i as f64) as f32;
+                let at = |k: usize| f32::from(src[k]) / 32768.0;
+                let l = at(2 * i) * (1.0 - f) + at(2 * i + 2) * f;
+                let r = at(2 * i + 1) * (1.0 - f) + at(2 * i + 3) * f;
+                put(o, l, r);
+                pos += step;
+            }
+            let used = pos as usize;
+            src.drain(..2 * used.min(src.len() / 2));
+            pos -= used as f64;
+        },
+        RATE,
+    )
+}
+
 /// Opens the viewer on the game at `dir`, at `node` or the first node.
 pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
     let (files, build) = A4Files::open_dir(dir).map_err(|e| e.to_string())?;
@@ -257,8 +323,11 @@ pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
         (None, Some(BootValue::Str(s))) => s.clone(),
         (None, other) => return Err(format!("no firstWarpPath ({other:?})")),
     };
+    let audio = start_sound(game.borrow().sounds.core());
+    game.borrow_mut().sounds.headless = audio.is_none();
     let script = new_game(&engine, options, &first).map_err(|e| e.to_string())?;
     let mut app = Viewer {
+        _audio: audio,
         game,
         script,
         start,
