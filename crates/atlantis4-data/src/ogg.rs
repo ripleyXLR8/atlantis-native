@@ -100,17 +100,25 @@ pub fn read(data: &[u8], max_packets: usize) -> Result<(Vec<Page>, Packets), Ogg
         }
         let mut body = &page[27 + nseg..];
         let cur = partial.entry(serial).or_default();
-        for &l in lacing {
-            let l = usize::from(l);
-            cur.extend_from_slice(&body[..l]);
-            body = &body[l..];
-            if l < 255 {
+        // A packet's segments in this page at once (up to the first under
+        // 255, which ends it): one copy, not one growth per segment.
+        let mut n = 0;
+        while n < lacing.len() {
+            let end = lacing[n..]
+                .iter()
+                .position(|&l| l < 255)
+                .map_or(lacing.len(), |p| n + p + 1);
+            let size: usize = lacing[n..end].iter().map(|&l| usize::from(l)).sum();
+            cur.extend_from_slice(&body[..size]);
+            body = &body[size..];
+            if lacing[end - 1] < 255 {
                 let done = std::mem::take(cur);
                 let list = packets.entry(serial).or_default();
                 if list.len() < max_packets {
                     list.push(done);
                 }
             }
+            n = end;
         }
         pages.push(Page {
             header_type,

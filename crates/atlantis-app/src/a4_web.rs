@@ -3,9 +3,11 @@
 //!
 //! - **The files**: the install folder the player picked
 //!   (`<input webkitdirectory>`), each file read when the engine reads it,
-//!   the part it reads ([`crate::web`]'s `PickedDir`): nothing of the
-//!   install is copied into the page. The movie colour table is read from
-//!   the picked `Atlantis Evolution.exe`, as on the desktop.
+//!   the part it reads ([`crate::web`]'s `PickedDir`), unless the
+//!   read-ahead ([`crate::a4_prefetch`]) has it already: nothing of the
+//!   install is copied into the page but that cache (256 MB at most).
+//!   The movie colour table is read from the picked
+//!   `Atlantis Evolution.exe`, as on the desktop.
 //! - **The picture**: the graphics card's renderer on the canvas's WebGL 2
 //!   context (`a4_gl_web.rs`), or the processor's on a 2D canvas when the
 //!   browser has no WebGL 2 or the page's storage says
@@ -19,7 +21,9 @@
 //!   output, started at the first click or key (a browser allows it only
 //!   then); until then the engine plays the sounds out silently on the
 //!   game's clock (`Sounds::headless`), so that a voice's end still comes.
-//!   Silent while the page is hidden.
+//!   Mixed a quarter of a second ahead, further before a scene's loading
+//!   or a movie's opening ([`crate::audio_out::web_out`]). Silent while
+//!   the page is hidden.
 //! - **The saves and `options.xml`**: the backup folder of the desktop,
 //!   `Documents/Atlantis Evolution/`, kept in the page's `localStorage`
 //!   under `atlantis-native/atlantis4/`, one key per file: written as the
@@ -41,14 +45,8 @@ use winit::platform::web::EventLoopExtWebSys;
 use super::*;
 use crate::a2_web::{self, FrameTimes};
 
-/// A redraw longer than this is logged: the sound's output is filled
-/// about this far ahead, so a longer one may leave a gap in it.
+/// A redraw longer than this is logged.
 const SLOW_REDRAW_MS: f64 = 80.0;
-
-/// The sound's output buffers: 4,096 frames (93 ms at 44,100 Hz), twice
-/// cpal's default, so that a node change (50 to 90 ms of the page's
-/// thread) leaves no gap in the ambience; the sound comes 46 ms later.
-pub const OUTPUT_FRAMES: u32 = 4096;
 
 /// The page's part of the viewer.
 pub struct WebPart {
@@ -61,7 +59,7 @@ pub struct WebPart {
     options_kept: Option<Vec<u8>>,
     pub options_due: bool,
     /// The sound, started on the first click or key.
-    audio: Option<cpal::Stream>,
+    audio: Option<crate::audio_out::web_out::WebOutput>,
     audio_pending: bool,
     /// The end of the last redraw and the read time then.
     last_redraw: Option<(Instant, Duration)>,
@@ -175,6 +173,17 @@ pub fn start(
         _ => String::new(),
     };
     let files = game.borrow().files.clone();
+    // The first scene (a new game's) and the saves' scenes read ahead.
+    crate::a4_prefetch::set_language(&files.language());
+    let mut seeds: Vec<(Vec<u8>, bool)> = ["Texts/Full", "Texts/PC", "Texts"]
+        .iter()
+        .find_map(|d| files.read(&format!("{d}/FirstWarpPath.lua")))
+        .map(|d| (d, true))
+        .into_iter()
+        .collect();
+    seeds.extend(kept.values().map(|d| (d.clone(), false)));
+    crate::a4_prefetch::seed(&seeds);
+    crate::a4_prefetch::seed_interface();
     let mut front = Front::new(&files, settings, version);
     let saves = GameSaves {
         game: game.clone(),
@@ -371,6 +380,7 @@ impl Viewer {
             return;
         }
         self.run_test_commands();
+        crate::audio_out::web_out::keep_ahead();
         let reads0 = crate::web::read_time();
         let (n, _) =
             crate::web_pace::steps_due(&mut self.next_frame, t + crate::web_pace::SLACK, FRAME);
@@ -379,6 +389,7 @@ impl Viewer {
             self.stats.frames += 1;
         }
         self.keep_files();
+        crate::audio_out::web_out::keep_ahead();
         let pass = t.elapsed().as_secs_f64() * 1e3;
         let key = self.frame_key();
         let mut present = 0.0;
@@ -529,7 +540,8 @@ pub fn atlantis4_test(command: String) {
 /// game in play and its node, the movie, the dialog and document shown,
 /// the inventory, the sound, the late sound buffers, the clock, the
 /// canvas, the renderer and the check mode's last comparison, the backup
-/// folder's files and their sizes, the frame times.
+/// folder's files and their sizes, the frame times, the read-ahead's
+/// counters.
 #[wasm_bindgen]
 pub fn atlantis4_state() -> String {
     STATE.with(|s| s.borrow().clone())
@@ -622,6 +634,7 @@ impl Viewer {
             BackupFolder::Dir(_) => Vec::new(),
         };
         let headless = g.sounds.headless;
+        crate::a4_prefetch::set_language(&g.files.language());
         drop(g);
         let found = FOUND.with(|f| *f.borrow()).map_or("null".to_string(), |r| {
             format!("[{},{},{},{}]", r[0], r[1], r[2], r[3])
@@ -641,22 +654,24 @@ impl Viewer {
             "{{\"screen\":\"{:?}\",\"front\":{},\"inGame\":{in_game},\"kind\":\"{kind}\",\
              \"warp\":{warp},\"movie\":{movie},\"document\":{document},\"dialog\":{dialog},\
              \"inventoryMenu\":{menu},\"objects\":[{}],\"selected\":{selected},\
-             \"audio\":{},\"headless\":{headless},\"underruns\":{},\"underrunsSince\":{},\"clock\":{:.1},\
+             \"audio\":{},\"headless\":{headless},\"underruns\":{},\"underrunsSince\":{},\"gapMs\":{:.0},\"clock\":{:.1},\
              \"musicVolume\":{},\"size\":[{},{}],\"by\":\"{}\",\"check\":{check},\"backup\":{{{}}},\
-             \"found\":{found},\"times\":{}}}",
+             \"found\":{found},\"times\":{},\"prefetch\":{}}}",
             self.front.screen,
             self.front.active() || self.front.in_transition(),
             objects.join(","),
             self.web.audio.is_some(),
             crate::audio_out::underruns(),
             crate::audio_out::underruns() - self.web.underruns0,
+            crate::audio_out::gap_ms(),
             self.now_ms(),
             self.front.settings.volume("music"),
             self.size.0,
             self.size.1,
             self.web.by,
             backup.join(","),
-            self.web.times.report()
+            self.web.times.report(),
+            crate::a4_prefetch::report()
         );
         STATE.with(|st| *st.borrow_mut() = s);
     }

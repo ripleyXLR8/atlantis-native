@@ -61,7 +61,7 @@ struct WebFiles {
     members: Mutex<Ranges>,
 }
 
-fn key(name: &str) -> String {
+pub(crate) fn key(name: &str) -> String {
     name.replace('\\', "/")
         .trim_matches('/')
         .to_ascii_lowercase()
@@ -753,6 +753,14 @@ pub(crate) fn read_time() -> web_time::Duration {
     READ_TIME.with(std::cell::Cell::get)
 }
 
+/// Reads `len` bytes at `offset` of picked file `index` without blocking
+/// the page: the browser reads it in the background (Atlantis Evolution's
+/// read-ahead, [`crate::a4_prefetch`]).
+pub(crate) async fn read_picked_async(index: usize, offset: u64, len: u64) -> Option<Vec<u8>> {
+    let file = PICKED.with(|p| p.borrow().get(index).cloned())?;
+    fetch(&file, offset, len).await.ok()
+}
+
 /// Reads `len` bytes at `offset` of picked file `index`.
 fn read_picked_part(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
     let t = web_time::Instant::now();
@@ -787,7 +795,7 @@ fn read_picked_part_now(index: usize, offset: u64, len: usize) -> Option<Vec<u8>
 /// A folder of the picked files (Atlantis II's installed folder, a disc's
 /// copy): its files by their path below it (lower case), read at once
 /// when the engine reads them ([`read_picked`]).
-struct PickedDir {
+pub(crate) struct PickedDir {
     /// Lower-case path below the folder -> (index in [`PICKED`], size).
     files: HashMap<String, (usize, u64)>,
 }
@@ -801,6 +809,18 @@ impl PickedDir {
                 .filter_map(|(k, v)| k.strip_prefix(prefix).map(|r| (r.to_string(), *v)))
                 .collect(),
         }
+    }
+}
+
+impl PickedDir {
+    /// A file's index in [`PICKED`] and its size.
+    pub(crate) fn entry(&self, name: &str) -> Option<(usize, u64)> {
+        self.files.get(&key(name)).copied()
+    }
+
+    /// Every file: lower-case path, index in [`PICKED`] and size.
+    pub(crate) fn entries(&self) -> impl Iterator<Item = (&String, &(usize, u64))> {
+        self.files.iter()
     }
 }
 
@@ -898,6 +918,9 @@ fn start_atlantis4(
             Rc::new(atlantis_engine::MemStore::new())
         }
     };
+    // Read ahead in the background, so that the engine's reads seldom
+    // wait for the browser.
+    let dir = crate::a4_prefetch::Prefetch::new(dir);
     crate::a4::web::start(Arc::new(dir), store, language)
 }
 
