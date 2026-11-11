@@ -358,6 +358,30 @@ fn a_conversation_offers_its_topics_and_a_click_answers() {
     let _ = clock;
 }
 
+/// While a narration shows, its lock button lies above the HUD: a click
+/// on the HUD's inventory button goes to the dialog, not to the menu; the
+/// bar is drawn over the HUD's layer and the notification over both.
+#[test]
+fn a_dialog_takes_the_clicks_over_the_hud() {
+    let Some((game, mut script, clock)) = boot("3D/Centre17_C1/0001.wp") else {
+        return;
+    };
+    run(&game, &mut script, &clock, T0 + 600_000);
+    assert!(game.borrow().dialogs.shown());
+    let b = game.borrow_mut().gui().hud_button(W, H).unwrap();
+    let (x, y) = (b.left + b.width / 2.0, b.top + b.height / 2.0);
+    assert!(game.borrow_mut().gui_press(W, H, x, y));
+    let actions = game.borrow_mut().gui_release(W, H, x, y).unwrap();
+    assert!(actions.is_empty());
+    assert!(!game.borrow_mut().gui().menu_shown);
+    // Once the narration is over, the same click opens the menu.
+    run(&game, &mut script, &clock, T0 + 120_000_000);
+    assert!(!game.borrow().dialogs.shown());
+    assert!(game.borrow_mut().gui_press(W, H, x, y));
+    game.borrow_mut().gui_release(W, H, x, y);
+    assert!(game.borrow_mut().gui().menu_shown);
+}
+
 fn dump(px: &[u32], path: &std::path::Path) {
     let mut out = format!("P6\n{W} {H}\n255\n").into_bytes();
     for p in px {

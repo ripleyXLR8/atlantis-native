@@ -37,7 +37,11 @@
 //! empty slot. `ShowDocument` shows its picture full screen (the first
 //! node's tutorials); a click turns to the next page 200 ms later, which
 //! closes it, a double click closes it at once. `LoadSprite` sprites and
-//! the `AddToBag` notification's picture show.
+//! the `AddToBag` notification (its picture and the object's name) show;
+//! the inventory's box names the selected object. The layers draw in the
+//! original's order (the HUD, the inventory menu, the dialog, the
+//! answers, the notification, the cursor) and the clicks go to the top
+//! one: a dialog takes them over the HUD.
 
 use std::cell::RefCell;
 use std::num::NonZeroU32;

@@ -8,8 +8,8 @@ use atlantis4_script::{SavedGlobal, Value};
 
 use crate::documents::{self, DocAction};
 use crate::game::Game;
+use crate::gui;
 use crate::inventory::{Inventory, ObjectClick};
-use crate::layout_tree;
 use crate::savexml::{save_text, SaveParts};
 use crate::screens::{Action, Screens};
 
@@ -69,7 +69,7 @@ impl Game {
         let stem = documents::page_stem(name, page);
         let found = [".png", ".jpg"]
             .iter()
-            .find_map(|e| layout_tree::resolve(&self.files, &format!("{stem}{e}"), &self.lang));
+            .find_map(|e| gui::resolve_in(&self.files, &format!("{stem}{e}"), &self.lang));
         match found {
             Some(p) => {
                 log::info!("document {name} page {page}: {p}");
@@ -229,7 +229,7 @@ impl Game {
             .draw_hud(inventory, out, width, height);
     }
 
-    /// The inventory menu, the shown document, the notification.
+    /// The inventory menu and the shown document.
     pub(crate) fn draw_menu(
         &mut self,
         out: &mut [u32],
@@ -240,27 +240,26 @@ impl Game {
         self.gui();
         let now = self.now_ms;
         let Game {
-            screens,
-            inventory,
-            text,
-            ..
+            screens, inventory, ..
         } = self;
-        screens.as_mut().expect("screens").draw_menu(
-            inventory,
-            text.as_mut(),
-            out,
-            width,
-            height,
-            now,
-            pointer,
-        );
+        screens
+            .as_mut()
+            .expect("screens")
+            .draw_menu(inventory, out, width, height, now, pointer);
+    }
+
+    /// The object notification (above the dialogs).
+    pub(crate) fn draw_notify(&mut self, out: &mut [u32], width: u32, height: u32) {
+        if let Some(s) = self.screens.as_mut() {
+            s.draw_notify(out, width, height);
+        }
     }
 
     /// What the GUI shows, for [`Game::frame_key`].
     pub(crate) fn gui_key(&self, h: &mut impl std::hash::Hasher) {
         use std::hash::Hash;
         if let Some(s) = &self.screens {
-            s.key(self.now_ms, h);
+            s.key(h);
         }
         self.inventory.selected.hash(h);
         for (at, o) in self.inventory.objects() {

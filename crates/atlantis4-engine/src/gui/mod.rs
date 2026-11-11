@@ -1,8 +1,9 @@
 //! The GUI's 2-D layer: `TeLuaGUI` layout files built into a tree of
 //! layouts, their geometry, buttons, animations, texts and drawing, as
-//! atlantis4-gog-en-2363910 has them. Only what the dialog bar, the answers
-//! and the talking heads need is here; the screens own their trees
-//! ([`crate::dialog`]).
+//! atlantis4-gog-en-2363910 has them: the one GUI base of the dialog bar,
+//! the answers and the talking heads ([`crate::dialog`]) and of the HUD,
+//! the inventory menu, the shown document, the notification and the
+//! on-screen sprites ([`crate::screens`]); each screen owns its trees.
 //!
 //! - **Files** (`TeLuaGUI::load` @ 0x0054b1d0): a fresh Lua state per
 //!   file with the 13 constructors ([`atlantis4_script::GuiState`]); each
@@ -26,6 +27,13 @@
 //!   consumes the event; `setUpLayout` gives a `Pixel` button of user size
 //!   (1, 1) its up layout's size.
 //! - **Lists** (`TeListLayout` @ 0x0056ea70): [`list_layout`].
+//! - **Colour**: a sprite's picture and a text's glyphs are multiplied by
+//!   the layout's colour times its ancestors' (`GL_MODULATE`); the
+//!   inheritance is `[INFERRED]` (not read here; the notification's fade
+//!   animates its sprite, whose child is the text).
+//! - **Pictures**: `GL_LINEAR` in a power-of-two texture, the taps beyond
+//!   the picture as the other GUI sprites' ([`crate::sprite`]: clamped
+//!   left and below, transparent right and above).
 //! - **Draw order**: a later child above an earlier one (the z order of
 //!   `updateZ` @ 0x004fbe50), except a button's state layouts, which are
 //!   drawn first, under the button's other children. `[INFERRED]` from the
@@ -42,6 +50,8 @@ pub mod text;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+
+use crate::movie::{draw_stretched, Mode};
 
 use atlantis4_data::image::decode_jpeg;
 use atlantis4_data::A4Files;
@@ -257,13 +267,19 @@ impl Node {
     }
 }
 
-/// A layout file built: its layouts and its `textFormat`.
-#[derive(Clone, Debug)]
+/// A layout file built: its layouts, its `textFormat` and the number
+/// globals a screen's loader reads ([`NUMBER_GLOBALS`]).
+#[derive(Clone, Debug, Default)]
 pub struct Gui {
     pub path: String,
     pub nodes: Vec<Node>,
     pub text_format: Option<Vec<u8>>,
+    pub numbers: HashMap<String, f64>,
 }
+
+/// The number globals the screens' loaders read after running a file
+/// (`InventoryObject.lua`'s `dragThreshold`, @ 0x0054e540).
+pub const NUMBER_GLOBALS: [&str; 1] = ["dragThreshold"];
 
 /// What draws a sprite's content.
 pub trait Painter {
@@ -282,10 +298,44 @@ pub trait Painter {
     ) -> bool;
 }
 
-/// The file a logical path stands for (as written, else in `HD/` or
-/// `PC-MacOSX/` beside the file, [`crate::movie::resolve`]).
+/// The file a logical path stands for: as written, else in `PC-MacOSX/`
+/// or `HD/` beside the file ([`crate::movie::resolve`]), else in the
+/// install language's folders ([`resolve_in`], the language of
+/// `lang.ini`, English without one).
 pub fn resolve(files: &A4Files, path: &str) -> Option<String> {
-    crate::movie::resolve(files, path)
+    crate::movie::resolve(files, path).or_else(|| {
+        let lang = files.lang_ini().unwrap_or_else(|| "en".to_string());
+        resolve_in(files, path, &lang)
+    })
+}
+
+/// The file a GUI path stands for in the install for language `lang`: as
+/// written, then with the platform, definition and language folders the
+/// install keeps (`PC-MacOSX/`, `HD/`, `HD/<lang>/`,
+/// `HD/<lang>/PC-MacOSX/`, `<lang>/` before the file name). `[UNKNOWN]`
+/// the resolver's own order (@ 0x00552bd0); this is the narrowest reading
+/// that finds every GUI picture, layout and document picture of the
+/// install.
+pub fn resolve_in(files: &A4Files, path: &str, lang: &str) -> Option<String> {
+    if files.source().size(path).is_some() {
+        return Some(path.to_string());
+    }
+    let (dir, file) = path.rsplit_once('/').unwrap_or(("", path));
+    let subs = [
+        "PC-MacOSX".to_string(),
+        "HD".to_string(),
+        format!("HD/{lang}"),
+        format!("HD/{lang}/PC-MacOSX"),
+        lang.to_string(),
+    ];
+    subs.iter().find_map(|s| {
+        let p = if dir.is_empty() {
+            format!("{s}/{file}")
+        } else {
+            format!("{dir}/{s}/{file}")
+        };
+        files.source().size(&p).is_some().then_some(p)
+    })
 }
 
 /// A picture's width and height, from a PNG's header or a JPEG.
@@ -301,11 +351,15 @@ pub fn image_size(files: &A4Files, path: &str) -> Option<(u32, u32)> {
 
 /// A picture (PNG or JPEG) as RGBA, from its logical path.
 pub fn load_picture(files: &A4Files, path: &str) -> Option<Picture> {
-    let data = files.read(&resolve(files, path)?)?;
+    decode_picture(&files.read(&resolve(files, path)?)?)
+}
+
+/// A PNG or JPEG file's bytes as an RGBA picture.
+pub fn decode_picture(data: &[u8]) -> Option<Picture> {
     let img = if data.starts_with(b"\x89PNG") {
-        atlantis4_data::image::decode_png(&data).ok()?
+        atlantis4_data::image::decode_png(data).ok()?
     } else {
-        decode_jpeg(&data).ok()?
+        decode_jpeg(data).ok()?
     };
     let rgba = match img.channels {
         4 => img.pixels,
@@ -615,7 +669,8 @@ impl Engine for Builder {
     }
 
     fn read_script(&mut self, path: &[u8]) -> Option<Vec<u8>> {
-        self.files.read(&String::from_utf8_lossy(path))
+        let p: String = path.iter().map(|&c| char::from(c)).collect();
+        self.files.read(&resolve(&self.files, &p)?)
     }
 
     fn gui_layout(&mut self, class: &str, entries: Option<&[(GuiKey, GuiValue)]>) -> usize {
@@ -683,9 +738,15 @@ impl Gui {
             names: HashMap::new(),
         }));
         let engine: EngineRef = builder.clone();
+        let mut numbers = HashMap::new();
         let text_format = {
             let mut state = GuiState::new(&engine, Options::default()).ok()?;
             state.run_file(file.as_bytes());
+            for g in NUMBER_GLOBALS {
+                if let Ok(Some(BootValue::Num(x))) = state.read(g) {
+                    numbers.insert(g.to_string(), x);
+                }
+            }
             match state.read("textFormat") {
                 Ok(Some(BootValue::Str(s))) => Some(s),
                 _ => None,
@@ -697,6 +758,7 @@ impl Gui {
             path: file,
             nodes: b.nodes,
             text_format,
+            numbers,
         };
         // An animation's `layout` names its target.
         for i in 0..gui.nodes.len() {
@@ -1069,9 +1131,22 @@ impl Gui {
 
     /// Draws `root`'s tree into `out` (`width × height` XRGB).
     pub fn draw(&self, root: Id, out: &mut [u32], width: u32, height: u32, painter: &dyn Painter) {
-        self.draw_node(root, out, width, height, painter, None);
+        let tint = self.inherited_colour(root);
+        self.draw_node(root, out, width, height, painter, None, tint);
     }
 
+    /// The colour `id`'s ancestors pass down (the product of theirs).
+    fn inherited_colour(&self, id: Id) -> [u8; 4] {
+        let mut c = [255u8; 4];
+        let mut at = self.nodes[id].parent;
+        while let Some(i) = at {
+            c = modulate(c, self.nodes[i].colour);
+            at = self.nodes[i].parent;
+        }
+        c
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn draw_node(
         &self,
         id: Id,
@@ -1080,11 +1155,13 @@ impl Gui {
         height: u32,
         painter: &dyn Painter,
         clip: Option<Clip>,
+        tint: [u8; 4],
     ) {
         let n = &self.nodes[id];
         if !n.visible {
             return;
         }
+        let tint = modulate(tint, n.colour);
         let rect = self.rect(id, width, height);
         let mut clip = clip;
         match n.class {
@@ -1097,7 +1174,7 @@ impl Gui {
                             let c = crate::layout::pixel_snap(n.world);
                             crate::layout::window_rect(c, n.computed_size, width, height)
                         };
-                        draw_picture(out, width, height, pic, r, clip);
+                        draw_picture(out, width, height, pic, r, clip, tint);
                     }
                 }
             }
@@ -1120,6 +1197,7 @@ impl Gui {
                         ox.round() as i64,
                         oy.round() as i64,
                         clip,
+                        tint,
                     );
                 }
             }
@@ -1134,16 +1212,16 @@ impl Gui {
         }
         if matches!(n.class, Class::Button | Class::Checkbox) {
             if let Some(s) = n.state_layout() {
-                self.draw_node(s, out, width, height, painter, clip);
+                self.draw_node(s, out, width, height, painter, clip, tint);
             }
             for &c in &n.children {
                 if !n.is_state_layout(c) {
-                    self.draw_node(c, out, width, height, painter, clip);
+                    self.draw_node(c, out, width, height, painter, clip, tint);
                 }
             }
         } else {
             for &c in &n.children {
-                self.draw_node(c, out, width, height, painter, clip);
+                self.draw_node(c, out, width, height, painter, clip, tint);
             }
         }
     }
@@ -1158,6 +1236,7 @@ impl Gui {
         }
         n.anchor.map(f32::to_bits).hash(h);
         n.position.map(f32::to_bits).hash(h);
+        n.colour.hash(h);
         (&n.image, n.state, n.scroll_offset.to_bits(), &n.markup).hash(h);
         n.block.is_some().hash(h);
         for &c in &n.children {
@@ -1208,7 +1287,25 @@ fn pixel_span(rect: Rect, width: u32, height: u32) -> Clip {
     (i0, i1, j0, j1)
 }
 
-/// A picture stretched over `rect` (`GL_LINEAR`, blended), inside `clip`.
+/// Two colours multiplied channel by channel, rounded (`× 255` is the
+/// identity).
+pub fn modulate(a: [u8; 4], b: [u8; 4]) -> [u8; 4] {
+    std::array::from_fn(|k| ((u32::from(a[k]) * u32::from(b[k]) + 127) / 255) as u8)
+}
+
+/// A tap of a GUI picture beyond its edges ([`crate::sprite`]'s rule: the
+/// picture sits bottom row first in a power-of-two texture; clamped left
+/// and below, the padding right and above taken as transparent).
+fn gui_tap(pic: &Picture, x: i64, y: i64) -> [u8; 4] {
+    let (w, h) = (i64::from(pic.width), i64::from(pic.height));
+    if x >= w || y < 0 {
+        return [0; 4];
+    }
+    pic.texel(x.max(0), y.min(h - 1))
+}
+
+/// A picture stretched over `rect` (`GL_LINEAR`, blended), its texels
+/// multiplied by `tint`, inside `clip`.
 pub fn draw_picture(
     out: &mut [u32],
     width: u32,
@@ -1216,30 +1313,27 @@ pub fn draw_picture(
     pic: &Picture,
     rect: Rect,
     clip: Option<Clip>,
+    tint: [u8; 4],
 ) {
+    let tinted;
+    let pic = if tint == [255; 4] {
+        pic
+    } else {
+        let mut p = pic.clone();
+        for px in p.rgba.as_chunks_mut::<4>().0 {
+            *px = modulate(*px, tint);
+        }
+        tinted = p;
+        &tinted
+    };
+    let tap = |x: i64, y: i64| gui_tap(pic, x, y);
     let Some((x0, x1, y0, y1)) = clip else {
-        crate::movie::draw_stretched(
-            out,
-            width,
-            height,
-            pic,
-            rect,
-            crate::movie::Mode::Blend,
-            &|x, y| pic.texel_clamped(x, y),
-        );
+        draw_stretched(out, width, height, pic, rect, Mode::Blend, &tap);
         return;
     };
     // Clipped: drawn into a copy, the pixels inside the clip kept.
     let mut tmp = out.to_vec();
-    crate::movie::draw_stretched(
-        &mut tmp,
-        width,
-        height,
-        pic,
-        rect,
-        crate::movie::Mode::Blend,
-        &|x, y| pic.texel_clamped(x, y),
-    );
+    draw_stretched(&mut tmp, width, height, pic, rect, Mode::Blend, &tap);
     for j in y0.max(0)..y1.min(i64::from(height)) {
         for i in x0.max(0)..x1.min(i64::from(width)) {
             let o = j as usize * width as usize + i as usize;
@@ -1278,6 +1372,68 @@ mod tests {
         assert_eq!(fit.0, 110.0);
         assert_eq!(c[0].0, 0.0);
         assert!((c[0].1 + c[2].1).abs() < 1e-4);
+    }
+
+    /// A file set holding `files` (path, bytes).
+    fn mem(files: &[(&str, Vec<u8>)]) -> A4Files {
+        let mut m = atlantis_data::files::MemFiles::new();
+        for (p, d) in files {
+            m.insert(p, d.clone());
+        }
+        A4Files::new(std::sync::Arc::new(m))
+    }
+
+    /// A PNG's signature and `IHDR` size: all [`image_size`] reads.
+    fn png_header(w: u32, h: u32) -> Vec<u8> {
+        let mut d = b"\x89PNG\r\n\x1a\n\0\0\0\x0dIHDR".to_vec();
+        d.extend(w.to_be_bytes());
+        d.extend(h.to_be_bytes());
+        d.extend([8, 6, 0, 0, 0]);
+        d
+    }
+
+    #[test]
+    fn a_pixel_button_takes_its_up_pictures_size() {
+        let f = mem(&[
+            (
+                "b.lua",
+                b"TeButtonLayout { name = \"b\", anchor = {1.0, 1.0}, position = {1.0, 1.0}, \
+                  upLayout = TeSpriteLayout { name = \"up\", image = \"a.png\" } }"
+                    .to_vec(),
+            ),
+            ("a.png", png_header(120, 80)),
+        ]);
+        let mut g = Gui::load(&f, "b.lua").unwrap();
+        let (b, up) = (g.find("b").unwrap(), g.find("up").unwrap());
+        assert_eq!(&g.node(b).size[..2], &[120.0, 80.0]);
+        assert_eq!(g.node(up).ratio, 1.5);
+        // Bottom-right corner of a 1365 × 768 window.
+        g.update(b, (1365.0, 768.0), (0.0, 0.0), None);
+        let r = g.rect(b, 1365, 768);
+        assert_eq!((r.left, r.top), (1245.0, 688.0));
+    }
+
+    #[test]
+    fn a_sized_sprite_keeps_its_size_and_takes_the_ratio() {
+        let f = mem(&[
+            (
+                "s.lua",
+                b"TeSpriteLayout { name = \"s\", image = \"a.png\", sizeType = Percent, \
+                  size = {1.0, 1.0}, ratioMode = LetterBox }"
+                    .to_vec(),
+            ),
+            ("a.png", png_header(400, 300)),
+        ]);
+        let mut g = Gui::load(&f, "s.lua").unwrap();
+        let s = g.find("s").unwrap();
+        g.update(s, (1365.0, 768.0), (0.0, 0.0), None);
+        assert_eq!(g.node(s).computed_size, (1024.0, 768.0));
+    }
+
+    #[test]
+    fn vectors_keep_missing_components() {
+        let t = GuiValue::Table(vec![(GuiKey::Index(1.0), GuiValue::Num(0.25))]);
+        assert_eq!(vec3(&t, [0.5, 0.5, 0.5]), [0.25, 0.5, 0.5]);
     }
 
     #[test]

@@ -637,7 +637,7 @@ pub type Clip = (i64, i64, i64, i64);
 
 /// Draws `block` with its top-left at the window pixel (`ox`, `oy`) into
 /// `out` (`width × height` XRGB): each quad's pixels take the vertex
-/// colour with the atlas's coverage (`GL_BLEND` texture environment,
+/// colour (the markup's times the layout's `tint`) with the atlas's coverage (`GL_BLEND` texture environment,
 /// `GL_LINEAR`), blended over the window.
 #[allow(clippy::too_many_arguments)]
 pub fn draw(
@@ -649,11 +649,13 @@ pub fn draw(
     ox: i64,
     oy: i64,
     clip: Option<Clip>,
+    tint: [u8; 4],
 ) {
     let (cx0, cx1, cy0, cy1) = clip.unwrap_or((0, i64::from(width), 0, i64::from(height)));
     let ah = f64::from(font.atlas_height);
     for line in &block.lines {
-        for q in line_quads(font, block, line) {
+        for mut q in line_quads(font, block, line) {
+            q.colour = super::modulate(q.colour, tint);
             let (qw, qh) = (q.x1 - q.x0, q.y1 - q.y0);
             if qw <= 0 || qh <= 0 {
                 continue;

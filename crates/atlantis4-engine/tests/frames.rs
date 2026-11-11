@@ -112,7 +112,9 @@ const FRAMES: [&str; 9] = [
 
 /// [`FRAMES`] with the GUI layers: the intro's background covers the HUD;
 /// on the node the inventory button is in the bottom-right corner (its
-/// pixels alone differ, `tests/inventory.rs`).
+/// pixels alone differ, `tests/inventory.rs`). No GUI text shows in these
+/// frames (no dialog, notification or open inventory), so drawing the
+/// text layouts left them as they were.
 const FRAMES_GUI: [&str; 9] = [
     "da9b9d4ba328fe4168416a42f330a43a",
     "b18ddbd8e4c10c8dfce32fbb52ec413d",

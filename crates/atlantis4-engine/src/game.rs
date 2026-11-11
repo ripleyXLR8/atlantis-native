@@ -43,7 +43,7 @@ use crate::markers::sprite_path;
 use crate::movie::{self, Click, Movie, MovieCue};
 use crate::package::Picture;
 use crate::render::{render, Coverage, Weights};
-use crate::screens::{NoText, Screens, TextDraw};
+use crate::screens::Screens;
 use crate::sound::{SoundEvent, Sounds};
 use crate::sprite::{self, cursor_corner, CURSOR_PATH};
 use crate::warp::{Warp, WarpNote};
@@ -105,8 +105,6 @@ pub struct Game {
     pub puzzle_timer: PuzzleTimer,
     /// The screens' layouts, read at their first use.
     pub(crate) screens: Option<Screens>,
-    /// The text of the GUI (the dialog work's glyphs; nothing until then).
-    pub text: Box<dyn TextDraw>,
     /// Callbacks the GUI raised (`OnDocumentClosed`, …), to run in order.
     pub(crate) callbacks: Vec<(String, Vec<Value>)>,
     /// The current node's path as `ChangeWarp` gave it (`WarpName`).
@@ -117,9 +115,18 @@ pub struct Game {
     /// The last save's file name and text (not written to disk yet).
     pub last_save: Option<(String, Vec<u8>)>,
     /// The GUI layers are drawn (the HUD, the inventory menu, the shown
-    /// document, the notification); off, a frame is the warp, the
-    /// markers, a movie and the cursor only.
+    /// document, the dialogs, the notification); off, a frame is the
+    /// warp, the markers, a movie and the cursor only.
     pub draw_gui: bool,
+    /// The GUI layer that took the last press (its release goes there).
+    press_layer: Option<Layer>,
+}
+
+/// A GUI layer that takes the pointer ([`Game::gui_press`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Layer {
+    Dialogs,
+    Screens,
 }
 
 /// A PNG as RGBA.
@@ -181,12 +188,12 @@ impl Game {
             diary: Diary::default(),
             puzzle_timer: PuzzleTimer::default(),
             screens: None,
-            text: Box::new(NoText),
             callbacks: Vec::new(),
             warp_name: Vec::new(),
             avatar: None,
             last_save: None,
             draw_gui: true,
+            press_layer: None,
             files,
             table,
             warp: None,
@@ -369,9 +376,9 @@ impl Game {
                     .hash(&mut h);
             }
         }
-        self.dialogs.hash_into(&mut h);
         self.draw_gui.hash(&mut h);
         if self.draw_gui {
+            self.dialogs.hash_into(&mut h);
             self.gui_key(&mut h);
         }
         if let Some(m) = &self.movie {
@@ -451,13 +458,14 @@ impl Game {
                 m.draw(out, width, height, get(&bg), get(&up), get(&down));
             }
         }
-        // The inventory menu (and the shown document), the notification.
+        // The screens in `Game::load`'s order (@ 0x00528c10, 0x005294bf..
+        // 0x00529712): the inventory menu (and the shown document), the
+        // dialog, the answers, then the notification.
         if self.draw_gui {
             self.draw_menu(out, width, height, pointer);
+            self.dialogs.draw(&self.files, out, width, height);
+            self.draw_notify(out, width, height);
         }
-        // Above the HUD (and the inventory menu): the dialog, then the
-        // answers (`Game::load` @ 0x005294bf..0x00529712).
-        self.dialogs.draw(&self.files, out, width, height);
         if let Some((x, y)) = pointer {
             self.load_sprite(CURSOR_PATH);
             if let Some(Some(pic)) = self.sprites.get(CURSOR_PATH) {
@@ -542,16 +550,30 @@ impl Game {
     }
 
     /// A press at window pixel (`x`, `y`): `true` when a GUI layer took it
-    /// (the view then neither turns nor clicks): the dialogs above the
-    /// screens (the HUD, the inventory menu, a document).
+    /// (the view then neither turns nor clicks). The layers are asked top
+    /// first, the reverse of their draw order (`Game::load` @ 0x00528c10):
+    /// the notification, the answers and the dialog (whose full-window
+    /// lock buttons take every press while they show, over the HUD, the
+    /// menu and a document), then the screens (a document, the inventory
+    /// menu, the HUD).
     pub fn gui_press(&mut self, width: u32, height: u32, x: f64, y: f64) -> bool {
-        if self.gui_shown() {
+        self.press_layer = None;
+        let on_notify = self
+            .screens
+            .as_mut()
+            .is_some_and(|s| s.notify_hit(width, height, x, y));
+        if !on_notify && self.gui_shown() {
             self.dialogs.layout(&self.files, width, height);
             if self.dialogs.press(x, y, width, height) {
+                self.press_layer = Some(Layer::Dialogs);
                 return true;
             }
         }
-        self.screens_press(width, height, x, y)
+        let took = self.screens_press(width, height, x, y);
+        if took {
+            self.press_layer = Some(Layer::Screens);
+        }
+        took
     }
 
     /// The pointer moved to (`x`, `y`): the buttons' pressed and roll-over
@@ -563,37 +585,46 @@ impl Game {
         }
     }
 
-    /// A release at (`x`, `y`): `None` when no GUI layer took it, else the
-    /// validated click's consequences to run in order (Lua callbacks, the
-    /// answers removed after `OnAnswered`).
+    /// A release at (`x`, `y`), sent to the layer that took the press
+    /// (the dialogs when they show and no layer did): `None` when no GUI
+    /// layer takes it, else the validated click's consequences to run in
+    /// order (Lua callbacks, the answers removed after `OnAnswered`).
     pub fn gui_release(&mut self, width: u32, height: u32, x: f64, y: f64) -> Option<Vec<Action>> {
-        if self.gui_shown() {
-            self.dialogs.layout(&self.files, width, height);
-            let now = self.clock_ms();
-            let mut c = Ctx {
-                files: &self.files,
-                sounds: &mut self.sounds,
-                table: self.table.as_ref(),
-                now,
-            };
-            if let Some(mut out) = self.dialogs.release(&mut c, x, y, width, height) {
-                // A click on the bar stopped the voice: its signal at once.
-                self.route_sound_events();
-                out.extend(
-                    self.dialogs
-                        .take_callbacks()
-                        .into_iter()
-                        .map(|(n, a)| Action::Lua(n, a)),
-                );
-                return Some(out);
-            }
+        let layer = self.press_layer.take();
+        let dialogs = match layer {
+            Some(l) => l == Layer::Dialogs,
+            None => self.gui_shown(),
+        };
+        if !dialogs {
+            return self.screens_release(width, height, x, y).then(|| {
+                self.gui_callbacks()
+                    .into_iter()
+                    .map(|(n, a)| Action::Lua(n, a))
+                    .collect()
+            });
         }
-        self.screens_release(width, height, x, y).then(|| {
-            self.gui_callbacks()
+        self.dialogs.layout(&self.files, width, height);
+        let now = self.clock_ms();
+        let mut c = Ctx {
+            files: &self.files,
+            sounds: &mut self.sounds,
+            table: self.table.as_ref(),
+            now,
+        };
+        let out = self.dialogs.release(&mut c, x, y, width, height);
+        let Some(mut out) = out else {
+            // The dialogs closed under the held press: swallowed.
+            return layer.map(|_| Vec::new());
+        };
+        // A click on the bar stopped the voice: its signal at once.
+        self.route_sound_events();
+        out.extend(
+            self.dialogs
+                .take_callbacks()
                 .into_iter()
-                .map(|(n, a)| Action::Lua(n, a))
-                .collect()
-        })
+                .map(|(n, a)| Action::Lua(n, a)),
+        );
+        Some(out)
     }
 
     /// The camera of a `width × height` view.

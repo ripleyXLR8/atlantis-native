@@ -17,7 +17,7 @@ use atlantis4_data::texts::{objects_path, parse_labelled, LANGUAGES};
 use atlantis4_data::A4Files;
 use atlantis4_engine::dialog::Action;
 use atlantis4_engine::documents::page_stem;
-use atlantis4_engine::layout_tree::resolve;
+use atlantis4_engine::gui::resolve_in as resolve;
 use atlantis4_engine::screens::{object_picture, Screens};
 use atlantis4_engine::Game;
 use atlantis4_script::{new_game, read_boot_vars, BootValue, EngineRef, Options, Script, Value};
@@ -114,14 +114,15 @@ fn the_screens_are_laid_out_from_the_files() {
     let Some(dir) = install() else { return };
     let (files, _) = A4Files::open_dir(&dir).unwrap();
     let lang = files.lang_ini().unwrap_or_else(|| "en".into());
-    let s = Screens::load(&files, &lang);
+    let mut s = Screens::load(&files, &lang);
     // One page of 8 slots; seven document pages, 16 then 3 slots each.
     assert_eq!(Screens::slots(&s.inventory), [8]);
     assert_eq!(Screens::slots(&s.documents), [16, 3, 3, 3, 3, 3, 3]);
     assert_eq!(
         s.inventory
-            .global_str("textFormat")
-            .map(|t| t.matches("%s").count()),
+            .text_format
+            .as_ref()
+            .map(|t| t.windows(2).filter(|w| w == b"%s").count()),
         Some(2)
     );
     // The slots: 87 × 87 of the 1365 × 768 picture, laid out at 1.01 of
@@ -313,6 +314,75 @@ fn a_selected_object_is_used_on_the_warp_and_stays_selected() {
     assert!(text.contains("<WarpName name=\"3D/Vaisseau_LM/0013.wp\" />"));
     assert_eq!(text.matches("<Page>").count(), 1 + 7);
     assert_eq!(text.matches("<Slot").count(), 8 + 16 + 6 * 3);
+}
+
+/// The GUI text is drawn: the notification's name (black, `Arial_r_16`)
+/// inside its picture, and the selected object's name in the inventory's
+/// text box (Colaborate 24, grey 200).
+#[test]
+fn the_notification_and_the_inventory_show_their_text() {
+    let Some(dir) = install() else { return };
+    let (game, mut script, clock) = boot(&dir);
+    game.borrow_mut().movie = None;
+    script
+        .callback(
+            "OnMovieFinished",
+            &[Value::Str(b"Videos/intro.ogv".to_vec())],
+        )
+        .unwrap();
+    for _ in 0..2 {
+        game.borrow_mut().hide_document();
+        run_callbacks(&game, &mut script);
+    }
+    game.borrow_mut().add_to_bag("COUTEAU", true);
+    at(&game, &mut script, &clock, 5_600_000);
+    let draw = |game: &Rc<RefCell<Game>>| {
+        let mut px = vec![0u32; (W * H) as usize];
+        game.borrow_mut().draw(&mut px, W, H, None);
+        px
+    };
+    let count = |px: &[u32], r: atlantis4_engine::layout::Rect, pred: &dyn Fn(u32) -> bool| {
+        let mut n = 0;
+        for j in r.top.ceil() as usize..(r.top + r.height) as usize {
+            for i in r.left.ceil() as usize..(r.left + r.width) as usize {
+                n += usize::from(pred(px[j * W as usize + i]));
+            }
+        }
+        n
+    };
+    let dark = |p: u32| (p >> 16 & 0xff) < 40 && (p >> 8 & 0xff) < 40 && (p & 0xff) < 40;
+    let px = draw(&game);
+    let r = {
+        let mut g = game.borrow_mut();
+        let n = &g.gui().notify;
+        n.rect(n.find("notify").unwrap(), W, H)
+    };
+    assert!(count(&px, r, &dark) > 100, "no notification text");
+    // The inventory open with the knife selected: its name in the box.
+    let b = game.borrow_mut().gui().hud_button(W, H).unwrap();
+    click(
+        &game,
+        &mut script,
+        b.left + b.width / 2.0,
+        b.top + b.height / 2.0,
+    );
+    let s = game.borrow_mut().gui().slot_rects(0, W, H)[1];
+    *clock.borrow_mut() = 9_000_000;
+    click(
+        &game,
+        &mut script,
+        s.left + s.width / 2.0,
+        s.top + s.height / 2.0,
+    );
+    assert!(game.borrow().inventory.is_selected("COUTEAU"));
+    let px = draw(&game);
+    let t = {
+        let mut g = game.borrow_mut();
+        let i = &g.gui().inventory;
+        i.rect(i.find("text").unwrap(), W, H)
+    };
+    let grey = |p: u32| (p >> 16 & 0xff) > 150 && (p >> 8 & 0xff) > 150 && (p & 0xff) > 150;
+    assert!(count(&px, t, &grey) > 100, "no object name");
 }
 
 /// Writes the screens as PNG files into `A4_SHOT_DIR` for a look: the

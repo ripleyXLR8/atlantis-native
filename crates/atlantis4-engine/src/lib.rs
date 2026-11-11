@@ -22,10 +22,9 @@
 //! - [`layout`]: the GUI layouts' sizes and positions;
 //! - [`movie`]: video sprites, `PlayMovie`'s full-screen movie and its
 //!   skip button;
-//! - [`gui`]: the 2-D layer: layout files, geometry, buttons, animations,
-//!   text;
+//! - [`gui`]: the 2-D layer every screen is built on: layout files,
+//!   geometry, buttons, animations, pictures, text;
 //! - [`dialog`]: the dialog bar, conversations and answers;
-//! - [`layout_tree`]: a layout file's tree, places and pictures;
 //! - [`inventory`], [`documents`]: the inventory and its selection, the
 //!   documents browser and the shown document, the diary and the puzzle
 //!   timer, with their save elements ([`savexml`]);
@@ -47,7 +46,6 @@ mod game_gui;
 pub mod gui;
 pub mod inventory;
 pub mod layout;
-pub mod layout_tree;
 pub mod markers;
 pub mod movie;
 pub mod node;
