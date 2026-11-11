@@ -398,11 +398,7 @@ impl Renderer {
 
     /// The texture of `pic` with `edge` beyond it, made or found by
     /// content.
-    fn texture(
-        &mut self,
-        pic: &Picture,
-        edge: Edge<'_>,
-    ) -> Option<Placed> {
+    fn texture(&mut self, pic: &Picture, edge: Edge<'_>) -> Option<Placed> {
         if pic.width == 0
             || pic.height == 0
             || pic.rgba.len() < 4 * (pic.width * pic.height) as usize
