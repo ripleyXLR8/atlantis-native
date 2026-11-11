@@ -250,6 +250,12 @@ pub struct Engine {
     /// voice-only line, the game-over wait) stops at once and puts both
     /// back; the end of a conversation puts them back too (0x00425be5).
     pub escape_request: bool,
+    /// The warp loop ended without a click, as the original's place loop
+    /// then still acts on the zone under the pointer
+    /// ([`Engine::no_click_exit`], [`BugFix::GameOverPuzzle`] off): `true`
+    /// after a game over or an Exit (0x00496124 is 1), `false` after the
+    /// in-game menu's LOAD or QUIT (0x00496124 is 0).
+    pub(crate) pending_no_click_exit: Option<bool>,
     /// A script Vue= named a place the WAM does not have: the variable VUE
     /// reads it until the next place change.
     pub vue_override: Option<i32>,
@@ -444,6 +450,7 @@ impl Engine {
             abort: None,
             section_play: false,
             escape_request: false,
+            pending_no_click_exit: None,
             vue_override: None,
             inventory: Vec::new(),
             bar_first: 0,
@@ -634,6 +641,14 @@ impl Engine {
     /// as the original ([`BugFix::PuzzleEscape`] off).
     pub fn puzzle_escape_latches(&self) -> bool {
         !self.enhancements().fix(BugFix::PuzzleEscape)
+    }
+
+    /// A game over ends the place loop's pass at once, GAMEOVER cleared
+    /// as the screen ends ([`BugFix::GameOverPuzzle`]); off, GAMEOVER
+    /// stays set until the reload and a warp loop left without a click
+    /// still runs the zone under the pointer ([`Engine::no_click_exit`]).
+    pub fn game_over_cleared_at_once(&self) -> bool {
+        self.enhancements().fix(BugFix::GameOverPuzzle)
     }
 
     /// The hexagon puzzle forces OBJETENMAIN to 402 before its test: the
@@ -953,6 +968,9 @@ impl Engine {
 
             let action = self.handle_warp(hooks).await;
             if action == WARP_ABORT {
+                if let Some(keep_running) = self.pending_no_click_exit.take() {
+                    self.no_click_exit(hooks, keep_running).await;
+                }
                 if self.should_abort() {
                     break;
                 }
@@ -1157,6 +1175,10 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
             // player's chapter byte (0x0041975d -> FUN_0042de5c), a new
             // game from play without one.
             Some(Abort::NewGame | Abort::Load) if !e.sys.should_quit() => {
+                // The checkpoint loader clears GAMEOVER (FUN_0042de5c ->
+                // FUN_00426c68), which BugFix::GameOverPuzzle off leaves
+                // set until here.
+                e.vars.set("gameover", 0);
                 e.load_checkpoint(hooks.as_mut(), true).await;
             }
             Some(Abort::Finished) if e.vars.get("exit") == 86 => break true,

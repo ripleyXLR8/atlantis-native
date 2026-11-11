@@ -25,7 +25,7 @@
 use atlantis_data::sprite_list::npc_hit_test;
 
 use crate::cursor::{warp_cursor_step, WarpCursorInput};
-use crate::engine::{Engine, CURSOR_UNSET, WARP_ABORT};
+use crate::engine::{Abort, Engine, CURSOR_UNSET, WARP_ABORT};
 use crate::hooks::ScriptHooks;
 use crate::look::warp_look_frame;
 use crate::sys::{Input, Key, MouseButton};
@@ -252,6 +252,7 @@ impl Engine {
     pub async fn handle_warp(&mut self, hooks: &mut dyn ScriptHooks) -> u32 {
         let mut exit = false;
         let mut action = 0u32;
+        self.pending_no_click_exit = None;
 
         // The loop takes the pointer where the caller left it (entry block):
         // a mouse motion since the engine last wrote it is the WM_MOUSEMOVE
@@ -453,6 +454,13 @@ impl Engine {
                     moved = self.arrival_scan_pending;
                 }
                 if self.should_abort() || moved {
+                    // GAMEOVER after the bar (0x0041c6fe..0x0041c717): the
+                    // bar closed with the pointer at (320, 240) (FUN_0042c098
+                    // @ 0x0042c275).
+                    if !moved && self.game_over_left_set() {
+                        self.pointer.recentre();
+                        self.pending_no_click_exit = Some(true);
+                    }
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -480,6 +488,13 @@ impl Engine {
                 }
                 self.sync_pointer_mouse();
                 if self.should_abort() {
+                    // LOAD or QUIT: 0x00496124 = 0 ends the loop.
+                    if matches!(self.abort, Some(Abort::Load | Abort::Quit))
+                        && !self.sys.should_quit()
+                        && !self.game_over_cleared_at_once()
+                    {
+                        self.pending_no_click_exit = Some(false);
+                    }
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -560,6 +575,9 @@ impl Engine {
             if !exit && hooks.warp_frame(self).await {
                 self.sync_pointer_mouse();
                 if self.should_abort() {
+                    if self.game_over_left_set() {
+                        self.pending_no_click_exit = Some(true);
+                    }
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -577,6 +595,9 @@ impl Engine {
             // Place sprites: FUN_00425304 at 0x0041c3a9, after the timers,
             // unless GameOver or Exit is set (then it leaves, 0x0041c387).
             if !exit && self.vars.get("exit") != 0 {
+                if !self.game_over_cleared_at_once() {
+                    self.pending_no_click_exit = Some(true);
+                }
                 action = WARP_ABORT;
                 exit = true;
             }
@@ -649,6 +670,47 @@ impl Engine {
         self.wait_buttons_up().await;
         log::debug!("handle_warp: action {action}");
         action
+    }
+
+    /// A game over ended the warp loop and GAMEOVER is left set until the
+    /// reload ([`crate::enhancements::BugFix::GameOverPuzzle`] off).
+    fn game_over_left_set(&self) -> bool {
+        self.abort == Some(Abort::NewGame)
+            && !self.sys.should_quit()
+            && !self.game_over_cleared_at_once()
+    }
+
+    /// The place loop after a warp loop left without a click
+    /// ([`crate::enhancements::BugFix::GameOverPuzzle`] off): the warp loop's exit block returns
+    /// the zone under the pointer whatever ended it (`FUN_0041bfa0` @
+    /// 0x0041c71e: FUN_00422bb0, and the id under it), and `FUN_00423ad8`
+    /// acts on it before it tests why (0x00423c12..0x00423ca5): ClicZone =
+    /// the zone; `FUN_004240fc` runs the armed puzzle of a zone 1000..1016
+    /// while 0x00496124 is 1 (0x00424114: after a game over or an Exit,
+    /// not after the in-game menu's LOAD or QUIT, `keep_running`), then
+    /// the view reload and a /sel scan; zone 999 with no id runs the /sel
+    /// scan with DepartVue = 999 (0x00423c47..0x00423c9b). GAMEOVER is
+    /// still set, so the scan's section shows the game-over picture again
+    /// after its first line (`Scripts::play_section`). Then the pass ends
+    /// for the reason the loop ended.
+    pub(crate) async fn no_click_exit(&mut self, hooks: &mut dyn ScriptHooks, keep_running: bool) {
+        let abort = self.abort.take();
+        let (zone, id) = self.pointer_targets();
+        self.vars.set("cliczone", zone as i32);
+        // 0x00496124 = 0 after LOAD or QUIT: the lines of the zone-999
+        // scan stop at their first poll, as after a puzzle's Escape.
+        self.escape_request = !keep_running;
+        if keep_running && (1000..1017).contains(&zone) {
+            hooks.puzzle_zone(self, zone - 1000).await;
+        }
+        if zone == 999 && id == 0 && !self.should_abort() {
+            hooks.zone_999(self).await;
+        }
+        // The main loop sets 0x00496124 = 1 before the reload (0x0041975d).
+        self.escape_request = false;
+        if abort.is_some() {
+            self.abort = abort;
+        }
     }
 }
 

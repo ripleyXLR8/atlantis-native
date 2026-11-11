@@ -79,6 +79,20 @@ pub enum BugFix {
     /// narration after the puzzle stops at its first poll (Muria's hint,
     /// the rat's meow, the crab's /941 narration).
     PuzzleEscape,
+    /// A game over that leaves the warp loop without a click (a timer
+    /// section's, or one after the inventory bar) ends the place loop's
+    /// pass at once, as a click's does. Off, as the original: the warp
+    /// loop's exit block returns the zone under the pointer whatever ended
+    /// it (`FUN_0041bfa0` @ 0x0041c71e), and the place loop runs the armed
+    /// puzzle of a zone 1000..1016 (`FUN_004240fc` @ 0x00424114, then a
+    /// /sel scan) or the zone-999 scan before it tests GAMEOVER
+    /// (`FUN_00423ad8` @ 0x00423c12..0x00423ca5), GAMEOVER still set: the
+    /// scan's section meets the executor's test after its first line and
+    /// shows the game-over picture again (CHAPI044's throne lock, armed at
+    /// view 281, opens after the guards' game over). The in-game menu's
+    /// LOAD and QUIT take the same exit without the puzzle (0x00496124 is
+    /// 0): the zone-999 scan runs ([`crate::engine::Engine::no_click_exit`]).
+    GameOverPuzzle,
     /// The hexagon puzzle always places its pieces, as the 2001 entry does
     /// (OBJETENMAIN set to 402 before its test). Off, as the 1997 and the
     /// Chinese builds (atlantis-cd-en-688128 FUN_0043c570), the pieces are
@@ -156,7 +170,7 @@ pub enum BugFix {
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 18] = [
+    pub const ALL: [BugFix; 19] = [
         BugFix::MusicLoop,
         BugFix::CinemaSound,
         BugFix::HeadOverlay,
@@ -166,6 +180,7 @@ impl BugFix {
         BugFix::FifthPlayer,
         BugFix::SnakesFirstWin,
         BugFix::PuzzleEscape,
+        BugFix::GameOverPuzzle,
         BugFix::HexagonPieces,
         BugFix::LoadMusik,
         BugFix::SharpS,
@@ -189,6 +204,7 @@ impl BugFix {
             BugFix::FifthPlayer => "fix_fifth_player",
             BugFix::SnakesFirstWin => "fix_snakes_first_win",
             BugFix::PuzzleEscape => "fix_puzzle_escape",
+            BugFix::GameOverPuzzle => "fix_gameover_puzzle",
             BugFix::HexagonPieces => "fix_hexagon_pieces",
             BugFix::LoadMusik => "fix_loadmusik",
             BugFix::SharpS => "fix_sharp_s",

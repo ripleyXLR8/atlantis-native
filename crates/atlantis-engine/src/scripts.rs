@@ -1117,6 +1117,16 @@ impl Scripts {
                             after_item(e).await;
                             break;
                         }
+                        // The executor's GAMEOVER test after every line
+                        // (0x00428c05) also meets a GAMEOVER already set
+                        // when the walk began: with BugFix::GameOverPuzzle
+                        // off, the place loop's puzzle and /sel scans after
+                        // a game over that left the warp loop without a
+                        // click (Engine::no_click_exit) run with it.
+                        if let Some(req) = pending_game_over(e, &sec, i, line_idx) {
+                            game_over = Some(req);
+                            break;
+                        }
                     }
                     ConItem::Line(line) => {
                         // Every dialog line lowers the music when no fade
@@ -1167,6 +1177,16 @@ impl Scripts {
                             after_item(e).await;
                             continue;
                         }
+                        // A line's pass of the byte walk also runs the /set
+                        // line after it (FUN_0042831c on the line's CR scans
+                        // the next line) before the GAMEOVER test.
+                        let set_next = matches!(sec.items.get(i + 1), Some(ConItem::Set { .. }));
+                        if !set_next {
+                            if let Some(req) = pending_game_over(e, &sec, i, line_idx) {
+                                game_over = Some(req);
+                                break;
+                            }
+                        }
                     }
                 }
                 after_item(e).await;
@@ -1178,11 +1198,17 @@ impl Scripts {
             // the music stays lowered under the narrator. Then GameOver = 0
             // (FUN_0042de5c -> FUN_00426c68) and the main loop reloads the
             // player's checkpoint (0x0041975d); without one, a new game.
+            // With BugFix::GameOverPuzzle off GAMEOVER stays set until the
+            // reload clears it, as the original's (the main loop,
+            // `run_game`): the place loop's puzzle and /sel scans after a
+            // warp loop left without a click still see it.
             let had_game_over = game_over.is_some();
             if let Some(req) = game_over {
                 e.emit(Event::GameOver(req.n));
                 self.dialog.game_over(e, &req).await;
-                e.vars.set("gameover", 0);
+                if e.game_over_cleared_at_once() {
+                    e.vars.set("gameover", 0);
+                }
                 e.abort = Some(Abort::NewGame);
             }
 
@@ -1296,6 +1322,32 @@ fn gameover_value(cmd: &str) -> i32 {
 /// FUN_00428da8's last call). So a sound that ended during a line is seen
 /// as done, NEWSOUND cleared, before the next item (a `Cinema=` among
 /// them) runs.
+/// The game over the executor's test after the item `i` of `sec` meets
+/// when GAMEOVER is already set (0x00428c05, FUN_00426590 with the text
+/// after the item: its narrator only when the next line is one).
+fn pending_game_over(
+    e: &mut Engine,
+    sec: &ConSection,
+    i: usize,
+    line_idx: usize,
+) -> Option<GameOverRequest> {
+    let n = e.vars.get("gameover");
+    if n == 0 {
+        return None;
+    }
+    let narrator = con_game_over_narrator(&sec.items, i)
+        .map(|l| (l.text.clone() + &l.trail, con_track_letter(line_idx)));
+    if let (Some(_), Some(ConItem::Line(l))) = (&narrator, sec.items.get(i + 1)) {
+        e.subtitle_text
+            .store(con_narrator_buffer_text(&latin1_bytes(&l.raw)));
+    }
+    Some(GameOverRequest {
+        section: sec.id,
+        n,
+        narrator,
+    })
+}
+
 async fn after_item(e: &mut Engine) {
     e.poll_new_sound().await;
 }
@@ -1665,6 +1717,144 @@ mod tests {
         let letters: Vec<char> = got.iter().map(|r| r.narrator.as_ref().unwrap().1).collect();
         assert_eq!(letters, ['C', 'D']);
         assert_ne!(got[0].narrator, got[1].narrator);
+    }
+
+    /// The game overs (GAMEOVER, with a narrator), the puzzles' (id,
+    /// result), GAMEOVER and the abort as the place loop returns.
+    type ThroneRun = (Vec<(i32, bool)>, Vec<(i32, i32)>, i32, Option<Abort>);
+
+    /// What CHAPI044's guards' timer does in the throne room: /602
+    /// (Tim2(Time2>315)&(FlagTemp1=0): Cinema=84, Gameover=14) fires in
+    /// view 281, where the arrival scan armed the throne lock
+    /// (StartPuzzle 5), the pointer at the screen's centre on zone 1005.
+    /// `fixed`: [`crate::enhancements::BugFix::GameOverPuzzle`]. Returns
+    /// the game overs (GAMEOVER, with a narrator), the puzzles' results,
+    /// and GAMEOVER and the abort as the place loop returns.
+    fn throne_timer_game_over(test: &str, fixed: bool) -> Option<ThroneRun> {
+        use crate::sys::{Input, MouseButton};
+        let got = Rc::new(RefCell::new(None));
+        let overs = Rc::new(RefCell::new(Vec::new()));
+        let (g2, o2, o3) = (got.clone(), overs.clone(), overs.clone());
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        let t2 = trace.clone();
+        let mut since = None::<u64>;
+        let ran = with_engine(
+            test,
+            move |mut e| async move {
+                if !fixed {
+                    e.set_enhancements(crate::enhancements::Enhancements::all_but_fix(
+                        crate::enhancements::BugFix::GameOverPuzzle,
+                    ));
+                }
+                let mut s = Scripts::with_dialog(Box::new(GameOvers(o2)));
+                s.chapter_loaded(&mut e, 44, false).await;
+                // The palace WAM that holds view 281, and the view with
+                // the throne's zone 1005 at the screen's centre.
+                let wams: Vec<String> = e
+                    .game
+                    .big
+                    .names()
+                    .filter(|n| n.ends_with(".WAM"))
+                    .map(|n| n.rsplit('\\').next().unwrap_or(n).to_string())
+                    .collect();
+                let mut found = None;
+                'search: for w in wams {
+                    if !e.load_wam(&w).await || !e.wam.places.iter().any(|p| p.id == 281) {
+                        continue;
+                    }
+                    e.next_place_id = Some(281);
+                    e.do_place_change().await;
+                    e.pointer.recentre();
+                    for ia in 0..315 {
+                        for ib in -4..=4 {
+                            let (a, b) = (ia as f32 * 0.02, ib as f32 * 0.1);
+                            e.set_view(a, b);
+                            if e.pointer_targets() == (1005, 0) {
+                                found = Some((a, b));
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+                let (a, b) = found.expect("no view of zone 1005 in place 281");
+                e.set_view(a, b);
+                // Past the chapter's first scan and the guards' first
+                // timer (/600); the lock armed; the clock past 315 s.
+                e.vars.set("initflag", 1);
+                e.vars.set("nbvisite", 2);
+                e.vars.set("startpuzzle", 5);
+                e.vars.set("testtime2", 1);
+                let now = e.now();
+                e.clocks.restart(2, 400, now);
+                e.update_con_clocks();
+                e.trace = Some(t2);
+                e.game_step(&mut s).await;
+                *g2.borrow_mut() = Some((e.vars.get("gameover"), e.abort));
+            },
+            move |sys, frame| {
+                // The throne lock left: a click left of its rings, a while
+                // after the first game over.
+                if since.is_none() && !o3.borrow().is_empty() {
+                    since = Some(frame);
+                }
+                if let Some(f0) = since {
+                    match (frame - f0) % 8 {
+                        0 if frame - f0 >= 40 => {
+                            sys.push_input(Input::MouseMove { x: 10, y: 240 });
+                            crate::test_support::button(sys, MouseButton::Left, true);
+                        }
+                        2 if frame - f0 >= 40 => {
+                            crate::test_support::button(sys, MouseButton::Left, false)
+                        }
+                        _ => {}
+                    }
+                }
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let overs = overs
+            .borrow()
+            .iter()
+            .map(|r: &GameOverRequest| (r.n, r.narrator.is_some()))
+            .collect();
+        let puzzles = trace
+            .borrow()
+            .iter()
+            .filter_map(|ev| match ev {
+                crate::engine::Event::Puzzle { id, result } => Some((*id, *result)),
+                _ => None,
+            })
+            .collect();
+        let (gameover, abort) = got.borrow().expect("the place loop did not return");
+        Some((overs, puzzles, gameover, abort))
+    }
+
+    /// FUN_00423ad8 after a warp loop left on a timer's GAMEOVER
+    /// (0x0041c387): the zone under the pointer still runs its armed
+    /// puzzle (FUN_004240fc @ 0x00424114), then the /sel scan, GAMEOVER
+    /// still set: /010 /sel(FinPuzzle>0) meets the executor's test after
+    /// its first line (0x00428c05) and shows the picture again, without a
+    /// narrator (the next line is a /set). With
+    /// [`crate::enhancements::BugFix::GameOverPuzzle`], the reload at once.
+    #[test]
+    fn a_timer_game_over_still_runs_the_throne_lock() {
+        let t = "a_timer_game_over_still_runs_the_throne_lock";
+        let Some(original) = throne_timer_game_over(t, false) else {
+            return;
+        };
+        assert_eq!(
+            original,
+            (
+                vec![(14, true), (14, false)],
+                vec![(5, 2)],
+                14,
+                Some(Abort::NewGame)
+            )
+        );
+        let fixed = throne_timer_game_over(t, true).unwrap();
+        assert_eq!(fixed, (vec![(14, true)], vec![], 0, Some(Abort::NewGame)));
     }
 
     /// StopSound clears the NewSound poller's playing flag (FUN_0042b290 @

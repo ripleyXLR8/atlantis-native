@@ -390,6 +390,14 @@ change an entry; Escape, F10 or O close it. Its entries:
     puzzle reads it, ignoring it there changes nothing else (Escape
     still opens the menu in the view and skips the lines and videos it
     skips in the original).
+  - **Game over: nothing after the picture**: when a timer ends the game
+    (the guards reaching the throne room) or the in-game menu's LOAD or
+    QUIT is chosen, the original still acts on what is under the
+    pointer: a puzzle armed there opens after the game-over picture (the
+    throne lock), and the picture then shows a second time; in the one
+    room whose border answers "Nobody leaves", the soldier starts that
+    line. The fix goes straight on to the reload, as after any other game
+    over.
 
   Those of some editions:
   - **Hexagon puzzle: its pieces always there** (the 1997 and Chinese
@@ -857,7 +865,7 @@ them in each checkpoint and sets them again when one is loaded) and the [enhance
 each: one per bug fix (`fix_music_loop`, `fix_cinema_sound`, `fix_head_overlay`,
 `fix_bar_slide_out`, `fix_pickup_icon`,
 `fix_menu_records`, `fix_fifth_player`, `fix_snakes_first_win`,
-`fix_puzzle_escape`,
+`fix_puzzle_escape`, `fix_gameover_puzzle`,
 `fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
 `fix_disc_revision`, `fix_menu_line_width`, `fix_chinese_rows`,
 `fix_subtitles_toggle`, `fix_dos_letters`, `fix_startup_logos`), `restored_content`, `ui_ux` and `arrow_keys`
@@ -950,7 +958,10 @@ not kept, erase saves you no longer need.
   OK on the fifth starts it with its name (the original empties that
   name, and the nameless player can no longer be chosen); Escape in a
   puzzle does nothing (the original then refuses the hexagon's right
-  click and cuts the first line after the puzzle); and the
+  click and cuts the first line after the puzzle); after a timed game
+  over or the in-game menu's LOAD or QUIT the game goes straight on
+  (the original still opens a puzzle armed under the pointer and shows
+  the game-over picture again); and the
   others of [the options menu](#the-options-menu). Each can be turned
   off alone in the options menu's "Choose the bug fixes...";
   `--original` turns them all off.

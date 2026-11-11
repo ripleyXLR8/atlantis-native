@@ -179,6 +179,7 @@ its executable's language:
 | `fix_fifth_player` | all | `ui::player_screen::player_screen_exit` | with five players, OK on the fifth starts it with its name (the original runs the commit of a typed name, empty, over the fifth name: that player stays listed with no name and cannot be chosen) |
 | `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
 | `fix_puzzle_escape` | all | `puzzle::assets::poll_flags`, `Engine::puzzle_escape_latches` | an Escape inside a puzzle is not latched (the original clears its run flag and sets the menu request, which no puzzle reads and the place loop clears only after the puzzle's /sel scan: the hexagon then turns no piece on a right click, and the first voice-only line or game-over narration after the puzzle stops at once: Muria's hint, the rat's meow, the crab's /941 narration) |
+| `fix_gameover_puzzle` | all | `Engine::no_click_exit`, `Scripts::play_section`, `Engine::game_over_cleared_at_once` | a game over that leaves the warp loop without a click (a timer section's, one after the inventory bar) ends the place loop's pass at once, GAMEOVER cleared as its screen ends (the original's warp loop returns the zone under the pointer whatever ended it, and its place loop runs the puzzle armed there, the view reload and a /sel scan, or the zone-999 scan, before it tests GAMEOVER, which stays set until the reload: the scan's section meets the executor's game-over test after its first line and shows the picture again; reachable in CHAPI044, whose guards' timer can fire with the throne lock armed under the pointer at view 281; the in-game menu's LOAD and QUIT take the same exit, without the puzzle: a zone 999 under the pointer runs its scan, its lines cut at their first poll) |
 | `fix_hexagon_pieces` | the 1997, Chinese, DVD and Perfect Edition builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
 | `fix_sharp_s` | (not the Czech and Brazilian CDs, whose 0xe1 is `á` with a glyph) a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
@@ -200,7 +201,7 @@ which fixes each edition lists). Each place a fix changes reads it
 through one `Engine` method (`music_through_ring`, `head_overlay_drawn`,
 `cinema_sound_fix`, `bar_state`, `menus_own_records`,
 `keep_fifth_name`, `snakes_first_run_fix`, `puzzle_escape_latches`,
-`hexa_forces_402`,
+`game_over_cleared_at_once`, `hexa_forces_402`,
 `loadmusik_track_by_track`, `sharp_s_as_ss`, `current_disc_copy`,
 `menu_rules`, `chinese_row_fix`): `tests/fix_menu.rs` sets each fix
 alone, then every fix but one, and checks that every reading follows its
@@ -292,8 +293,9 @@ the run without writing it; the browser goes full screen only on a user
 gesture). With both, the menu's rows are 20 pixels high instead of 24
 (`OptionsMenu::layout`), to keep a margin on the 640 x 480 screen. The
 bug fixes' box does the same with its rows (`OptionsMenu::fix_layout`):
-24 pixels high, else 20, else 18 (`DENSE_ROW_H`), the first height that
-leaves 8 pixels around the box. The
+24 pixels high, else 20, else 18 (`DENSE_ROW_H`: only the boxes of the
+Simplified Chinese CD and the May 1997 German CD, which list the most
+fixes), the first height that leaves 8 pixels around the box. The
 engine's own save of `settings.ini` (the game's options page) keeps the
 front end's keys as stored: the graphics mode, the HD options, the
 enhancements and full screen.

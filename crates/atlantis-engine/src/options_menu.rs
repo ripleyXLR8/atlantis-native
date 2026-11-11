@@ -567,6 +567,7 @@ impl BugFix {
             BugFix::FifthPlayer => "Players: OK on the fifth player",
             BugFix::SnakesFirstWin => "Snakes puzzle: the false first win",
             BugFix::PuzzleEscape => "Puzzles: Escape stays without effect",
+            BugFix::GameOverPuzzle => "Game over: nothing after the picture",
             BugFix::HexagonPieces => "Hexagon puzzle: its pieces always there",
             BugFix::LoadMusik => "Music: tracks copied one by one",
             BugFix::SharpS => "German: the sharp s in the LOAD list",
@@ -627,6 +628,11 @@ impl BugFix {
                 "After Escape in a puzzle, the original's hexagon",
                 "turns no piece on a right click, and the first line",
                 "after the puzzle stops at once.",
+            ],
+            BugFix::GameOverPuzzle => &[
+                "After a timed game over, the original still opens",
+                "a puzzle left under the pointer, then shows the",
+                "game over picture again (the throne room).",
             ],
             BugFix::HexagonPieces => &[
                 "This build places the hexagon puzzle's pieces only",
@@ -1314,7 +1320,7 @@ mod tests {
                 ..DEFAULTS
             }
         );
-        assert_eq!(x.fixes.count(), BugFix::ALL.len() - 9);
+        assert_eq!(x.fixes.count(), BugFix::ALL.len() - 10);
         // "Choose the bug fixes...": a button, its box.
         m.key(Key::Down, ORIG);
         assert_eq!(m.selected(), Entry::ChooseFixes);
@@ -1541,9 +1547,9 @@ mod tests {
         assert_eq!(value(BugFixes::NONE), "Off");
         assert_eq!(
             value(BugFixes::all_but(BugFix::SnakesFirstWin)),
-            "Custom (10/11)"
+            "Custom (11/12)"
         );
-        assert_eq!(value(BugFixes::only(BugFix::LoadMusik)), "Custom (1/11)");
+        assert_eq!(value(BugFixes::only(BugFix::LoadMusik)), "Custom (1/12)");
         // The fixes of other builds do not count.
         assert_eq!(value(BugFixes::all_but(BugFix::SharpS)), "On");
         assert_eq!(value(BugFixes::only(BugFix::SharpS)), "Off");
@@ -1557,10 +1563,10 @@ mod tests {
         let off = game_fixes_set(&m, BugFixes::ALL, false);
         assert_eq!(press(&mut m, BugFixes::ALL), off);
         assert!(off.get(BugFix::SharpS) && !off.get(BugFix::LoadMusik));
-        assert_eq!(off.count(), BugFix::ALL.len() - 11);
+        assert_eq!(off.count(), BugFix::ALL.len() - 12);
         let on = game_fixes_set(&m, BugFixes::NONE, true);
         assert_eq!(press(&mut m, BugFixes::NONE), on);
-        assert_eq!(on.count(), 11);
+        assert_eq!(on.count(), 12);
         assert!(!on.get(BugFix::SharpS) && on.get(BugFix::LoadMusik));
         let mix = BugFixes::all_but(BugFix::HexagonPieces);
         assert_eq!(press(&mut m, mix), BugFixes::ALL);
@@ -1572,7 +1578,7 @@ mod tests {
         let mut s = vec![0u16; SCREEN_W * SCREEN_H];
         let mut t = HdText::default();
         m.draw_recording(&mut s, &font, with_fixes(mix), Some(&mut t));
-        assert!(t.items.iter().any(|i| i.text == b"< Custom (10/11) >"));
+        assert!(t.items.iter().any(|i| i.text == b"< Custom (11/12) >"));
     }
 
     /// The bug fixes' box by the keys: its rows (the game's fixes only),
@@ -1601,7 +1607,7 @@ mod tests {
             game_fixes_set(&m, BugFixes::ALL, false)
         );
         let fixes = m.game_fixes().to_vec();
-        assert_eq!(fixes.len(), 11);
+        assert_eq!(fixes.len(), 12);
         for &f in &fixes {
             m.key(Key::Down, ORIG);
             assert_eq!(m.fix_selected(), FixRow::Fix(f));
@@ -1648,7 +1654,7 @@ mod tests {
         let rows = m.fix_rows();
         let (fx, fy, row_y) = {
             let layout = m.fix_layout();
-            assert_eq!(layout.row_h, SMALL_ROW_H, "eleven fixes: rows of 20 pixels");
+            assert_eq!(layout.row_h, SMALL_ROW_H, "twelve fixes: rows of 20 pixels");
             assert_eq!(layout.row_y(2), TITLE_H + 2 * SMALL_ROW_H + GAP_H);
             let (fx, fy) = layout.origin(rows.len(), SCREEN_W, SCREEN_H);
             let row_y: Vec<i32> = (0..rows.len()).map(|i| layout.row_y(i)).collect();
@@ -1801,7 +1807,7 @@ mod tests {
     #[test]
     fn without_a_game_the_fixes_of_every_build() {
         let m = OptionsMenu::new();
-        assert_eq!(m.game_fixes().len(), 9);
+        assert_eq!(m.game_fixes().len(), 10);
         assert!(m.game_fixes().iter().all(|f| f.of_every_build()));
         assert_eq!(m.fix_title, "Original bug fixes");
     }
