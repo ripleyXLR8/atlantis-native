@@ -389,6 +389,12 @@ impl Screens {
             .collect()
     }
 
+    /// A button of the inventory menu (`mainMenuButton`, `quitButton`, …).
+    pub fn menu_button(&mut self, name: &str, width: u32, height: u32) -> Option<Rect> {
+        self.layout(width, height);
+        Self::rect_of(&self.menu, name, width, height)
+    }
+
     /// The HUD's inventory button.
     pub fn hud_button(&mut self, width: u32, height: u32) -> Option<Rect> {
         self.layout(width, height);

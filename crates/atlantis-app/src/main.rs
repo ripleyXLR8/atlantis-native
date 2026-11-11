@@ -125,16 +125,20 @@ fn main() {
     #[cfg(feature = "atlantis4")]
     if args.first().map(String::as_str) == Some("--atlantis4-view") {
         let Some(dir) = args.get(1) else {
-            eprintln!("--atlantis4-view <game folder> [[--node] node]");
+            eprintln!("--atlantis4-view <game folder> [--node <node> | --save <file>]");
             std::process::exit(2);
         };
-        // `[node]` or `--node <node>`: the development shortcut past the
-        // menus.
-        let node = match args.get(2).map(String::as_str) {
-            Some("--node") => args.get(3).map(String::as_str),
-            other => other,
+        // The development shortcuts past the menus: `--node <node>` (or a
+        // bare node) a new game there, `--save <file>` (or a bare name
+        // ending in `.xml`) that save of the backup folder.
+        let start = match (args.get(2).map(String::as_str), args.get(3)) {
+            (Some("--node"), Some(n)) => atlantis_app::a4::Start::Node(n.clone()),
+            (Some("--save"), Some(f)) => atlantis_app::a4::Start::Save(f.clone()),
+            (Some(a), _) if a.ends_with(".xml") => atlantis_app::a4::Start::Save(a.to_string()),
+            (Some(a), _) if !a.starts_with("--") => atlantis_app::a4::Start::Node(a.to_string()),
+            _ => atlantis_app::a4::Start::Menus,
         };
-        if let Err(e) = atlantis_app::a4::run_view(Path::new(dir), node) {
+        if let Err(e) = atlantis_app::a4::run_view(Path::new(dir), start) {
             eprintln!("{e}");
             std::process::exit(1);
         }

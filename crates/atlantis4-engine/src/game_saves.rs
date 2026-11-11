@@ -317,7 +317,10 @@ impl SaveStore for GameSaves {
     }
 
     fn delete(&mut self, name: &str) {
-        self.game.borrow_mut().backup.remove(&format!("Backup/{name}"));
+        self.game
+            .borrow_mut()
+            .backup
+            .remove(&format!("Backup/{name}"));
     }
 
     fn save(
@@ -326,7 +329,9 @@ impl SaveStore for GameSaves {
         script: &mut Script,
         name: &str,
     ) -> Result<(), String> {
-        let globals = script.globals().map_err(|e| format!("SaveGame({name}): {e}"))?;
+        let globals = script
+            .globals()
+            .map_err(|e| format!("SaveGame({name}): {e}"))?;
         if game.borrow_mut().save_to(name, &globals) {
             Ok(())
         } else {
