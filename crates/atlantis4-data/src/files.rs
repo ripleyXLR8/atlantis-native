@@ -11,7 +11,7 @@
 //! warp packages ([`WarpPath`]).
 
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use atlantis_data::{FileSource, StdDir};
 
@@ -33,7 +33,14 @@ pub const PLATFORM_DIR: &str = "PC-MacOSX";
 #[derive(Clone)]
 pub struct A4Files {
     src: Arc<dyn FileSource>,
+    /// The language tag (shared by every clone): [`A4Files::choose_language`].
+    lang: Arc<RwLock<String>>,
 }
+
+/// The languages `Application::create` tries, in order, when
+/// `Texts/<language>.xml` is missing (the list @ 0x0057adde: string
+/// pointers 0x005b98a4..0x005b98b8, then a null).
+pub const FALLBACK_LANGUAGES: [&str; 6] = ["en", "fr", "de", "es", "it", "ru"];
 
 /// Why a folder is not a playable install.
 #[derive(Debug)]
@@ -67,8 +74,17 @@ pub fn holds_atlantis4(dir: &Path) -> bool {
 
 impl A4Files {
     /// An install read from `src`, unchecked.
+    ///
+    /// Its language is the original's at start-up: `lang.ini`'s, checked
+    /// against the texts ([`A4Files::choose_language`]).
     pub fn new(src: Arc<dyn FileSource>) -> A4Files {
-        A4Files { src }
+        let files = A4Files {
+            src,
+            lang: Arc::new(RwLock::new(String::new())),
+        };
+        let ini = files.lang_ini();
+        files.choose_language(ini.as_deref());
+        files
     }
 
     /// The install at `dir`, with its executable identified.
@@ -105,11 +121,52 @@ impl A4Files {
 
     /// The language code of `lang.ini` (`[lang]`, `lang=en`), lower case.
     ///
-    /// The executable names `lang.ini` (file +0x1a7726); which of it and the
-    /// GOG installer's language the game follows is not settled (the French
-    /// install seen says `en`).
+    /// The game's only source of its language: the core's constructor
+    /// (@ 0x00550eb0 → 0x0056a000) reads it with
+    /// `GetPrivateProfileStringA("lang", "lang", "", buf, 0x59,
+    /// ".\\lang.ini")` and makes it the `language` tag. GOG.com ships
+    /// `lang=en` and its installer rewrites the value for the language
+    /// chosen in its client (`de`, `en`, `es`, `fr`, `it`); the executable
+    /// reads neither the registry nor the system's locale.
     pub fn lang_ini(&self) -> Option<String> {
         parse_lang_ini(&self.src.read("lang.ini")?)
+    }
+
+    /// The language tag: the folder of the voices, movie sounds, texts and
+    /// localised pictures (`de`, `en`, `es`, `fr`, `it`).
+    pub fn language(&self) -> String {
+        self.lang.read().map(|l| l.clone()).unwrap_or_default()
+    }
+
+    /// Sets the language tag to `wanted` (`None`: empty, as a missing
+    /// `lang.ini` gives) as `Application::create` checks it
+    /// (@ 0x0057aedf..0x0057b54a): while `Texts/<language>.xml` does not
+    /// exist, the next of [`FALLBACK_LANGUAGES`] becomes the language; the
+    /// list's end keeps the last one. Every clone sees the new tag.
+    /// Returns it.
+    pub fn choose_language(&self, wanted: Option<&str>) -> String {
+        let mut lang = wanted.unwrap_or("").trim().to_ascii_lowercase();
+        let mut next = FALLBACK_LANGUAGES.iter();
+        while !self.exists(&crate::texts::texts_path(&lang)) {
+            match next.next() {
+                Some(l) => lang = l.to_string(),
+                None => break,
+            }
+        }
+        if let Ok(mut l) = self.lang.write() {
+            l.clone_from(&lang);
+        }
+        lang
+    }
+
+    /// The languages the install has texts for, of [`FALLBACK_LANGUAGES`]
+    /// (the five of GOG.com's install: `ru` has none).
+    pub fn languages(&self) -> Vec<&'static str> {
+        FALLBACK_LANGUAGES
+            .iter()
+            .copied()
+            .filter(|l| self.exists(&crate::texts::texts_path(l)))
+            .collect()
     }
 }
 
@@ -198,5 +255,47 @@ mod tests {
     fn lang_ini_gives_its_code() {
         assert_eq!(parse_lang_ini(b"[lang]\r\nlang=en").as_deref(), Some("en"));
         assert_eq!(parse_lang_ini(b"[lang]\r\n"), None);
+        assert_eq!(
+            parse_lang_ini(b"[lang]\r\nlang=fr\r\n").as_deref(),
+            Some("fr")
+        );
+    }
+
+    /// An install of the texts `names`, with `lang.ini` `ini`.
+    fn install(names: &[&str], ini: Option<&str>) -> A4Files {
+        let mut m = atlantis_data::MemFiles::default();
+        for n in names {
+            m.insert(n, b"<dialog />".to_vec());
+        }
+        if let Some(i) = ini {
+            m.insert("lang.ini", format!("[lang]\r\nlang={i}").into_bytes());
+        }
+        A4Files::new(Arc::new(m))
+    }
+
+    #[test]
+    fn the_language_falls_back_as_application_create() {
+        let all = [
+            "Texts/de.xml",
+            "Texts/en.xml",
+            "Texts/es.xml",
+            "Texts/fr.xml",
+            "Texts/it.xml",
+        ];
+        assert_eq!(install(&all, Some("fr")).language(), "fr");
+        assert_eq!(install(&all, Some("IT")).language(), "it");
+        // No `lang.ini`, an empty value, a language without texts: English.
+        assert_eq!(install(&all, None).language(), "en");
+        assert_eq!(install(&all, Some("")).language(), "en");
+        assert_eq!(install(&all, Some("ru")).language(), "en");
+        // Without English: the next of the list.
+        assert_eq!(install(&["Texts/de.xml"], Some("ru")).language(), "de");
+        // No texts at all: the list's end.
+        assert_eq!(install(&[], Some("fr")).language(), "ru");
+        let f = install(&all, Some("fr"));
+        let g = f.clone();
+        assert_eq!(f.choose_language(Some("de")), "de");
+        assert_eq!(g.language(), "de", "clones share the tag");
+        assert_eq!(f.languages(), ["en", "fr", "de", "es", "it"]);
     }
 }

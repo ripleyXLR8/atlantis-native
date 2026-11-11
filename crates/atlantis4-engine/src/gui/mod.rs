@@ -330,13 +330,9 @@ pub trait Painter {
 
 /// The file a logical path stands for: as written, else in `PC-MacOSX/`
 /// or `HD/` beside the file ([`crate::movie::resolve`]), else in the
-/// install language's folders ([`resolve_in`], the language of
-/// `lang.ini`, English without one).
+/// language's folders ([`resolve_in`], [`A4Files::language`]).
 pub fn resolve(files: &A4Files, path: &str) -> Option<String> {
-    crate::movie::resolve(files, path).or_else(|| {
-        let lang = files.lang_ini().unwrap_or_else(|| "en".to_string());
-        resolve_in(files, path, &lang)
-    })
+    crate::movie::resolve(files, path).or_else(|| resolve_in(files, path, &files.language()))
 }
 
 /// The file a GUI path stands for in the install for language `lang`: as

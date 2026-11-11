@@ -319,9 +319,12 @@ pub async fn start(
     language: Option<String>,
     game: Option<String>,
     paths: Option<Vec<String>>,
+    a4_language: Option<String>,
 ) -> Result<JsValue, JsValue> {
     console_error_panic_hook::set_once();
     let _ = console_log::init_with_level(log::Level::Info);
+    #[cfg(not(feature = "atlantis4"))]
+    let _ = a4_language;
 
     // Paths are "<picked folder>/<path>".
     let mut all: HashMap<String, File> = HashMap::new();
@@ -355,7 +358,7 @@ pub async fn start(
         }
         if others.is_empty() || game.as_deref() == Some("atlantis4") {
             drop(paths);
-            start_atlantis4(all, &install)?;
+            start_atlantis4(all, &install, a4_language.as_deref())?;
             return Ok("atlantis4".into());
         }
         if game.is_none() {
@@ -880,7 +883,11 @@ fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsVa
 /// (about 2 GB) stays in the player's files: each is read when the engine
 /// reads it, the part it reads.
 #[cfg(feature = "atlantis4")]
-fn start_atlantis4(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
+fn start_atlantis4(
+    all: HashMap<String, File>,
+    install: &str,
+    language: Option<&str>,
+) -> Result<(), JsValue> {
     let index = keep_picked(all);
     let dir = PickedDir::new(&index, install);
     let bytes: u64 = dir.files.values().map(|&(_, s)| s).sum();
@@ -896,7 +903,7 @@ fn start_atlantis4(all: HashMap<String, File>, install: &str) -> Result<(), JsVa
             Rc::new(atlantis_engine::MemStore::new())
         }
     };
-    crate::a4::web::start(Arc::new(dir), store)
+    crate::a4::web::start(Arc::new(dir), store, language)
 }
 
 /// Atlantis II from the picked files: its installed folder and discs

@@ -112,6 +112,7 @@ fn render_setting() -> Render {
 pub fn start(
     install: Arc<dyn FileSource>,
     store: Rc<dyn atlantis_engine::SaveStore>,
+    language: Option<&str>,
 ) -> Result<(), JsValue> {
     let files = A4Files::new(install);
     let build = files
@@ -165,6 +166,10 @@ pub fn start(
         .map(Settings::read)
         .unwrap_or_default();
     game.borrow_mut().apply_settings(&settings);
+    if let Some(l) = language {
+        game.borrow_mut().set_language(Some(l));
+    }
+    log::info!("language {}", game.borrow().lang);
     let version = match &boot.version_string {
         Some(BootValue::Str(s)) => s.iter().map(|&c| char::from(c)).collect(),
         _ => String::new(),

@@ -18,6 +18,13 @@
 //! without that save, then the game is left (its autosave) and the main
 //! menu shows, without the credits.
 //!
+//! The language is the original's: `lang.ini`'s (GOG.com's installer
+//! writes the one chosen in its client), else `options.xml`'s
+//! `DebugLanguage`, checked against `Texts/<language>.xml` with the
+//! fallbacks `en fr de es it ru` (`atlantis4_data::A4Files::choose_language`).
+//! The original has no language menu; `--lang <de|en|es|fr|it>` is
+//! Native's own choice over both.
+//!
 //! Two development shortcuts skip the menus: `--node <node>` (or a bare
 //! `node`) starts a new game at `node`, `--save <file>` (or a bare name
 //! ending in `.xml`) loads that save of the backup folder; either game
@@ -920,9 +927,15 @@ pub fn data_dir() -> std::path::PathBuf {
 }
 
 /// Opens the viewer on the game at `dir`, starting as `start` says,
-/// drawing as `render` says.
+/// drawing as `render` says, in `language` when given (Native's
+/// `--lang`), else in the install's (`lang.ini`, as the original).
 #[cfg(not(target_arch = "wasm32"))]
-pub fn run_view(dir: &Path, start_at: Start, render: Render) -> Result<(), String> {
+pub fn run_view(
+    dir: &Path,
+    start_at: Start,
+    render: Render,
+    language: Option<&str>,
+) -> Result<(), String> {
     let (files, build) = A4Files::open_dir(dir).map_err(|e| e.to_string())?;
     log::info!("Atlantis Evolution {}", build.id);
     let clock = GameClock::new();
@@ -955,6 +968,10 @@ pub fn run_view(dir: &Path, start_at: Start, render: Render) -> Result<(), Strin
         .map(|d| Settings::read(&d))
         .unwrap_or_default();
     game.borrow_mut().apply_settings(&settings);
+    if let Some(l) = language {
+        game.borrow_mut().set_language(Some(l));
+    }
+    log::info!("language {}", game.borrow().lang);
     let version = match &boot.version_string {
         Some(BootValue::Str(s)) => s.iter().map(|&c| char::from(c)).collect(),
         _ => String::new(),

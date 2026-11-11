@@ -100,7 +100,9 @@ pub struct Game {
     pub dialogs: Dialogs,
     /// `OnSoundStopped` callbacks raised and not yet run.
     sound_pending: Vec<(String, Vec<Value>)>,
-    /// The install's language (`lang.ini`).
+    /// The language tag ([`A4Files::language`]: `lang.ini`'s, else
+    /// `options.xml`'s `DebugLanguage`, else Native's choice, checked
+    /// against the texts).
     pub lang: String,
     pub inventory: Inventory,
     pub documents: Documents,
@@ -208,7 +210,7 @@ impl Game {
             }
         });
         // The language of the voices and of the localised sounds.
-        let lang = files.lang_ini().unwrap_or_else(|| "en".to_string());
+        let lang = files.language();
         Game {
             sounds: Sounds::new(&lang),
             lang: lang.clone(),
@@ -536,11 +538,30 @@ impl Game {
     /// `+0x86b1` the inverted look, read by the view @ 0x0052a950) and
     /// the channels' volumes.
     pub fn apply_settings(&mut self, s: &crate::options::Settings) {
+        // `DebugLanguage` sets the language tag (@ 0x005788eb ->
+        // 0x00550c60), before `Application::create` checks it.
+        if !s.debug_language.is_empty() {
+            self.set_language(Some(&s.debug_language));
+        }
         self.markers_shown = s.permanent_help;
         self.inverse_look = s.inverse_look;
         for (_, ch) in crate::options::VOLUMES {
             self.sounds.set_channel_volume(ch, s.volume(ch));
         }
+    }
+
+    /// Sets the language tag ([`A4Files::choose_language`]: `wanted` if its
+    /// texts exist, else the first of `en fr de es it ru` that has them)
+    /// for the voices, movie sounds, texts and pictures loaded from now
+    /// on: called before the menus and the game load anything. Returns
+    /// the language.
+    pub fn set_language(&mut self, wanted: Option<&str>) -> String {
+        let lang = self.files.choose_language(wanted);
+        self.sounds.set_language(&lang);
+        self.lang.clone_from(&lang);
+        self.dialogs = Dialogs::default();
+        self.screens = None;
+        lang
     }
 
     /// The game's objects dropped with the scene by `Game::leave`

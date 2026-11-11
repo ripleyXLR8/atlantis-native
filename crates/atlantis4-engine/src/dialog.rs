@@ -174,7 +174,7 @@ impl Dialogs {
             return;
         }
         self.loaded = true;
-        let lang = files.lang_ini().unwrap_or_else(|| "en".to_string());
+        let lang = files.language();
         self.texts = files
             .read(&texts_path(&lang))
             .and_then(|d| DialogTable::parse(&d).ok());

@@ -256,6 +256,12 @@ impl Stream {
         &self.raw
     }
 
+    /// The file it stands for (the language folder's when the path has
+    /// none of its own).
+    pub fn resolved(&self) -> &str {
+        &self.resolved
+    }
+
     pub fn is_playing(&self) -> bool {
         self.playing
     }
@@ -310,6 +316,11 @@ pub struct Sounds {
 }
 
 impl Sounds {
+    /// The language folder of the localised sounds from now on.
+    pub fn set_language(&mut self, lang: &str) {
+        self.lang = lang.to_string();
+    }
+
     /// The sound manager, every channel at 1.0 (no `options.xml`).
     pub fn new(lang: &str) -> Sounds {
         Sounds {

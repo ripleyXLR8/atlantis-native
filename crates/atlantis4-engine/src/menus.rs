@@ -308,7 +308,7 @@ impl Front {
     /// `Application::create`'s part: the planks loaded and hidden, the
     /// settings read; [`Front::start`] begins the splashes.
     pub fn new(files: &A4Files, settings: Settings, version: String) -> Front {
-        let lang = files.lang_ini().unwrap_or_else(|| "en".to_string());
+        let lang = files.language();
         let mut rotation = Screenful::load(files, ROTATION_LUA, "rotationAnim");
         if let Some(r) = rotation.as_mut() {
             let root = r.root;

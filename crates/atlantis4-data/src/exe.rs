@@ -25,8 +25,9 @@ pub struct Build {
 
 /// The builds this port knows.
 pub const KNOWN_BUILDS: [Build; 1] = [Build {
-    // "en" is the `lang.ini` of the install it came from; the one install
-    // carries all five languages.
+    // "en" is the `lang.ini` GOG.com ships; this one file is the
+    // executable of all five GOG.com languages (one data depot for de,
+    // en, es, fr, it: the languages differ only by `lang.ini`'s value).
     id: "atlantis4-gog-en-2363910",
     label: "Atlantis Evolution, GOG.com",
     size: 2_363_910,

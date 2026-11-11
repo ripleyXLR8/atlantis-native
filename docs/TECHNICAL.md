@@ -4034,6 +4034,39 @@ code under emulation. Not compared: the original's GDI glyph pixels,
 its DirectDraw display, and the heads' and unicorn's 32-bit spans (read
 statically).
 
+## Atlantis Evolution (development, feature `atlantis4`)
+
+### Languages
+
+GOG.com sells *Atlantis Evolution* in five languages (German, English,
+Spanish, French, Italian) and ships them as one build: one data depot
+for all five, holding every language's texts, voices and pictures, and
+one `Atlantis Evolution.exe` (the same file in every language, so
+`atlantis4_data::exe` knows one build and the movie colour table is at
+the same place for all). The languages differ only by `lang.ini`
+(`[lang]` / `lang=en` as shipped), whose value GOG.com's installer sets
+to the language chosen in its client. The executable reads its language
+from that file alone: not from the registry, not from the system's
+locale (both functions are imported but never called). It then checks
+that `Texts/<language>.xml` exists and, if not, takes the first of `en
+fr de es it ru` that has one, so a missing or unknown value gives
+English. `options.xml`'s `DebugLanguage`, a development setting the
+game never writes on its own, overrides `lang.ini` before that check.
+The original has no language menu.
+
+`A4Files::choose_language` applies that rule and keeps the result as the
+language tag that every file lookup shares: the texts
+(`Texts/<language>.xml`), the voices (`Sounds/Dialogs/<language>/`), the
+movies' sound tracks (`Videos/<language>/`), the object and document
+names, and the localised pictures (`HD/<language>/` folders of the menus,
+the inventory menu, the objectives and the documents). A sound path that
+is not found in the language's folder falls back to `en/`, as in the
+original. Native adds its own choice over `lang.ini`: `--lang
+<de|en|es|fr|it>` on the desktop (`--atlantis4-view <folder> --lang fr`)
+and `?lang=fr` in the web page's address. `tests/languages.rs` boots
+each language present: the first node, the intro's sound file, a
+narration's text and voice, and the menu pictures.
+
 ## Tests
 
 Tests that need the game files read the game directory from the

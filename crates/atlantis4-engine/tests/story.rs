@@ -37,7 +37,9 @@
 //!
 //! Needs the game: `ATLANTIS4_DATA` (see `atlantis4_data::testing`);
 //! skipped with `ATLANTIS4_SKIP_DATA_TESTS=1`. Run in release: the whole
-//! story takes a few minutes. `A4_STORY_LOG=1` prints each action.
+//! story takes a few minutes. `A4_STORY_LOG=1` prints each action;
+//! `A4_STORY_LANG=<de|en|es|fr|it>` plays it in that language instead of
+//! the install's (`lang.ini`).
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
@@ -357,6 +359,12 @@ impl Player {
     fn start(files: A4Files) -> Result<Player, String> {
         let clock = Rc::new(Cell::new(T0));
         let mut g = Game::new(files, H);
+        if let Some(l) = std::env::var("A4_STORY_LANG")
+            .ok()
+            .filter(|l| !l.is_empty())
+        {
+            assert_eq!(g.set_language(Some(&l)), l, "A4_STORY_LANG");
+        }
         let c = clock.clone();
         g.clock_us = Some(Box::new(move || c.get()));
         // The sounds' clock starts here (no output: mixed on this clock).

@@ -113,7 +113,7 @@ fn script_args(dir: &Path, names: &[&str]) -> BTreeSet<String> {
 fn the_screens_are_laid_out_from_the_files() {
     let Some(dir) = install() else { return };
     let (files, _) = A4Files::open_dir(&dir).unwrap();
-    let lang = files.lang_ini().unwrap_or_else(|| "en".into());
+    let lang = files.language();
     let mut s = Screens::load(&files, &lang);
     // One page of 8 slots; seven document pages, 16 then 3 slots each.
     assert_eq!(Screens::slots(&s.inventory), [8]);

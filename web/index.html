@@ -365,6 +365,9 @@
   // Opens the game of the picked files; for Cryo's DVD, `language` is the
   // folder of the language the player chose (the engine lists them); for
   // a folder holding several games, `game` the one chosen.
+  // Atlantis Evolution's language when the page's address asks for one
+  // (`?lang=de|en|es|fr|it`): Native's choice over the install's lang.ini.
+  const a4lang = new URLSearchParams(location.search).get("lang") || undefined;
   const open = async (files, language, game, paths) => {
     const box = document.getElementById("err");
     box.textContent = "";
@@ -372,7 +375,7 @@
     // (the browser draws the message before the engine reads the files)
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
     try {
-      const started = await start(files, language, game, paths);
+      const started = await start(files, language, game, paths, a4lang);
       document.body.classList.add({ atlantis2: "game-a2", atlantis3: "game-a3", atlantis4: "game-a4" }[started] || "game-a1");
       document.body.classList.remove("landing");
       // Atlantis II or III quit from its menu: the page again.

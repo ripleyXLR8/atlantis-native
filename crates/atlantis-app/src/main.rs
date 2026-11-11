@@ -131,9 +131,18 @@ fn main() {
             check: args.iter().any(|a| a == "--gpu-check"),
         };
         args.retain(|a| a != "--cpu" && a != "--gpu-check");
+        // Native's language choice over the install's `lang.ini`.
+        let language = args.iter().position(|a| a == "--lang").map(|i| {
+            args.remove(i);
+            if i < args.len() {
+                args.remove(i)
+            } else {
+                String::new()
+            }
+        });
         let Some(dir) = args.get(1) else {
             eprintln!(
-                "--atlantis4-view <game folder> [--node <node> | --save <file>] [--cpu] [--gpu-check]"
+                "--atlantis4-view <game folder> [--node <node> | --save <file>] [--lang <de|en|es|fr|it>] [--cpu] [--gpu-check]"
             );
             std::process::exit(2);
         };
@@ -147,7 +156,9 @@ fn main() {
             (Some(a), _) if !a.starts_with("--") => atlantis_app::a4::Start::Node(a.to_string()),
             _ => atlantis_app::a4::Start::Menus,
         };
-        if let Err(e) = atlantis_app::a4::run_view(Path::new(dir), start, render) {
+        if let Err(e) =
+            atlantis_app::a4::run_view(Path::new(dir), start, render, language.as_deref())
+        {
             eprintln!("{e}");
             std::process::exit(1);
         }
