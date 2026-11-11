@@ -11,6 +11,7 @@ members = [
     "crates/atlantis4-data",
     "crates/atlantis4-engine",
     "crates/atlantis4-script",
+    "crates/atlantis4-gl",
     "crates/atlantis-app",
     "crates/atlantis-sdl",
 ]

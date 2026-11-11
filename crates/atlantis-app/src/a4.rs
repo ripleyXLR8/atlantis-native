@@ -72,6 +72,7 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use atlantis4_data::A4Files;
+use atlantis4_engine::canvas::{Canvas, CpuCache, CpuCanvas};
 use atlantis4_engine::dialog::Action;
 use atlantis4_engine::game_saves::GameSaves;
 use atlantis4_engine::menus::{Front, FrontAction};
@@ -111,7 +112,17 @@ struct Viewer {
     options_path: Option<std::path::PathBuf>,
     start: Instant,
     window: Option<Rc<Window>>,
+    /// The processor's picture in the window (with `--cpu`, or when the
+    /// card's could not be made).
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// The card's renderer on the window.
+    gl: Option<crate::a4_gl::GlView>,
+    render: Render,
+    /// The processor's renderer's state between frames.
+    cpu_cache: CpuCache,
+    /// The check mode's processor frame and when it last ran.
+    check_buf: Vec<u32>,
+    last_check: Option<Instant>,
     pointer: Option<(f64, f64)>,
     down: Option<(f64, f64)>,
     /// The press went to a GUI layer (the dialogs, the HUD, the inventory,
@@ -128,6 +139,18 @@ struct Viewer {
     stats: Stats,
     /// The window closes.
     quit: bool,
+}
+
+/// How the viewer draws.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Render {
+    /// The processor's renderer (`--cpu`) instead of the card's.
+    pub cpu: bool,
+    /// The check mode (`--gpu-check`): at most once a second, the frame
+    /// drawn by the card is drawn by the processor too and the two are
+    /// compared (logged: pixels that differ, the largest and the mean
+    /// channel difference, see `atlantis4_gl::check`).
+    pub check: bool,
 }
 
 /// Where the viewer starts.
@@ -151,6 +174,8 @@ struct Stats {
     draw: Duration,
     present: Duration,
     since: Option<Instant>,
+    /// "card" or "processor".
+    by: &'static str,
 }
 
 impl Stats {
@@ -162,16 +187,18 @@ impl Stats {
         }
         let per = |d: Duration, n: u32| d.as_secs_f64() * 1e3 / f64::from(n.max(1));
         log::info!(
-            "frames: {} updates ({:.2} ms each), {} drawn ({:.2} ms draw, {:.2} ms present) in {:.1} s",
+            "frames: {} updates ({:.2} ms each), {} drawn by the {} ({:.2} ms draw, {:.2} ms present) in {:.1} s",
             self.frames,
             per(self.tick, self.frames),
             self.draws,
+            self.by,
             per(self.draw, self.draws),
             per(self.present, self.draws),
             (now - since).as_secs_f64()
         );
         *self = Stats {
             since: Some(now),
+            by: self.by,
             ..Stats::default()
         };
     }
@@ -356,44 +383,111 @@ impl Viewer {
         self.game.borrow().movie.is_some()
     }
 
+    /// The frame on `c`: the front end's layers over the game when it
+    /// shows, else the game, the cursor last.
+    fn paint(&mut self, c: &mut dyn Canvas) {
+        let (_, h) = c.size();
+        let mut g = self.game.borrow_mut();
+        g.height = h;
+        if self.front.active() || self.front.in_transition() {
+            if self.front.active() {
+                c.clear();
+            } else {
+                g.draw_on(c, None);
+            }
+            self.front.draw_on(c);
+            g.draw_cursor_on(c, self.pointer);
+        } else {
+            g.draw_on(c, self.pointer);
+        }
+    }
+
     fn draw(&mut self) {
         let key = self.frame_key();
-        let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
-            return;
-        };
         let (w, h) = self.size;
+        if w == 0 || h == 0 {
+            return;
+        }
+        if self.gl.is_some() {
+            self.draw_gl(w, h);
+        } else {
+            self.draw_cpu(w, h);
+        }
+        self.shown = Some(key);
+    }
+
+    /// The frame drawn by the card; in the check mode, by the processor
+    /// too, and compared.
+    fn draw_gl(&mut self, w: u32, h: u32) {
+        let Some(mut gl) = self.gl.take() else { return };
+        let t0 = Instant::now();
+        {
+            let mut f = gl.renderer.begin(w, h);
+            self.paint(&mut f);
+            f.finish();
+        }
+        let t1 = Instant::now();
+        if let Some(win) = &self.window {
+            win.pre_present_notify();
+        }
+        if let Err(e) = gl.present(w, h) {
+            log::warn!("present: {e}");
+        }
+        self.stats.draws += 1;
+        self.stats.draw += t1 - t0;
+        self.stats.present += t1.elapsed();
+        let due = self
+            .last_check
+            .is_none_or(|t| t.elapsed() >= Duration::from_secs(1));
+        if self.render.check && due {
+            self.last_check = Some(Instant::now());
+            let card = gl.renderer.read_pixels();
+            let mut buf = std::mem::take(&mut self.check_buf);
+            buf.resize(w as usize * h as usize, 0);
+            let mut cache = std::mem::take(&mut self.cpu_cache);
+            let weights = self.game.borrow().weights;
+            self.paint(&mut CpuCanvas::new(&mut buf, w, h, &mut cache, weights));
+            self.cpu_cache = cache;
+            let d = atlantis4_gl::check::compare(&buf, &card, w as usize);
+            log::info!(
+                "GPU check {w}x{h}: {d}{}",
+                if d.within() {
+                    ""
+                } else {
+                    " (over the tolerance)"
+                }
+            );
+            self.check_buf = buf;
+        }
+        self.gl = Some(gl);
+    }
+
+    /// The frame drawn by the processor into the window's buffer.
+    fn draw_cpu(&mut self, w: u32, h: u32) {
         let (Some(nw), Some(nh)) = (NonZeroU32::new(w), NonZeroU32::new(h)) else {
             return;
         };
-        if surface.resize(nw, nh).is_err() {
+        let Some(mut surface) = self.surface.take() else {
             return;
-        }
-        if let Ok(mut buf) = surface.buffer_mut() {
-            let t0 = Instant::now();
-            {
-                let mut g = self.game.borrow_mut();
-                g.height = h;
-                if self.front.active() || self.front.in_transition() {
-                    if self.front.active() {
-                        buf.fill(0);
-                    } else {
-                        g.draw(&mut buf, w, h, None);
-                    }
-                    self.front.draw(&mut buf, w, h);
-                    g.draw_cursor(&mut buf, w, h, self.pointer);
-                } else {
-                    g.draw(&mut buf, w, h, self.pointer);
+        };
+        if surface.resize(nw, nh).is_ok() {
+            if let Ok(mut buf) = surface.buffer_mut() {
+                let t0 = Instant::now();
+                let mut cache = std::mem::take(&mut self.cpu_cache);
+                let weights = self.game.borrow().weights;
+                self.paint(&mut CpuCanvas::new(&mut buf, w, h, &mut cache, weights));
+                self.cpu_cache = cache;
+                let t1 = Instant::now();
+                if let Some(win) = &self.window {
+                    win.pre_present_notify();
                 }
-                drop(g);
-                self.shown = Some(key);
+                let _ = buf.present();
+                self.stats.draws += 1;
+                self.stats.draw += t1 - t0;
+                self.stats.present += t1.elapsed();
             }
-            let t1 = Instant::now();
-            window.pre_present_notify();
-            let _ = buf.present();
-            self.stats.draws += 1;
-            self.stats.draw += t1 - t0;
-            self.stats.present += t1.elapsed();
         }
+        self.surface = Some(surface);
     }
 
     /// What the picture depends on: the game's, the front end's.
@@ -471,22 +565,43 @@ impl ApplicationHandler for Viewer {
         let attrs = Window::default_attributes()
             .with_title("Atlantis Evolution (warp view) - Atlantis Native")
             .with_inner_size(PhysicalSize::new(WIDTH, HEIGHT));
-        let window = match el.create_window(attrs) {
-            Ok(w) => Rc::new(w),
-            Err(e) => {
-                log::error!("no window: {e}");
-                el.exit();
-                return;
+        // The card's renderer unless `--cpu`; the processor's when the
+        // card's cannot be made.
+        let mut window = None;
+        if !self.render.cpu {
+            let (win, view) = crate::a4_gl::create(el, attrs.clone());
+            window = win;
+            match view {
+                Ok(v) => {
+                    log::info!("drawn by the graphics card: {}", v.renderer.info);
+                    self.gl = Some(v);
+                    self.stats.by = "card";
+                }
+                Err(e) => log::warn!("no OpenGL ({e}): drawn by the processor"),
             }
+        }
+        let window = match window {
+            Some(w) => Rc::new(w),
+            None => match el.create_window(attrs) {
+                Ok(w) => Rc::new(w),
+                Err(e) => {
+                    log::error!("no window: {e}");
+                    el.exit();
+                    return;
+                }
+            },
         };
-        match softbuffer::Context::new(window.clone())
-            .and_then(|c| softbuffer::Surface::new(&c, window.clone()))
-        {
-            Ok(s) => self.surface = Some(s),
-            Err(e) => {
-                log::error!("no picture in the window: {e}");
-                el.exit();
-                return;
+        if self.gl.is_none() {
+            self.stats.by = "processor";
+            match softbuffer::Context::new(window.clone())
+                .and_then(|c| softbuffer::Surface::new(&c, window.clone()))
+            {
+                Ok(s) => self.surface = Some(s),
+                Err(e) => {
+                    log::error!("no picture in the window: {e}");
+                    el.exit();
+                    return;
+                }
             }
         }
         // The game draws its own cursor (`2D/arrow6.png`).
@@ -536,6 +651,9 @@ impl ApplicationHandler for Viewer {
             }
             WindowEvent::Resized(s) => {
                 self.size = (s.width, s.height);
+                if let Some(gl) = &self.gl {
+                    gl.resize(s.width, s.height);
+                }
                 self.shown = None;
             }
             WindowEvent::RedrawRequested => self.draw(),
@@ -609,6 +727,14 @@ impl ApplicationHandler for Viewer {
     }
 }
 
+impl Drop for Viewer {
+    /// The card's surface and context go before the window they draw on.
+    fn drop(&mut self) {
+        self.gl = None;
+        self.surface = None;
+    }
+}
+
 /// Whole microseconds since `start` (the original's clock counts whole
 /// microseconds, @ 0x004faf40).
 fn clock_us(start: Instant) -> u64 {
@@ -674,8 +800,9 @@ pub fn data_dir() -> std::path::PathBuf {
     crate::desktop::data_dir().join("atlantis4")
 }
 
-/// Opens the viewer on the game at `dir`, starting as `start` says.
-pub fn run_view(dir: &Path, start_at: Start) -> Result<(), String> {
+/// Opens the viewer on the game at `dir`, starting as `start` says,
+/// drawing as `render` says.
+pub fn run_view(dir: &Path, start_at: Start, render: Render) -> Result<(), String> {
     let (files, build) = A4Files::open_dir(dir).map_err(|e| e.to_string())?;
     log::info!("Atlantis Evolution {}", build.id);
     let start = Instant::now();
@@ -738,6 +865,11 @@ pub fn run_view(dir: &Path, start_at: Start) -> Result<(), String> {
         start,
         window: None,
         surface: None,
+        gl: None,
+        render,
+        cpu_cache: CpuCache::default(),
+        check_buf: Vec::new(),
+        last_check: None,
         pointer: None,
         down: None,
         gui_down: false,

@@ -39,6 +39,8 @@ mod a3_web;
 /// a release, see the module).
 #[cfg(all(feature = "atlantis4", not(target_arch = "wasm32")))]
 pub mod a4;
+#[cfg(all(feature = "atlantis4", not(target_arch = "wasm32")))]
+mod a4_gl;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;

@@ -124,8 +124,17 @@ fn main() {
     // Atlantis Evolution's warp viewer (a development build's only).
     #[cfg(feature = "atlantis4")]
     if args.first().map(String::as_str) == Some("--atlantis4-view") {
+        // How it draws: the graphics card unless `--cpu`; `--gpu-check`
+        // compares the card's frames with the processor's (logged).
+        let render = atlantis_app::a4::Render {
+            cpu: args.iter().any(|a| a == "--cpu"),
+            check: args.iter().any(|a| a == "--gpu-check"),
+        };
+        args.retain(|a| a != "--cpu" && a != "--gpu-check");
         let Some(dir) = args.get(1) else {
-            eprintln!("--atlantis4-view <game folder> [--node <node> | --save <file>]");
+            eprintln!(
+                "--atlantis4-view <game folder> [--node <node> | --save <file>] [--cpu] [--gpu-check]"
+            );
             std::process::exit(2);
         };
         // The development shortcuts past the menus: `--node <node>` (or a
@@ -138,7 +147,7 @@ fn main() {
             (Some(a), _) if !a.starts_with("--") => atlantis_app::a4::Start::Node(a.to_string()),
             _ => atlantis_app::a4::Start::Menus,
         };
-        if let Err(e) = atlantis_app::a4::run_view(Path::new(dir), start) {
+        if let Err(e) = atlantis_app::a4::run_view(Path::new(dir), start, render) {
             eprintln!("{e}");
             std::process::exit(1);
         }
