@@ -91,6 +91,31 @@ impl SavedValue {
     }
 }
 
+/// A global read back from a save (`TeLuaContext::load`,
+/// atlantis4-gog-en-2363910 @ `0x004c1aa0`): the value pushed for one
+/// top-level `Boolean` / `Number` / `String` element.
+#[derive(Clone, Debug, PartialEq)]
+pub enum LoadedValue {
+    Boolean(bool),
+    Number(f64),
+    String(Vec<u8>),
+    /// A `String` element without `value` (`lua_pushstring(NULL)`).
+    Nil,
+}
+
+/// What `Game::load` (@ `0x00529e30`) found at `Backup/<name>`.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SaveOpen {
+    /// No file: a new game (the node change goes to `firstWarpPath`).
+    Missing,
+    /// The file does not parse: `Failed to load file "%s"` and `Game::load`
+    /// returns at once, after `3D/OnGameEnter.lua` only.
+    Broken,
+    /// The file's globals, in file order (the engine keeps the rest for
+    /// [`Engine::restore_save`]).
+    Globals(Vec<(Vec<u8>, LoadedValue)>),
+}
+
 /// A callback argument (`TeLuaScript::Execute` pushes the variant's type).
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -193,6 +218,20 @@ pub trait Engine {
 
     /// The save (the `SaveGame` worker): the file name and the globals.
     fn save_game(&mut self, _file: &[u8], _globals: &[SavedGlobal]) {}
+
+    /// `Game::load`'s test and parse of `Backup/<file>` (@ `0x00529fd3`):
+    /// the default has no saves.
+    fn open_save(&mut self, _file: &[u8]) -> SaveOpen {
+        SaveOpen::Missing
+    }
+
+    /// The rest of the save branch after the globals (@ `0x0052a4d2`..
+    /// `0x0052a7ba`): inventory, documents, diary, puzzle timer, warp
+    /// name, orientation, music, played time. Returns the warp path the
+    /// node change goes to (empty without a `WarpName`).
+    fn restore_save(&mut self) -> Vec<u8> {
+        Vec::new()
+    }
 
     /// Before the callback reset: stop sounds, build the new node and its
     /// camera (`path` normalised, still `.wp`).
