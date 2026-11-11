@@ -293,6 +293,21 @@ impl VideoSprite {
         self.picture.as_ref()
     }
 
+    /// Draws the texture stretched over `rect` (window pixels) into `out`
+    /// (`width × height` XRGB): blended through the alpha video when it
+    /// has one, else opaque. Nothing before the first frame.
+    pub fn draw(&self, out: &mut [u32], width: u32, height: u32, rect: Rect) {
+        let Some(pic) = self.picture() else { return };
+        let mode = if self.has_alpha() {
+            Mode::Blend
+        } else {
+            Mode::Opaque
+        };
+        draw_stretched(out, width, height, pic, rect, mode, &|x, y| {
+            self.tap(pic, x, y)
+        });
+    }
+
     /// A tap of the texture at (`x`, `y`) of the picture: clamped at the
     /// left and top edges (the texture's own), the first frame's edge in
     /// the margin right and below.

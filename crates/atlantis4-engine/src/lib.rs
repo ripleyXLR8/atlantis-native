@@ -22,16 +22,21 @@
 //! - [`layout`]: the GUI layouts' sizes and positions;
 //! - [`movie`]: video sprites, `PlayMovie`'s full-screen movie and its
 //!   skip button;
+//! - [`gui`]: the 2-D layer: layout files, geometry, buttons, animations,
+//!   text;
+//! - [`dialog`]: the dialog bar, conversations and answers;
 //! - [`game`]: the bindings' engine side for the scripts.
 //!
-//! Not here yet: sounds, dialogs, the inventory and the rest of the GUI.
+//! Not here yet: the inventory and the rest of the GUI (menus, documents).
 
 #![forbid(unsafe_code)]
 
 pub mod camera;
 pub mod cube;
+pub mod dialog;
 pub mod frame_anim;
 pub mod game;
+pub mod gui;
 pub mod layout;
 pub mod markers;
 pub mod movie;
