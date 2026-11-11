@@ -31,6 +31,15 @@ if [ -z "$(ls gamedata | grep -v place-game-files-here)" ]; then
   exit 1
 fi
 
+# Atlantis Evolution needs OpenGL 3.3 and a desktop processor: the
+# PortMaster build plays the first game only.
+if ls gamedata | grep -qi '^atlantis evolution\.exe$'; then
+  pm_message "Atlantis Evolution is not played by the PortMaster build (Atlantis: The Lost Tales only): use Atlantis Native for Windows, macOS or Linux."
+  sleep 5
+  pm_finish
+  exit 1
+fi
+
 export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 chmod +x ./atlantis-native-sdl.${DEVICE_ARCH}
 

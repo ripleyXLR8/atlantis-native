@@ -323,8 +323,6 @@ pub async fn start(
 ) -> Result<JsValue, JsValue> {
     console_error_panic_hook::set_once();
     let _ = console_log::init_with_level(log::Level::Info);
-    #[cfg(not(feature = "atlantis4"))]
-    let _ = a4_language;
 
     // Paths are "<picked folder>/<path>".
     let mut all: HashMap<String, File> = HashMap::new();
@@ -344,7 +342,6 @@ pub async fn start(
     let paths: Vec<&str> = all.keys().map(String::as_str).collect();
     let picked = crate::web_layout::picked(&paths);
     // Atlantis Evolution alone, or chosen among the games of the folder.
-    #[cfg(feature = "atlantis4")]
     if let Some(install) = crate::web_layout::a4_install(&paths) {
         use crate::web_layout::Picked;
         let mut others: Vec<&str> = match &picked {
@@ -752,7 +749,6 @@ thread_local! {
 
 /// The time the page has spent reading the picked files at once
 /// ([`read_picked`]): Atlantis Evolution's clock does not count it.
-#[cfg_attr(not(feature = "atlantis4"), allow(dead_code))]
 pub(crate) fn read_time() -> web_time::Duration {
     READ_TIME.with(std::cell::Cell::get)
 }
@@ -882,7 +878,6 @@ fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsVa
 /// ([`crate::a4::web`]), the saves in the browser's storage. The install
 /// (about 2 GB) stays in the player's files: each is read when the engine
 /// reads it, the part it reads.
-#[cfg(feature = "atlantis4")]
 fn start_atlantis4(
     all: HashMap<String, File>,
     install: &str,

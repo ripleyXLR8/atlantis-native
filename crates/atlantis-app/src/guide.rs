@@ -15,6 +15,10 @@ pub const HELP_URL_A2: &str =
 pub const HELP_URL_A3: &str =
     "https://github.com/ripleyXLR8/atlantis-native/blob/main/docs/GUIDE.md#atlantis-iii";
 
+/// The guide's section on Atlantis Evolution.
+pub const HELP_URL_A4: &str =
+    "https://github.com/ripleyXLR8/atlantis-native/blob/main/docs/GUIDE.md#atlantis-evolution";
+
 /// What to tell the player about the folder `shown` whose files are
 /// `names` (lower case), which `Game::open` refused with `err`.
 pub fn explain(names: &[String], shown: &str, err: &GameError) -> String {

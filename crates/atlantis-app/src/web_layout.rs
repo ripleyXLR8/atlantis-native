@@ -168,7 +168,6 @@ pub fn a3_install(paths: &[&str]) -> Option<String> {
 /// Atlantis Evolution's installed folder among `paths`: the shallowest
 /// holding `atlantis evolution.exe` and `3d/ongameenter.lua`
 /// ([`atlantis4_data::files::holds_atlantis4`]).
-#[cfg(feature = "atlantis4")]
 pub fn a4_install(paths: &[&str]) -> Option<String> {
     paths
         .iter()
@@ -255,7 +254,6 @@ mod tests {
         assert_eq!(a3_install(CD), None);
     }
 
-    #[cfg(feature = "atlantis4")]
     #[test]
     fn atlantis_evolutions_installed_folder() {
         let paths = [

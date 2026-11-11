@@ -1,9 +1,7 @@
-//! A development viewer of *Atlantis Evolution*'s warp view (cargo
-//! feature `atlantis4`, off by default and in every release: the game is
-//! not offered until its port is complete).
+//! *Atlantis Evolution* on the desktop and in the browser.
 //!
-//! `atlantis-native --atlantis4-view <game folder>` starts as the original
-//! does (`atlantis4_engine::menus`): the two splash screens (1.5 s each),
+//! The game library and `atlantis-native <game folder>` start it as the
+//! original does (`atlantis4_engine::menus`): the two splash screens (1.5 s each),
 //! then the main menu with its music; "new game" (which deletes
 //! `save.xml` and `0.xml`..`10.xml`), "continue" (`save.xml`) and a
 //! chapter of the load screen (`<N>.xml`) close the planks and start or
@@ -14,18 +12,32 @@
 //! holds both; `options.xml` is read at the start and written when the
 //! window closes or "quit" is clicked. In the game, the inventory menu's
 //! "menu" button writes `save.xml` and goes back to the main menu
-//! through the portrait planks; `FinishGame` takes the same planks
+//! through the planks; `FinishGame` takes the same planks
 //! without that save, then the game is left (its autosave) and the main
 //! menu shows, without the credits.
+//!
+//! The window is the original's: the interface is laid out on the
+//! window's client area, whatever its size (the root layout is the client
+//! size in pixels, an orthographic projection centred on it, `TeMainWindow`
+//! 0x004ff990; the layouts keep their own proportions with their
+//! `LetterBox` and `PanScan` modes), so the window is resizable and the
+//! full screen is the screen's size, with no bars added. It opens at
+//! 1365 x 768 (smaller when the screen is), or full screen (the
+//! original's default: full screen at the desktop's size unless its
+//! `options.xml` asks for a window). The port's own: F11 and Alt+Enter
+//! switch the full screen. The port's settings are in `atlantis4/settings.ini`
+//! ([`A4Settings`]: the language, the renderer, the full screen).
 //!
 //! The language is the original's: `lang.ini`'s (GOG.com's installer
 //! writes the one chosen in its client), else `options.xml`'s
 //! `DebugLanguage`, checked against `Texts/<language>.xml` with the
 //! fallbacks `en fr de es it ru` (`atlantis4_data::A4Files::choose_language`).
-//! The original has no language menu; `--lang <de|en|es|fr|it>` is
-//! Native's own choice over both.
+//! The original has no language menu; `settings.ini`'s `language` and
+//! `--lang <de|en|es|fr|it>` are Native's own choice over both.
 //!
-//! Two development shortcuts skip the menus: `--node <node>` (or a bare
+//! The development viewer, `atlantis-native --atlantis4-view <game
+//! folder>` (`--lang`, `--cpu`, `--gpu-check`, `--fullscreen`), has two
+//! shortcuts past the menus: `--node <node>` (or a bare
 //! `node`) starts a new game at `node`, `--save <file>` (or a bare name
 //! ending in `.xml`) loads that save of the backup folder; either game
 //! still goes back to the main menu.
@@ -33,8 +45,8 @@
 //! scripts (the `Texts` boot files, `3D/OnGameEnter.lua`,
 //! `Diary/Diary.lua`, `Inventory/InventoryScripts.lua`, then the node
 //! change to `firstWarpPath`, or to `node` when given) and shows the node
-//! in a window of 1365 × 768 drawn on the processor by
-//! `atlantis4_engine`: the background, the objects and animations the
+//! in the window, drawn by the graphics card (`atlantis4_gl`) or the
+//! processor (`atlantis4_engine`): the background, the objects and animations the
 //! node's `OnWarpEnter` puts there, the markers and the game's cursor.
 //! Dragging with the left button turns the view (0.5° per pixel, the
 //! original's mouse look); a left click of less than 20 pixels calls the
@@ -109,6 +121,10 @@ use winit::event::{ElementState, MouseButton, WindowEvent};
 #[cfg(not(target_arch = "wasm32"))]
 use winit::event_loop::EventLoop;
 use winit::event_loop::{ActiveEventLoop, ControlFlow};
+#[cfg(not(target_arch = "wasm32"))]
+use winit::keyboard::{Key, NamedKey};
+#[cfg(not(target_arch = "wasm32"))]
+use winit::window::Fullscreen;
 use winit::window::{Window, WindowId};
 
 #[cfg(target_arch = "wasm32")]
@@ -192,6 +208,9 @@ struct Viewer {
     /// in memory).
     #[cfg(not(target_arch = "wasm32"))]
     options_path: Option<std::path::PathBuf>,
+    /// The desktop window's part: full screen, the keys, the game library.
+    #[cfg(not(target_arch = "wasm32"))]
+    desk: Desk,
     /// The page's part: the storage, the sound's start, the pace.
     #[cfg(target_arch = "wasm32")]
     web: web::WebPart,
@@ -670,9 +689,21 @@ impl ApplicationHandler for Viewer {
         if self.window.is_some() {
             return;
         }
+        // The original's window: its client area is the game's screen,
+        // whatever its size (the interface's root is the client size,
+        // `TeMainWindow` 0x004ff990); 1365 x 768 unless the screen is
+        // smaller, resizable; or the full screen.
+        let size = el
+            .primary_monitor()
+            .map(|m| m.size())
+            .map_or(PhysicalSize::new(WIDTH, HEIGHT), |m| {
+                window_size(m.width, m.height)
+            });
         let attrs = Window::default_attributes()
-            .with_title("Atlantis Evolution (warp view) - Atlantis Native")
-            .with_inner_size(PhysicalSize::new(WIDTH, HEIGHT));
+            .with_title("Atlantis Evolution - Atlantis Native")
+            .with_inner_size(size)
+            .with_resizable(true)
+            .with_fullscreen(self.desk.fullscreen.then_some(Fullscreen::Borderless(None)));
         // The card's renderer unless `--cpu`; the processor's when the
         // card's cannot be made.
         let mut window = None;
@@ -780,6 +811,31 @@ impl ApplicationHandler for Viewer {
             }
             #[cfg(not(target_arch = "wasm32"))]
             WindowEvent::RedrawRequested => self.draw(),
+            #[cfg(not(target_arch = "wasm32"))]
+            WindowEvent::ModifiersChanged(m) => {
+                self.desk.alt = m.state().alt_key();
+                // Shift in the first moments of an automatic start: the
+                // game library.
+                let early = self.desk.shift_until.is_some_and(|t| Instant::now() < t);
+                if early && m.state().shift_key() {
+                    log::info!("Atlantis Evolution stopped: the game library");
+                    self.desk.to_library = true;
+                    self.write_options();
+                    el.exit();
+                }
+            }
+            // The port's keys (the original reads none for the window):
+            // F11 and Alt+Enter switch the full screen.
+            #[cfg(not(target_arch = "wasm32"))]
+            WindowEvent::KeyboardInput { event, .. }
+                if event.state == ElementState::Pressed && !event.repeat =>
+            {
+                match event.logical_key {
+                    Key::Named(NamedKey::Enter) if self.desk.alt => self.toggle_fullscreen(),
+                    Key::Named(NamedKey::F11) => self.toggle_fullscreen(),
+                    _ => {}
+                }
+            }
             WindowEvent::CursorLeft { .. } => self.pointer = None,
             WindowEvent::CursorMoved { position, .. } => {
                 let p = (position.x, position.y);
@@ -918,26 +974,240 @@ fn start_sound(core: atlantis4_engine::sound::Core) -> Option<cpal::Stream> {
     stream
 }
 
+/// The desktop window's part of the game.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Default)]
+struct Desk {
+    /// The window is full screen.
+    fullscreen: bool,
+    /// Alt is held (Alt+Enter).
+    alt: bool,
+    /// Until when Shift goes back to the game library (started from it
+    /// without its screen).
+    shift_until: Option<Instant>,
+    /// The window ended for the game library's screen.
+    to_library: bool,
+    /// `settings.ini`, when the game was started from it (the full screen
+    /// switch is kept there); none for the development viewer.
+    settings: Option<A4Settings>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Viewer {
+    /// F11 or Alt+Enter: the window or the full screen, kept in
+    /// `settings.ini` (as the first game's switch is).
+    fn toggle_fullscreen(&mut self) {
+        let full = !self.desk.fullscreen;
+        self.desk.fullscreen = full;
+        if let Some(w) = &self.window {
+            w.set_fullscreen(full.then_some(Fullscreen::Borderless(None)));
+        }
+        if let Some(s) = &mut self.desk.settings {
+            s.fullscreen = full;
+            save_settings(&settings_path(), s);
+        }
+    }
+}
+
+/// The window's first size: the original's 1365 x 768 when the screen
+/// (`screen_w` x `screen_h` pixels) holds it with room for the window's
+/// frame, else as large as 90 % of the screen allows, at the same
+/// proportions. The interface is laid out on whatever size the window
+/// has, as the original lays it out on its client area.
+#[cfg(not(target_arch = "wasm32"))]
+fn window_size(screen_w: u32, screen_h: u32) -> PhysicalSize<u32> {
+    let (mw, mh) = (screen_w * 9 / 10, screen_h * 9 / 10);
+    if screen_w == 0 || screen_h == 0 || (WIDTH <= mw && HEIGHT <= mh) {
+        return PhysicalSize::new(WIDTH, HEIGHT);
+    }
+    // The largest of the original's proportions within the room.
+    let w = mw.min(mh * WIDTH / HEIGHT).max(1);
+    PhysicalSize::new(w, (w * HEIGHT / WIDTH).max(1))
+}
+
 /// Atlantis Evolution's folder in the per-user data folder: its
 /// `Documents/` stands for the player's documents, so the backup folder
-/// (the saves and `options.xml`) is `Documents/Atlantis Evolution/`.
+/// (the saves and `options.xml`) is `Documents/Atlantis Evolution/`;
+/// `settings.ini` (the port's own settings) is beside it.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn data_dir() -> std::path::PathBuf {
     crate::desktop::data_dir().join("atlantis4")
 }
 
-/// Opens the viewer on the game at `dir`, starting as `start` says,
-/// drawing as `render` says, in `language` when given (Native's
-/// `--lang`), else in the install's (`lang.ini`, as the original).
+/// The name, for people, of a language of the game (its `lang.ini` tag).
+pub fn language_name(tag: &str) -> Option<&'static str> {
+    Some(match tag {
+        "de" => "German",
+        "en" => "English",
+        "es" => "Spanish",
+        "fr" => "French",
+        "it" => "Italian",
+        "ru" => "Russian",
+        _ => return None,
+    })
+}
+
+/// The edition of the installation in `dir`, for the game library: the
+/// build's name and the language its `lang.ini` gives, as the original
+/// chooses it ("Atlantis Evolution, GOG.com, French").
 #[cfg(not(target_arch = "wasm32"))]
-pub fn run_view(
+pub fn label(dir: &Path) -> Result<String, atlantis4_data::files::OpenError> {
+    let (files, build) = A4Files::open_dir(dir)?;
+    Ok(match language_name(&files.language()) {
+        Some(name) => format!("{}, {name}", build.label),
+        None => build.label.to_string(),
+    })
+}
+
+/// The name of the port's settings file, in [`data_dir`].
+pub const SETTINGS_FILE: &str = "settings.ini";
+
+/// The port's settings for Atlantis Evolution (`settings.ini`, the other
+/// games' pattern: `key = value` lines, `#` comments, unknown keys and bad
+/// values ignored with a warning). The original's own options (the
+/// volumes, the three check boxes) stay in its `options.xml`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct A4Settings {
+    /// The language (`language = de|en|es|fr|it`), over the install's
+    /// `lang.ini`; `auto` (none): `lang.ini`'s, as the original.
+    pub language: Option<String>,
+    /// The processor's renderer (`renderer = cpu`) instead of the
+    /// graphics card's (`gpu`).
+    pub cpu: bool,
+    /// Start in full screen (`fullscreen = on|off`; on: the original runs
+    /// full screen unless its `options.xml` asks for a window).
+    pub fullscreen: bool,
+}
+
+impl Default for A4Settings {
+    fn default() -> A4Settings {
+        A4Settings {
+            language: None,
+            cpu: false,
+            fullscreen: true,
+        }
+    }
+}
+
+impl A4Settings {
+    /// `key = value` lines; unknown keys and bad values keep the default.
+    pub fn parse(text: &str) -> A4Settings {
+        let mut s = A4Settings::default();
+        for line in text.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+                continue;
+            }
+            let ok = match line.split_once('=') {
+                Some((k, v)) => {
+                    let v = v.trim().to_ascii_lowercase();
+                    match (k.trim().to_ascii_lowercase().as_str(), v.as_str()) {
+                        ("language", "auto" | "") => {
+                            s.language = None;
+                            true
+                        }
+                        ("language", l) if language_name(l).is_some() => {
+                            s.language = Some(l.to_string());
+                            true
+                        }
+                        ("renderer", "gpu") => {
+                            s.cpu = false;
+                            true
+                        }
+                        ("renderer", "cpu") => {
+                            s.cpu = true;
+                            true
+                        }
+                        ("fullscreen", "1" | "true" | "on" | "yes") => {
+                            s.fullscreen = true;
+                            true
+                        }
+                        ("fullscreen", "0" | "false" | "off" | "no") => {
+                            s.fullscreen = false;
+                            true
+                        }
+                        _ => false,
+                    }
+                }
+                None => false,
+            };
+            if !ok {
+                log::warn!("{SETTINGS_FILE}: '{line}' not understood");
+            }
+        }
+        s
+    }
+
+    pub fn to_text(&self) -> String {
+        format!(
+            "# Atlantis Native settings (Atlantis Evolution)\n\
+             # The original's own options (volumes, inverse look, compass,\n\
+             # permanent help) are kept in Documents/Atlantis Evolution/options.xml.\n\
+             # language: auto (the installation's lang.ini, as the original),\n\
+             # or de, en, es, fr, it\n\
+             language = {}\n\
+             # renderer: gpu (the graphics card, OpenGL 3.3 or ES 3.0) or cpu\n\
+             # (the processor, the reference)\n\
+             renderer = {}\n\
+             # Start in full screen (F11 or Alt+Enter switches it)\n\
+             fullscreen = {}\n",
+            self.language.as_deref().unwrap_or("auto"),
+            if self.cpu { "cpu" } else { "gpu" },
+            if self.fullscreen { "on" } else { "off" },
+        )
+    }
+}
+
+/// `settings.ini`'s place.
+#[cfg(not(target_arch = "wasm32"))]
+fn settings_path() -> std::path::PathBuf {
+    data_dir().join(SETTINGS_FILE)
+}
+
+/// `settings.ini` at `path`, written with the defaults when there is none
+/// (as the other games').
+#[cfg(not(target_arch = "wasm32"))]
+pub fn load_settings(path: &Path) -> A4Settings {
+    match std::fs::read(path) {
+        Ok(b) => A4Settings::parse(&String::from_utf8_lossy(&b)),
+        Err(_) => {
+            let s = A4Settings::default();
+            save_settings(path, &s);
+            s
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn save_settings(path: &Path, s: &A4Settings) {
+    if let Some(d) = path.parent() {
+        let _ = std::fs::create_dir_all(d);
+    }
+    if let Err(e) = std::fs::write(path, s.to_text()) {
+        log::warn!("{}: {e}", path.display());
+    }
+}
+
+/// The game at `dir` ready for its window: starting as `start` says,
+/// drawing as `render` says, in `language` when given (Native's choice),
+/// else in the install's (`lang.ini`, as the original), full screen as
+/// `fullscreen` says.
+#[cfg(not(target_arch = "wasm32"))]
+fn open_viewer(
     dir: &Path,
     start_at: Start,
     render: Render,
     language: Option<&str>,
-) -> Result<(), String> {
-    let (files, build) = A4Files::open_dir(dir).map_err(|e| e.to_string())?;
-    log::info!("Atlantis Evolution {}", build.id);
+    fullscreen: bool,
+) -> Result<Viewer, String> {
+    let (files, build) =
+        A4Files::open_dir(dir).map_err(|e| crate::setup::explain_atlantis4(dir, &e))?;
+    log::info!(
+        "Atlantis Evolution {}, {}; saves and settings in {}",
+        build.id,
+        crate::version_string(),
+        data_dir().display()
+    );
     let clock = GameClock::new();
     let mut g = Game::new(files, HEIGHT);
     // `play()` reads the clock at the call (a movie started by a script).
@@ -993,13 +1263,17 @@ pub fn run_view(
         }
         Start::Save(f) => Some(saves.load(&game, &f)?),
     };
-    let mut app = Viewer {
+    Ok(Viewer {
         _audio: audio,
         game,
         script,
         front,
         saves,
         options_path,
+        desk: Desk {
+            fullscreen,
+            ..Desk::default()
+        },
         clock,
         window: None,
         surface: None,
@@ -1018,8 +1292,144 @@ pub fn run_view(
         shown: None,
         stats: Stats::default(),
         quit: false,
-    };
+    })
+}
+
+/// The development viewer (`--atlantis4-view`): the game at `dir`,
+/// starting as `start` says, drawing as `render` says, in `language` when
+/// given (`--lang`), else in `settings.ini`'s or the install's; in a
+/// window unless `fullscreen`. `settings.ini` is neither used for the
+/// renderer nor written.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn run_view(
+    dir: &Path,
+    start_at: Start,
+    render: Render,
+    language: Option<&str>,
+    fullscreen: bool,
+) -> Result<(), String> {
+    let mut app = open_viewer(dir, start_at, render, language, fullscreen)?;
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     el.run_app(&mut app)
         .map_err(|e| format!("The window failed: {e}"))
+}
+
+/// How long after an automatic start Shift still goes back to the game
+/// library (the other games' delay).
+#[cfg(not(target_arch = "wasm32"))]
+const SHIFT_GRACE: Duration = Duration::from_millis(2000);
+
+/// The game at `dir` as the program plays it (a folder on the command
+/// line, or the game library's choice, on its event loop `el`): the
+/// splashes and the main menu, as `settings.ini` says (the language, the
+/// renderer, the full screen; `fullscreen` forces the last); with
+/// `shift_grace` (the library's one game, started without its screen)
+/// Shift held in the first moments goes back to the library. Returns when
+/// the window closes.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn run_window_on(
+    el: &mut EventLoop<()>,
+    dir: &Path,
+    fullscreen: bool,
+    shift_grace: bool,
+) -> Result<crate::a2::Ended, String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    let path = settings_path();
+    let settings = load_settings(&path);
+    let render = Render {
+        cpu: settings.cpu,
+        check: false,
+    };
+    let mut app = open_viewer(
+        dir,
+        Start::Menus,
+        render,
+        settings.language.as_deref(),
+        fullscreen || settings.fullscreen,
+    )?;
+    app.desk.settings = Some(settings);
+    app.desk.shift_until = shift_grace.then(|| Instant::now() + SHIFT_GRACE);
+    el.run_app_on_demand(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))?;
+    Ok(if app.desk.to_library {
+        crate::a2::Ended::Library
+    } else {
+        crate::a2::Ended::Quit
+    })
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settings_ini_reads_and_writes_its_keys() {
+        let d = A4Settings::default();
+        assert_eq!(d.language, None);
+        assert!(!d.cpu && d.fullscreen);
+        assert_eq!(A4Settings::parse(&d.to_text()), d);
+        let s = A4Settings::parse("language = FR\nrenderer = cpu\nfullscreen = off\n");
+        assert_eq!(s.language.as_deref(), Some("fr"));
+        assert!(s.cpu && !s.fullscreen);
+        assert_eq!(A4Settings::parse(&s.to_text()), s);
+        assert!(s.to_text().contains("\nlanguage = fr\n"));
+        // Unknown values keep the default; `auto` is the install's.
+        let bad =
+            A4Settings::parse("language = xx\nrenderer = vulkan\nfullscreen = maybe\nother = 1");
+        assert_eq!(bad, A4Settings::default());
+        assert_eq!(
+            A4Settings::parse("language = de\nlanguage = auto").language,
+            None
+        );
+    }
+
+    #[test]
+    fn settings_ini_is_written_with_the_defaults() {
+        let d = std::env::temp_dir().join(format!("atlantis-a4-settings-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let p = d.join(SETTINGS_FILE);
+        assert_eq!(load_settings(&p), A4Settings::default());
+        assert!(std::fs::read_to_string(&p)
+            .unwrap()
+            .contains("fullscreen = on"));
+        std::fs::write(&p, "renderer = cpu\n").unwrap();
+        assert!(load_settings(&p).cpu);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// The first window: the original's size when the screen holds it,
+    /// else smaller at the same proportions.
+    #[test]
+    fn the_window_fits_the_screen() {
+        assert_eq!(window_size(1920, 1080), PhysicalSize::new(1365, 768));
+        assert_eq!(window_size(2560, 1440), PhysicalSize::new(1365, 768));
+        let s = window_size(1366, 768);
+        assert!(s.width <= 1229 && s.height <= 691, "{s:?}");
+        assert_eq!(s.width * 768 / 1365, s.height);
+        assert_eq!(window_size(0, 0), PhysicalSize::new(1365, 768));
+    }
+
+    #[test]
+    fn languages_have_names() {
+        for l in ["de", "en", "es", "fr", "it"] {
+            assert!(language_name(l).is_some());
+        }
+        assert_eq!(language_name("fr"), Some("French"));
+        assert_eq!(language_name("xx"), None);
+    }
+
+    /// GOG.com's folder: its edition and the language its `lang.ini`
+    /// gives, as the game library shows them.
+    #[test]
+    fn labels_gogs_installation() {
+        let Some(dir) = atlantis4_data::testing::install_dir() else {
+            return;
+        };
+        let (files, _) = A4Files::open_dir(&dir).unwrap();
+        let name = language_name(&files.language()).expect("one of the five languages");
+        assert_eq!(
+            label(&dir).unwrap(),
+            format!("Atlantis Evolution, GOG.com, {name}")
+        );
+    }
 }

@@ -96,6 +96,48 @@ fn the_main_menus_buttons_sit_where_the_layout_formulas_put_them() {
     assert_eq!(f.button_state("continueGameButton"), Some(State::Up));
 }
 
+/// The interface is laid out on the window's client size, whatever it is
+/// (`TeMainWindow`'s resize, 0x004ff990: the root layout is the client
+/// size in pixels): the main menu at five window sizes, of other
+/// proportions too, sits where the formulas put it for that size, and a
+/// press at a button's centre in window pixels presses that button.
+#[test]
+fn the_main_menu_follows_the_windows_client_size() {
+    let Some(mut f) = front() else { return };
+    let saves = StubSaves::default();
+    f.enter_main(&saves);
+    // (the main menu's music)
+    f.take_actions();
+    for (w, h) in [
+        (1365, 768),
+        (1024, 768),
+        (1920, 1080),
+        (2560, 1080),
+        (800, 600),
+    ] {
+        // `menu` 1.01 × the window; the background PanScan keeps its
+        // height (1.01 × the window's); the buttons keep their pictures'
+        // size and their place in it.
+        let bg_h = f64::from(1.01f32 * h as f32);
+        let r = f.rect_of("newGameButton", w, h).unwrap();
+        assert_eq!((r.width, r.height), (366.0, 75.0), "{w}x{h}");
+        let (cx, cy) = (r.left + r.width / 2.0, r.top + r.height / 2.0);
+        assert!(close(cx, f64::from(w) / 2.0), "{w}x{h}: x {cx}");
+        let want = f64::from(h) / 2.0 + (0.42 - 0.5) * bg_h;
+        assert!((cy - want).abs() < 0.01, "{w}x{h}: y {cy} vs {want}");
+        assert!(f.press(w, h, cx, cy), "{w}x{h}");
+        assert_eq!(
+            f.button_state("newGameButton"),
+            Some(State::Down),
+            "{w}x{h}"
+        );
+        // Released outside: nothing starts.
+        f.release(w, h, 1.0, 1.0, 0.0, &mut StubSaves::default());
+        let a = f.take_actions();
+        assert!(a.is_empty(), "{w}x{h}: {a:?}");
+    }
+}
+
 #[test]
 fn a_new_game_closes_turns_and_opens_the_planks() {
     let Some(mut f) = front() else { return };

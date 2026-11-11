@@ -252,6 +252,9 @@ fn main() {
         .first()
         .map(PathBuf::from)
         .unwrap_or_else(|| here.join("gamedata"));
+    if let Some(text) = atlantis_sdl::other_game(&dir) {
+        fail(text);
+    }
     let game = Game::open(Arc::new(StdDir::new(&dir))).unwrap_or_else(|e| {
         fail(&format!(
             "{}: {e}\nCopy your own Atlantis: The Lost Tales (CD or GOG.com) there.",

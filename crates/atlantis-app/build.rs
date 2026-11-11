@@ -16,10 +16,8 @@ fn main() {
     // and sound decoders deep in their stack, whose frames are large (the
     // Theora decoder's state); WebAssembly's default stack of 1 MiB, which
     // the desktop's 8 MiB main thread never reaches, overflows into the
-    // heap. The other games' web build keeps the default.
-    if std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("wasm32")
-        && std::env::var_os("CARGO_FEATURE_ATLANTIS4").is_some()
-    {
+    // heap.
+    if std::env::var("CARGO_CFG_TARGET_ARCH").as_deref() == Ok("wasm32") {
         println!("cargo:rustc-link-arg=-zstack-size=8388608");
     }
 

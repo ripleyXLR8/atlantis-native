@@ -6,7 +6,7 @@
 //! libvorbisfile (`atlantis4-data/tests/golden`).
 //!
 //! Run in Node.js by `wasm-bindgen-test-runner` (the crate's
-//! `--target wasm32-unknown-unknown --features atlantis4` tests); the
+//! `--target wasm32-unknown-unknown` tests); the
 //! game's files are read through Node's `fs` from `ATLANTIS4_DATA`. Without
 //! it each test returns at once, unless `ATLANTIS4_REQUIRE_DATA=1`.
 

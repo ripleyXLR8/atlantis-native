@@ -23,10 +23,7 @@ where
 
 /// The same, asking the device for `rate` when it offers it (in any of
 /// its supported ranges), else its default rate.
-#[cfg_attr(
-    any(not(feature = "atlantis4"), target_arch = "wasm32"),
-    allow(dead_code)
-)]
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
 pub fn start_with_rate<F>(fill: F, rate: u32) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
@@ -38,7 +35,7 @@ where
 /// buffer is filled when the one before it starts playing, so the page's
 /// thread may be busy that long without a gap in the sound; cpal's
 /// default is 2,048 frames, 46 ms at 44,100 Hz).
-#[cfg(all(target_arch = "wasm32", feature = "atlantis4"))]
+#[cfg(target_arch = "wasm32")]
 pub fn start_with_rate_buffer<F>(fill: F, rate: u32, frames: u32) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
@@ -145,7 +142,6 @@ fn note_underrun(info: &cpal::OutputCallbackInfo) {
 
 /// The count of late output buffers since the page opened.
 #[cfg(target_arch = "wasm32")]
-#[cfg_attr(not(feature = "atlantis4"), allow(dead_code))]
 pub fn underruns() -> u32 {
     UNDERRUNS.load(std::sync::atomic::Ordering::Relaxed)
 }
