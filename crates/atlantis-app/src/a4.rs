@@ -29,7 +29,15 @@
 //! (`PushAnswer`) stacked on the left, a click on a topic calling
 //! `OnAnswered`, a click on the bar skipping the line, `quit` closing the
 //! conversation; while they show, they take the clicks and the view does
-//! not turn. The inventory and the documents are not there yet (logged).
+//! not turn. The HUD's inventory button (bottom right) opens the
+//! inventory menu: a click on an object selects it (shown in the HUD
+//! button) and a second within 300 ms closes the menu, as does the
+//! menu's quit button; the selected object is what the scripts'
+//! `Selected` sees when the warp is clicked. Objects can be dragged to an
+//! empty slot. `ShowDocument` shows its picture full screen (the first
+//! node's tutorials); a click turns to the next page 200 ms later, which
+//! closes it, a double click closes it at once. `LoadSprite` sprites and
+//! the `AddToBag` notification's picture show.
 
 use std::cell::RefCell;
 use std::num::NonZeroU32;
@@ -68,7 +76,8 @@ struct Viewer {
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
     pointer: Option<(f64, f64)>,
     down: Option<(f64, f64)>,
-    /// The press went to a GUI layer (the dialogs).
+    /// The press went to a GUI layer (the dialogs, the HUD, the inventory,
+    /// a document).
     gui_down: bool,
     last: (f64, f64),
     size: (u32, u32),
@@ -155,9 +164,27 @@ impl Viewer {
                 log::error!("{e}");
             }
         }
+        // The shown document's alarm and the notification's fades.
+        self.game.borrow_mut().update_gui(now);
+        self.gui_callbacks();
     }
 
-    /// Runs what a click on the dialogs led to, in order.
+    /// The callbacks the screens raised (`OnDocumentClosed`, …).
+    fn gui_callbacks(&mut self) {
+        loop {
+            let cbs = self.game.borrow_mut().gui_callbacks();
+            if cbs.is_empty() {
+                break;
+            }
+            for (name, args) in cbs {
+                if let Err(e) = self.script.callback(&name, &args) {
+                    log::error!("{e}");
+                }
+            }
+        }
+    }
+
+    /// Runs what a click on the GUI led to, in order.
     fn run_actions(&mut self, actions: Vec<Action>) {
         for a in actions {
             match a {
@@ -219,6 +246,7 @@ impl Viewer {
             let actions = self.game.borrow_mut().gui_release(w, h, up.0, up.1);
             if let Some(a) = actions {
                 self.run_actions(a);
+                self.gui_callbacks();
                 return;
             }
             if gui_down {
@@ -328,7 +356,11 @@ impl ApplicationHandler for Viewer {
                     self.game.borrow_mut().gui_hover(w, h, p.0, p.1);
                 }
                 if self.gui_down {
-                    // A press on the dialogs does not turn the view.
+                    // A press on the GUI does not turn the view; it may
+                    // drag an inventory object.
+                    if self.down.is_some() {
+                        self.game.borrow_mut().gui_drag(p.0, p.1);
+                    }
                 } else if self.in_movie() {
                     // The view update (0x0052ab40) does not run during a
                     // movie; a held press only changes the skip button's
@@ -337,7 +369,7 @@ impl ApplicationHandler for Viewer {
                         let (w, h) = self.size;
                         self.game.borrow_mut().movie_drag(w, h, p.0, p.1);
                     }
-                } else if self.down.is_some() {
+                } else if self.down.is_some() && self.game.borrow().warp_takes_input() {
                     // Input pixels, y up.
                     let dx = p.0 - self.last.0;
                     let dy_up = self.last.1 - p.1;
@@ -358,12 +390,11 @@ impl ApplicationHandler for Viewer {
                         self.down = Some(p);
                         self.last = p;
                         let (w, h) = self.size;
+                        // The GUI above the warp first (the dialogs, a
+                        // document, the inventory menu, the HUD); a movie's
+                        // buttons when none takes it.
                         self.gui_down = self.game.borrow_mut().gui_press(w, h, p.0, p.1);
-                        if self.gui_down {
-                            return;
-                        }
-                        if self.in_movie() {
-                            let (w, h) = self.size;
+                        if !self.gui_down && self.in_movie() {
                             self.game.borrow_mut().movie_press(w, h, p.0, p.1);
                         }
                     }
