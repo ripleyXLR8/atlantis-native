@@ -1,0 +1,392 @@
+//! The engine side of the scripts' bindings for the warp view
+//! (`atlantis4_script::Engine`): the node change builds the node, and the
+//! view bindings drive the warp (atlantis4-gog-en-2363910).
+//!
+//! The node change itself (`ChangeWarp`'s worker @ 0x00526c70) runs in
+//! `atlantis4_script` in the original's order: `OnWarpLeave`, the
+//! autosave, the new scene ([`Engine::enter_scene`]: here the node's
+//! background and XML, the limits reset, the camera's FOV), the eight
+//! callbacks set to `nil`, `warpName`, the node's `.lua`, `OnWarpEnter`.
+//!
+//! Done here: `PutObject`, `RemoveObject`, `StartAnimation`,
+//! `StartAnimationPart`, `SetMarker`, `LookAt`, `SetViewAngleXLimits`,
+//! `SetViewAngleYLimits`, `SetFOV`, `ChangeWarp`. Every other binding is
+//! logged and does nothing (sounds, videos, dialogs, inventory,
+//! documents, diary and saves belong to later milestones); `Selected`
+//! answers `false` (empty inventory) and `ObjectCount` 0.
+
+use std::collections::HashMap;
+
+use atlantis4_data::image::decode_png;
+use atlantis4_data::video::RgbTable;
+use atlantis4_data::{A4Files, WarpPath};
+use atlantis4_script::tolua::Binding;
+use atlantis4_script::{Call, Engine, ErrorSite, Event, Reply, SavedGlobal};
+
+use crate::camera::fov_for_height;
+use crate::markers::sprite_path;
+use crate::package::Picture;
+use crate::render::{render, Coverage, Weights};
+use crate::sprite::{self, cursor_corner, CURSOR_PATH};
+use crate::warp::{Warp, WarpNote};
+use crate::View;
+
+/// The background of the last frame, kept while the view does not move.
+struct BackgroundCache {
+    key: (u64, u32, u32, u32, u32, u32),
+    pixels: Vec<u32>,
+}
+
+/// The game as the scripts see it.
+pub struct Game {
+    pub files: A4Files,
+    /// The original's video colour table (from its executable).
+    pub table: Option<RgbTable>,
+    pub warp: Option<Warp>,
+    pub view: View,
+    /// The camera's field of view (`camera+0xb8`), radians.
+    pub fov: f32,
+    /// The window's height (the `HD` definition, hence the FOV).
+    pub height: u32,
+    /// The engine clock, ms.
+    pub now_ms: f64,
+    /// The global marker flag (`App+0x86b0`).
+    pub markers_shown: bool,
+    /// The bilinear weights' precision of the drawing.
+    pub weights: Weights,
+    /// When set, the files run, callbacks entered and bindings called, as
+    /// `FILE path`, `ENTER name`, `CALL name` (the live trace's lines
+    /// without their arguments).
+    pub trace: Option<Vec<String>>,
+    /// Counts the node changes (the background cache's key).
+    serial: u64,
+    background: Option<BackgroundCache>,
+    cover: Coverage,
+    /// Decoded 2-D pictures by path (`None`: missing or broken).
+    sprites: HashMap<String, Option<Picture>>,
+}
+
+/// A PNG as RGBA.
+fn png_rgba(data: &[u8]) -> Option<Picture> {
+    let img = decode_png(data).ok()?;
+    let rgba = match img.channels {
+        4 => img.pixels,
+        3 => img
+            .pixels
+            .as_chunks::<3>().0.iter()
+            .flat_map(|c| [c[0], c[1], c[2], 255])
+            .collect(),
+        2 => img
+            .pixels
+            .as_chunks::<2>().0.iter()
+            .flat_map(|c| [c[0], c[0], c[0], c[1]])
+            .collect(),
+        _ => img.pixels.iter().flat_map(|&g| [g, g, g, 255]).collect(),
+    };
+    Some(Picture {
+        width: img.width,
+        height: img.height,
+        rgba,
+    })
+}
+
+fn text(b: Option<&[u8]>) -> String {
+    b.map(|b| b.iter().map(|&c| char::from(c)).collect())
+        .unwrap_or_default()
+}
+
+/// `_ftol`: towards zero.
+fn int(x: f64) -> i32 {
+    x as i32
+}
+
+impl Game {
+    pub fn new(files: A4Files, height: u32) -> Game {
+        let table = files
+            .read(atlantis4_data::exe::EXE_NAME)
+            .and_then(|exe| match RgbTable::from_exe(&exe) {
+                Ok(t) => Some(t),
+                Err(e) => {
+                    log::warn!("no video colour table: {e}");
+                    None
+                }
+            });
+        Game {
+            files,
+            table,
+            warp: None,
+            view: View::default(),
+            fov: fov_for_height(height),
+            height,
+            now_ms: 0.0,
+            markers_shown: true,
+            weights: Weights::Exact,
+            trace: None,
+            serial: 0,
+            background: None,
+            cover: Coverage::new(),
+            sprites: HashMap::new(),
+        }
+    }
+
+    fn load_sprite(&mut self, path: &str) {
+        if !self.sprites.contains_key(path) {
+            let pic = self.files.read(path).and_then(|d| png_rgba(&d));
+            if pic.is_none() {
+                log::warn!("no picture {path}");
+            }
+            self.sprites.insert(path.to_string(), pic);
+        }
+    }
+
+    /// The frame of a `width × height` window into `out` (XRGB, rows
+    /// top-down), in the original's order: the warp (background, then the
+    /// draw list), the markers, the cursor at `pointer` (window pixels)
+    /// when given.
+    pub fn draw(&mut self, out: &mut [u32], width: u32, height: u32, pointer: Option<(f64, f64)>) {
+        let n = width as usize * height as usize;
+        let out = &mut out[..n];
+        let cam = self.camera(width, height);
+        if let Some(w) = self.warp.as_mut() {
+            let key = (
+                self.serial,
+                cam.fov.to_bits(),
+                self.view.yaw.to_bits(),
+                self.view.pitch.to_bits(),
+                width,
+                height,
+            );
+            let stale = self.background.as_ref().is_none_or(|b| b.key != key);
+            if stale {
+                let mut pixels = vec![0u32; n];
+                render(&cam, &w.node.faces, &mut pixels, self.weights);
+                self.background = Some(BackgroundCache { key, pixels });
+            }
+            if let Some(b) = &self.background {
+                out.copy_from_slice(&b.pixels);
+            }
+            w.draw_layers(&cam, self.table.as_ref(), out, &mut self.cover, self.weights);
+        } else {
+            out.fill(0);
+        }
+        let images: Vec<u32> = self
+            .warp
+            .iter()
+            .flat_map(|w| w.markers.iter().filter_map(|m| m.sprite.map(|s| s.image)))
+            .collect();
+        for i in images {
+            self.load_sprite(&sprite_path(i, false));
+        }
+        if let Some(w) = &self.warp {
+            let sprites = &self.sprites;
+            w.draw_markers(&cam, self.now_ms, out, |i| {
+                sprites.get(&sprite_path(i, false)).and_then(Option::as_ref)
+            });
+        }
+        if let Some((x, y)) = pointer {
+            self.load_sprite(CURSOR_PATH);
+            if let Some(Some(pic)) = self.sprites.get(CURSOR_PATH) {
+                let (l, t) = cursor_corner(pic, x, y);
+                sprite::draw(out, width, height, pic, (0, 0, pic.width, pic.height), l, t);
+            }
+        }
+    }
+
+    fn note(r: Result<(), WarpNote>) {
+        if let Err(n) = r {
+            match n {
+                WarpNote::NoPackage(name, e) => log::warn!("no package {name}: {e}"),
+                WarpNote::NoMarkerTarget(name) => {
+                    log::warn!("SetMarker: no exit or animation {name}")
+                }
+                WarpNote::UnknownMarker(n, name) => log::warn!(
+                    "[TeWarp3::configMarker: Unknown marker {n} on animation : {name}"
+                ),
+            }
+        }
+    }
+
+    /// The frame animations at `now_ms`; the names whose animation
+    /// finished (for `OnAnimationFinished(name)`).
+    pub fn update(&mut self, now_ms: f64) -> Vec<String> {
+        self.now_ms = now_ms;
+        self.warp
+            .as_mut()
+            .map(|w| w.update(now_ms))
+            .unwrap_or_default()
+    }
+
+    /// The camera of a `width × height` view.
+    pub fn camera(&self, width: u32, height: u32) -> crate::Camera {
+        crate::Camera::new(self.fov, width, height, self.view.yaw, self.view.pitch)
+    }
+
+    /// What a click at window pixel (`x`, `y`) of a `width × height` view
+    /// hits: the name `OnWarpObjectHit` gets (an animation's, or `3D\` +
+    /// the exit's `linkedWarp`).
+    pub fn click(&self, width: u32, height: u32, x: i32, y: i32) -> Option<String> {
+        let w = self.warp.as_ref()?;
+        let cam = self.camera(width, height);
+        match crate::pick::click(&cam, x, y, &w.picks(), &w.node.exits)? {
+            crate::pick::Target::Anim(a) => Some(a),
+            crate::pick::Target::Exit(e) => Some(crate::warp::exit_name(&e)),
+        }
+    }
+
+    fn with_warp(&mut self, what: &str, f: impl FnOnce(&mut Warp, &A4Files, f64) -> Result<(), WarpNote>) {
+        let now = self.now_ms;
+        match self.warp.as_mut() {
+            Some(w) => Self::note(f(w, &self.files, now)),
+            None => log::warn!("{what}: no node"),
+        }
+    }
+}
+
+impl Engine for Game {
+    fn call(&mut self, call: &Call) -> Reply {
+        let name = text(call.str(0));
+        if let Some(t) = &mut self.trace {
+            t.push(format!("CALL {}", call.binding.name()));
+        }
+        match call.binding {
+            Binding::ChangeWarp => return Reply::Warp,
+            Binding::PutObject => {
+                let clickable = call.flag(1);
+                self.with_warp("PutObject", |w, f, now| w.put_object(f, &name, clickable, now));
+            }
+            Binding::RemoveObject => {
+                if let Some(w) = self.warp.as_mut() {
+                    w.remove_object(&name);
+                }
+            }
+            Binding::StartAnimation => {
+                let (loops, clickable) = (int(call.num(1)), call.flag(2));
+                self.with_warp("StartAnimation", |w, f, now| {
+                    w.start_animation(f, &name, loops, clickable, now)
+                });
+            }
+            Binding::StartAnimationPart => {
+                let (first, last) = (int(call.num(1)), int(call.num(2)));
+                let (loops, clickable) = (int(call.num(3)), call.flag(4));
+                self.with_warp("StartAnimationPart", |w, f, now| {
+                    w.start_animation_part(f, &name, first, last, loops, clickable, now)
+                });
+            }
+            Binding::SetMarker => {
+                let (image, n) = (int(call.num(1)), int(call.num(2)));
+                self.with_warp("SetMarker", |w, _, now| {
+                    w.set_marker(&name, image, n as u32, now)
+                });
+            }
+            Binding::LookAt => {
+                // `0x0052b0d0`: both truncated to int first.
+                let (x, y) = (int(call.num(0)), int(call.num(1)));
+                self.view.look_at(x as f32, y as f32);
+            }
+            Binding::SetViewAngleXLimits => {
+                self.view
+                    .set_yaw_limits(call.num(0) as f32, call.num(1) as f32);
+            }
+            Binding::SetViewAngleYLimits => {
+                self.view
+                    .set_pitch_limits(call.num(0) as f32, call.num(1) as f32);
+            }
+            Binding::SetFov => {
+                self.fov = (call.num(0) * f64::from(std::f32::consts::PI) / 180.0) as f32;
+            }
+            Binding::Selected => {
+                log::info!("Selected({name}): no inventory yet, false");
+                return Reply::Bool(false);
+            }
+            Binding::TestObjectLimit => return Reply::Bool(false),
+            Binding::ObjectCount => return Reply::Num(0.0),
+            Binding::PrintDebugMessage => log::info!("PrintDebugMessage: {name}"),
+            other => log::info!("{other:?}({name}): not done in the warp view yet"),
+        }
+        Reply::None
+    }
+
+    fn read_script(&mut self, path: &[u8]) -> Option<Vec<u8>> {
+        self.files.read(&text(Some(path)))
+    }
+
+    /// `Texts/<file>` is looked for in `Texts/Full/`, `Texts/PC/`, then
+    /// `Texts/` (the `part` and `platform` values the application sets).
+    fn resolve(&mut self, path: &[u8]) -> Vec<u8> {
+        let Some(slash) = path.iter().position(|&c| c == b'/') else {
+            return path.to_vec();
+        };
+        let (dir, file) = (&path[..slash], &path[slash + 1..]);
+        if !dir.eq_ignore_ascii_case(b"texts") {
+            return path.to_vec();
+        }
+        for sub in [&b"Texts/Full/"[..], b"Texts/PC/", b"Texts/"] {
+            let p = [sub, file].concat();
+            if self.files.read(&text(Some(&p))).is_some() {
+                return p;
+            }
+        }
+        path.to_vec()
+    }
+
+    fn has_scene(&self) -> bool {
+        self.warp.is_some()
+    }
+
+    fn save_game(&mut self, file: &[u8], globals: &[SavedGlobal]) {
+        log::info!(
+            "SaveGame({}): {} globals, not written (saves are M4)",
+            text(Some(file)),
+            globals.len()
+        );
+    }
+
+    /// The new scene (`0x00526c70` @ 0x0052703c..0x00527265, then the XML
+    /// @ 0x00527c1b): the limits reset (yaw and pitch kept), the FOV of
+    /// the definition, the node's background, objects, animations, exits
+    /// and markers, the global marker flag.
+    fn enter_scene(&mut self, path: &[u8]) {
+        let name = text(Some(path));
+        self.view.reset_limits();
+        self.fov = fov_for_height(self.height);
+        self.warp = None;
+        let Some(p) = WarpPath::parse(&name) else {
+            log::warn!("ChangeWarp({name}): not a node");
+            return;
+        };
+        match Warp::load(&self.files, &p) {
+            Ok(mut w) => {
+                w.markers_shown = self.markers_shown;
+                self.warp = Some(w);
+                self.serial += 1;
+            }
+            Err(e) => log::warn!("ChangeWarp({name}): {e}"),
+        }
+    }
+
+    fn event(&mut self, event: &Event<'_>) {
+        if let Some(t) = &mut self.trace {
+            match event {
+                Event::Load(p) => t.push(format!("FILE {}", text(Some(p)))),
+                Event::Enter(name, _) => t.push(format!("ENTER {name}")),
+                _ => {}
+            }
+        }
+        match event {
+            Event::Warp(p) => log::info!("entering {}", text(Some(p))),
+            Event::MissingFile(p) => log::warn!("missing script {}", text(Some(p))),
+            Event::Error(site, msg) => {
+                let site = match site {
+                    ErrorSite::Load(f) | ErrorSite::Chunk(f) => text(Some(f)),
+                    ErrorSite::Callback(c) => c.clone(),
+                };
+                log::warn!("Lua error in {site}: {}", text(Some(msg)));
+            }
+            Event::Missing(name) => {
+                log::debug!("[TeLuaScript::Execute] La fonction : \"{name}\" n'existe pas.")
+            }
+            Event::Enter(name, _) => log::debug!("callback {name}"),
+            _ => {}
+        }
+    }
+}

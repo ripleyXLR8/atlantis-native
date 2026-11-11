@@ -185,6 +185,7 @@ dependencies = [
  "atlantis3-engine",
  "atlantis4-data",
  "atlantis4-engine",
+ "atlantis4-script",
  "console_error_panic_hook",
  "console_log",
  "cpal",
@@ -314,22 +315,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "atlantis4-script"
-version = "0.6.0"
-dependencies = [
- "atlantis4-data",
- "rilua",
-]
-
-[[package]]
 name = "atlantis4-engine"
 version = "0.6.0"
 dependencies = [
  "atlantis-data",
  "atlantis4-data",
+ "atlantis4-script",
  "libm",
+ "log",
  "md-5",
  "png",
+]
+
+[[package]]
+name = "atlantis4-script"
+version = "0.6.0"
+dependencies = [
+ "atlantis4-data",
+ "rilua",
 ]
 
 [[package]]

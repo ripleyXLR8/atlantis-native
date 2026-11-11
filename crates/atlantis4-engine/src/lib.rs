@@ -1,5 +1,6 @@
 //! The engine of *Atlantis Evolution* (Atlantis IV): for now the warp view
-//! of a node, drawn as the original's `TeWarp3` draws it.
+//! of a node, drawn as the original's `TeWarp3` draws it and driven by the
+//! node's scripts.
 //!
 //! Comments cite addresses in the GOG.com release's `Atlantis Evolution.exe`
 //! (atlantis4-gog-en-2363910, see `atlantis4_data::exe`).
@@ -12,23 +13,32 @@
 //! - [`pick`]: clicks on animations and exits;
 //! - [`markers`]: the markers' placement;
 //! - [`frame_anim`]: `TeFrameAnim`'s frame for a time;
-//! - [`render`]: the view drawn on the processor (GL's `GL_LINEAR` model);
-//! - [`node`]: a node loaded from the install.
+//! - [`render`]: the view drawn on the processor (GL's `GL_LINEAR` model),
+//!   background and tile meshes;
+//! - [`node`]: a node loaded from the install;
+//! - [`package`]: an object's or animation's tiles, pictures and picks;
+//! - [`warp`]: the node in play: draw list, markers, exits;
+//! - [`sprite`]: the markers' and the cursor's 2-D sprites;
+//! - [`game`]: the bindings' engine side for the scripts.
 //!
-//! Not here yet: the Lua scripts, the objects and Theora animations drawn
-//! over the background, sounds, the cursor and the interface.
+//! Not here yet: sounds, videos, dialogs, the inventory and the GUI.
 
 #![forbid(unsafe_code)]
 
 pub mod camera;
 pub mod cube;
 pub mod frame_anim;
+pub mod game;
 pub mod markers;
 pub mod node;
+pub mod package;
 pub mod pick;
 pub mod render;
+pub mod sprite;
 pub mod view;
+pub mod warp;
 
 pub use camera::Camera;
+pub use game::Game;
 pub use node::Node;
 pub use view::View;
