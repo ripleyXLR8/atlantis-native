@@ -1133,8 +1133,12 @@ impl Engine {
         self.step += 1;
     }
 
-    /// A click at (x, y), then `idle` frames with the mouse there.
+    /// A click at (x, y), then `idle` frames with the mouse there. The
+    /// mouse gets there one pass before the press: on the pass that reads
+    /// a press `FUN_0041a298` returns before its message pump, so the
+    /// click is handled at the pointer of the pass before.
     fn click(&mut self, x: i32, y: i32, idle: usize) {
+        self.pass(x, y, false);
         self.pass(x, y, true);
         for _ in 0..idle {
             self.pass(x, y, false);

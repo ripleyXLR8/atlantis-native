@@ -14,7 +14,7 @@ use crate::audio::Pcm;
 use crate::engine::Engine;
 use crate::hooks::ScriptHooks;
 use crate::music::apc_pcm;
-use crate::sys::{Input, MouseButton, Sys};
+use crate::sys::{Input, Key, MouseButton, Sys};
 use crate::warp::{SCREEN_H, SCREEN_W};
 
 /// The 640x480 class maps of the metal pieces and the hexagon.
@@ -216,6 +216,11 @@ pub struct PuzzleMouse {
     pub click: bool,
     /// The right button went down at this read (see [`right_press`]).
     pub right: bool,
+    /// Escape went down since the last read, with no left press at this
+    /// read: Escape is an edge-mode key (`FUN_0042e6dc`) and
+    /// `FUN_0041a298` tests it only when the left button's bit is clear
+    /// (0x0041a2b5).
+    pub escape: bool,
 }
 
 /// The right flag `FUN_0041a298` leaves (0x00496120): `FUN_0042e6dc` puts
@@ -262,8 +267,10 @@ impl PuzzleInput {
     /// (false) since the last read passed to `on_left` in order.
     pub fn read_with(&mut self, sys: &Sys, mut on_left: impl FnMut(bool)) -> PuzzleMouse {
         let mut pressed = false;
+        let mut escape = false;
         while let Some(ev) = sys.poll_event() {
             match ev {
+                Input::KeyDown(Key::Escape) => escape = true,
                 Input::MouseDown {
                     button: MouseButton::Left,
                     ..
@@ -283,7 +290,39 @@ impl PuzzleInput {
         let click = (left && !self.prev_left) || pressed;
         self.prev_left = left;
         let right = right_press(right, &mut self.prev_right, click);
-        PuzzleMouse { x, y, click, right }
+        PuzzleMouse {
+            x,
+            y,
+            click,
+            right,
+            escape: escape && !click,
+        }
+    }
+}
+
+/// The flags `FUN_0041a298` leaves inside a puzzle loop (no puzzle
+/// function reads 0x00496124 or writes 0x00496138, so they outlive the
+/// puzzle until `FUN_004240fc` resets them after its /sel scan):
+/// - a left press returns at once (0x0041a2b5): nothing else is read;
+/// - a right press sets 0x00496120 and toggles the bar request 0x004960c4
+///   unless a clicked section plays (0x00496170) or the menu request
+///   0x00496138 is set (0x0041a2f2..0x0041a337);
+/// - Escape, with no talking head (0x00496188 is 0 in a puzzle), no bow
+///   mode, no bar request and an empty hand, clears 0x00496124 and sets
+///   0x00496138 (0x0041a3c0..0x0041a423): [`Engine::escape_request`].
+///
+/// With [`crate::enhancements::BugFix::PuzzleEscape`] the Escape is not
+/// latched: nothing in a puzzle reads the latch, which only stops the
+/// hexagon's right presses and cuts the first line after the puzzle.
+pub(crate) fn poll_flags(e: &mut Engine, m: &PuzzleMouse) {
+    if m.click {
+        return;
+    }
+    if m.right {
+        e.bar.right_pressed(e.section_play, e.escape_request);
+    }
+    if m.escape && e.escape_gate_open() && e.puzzle_escape_latches() {
+        e.escape_request = true;
     }
 }
 
@@ -348,6 +387,9 @@ pub struct PuzzleHost<'a> {
     pub screen: PuzzleScreen,
     pub input: PuzzleInput,
     pub sounds: PuzzleSounds,
+    /// The pointer 0x004960ec / 0x004960f0 as the last pumped poll left it
+    /// (see [`PuzzleHost::read_input_held_pointer`]).
+    pub pointer: (i32, i32),
 }
 
 impl<'a> PuzzleHost<'a> {
@@ -356,18 +398,40 @@ impl<'a> PuzzleHost<'a> {
     pub fn new(e: &'a mut Engine, hooks: &'a mut dyn ScriptHooks) -> PuzzleHost<'a> {
         e.sys.set_mouse_locked(false);
         let input = PuzzleInput::new(&e.sys);
+        let pointer = e.sys.mouse();
         PuzzleHost {
             e,
             hooks,
             screen: PuzzleScreen::default(),
             input,
             sounds: PuzzleSounds::default(),
+            pointer,
         }
     }
 
-    /// The input at a frame boundary (`FUN_0043318c`).
+    /// The input at a frame boundary: the poll `FUN_0041a298` every puzzle
+    /// loop calls once a pass, with its flags (see
+    /// [`poll_flags`]).
     pub fn read_input(&mut self) -> PuzzleMouse {
-        self.input.read(&self.e.sys)
+        let m = self.input.read(&self.e.sys);
+        poll_flags(self.e, &m);
+        m
+    }
+
+    /// [`PuzzleHost::read_input`] for a loop whose click handler reads the
+    /// pointer 0x004960ec / 0x004960f0 after the poll: on the pass that
+    /// raises the click flag `FUN_0041a298` returns before its message pump
+    /// (0x0041a2b5), and only the pump's WM_MOUSEMOVE writes the pointer
+    /// (0x00419bfa), so the click and that pass's cursor are at the
+    /// previous pass's pointer.
+    pub fn read_input_held_pointer(&mut self) -> PuzzleMouse {
+        let mut m = self.read_input();
+        if m.click {
+            (m.x, m.y) = self.pointer;
+        } else {
+            self.pointer = (m.x, m.y);
+        }
+        m
     }
 
     pub fn draw_background(&mut self) {

@@ -333,7 +333,8 @@ pub struct InventoryRecord {
 /// writes, in its order.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Checkpoint {
-    /// 0x000: the path of the current WAM (`wam\atlan4.wam`), 0x104 bytes.
+    /// 0x000: the path of the current WAM (`wam\atlan4.wam`), 0x104 bytes:
+    /// the buffer 0x006cdce0 whole, the bytes after its NUL included.
     pub wam_path: Vec<u8>,
     /// 0x104: the chapter (0x00772909).
     pub chapter: u8,
@@ -434,7 +435,7 @@ impl Checkpoint {
             .map(|i| i16::from_le_bytes([b[0x842 + 2 * i], b[0x843 + 2 * i]]))
             .collect();
         Some(Checkpoint {
-            wam_path: cstr(&b[..0x104]).to_vec(),
+            wam_path: b[..0x104].to_vec(),
             chapter: b[0x104],
             prev_chapter: b[0x105],
             bank: le32(b, 0x106),
@@ -460,9 +461,9 @@ impl Checkpoint {
     /// The file `FUN_0042d6b8` writes (unused bytes zero).
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut b = vec![0u8; CHECKPOINT_SIZE];
-        let path = cstr(&self.wam_path);
-        let n = path.len().min(0x103);
-        b[..n].copy_from_slice(&path[..n]);
+        // The buffer as it stands, the bytes after its NUL included.
+        let n = self.wam_path.len().min(0x104);
+        b[..n].copy_from_slice(&self.wam_path[..n]);
         b[0x104] = self.chapter;
         b[0x105] = self.prev_chapter;
         let put = |b: &mut [u8], at: usize, v: i32| b[at..at + 4].copy_from_slice(&v.to_le_bytes());
@@ -804,8 +805,11 @@ mod tests {
 
     #[test]
     fn checkpoint_round_trip() {
+        // The path buffer whole, with the tail a longer path left.
+        let mut path = b"wam\\atlan4.wam\0M".to_vec();
+        path.resize(0x104, 0);
         let mut cp = Checkpoint {
-            wam_path: b"wam\\atlan4.wam".to_vec(),
+            wam_path: path,
             chapter: 12,
             prev_chapter: 11,
             place_id: 180,

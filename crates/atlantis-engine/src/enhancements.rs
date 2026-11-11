@@ -24,18 +24,19 @@ pub enum BugFix {
     /// the sound driver's play position runs ahead of the refills. Read at
     /// each track start.
     MusicLoop,
+    /// A cinematic plays its own sound when the sound of the cinematic
+    /// before it still plays: that one stops. Off, as the original
+    /// (`FUN_0042a100` @ 0x0042a865..0x0042a8e6, the NewSound poller
+    /// `FUN_00432a64`): the value 1 is still the one playing, so the new
+    /// sound is not started, and the end of the old one clears NEWSOUND;
+    /// the second cinematic is silent (CINEM053.APC outlasts its film by a
+    /// second and is followed by CINEM058 in five sections).
+    CinemaSound,
     /// The dialog SPF overlay (the guards' coif, the pilot's scarf) is
     /// drawn over the talking head. Off, as the original, it is drawn into
     /// the locked surface, which the back-buffer copy then overwrites
     /// (`FUN_0042ee88` @ 0x0042f57e), so it is never seen.
     HeadOverlay,
-    /// Frame 0 of a talking head's animation is drawn with frame 1's pose.
-    /// Off, as the original, the first key of each track, a rest pose in
-    /// some `*A.3DA` files (Meljanz, Actyon, Servage, the Queen, Gimbas):
-    /// the 3D lower face is drawn up to 35 pixels away from the video's
-    /// face on the first frame of each loop
-    /// ([`crate::head::DialogHead::set_rest_key_fix`]).
-    HeadFirstFrame,
     /// The inventory bar's slide-out draws no icon once the slots are at
     /// y 506. Off, as the original (`FUN_0042c59c` @ 0x0042c643 reads the
     /// y of a record from 9 on past the 9-entry slot table), a scrolled
@@ -67,6 +68,31 @@ pub enum BugFix {
     /// carried to the screen's (0, 0) wins
     /// ([`crate::puzzle::snakes::SnakesGame::frame`]).
     SnakesFirstWin,
+    /// An Escape inside a puzzle is not latched. Off, as the original
+    /// (`FUN_0041a298` @ 0x0041a419 / 0x0041a423 in the puzzles' poll,
+    /// [`crate::puzzle::assets::poll_flags`]), it clears 0x00496124 and
+    /// sets the menu request 0x00496138, which no puzzle reads or resets
+    /// and `FUN_004240fc` clears only after its /sel scan (0x00424224,
+    /// 0x00424238): in the hexagon puzzle no right press turns a piece
+    /// any more (the poll no longer toggles the bar request
+    /// `FUN_00440bfc` reads), and the first voice-only line or game-over
+    /// narration after the puzzle stops at its first poll (Muria's hint,
+    /// the rat's meow, the crab's /941 narration).
+    PuzzleEscape,
+    /// A game over that leaves the warp loop without a click (a timer
+    /// section's, or one after the inventory bar) ends the place loop's
+    /// pass at once, as a click's does. Off, as the original: the warp
+    /// loop's exit block returns the zone under the pointer whatever ended
+    /// it (`FUN_0041bfa0` @ 0x0041c71e), and the place loop runs the armed
+    /// puzzle of a zone 1000..1016 (`FUN_004240fc` @ 0x00424114, then a
+    /// /sel scan) or the zone-999 scan before it tests GAMEOVER
+    /// (`FUN_00423ad8` @ 0x00423c12..0x00423ca5), GAMEOVER still set: the
+    /// scan's section meets the executor's test after its first line and
+    /// shows the game-over picture again (CHAPI044's throne lock, armed at
+    /// view 281, opens after the guards' game over). The in-game menu's
+    /// LOAD and QUIT take the same exit without the puzzle (0x00496124 is
+    /// 0): the zone-999 scan runs ([`crate::engine::Engine::no_click_exit`]).
+    GameOverPuzzle,
     /// The hexagon puzzle always places its pieces, as the 2001 entry does
     /// (OBJETENMAIN set to 402 before its test). Off, as the 1997 and the
     /// Chinese builds (atlantis-cd-en-688128 FUN_0043c570), the pieces are
@@ -144,15 +170,17 @@ pub enum BugFix {
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 17] = [
+    pub const ALL: [BugFix; 19] = [
         BugFix::MusicLoop,
+        BugFix::CinemaSound,
         BugFix::HeadOverlay,
-        BugFix::HeadFirstFrame,
         BugFix::BarSlideOut,
         BugFix::PickupIcon,
         BugFix::MenuRecords,
         BugFix::FifthPlayer,
         BugFix::SnakesFirstWin,
+        BugFix::PuzzleEscape,
+        BugFix::GameOverPuzzle,
         BugFix::HexagonPieces,
         BugFix::LoadMusik,
         BugFix::SharpS,
@@ -168,13 +196,15 @@ impl BugFix {
     pub fn key(self) -> &'static str {
         match self {
             BugFix::MusicLoop => "fix_music_loop",
+            BugFix::CinemaSound => "fix_cinema_sound",
             BugFix::HeadOverlay => "fix_head_overlay",
-            BugFix::HeadFirstFrame => "fix_head_first_frame",
             BugFix::BarSlideOut => "fix_bar_slide_out",
             BugFix::PickupIcon => "fix_pickup_icon",
             BugFix::MenuRecords => "fix_menu_records",
             BugFix::FifthPlayer => "fix_fifth_player",
             BugFix::SnakesFirstWin => "fix_snakes_first_win",
+            BugFix::PuzzleEscape => "fix_puzzle_escape",
+            BugFix::GameOverPuzzle => "fix_gameover_puzzle",
             BugFix::HexagonPieces => "fix_hexagon_pieces",
             BugFix::LoadMusik => "fix_loadmusik",
             BugFix::SharpS => "fix_sharp_s",
@@ -459,6 +489,12 @@ pub struct Enhancements {
     ///   (`FUN_0042ee88` @ 0x0042f036) is not shown; the line is skipped
     ///   either way.
     pub ui_ux: bool,
+    /// The arrow keys turn the view as F5..F8 do, and the load picker
+    /// takes Enter as OK and Up / Down as a row click (default on, port
+    /// conveniences as Atlantis II's); off, as the original, whose input
+    /// poll (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba) reads F5..F8 only
+    /// and whose picker (`FUN_0041cf78`) reads no key.
+    pub arrow_keys: bool,
 }
 
 impl Default for Enhancements {
@@ -467,6 +503,7 @@ impl Default for Enhancements {
             fixes: BugFixes::ALL,
             restored_content: false,
             ui_ux: false,
+            arrow_keys: true,
         }
     }
 }
@@ -478,6 +515,7 @@ impl Enhancements {
             fixes: BugFixes::NONE,
             restored_content: false,
             ui_ux: false,
+            arrow_keys: false,
         }
     }
 
@@ -533,6 +571,7 @@ impl Enhancements {
             after.restored_content,
         );
         x.ui_ux = pick(self.ui_ux, before.ui_ux, after.ui_ux);
+        x.arrow_keys = pick(self.arrow_keys, before.arrow_keys, after.arrow_keys);
         x
     }
 }

@@ -25,7 +25,7 @@
 use atlantis_data::sprite_list::npc_hit_test;
 
 use crate::cursor::{warp_cursor_step, WarpCursorInput};
-use crate::engine::{Engine, CURSOR_UNSET, WARP_ABORT};
+use crate::engine::{Abort, Engine, CURSOR_UNSET, WARP_ABORT};
 use crate::hooks::ScriptHooks;
 use crate::look::warp_look_frame;
 use crate::sys::{Input, Key, MouseButton};
@@ -196,11 +196,63 @@ impl Engine {
         }
     }
 
+    /// The zone (`FUN_00422bb0`) and the character (`FUN_00422d5c`) under
+    /// the pointer at the view as it stands.
+    pub(crate) fn pointer_targets(&mut self) -> (u32, u32) {
+        let (Some(vue), true) = (self.current_place_id, self.warp_loaded) else {
+            return (0, 0);
+        };
+        let Some(place) = self.current_place.and_then(|i| self.wam.places.get(i)) else {
+            return (0, 0);
+        };
+        let (px, py) = self
+            .warp
+            .screen_to_panorama(self.pointer.pos.0, self.pointer.pos.1);
+        let (px, py) = (i32::from(px as i16), i32::from(py as i16));
+        let perso = npc_hit_test(
+            &self.wam.npcs,
+            &self.npc_rects,
+            &self.sprite_list,
+            vue,
+            px,
+            py,
+        );
+        (u32::from(place.hit_test(px as i16, py as i16)), perso)
+    }
+
+    /// `FUN_0041afd0`'s cursor, for a still frame it presents outside the
+    /// warp loop (the voice-only line, `FUN_00430258` @ 0x00430550): with
+    /// 0x004960c0, GAMEOVER, bow mode, 0x00496188, the bar request, the
+    /// menu request, 0x00496154 and 0x0049616c all 0
+    /// (0x0041afe8..0x0041b050), one step of `FUN_00422fcc` over what is
+    /// under the pointer, the sprite to draw at the pointer.
+    pub(crate) fn still_frame_cursor(&mut self) -> Option<(usize, (i32, i32))> {
+        if self.bow_mode
+            || self.vars.get("gameover") != 0
+            || self.bar.request
+            || self.escape_request
+        {
+            return None;
+        }
+        let (zone, perso) = self.pointer_targets();
+        let input = WarpCursorInput {
+            zone,
+            id: perso,
+            held: self.vars.get("objetenmain").max(0) as u32,
+            hidden: false,
+            edge_scroll: false,
+            id_rule: self.game.exe.build.cursor_id_rule,
+        };
+        let sprite = warp_cursor_step(&mut self.cursor_state, &input).sprite;
+        usize::try_from(sprite).ok().map(|s| (s, self.pointer.pos))
+    }
+
     /// The warp loop `FUN_0041bfa0`: the view until a click. Returns the
     /// zone clicked (0 for none) or [`WARP_ABORT`].
     pub async fn handle_warp(&mut self, hooks: &mut dyn ScriptHooks) -> u32 {
         let mut exit = false;
         let mut action = 0u32;
+        self.pending_no_click_exit = None;
 
         // The loop takes the pointer where the caller left it (entry block):
         // a mouse motion since the engine last wrote it is the WM_MOUSEMOVE
@@ -213,9 +265,12 @@ impl Engine {
         // No wait at the entry (0x0041bfb8..0x0041c01e; the first frame
         // polls FUN_0041a298 @ 0x0041c5f2). A click is a press edge
         // (FUN_0042e624's latch): a button still down from a press an
-        // earlier poll saw is none, and a press no poll has seen yet (during
-        // a video's last frame, a place load) is one. The engine's input
-        // events are those edges.
+        // earlier poll saw is none, and a press no poll has seen yet is
+        // one. After a move none is left: FUN_00423ad8 polls once after
+        // the place load and clears the flags (0x00424093..0x004240ca,
+        // Engine::end_of_move_input), so a press during the video's last
+        // frame or the load is lost. The engine's input events are those
+        // edges.
         self.sys
             .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
         self.mark_pointer_mouse();
@@ -235,8 +290,7 @@ impl Engine {
             // Each frame starts by clearing the double-click flag
             // (0x0041c04a).
             self.turn_double_click.flag = false;
-            self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
-                                      // This frame's relative motion (x right, y down).
+            // This frame's relative motion (x right, y down).
             let (motion_x, motion_y) = self.sys.take_mouse_relative();
             // A press edge (FUN_0042e624): a held button is no click.
             let mut clicked = fi.left_press;
@@ -247,47 +301,21 @@ impl Engine {
             if self.bow_mode {
                 clicked = false;
             }
+            // A bar request a timer section of the previous pass left (a
+            // right press during its lines): the original's pass ends its
+            // inner loop on `0x004960c4 == 1` (FUN_0041bfa0, the
+            // `while (0x004960c4 != 1)` after the poll at 0x0041c5f2)
+            // before its head tests the click, opens the bar
+            // (FUN_0042c2c4) and clears the click flag 0x0049611c: the bar
+            // opens below and the click is lost.
+            if clicked && self.bar.request {
+                clicked = false;
+            }
 
             // The zone and the character under the pointer: a character
             // takes priority over the zone underneath it.
-            action = 0;
-            let mut centre_perso = 0u32;
-            if let (Some(vue), true) = (self.current_place_id, self.warp_loaded) {
-                if let Some(place) = self.current_place.and_then(|i| self.wam.places.get(i)) {
-                    let (px, py) = self
-                        .warp
-                        .screen_to_panorama(self.pointer.pos.0, self.pointer.pos.1);
-                    let (px, py) = (i32::from(px as i16), i32::from(py as i16));
-                    centre_perso = npc_hit_test(
-                        &self.wam.npcs,
-                        &self.npc_rects,
-                        &self.sprite_list,
-                        vue,
-                        px,
-                        py,
-                    );
-                    action = u32::from(place.hit_test(px as i16, py as i16));
-                }
-            }
-
-            // The cursor (FUN_00422fcc): talk (NPC) > navigate (zone) >
-            // nothing; with an object in hand, its animation over the icon.
-            // Step 10 of FUN_0041bfa0 (0x0041c4b4) and its helper
-            // FUN_0041afd0 (0x0041b00e) skip it in bow mode (0x00496164):
-            // its animation state does not advance.
-            let now = self.sys.millis();
-            if !self.bow_mode && (self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms) {
-                self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
-                let input = WarpCursorInput {
-                    zone: action,
-                    id: centre_perso,
-                    held: self.vars.get("objetenmain").max(0) as u32,
-                    hidden: false,
-                    edge_scroll: false,
-                    id_rule,
-                };
-                self.cursor_shown = warp_cursor_step(&mut self.cursor_state, &input).sprite;
-            }
+            let (zone, centre_perso) = self.pointer_targets();
+            action = zone;
 
             // A click on a character or an object (FUN_004278a0): ids
             // 0x100..0x1ff are objects, from 0x200 the conversation; no move.
@@ -355,6 +383,37 @@ impl Engine {
                 action = WARP_ABORT;
                 exit = true;
             }
+            // The poll that read the click is the last call but two of the
+            // original's pass (0x0041c5f2); the bow step and FUN_00432178
+            // follow it, and the click ends the loop at the next loop head
+            // (0x0041c028..0x0041c041): no clock update, cursor step, timer
+            // scan, sprite step or drawing comes between the click and its
+            // handling. (The port's pass starts with that poll.)
+            if left_pressed && !exit {
+                self.poll_new_sound().await;
+                self.ambient_frame();
+                break;
+            }
+            self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
+
+            // The cursor (FUN_00422fcc): talk (NPC) > navigate (zone) >
+            // nothing; with an object in hand, its animation over the icon.
+            // Step 10 of FUN_0041bfa0 (0x0041c4b4) and its helper
+            // FUN_0041afd0 (0x0041b00e) skip it in bow mode (0x00496164):
+            // its animation state does not advance.
+            let now = self.sys.millis();
+            if !self.bow_mode && (self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms) {
+                self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
+                let input = WarpCursorInput {
+                    zone: action,
+                    id: centre_perso,
+                    held: self.vars.get("objetenmain").max(0) as u32,
+                    hidden: false,
+                    edge_scroll: false,
+                    id_rule,
+                };
+                self.cursor_shown = warp_cursor_step(&mut self.cursor_state, &input).sprite;
+            }
 
             // A right click opens the inventory bar (FUN_0041a298 toggles
             // 0x004960c4, the loop opens the bar @ 0x0041c6d2), also when a
@@ -395,6 +454,13 @@ impl Engine {
                     moved = self.arrival_scan_pending;
                 }
                 if self.should_abort() || moved {
+                    // GAMEOVER after the bar (0x0041c6fe..0x0041c717): the
+                    // bar closed with the pointer at (320, 240) (FUN_0042c098
+                    // @ 0x0042c275).
+                    if !moved && self.game_over_left_set() {
+                        self.pointer.recentre();
+                        self.pending_no_click_exit = Some(true);
+                    }
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -422,6 +488,13 @@ impl Engine {
                 }
                 self.sync_pointer_mouse();
                 if self.should_abort() {
+                    // LOAD or QUIT: 0x00496124 = 0 ends the loop.
+                    if matches!(self.abort, Some(Abort::Load | Abort::Quit))
+                        && !self.sys.should_quit()
+                        && !self.game_over_cleared_at_once()
+                    {
+                        self.pending_no_click_exit = Some(false);
+                    }
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -437,13 +510,15 @@ impl Engine {
             // The view: FUN_0041bfa0 steps 2..5. The stored angles first
             // take F5 / F6 (turn) and F8 / F7 (tilt) with the left button
             // up (FUN_0041a298 at the end of the previous frame); the port
-            // adds the arrow keys, which the original's view ignores, as
-            // the same keys: left F5, right F6, up F7, down F8 (a larger
-            // beta looks down).
+            // adds the arrow keys (Enhancements::arrow_keys), which the
+            // original's view ignores, as the same keys: left F5, right F6,
+            // up F7, down F8 (a larger beta looks down).
             let (mut alpha, mut beta) = (self.warp.alpha(), self.warp.beta());
             if !self.sys.buttons().0 {
-                let held =
-                    |f: u8, arrow: Key| self.sys.key_held(Key::F(f)) || self.sys.key_held(arrow);
+                let arrows = self.enhancements().arrow_keys;
+                let held = |f: u8, arrow: Key| {
+                    self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow))
+                };
                 if held(5, Key::Left) {
                     alpha = (f64::from(alpha) + VIEW_KEY_STEP) as f32;
                 }
@@ -500,6 +575,9 @@ impl Engine {
             if !exit && hooks.warp_frame(self).await {
                 self.sync_pointer_mouse();
                 if self.should_abort() {
+                    if self.game_over_left_set() {
+                        self.pending_no_click_exit = Some(true);
+                    }
                     action = WARP_ABORT;
                     exit = true;
                 } else {
@@ -517,6 +595,9 @@ impl Engine {
             // Place sprites: FUN_00425304 at 0x0041c3a9, after the timers,
             // unless GameOver or Exit is set (then it leaves, 0x0041c387).
             if !exit && self.vars.get("exit") != 0 {
+                if !self.game_over_cleared_at_once() {
+                    self.pending_no_click_exit = Some(true);
+                }
                 action = WARP_ABORT;
                 exit = true;
             }
@@ -589,6 +670,47 @@ impl Engine {
         self.wait_buttons_up().await;
         log::debug!("handle_warp: action {action}");
         action
+    }
+
+    /// A game over ended the warp loop and GAMEOVER is left set until the
+    /// reload ([`crate::enhancements::BugFix::GameOverPuzzle`] off).
+    fn game_over_left_set(&self) -> bool {
+        self.abort == Some(Abort::NewGame)
+            && !self.sys.should_quit()
+            && !self.game_over_cleared_at_once()
+    }
+
+    /// The place loop after a warp loop left without a click
+    /// ([`crate::enhancements::BugFix::GameOverPuzzle`] off): the warp loop's exit block returns
+    /// the zone under the pointer whatever ended it (`FUN_0041bfa0` @
+    /// 0x0041c71e: FUN_00422bb0, and the id under it), and `FUN_00423ad8`
+    /// acts on it before it tests why (0x00423c12..0x00423ca5): ClicZone =
+    /// the zone; `FUN_004240fc` runs the armed puzzle of a zone 1000..1016
+    /// while 0x00496124 is 1 (0x00424114: after a game over or an Exit,
+    /// not after the in-game menu's LOAD or QUIT, `keep_running`), then
+    /// the view reload and a /sel scan; zone 999 with no id runs the /sel
+    /// scan with DepartVue = 999 (0x00423c47..0x00423c9b). GAMEOVER is
+    /// still set, so the scan's section shows the game-over picture again
+    /// after its first line (`Scripts::play_section`). Then the pass ends
+    /// for the reason the loop ended.
+    pub(crate) async fn no_click_exit(&mut self, hooks: &mut dyn ScriptHooks, keep_running: bool) {
+        let abort = self.abort.take();
+        let (zone, id) = self.pointer_targets();
+        self.vars.set("cliczone", zone as i32);
+        // 0x00496124 = 0 after LOAD or QUIT: the lines of the zone-999
+        // scan stop at their first poll, as after a puzzle's Escape.
+        self.escape_request = !keep_running;
+        if keep_running && (1000..1017).contains(&zone) {
+            hooks.puzzle_zone(self, zone - 1000).await;
+        }
+        if zone == 999 && id == 0 && !self.should_abort() {
+            hooks.zone_999(self).await;
+        }
+        // The main loop sets 0x00496124 = 1 before the reload (0x0041975d).
+        self.escape_request = false;
+        if abort.is_some() {
+            self.abort = abort;
+        }
     }
 }
 
@@ -810,5 +932,211 @@ mod tests {
             "the timers saw time1 = {} after Time1=0",
             seen[0]
         );
+    }
+
+    struct ClickPass {
+        timers: Rc<Cell<u32>>,
+        at_click: Rc<Cell<Option<u32>>>,
+    }
+
+    impl ScriptHooks for ClickPass {
+        fn warp_frame<'a>(&'a mut self, _e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.timers.set(self.timers.get() + 1);
+            ready(false)
+        }
+
+        fn zone_click<'a>(&'a mut self, _e: &'a mut Engine, _z: u32) -> HookFuture<'a, ()> {
+            if self.at_click.get().is_none() {
+                self.at_click.set(Some(self.timers.get()));
+            }
+            ready(())
+        }
+    }
+
+    /// The poll that reads a left click ends the original's pass (the bow
+    /// step and FUN_00432178 follow it) and the loop at its head
+    /// (0x0041c028): no timer scan (FUN_0042be3c @ 0x0041c369) runs
+    /// between the click and its handling.
+    #[test]
+    fn no_timer_pass_between_a_click_and_its_handling() {
+        let timers = Rc::new(Cell::new(0u32));
+        let at_click = Rc::new(Cell::new(None));
+        let pushed = Rc::new(Cell::new(None::<u32>));
+        let (t2, a2, t3, a3, p2) = (
+            timers.clone(),
+            at_click.clone(),
+            timers.clone(),
+            at_click.clone(),
+            pushed.clone(),
+        );
+        let mut locked_for = 0u64;
+        let ran = with_engine(
+            "no_timer_pass_between_a_click_and_its_handling",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                let mut hooks = ClickPass {
+                    timers: t2,
+                    at_click: a2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _f| {
+                if a3.get().is_some() {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                if p2.get().is_some() {
+                    locked_for += 1;
+                    if locked_for == 2 {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    return;
+                }
+                locked_for = if sys.mouse_locked() {
+                    locked_for + 1
+                } else {
+                    0
+                };
+                if locked_for == 10 {
+                    p2.set(Some(t3.get()));
+                    button(sys, MouseButton::Left, true);
+                    locked_for = 0;
+                }
+            },
+        );
+        if ran {
+            assert_eq!(at_click.get().unwrap() - pushed.get().unwrap(), 0);
+        }
+    }
+
+    struct RequestThenClick {
+        arm: Rc<Cell<u8>>,
+        clicked: Rc<Cell<bool>>,
+        bar: Rc<Cell<bool>>,
+    }
+
+    impl ScriptHooks for RequestThenClick {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            // A timer section whose line saw a right press: the request
+            // stays for the next pass.
+            if self.arm.get() == 1 {
+                e.bar.request = true;
+                self.arm.set(2);
+            }
+            ready(false)
+        }
+
+        fn zone_click<'a>(&'a mut self, _e: &'a mut Engine, _z: u32) -> HookFuture<'a, ()> {
+            self.clicked.set(true);
+            ready(())
+        }
+
+        fn bar_timers<'a>(&'a mut self, _e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.bar.set(true);
+            ready(false)
+        }
+    }
+
+    /// A bar request left by a timer section and a click in the next pass:
+    /// the original's inner loop ends on the request before its head reads
+    /// the click (FUN_0041bfa0, `while (0x004960c4 != 1)`), opens the bar
+    /// and clears the click flag 0x0049611c. The bar opens, the click is
+    /// lost.
+    #[test]
+    fn a_pending_bar_request_takes_the_click() {
+        let arm = Rc::new(Cell::new(0u8));
+        let clicked = Rc::new(Cell::new(false));
+        let bar = Rc::new(Cell::new(false));
+        let (a2, c2, b2) = (arm.clone(), clicked.clone(), bar.clone());
+        let (a3, c3, b3) = (arm.clone(), clicked.clone(), bar.clone());
+        let mut locked = 0u64;
+        let mut pressed = false;
+        let ran = with_engine(
+            "a_pending_bar_request_takes_the_click",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                let mut hooks = RequestThenClick {
+                    arm: a2,
+                    clicked: c2,
+                    bar: b2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _f| {
+                if b3.get() || c3.get() {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                if a3.get() == 2 && !pressed {
+                    pressed = true;
+                    button(sys, MouseButton::Left, true);
+                    return;
+                }
+                locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                if locked == 10 && a3.get() == 0 {
+                    a3.set(1);
+                }
+            },
+        );
+        if ran {
+            assert!(bar.get(), "the bar did not open");
+            assert!(!clicked.get(), "the click was handled");
+        }
+    }
+
+    /// The view's alpha after the warp loop of place 1, with the left
+    /// arrow held for 20 frames (`press`), under `x`.
+    fn alpha_after_left_arrow(x: crate::enhancements::Enhancements, press: bool) -> Option<f32> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let mut locked = 0u64;
+        let ran = with_engine(
+            "arrow_keys_turn_the_view_unless_original",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.set_enhancements(x);
+                e.next_place_id = Some(1);
+                let mut hooks = crate::hooks::NoScripts;
+                e.game_step(&mut hooks).await;
+                g2.set(Some(e.warp.alpha()));
+            },
+            move |sys, _| {
+                locked = if sys.mouse_locked() {
+                    locked + 1
+                } else {
+                    locked
+                };
+                if locked == 5 && press {
+                    sys.push_input(Input::KeyDown(Key::Left));
+                } else if locked == 25 {
+                    sys.push_input(Input::KeyUp(Key::Left));
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// The arrow keys turn the view as F5..F8 by default
+    /// (`Enhancements::arrow_keys`, a port convenience); with `--original`
+    /// they do not, as the original's poll reads F5..F8 only
+    /// (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba).
+    #[test]
+    fn arrow_keys_turn_the_view_unless_original() {
+        use crate::enhancements::Enhancements;
+        let Some(still) = alpha_after_left_arrow(Enhancements::default(), false) else {
+            return;
+        };
+        let turned = alpha_after_left_arrow(Enhancements::default(), true).unwrap();
+        let original = alpha_after_left_arrow(Enhancements::original(), true).unwrap();
+        let original_still = alpha_after_left_arrow(Enhancements::original(), false).unwrap();
+        assert_ne!(turned, still);
+        assert_eq!(original, original_still);
     }
 }

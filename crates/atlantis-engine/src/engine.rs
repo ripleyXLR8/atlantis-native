@@ -42,6 +42,10 @@ pub const WARP_ABORT: u32 = 66666;
 /// requested vue 0x0049692c = 1; the view angles 0x00bcb59c / 0x00bcb598
 /// keep their .bss value, 0.
 pub const NEW_GAME_WAM: &str = "ATLAN1.WAM";
+
+/// The size of the WAM path buffer 0x006cdce0, the checkpoint's first
+/// field.
+pub const WAM_PATH_LEN: usize = 0x104;
 pub const NEW_GAME_VUE: u16 = 1;
 
 /// What happened, for tests and tools.
@@ -196,6 +200,9 @@ pub struct Engine {
     // The area.
     pub wam: Wam,
     pub wam_name: String,
+    /// The WAM path buffer 0x006cdce0 (0x104 bytes) as the checkpoint
+    /// writer copies it whole: see [`Engine::set_wam_path`].
+    pub wam_path: [u8; WAM_PATH_LEN],
     /// The place shown (0x006cd7c0), `None` before the first.
     pub current_place_id: Option<u16>,
     /// Its record in `wam.places`; `None` after a sub-WAM swap until the
@@ -206,6 +213,13 @@ pub struct Engine {
     /// A script Vue= entered a place: the place loop runs its arrival scan.
     pub arrival_scan_pending: bool,
     pub arrival_from_vue: u16,
+    /// A move ended: the place loop polls the input once and clears every
+    /// input flag before the next arrival scan ([`Engine::end_of_move_input`]).
+    pub move_input_poll: bool,
+    /// The panorama a move loads (`FUN_00421cfc` at the click builds
+    /// 0x006cd288 from the destination's record in the WAM being left; see
+    /// [`Engine::execute_transition`]).
+    pub move_cyclo: Option<(u16, String)>,
     /// The first arrival scan after a chapter load reads ArriveeVue =
     /// LastVue.
     pub(crate) arrival_after_load: bool,
@@ -229,6 +243,19 @@ pub struct Engine {
     pub abort: Option<Abort>,
     /// A CON section plays from a click (0x00496170).
     pub section_play: bool,
+    /// An Escape that `FUN_0041a298` saw in a loop that does not end on it
+    /// (the turn before a move's video, the subject menu) left 0x00496124
+    /// = 0 and the menu request 0x00496138 = 1 (@ 0x0041a419..0x0041a423):
+    /// the next loop that runs only while 0x00496124 is 1 (a video, a
+    /// voice-only line, the game-over wait) stops at once and puts both
+    /// back; the end of a conversation puts them back too (0x00425be5).
+    pub escape_request: bool,
+    /// The warp loop ended without a click, as the original's place loop
+    /// then still acts on the zone under the pointer
+    /// ([`Engine::no_click_exit`], [`BugFix::GameOverPuzzle`] off): `true`
+    /// after a game over or an Exit (0x00496124 is 1), `false` after the
+    /// in-game menu's LOAD or QUIT (0x00496124 is 0).
+    pub(crate) pending_no_click_exit: Option<bool>,
     /// A script Vue= named a place the WAM does not have: the variable VUE
     /// reads it until the next place change.
     pub vue_override: Option<i32>,
@@ -391,8 +418,8 @@ impl Engine {
         let clock_epoch = Rc::new(Cell::new(sys.millis()));
         // FUN_004320bc draws from timeGetTime - 0x00bcb5b8 (FUN_00451d0c).
         ambient.set_clock(spinning_clock(clock_sys, clock_epoch.clone()));
-        // The effects volume 0x00495e73 at full scale.
-        ambient.effects_volume = 127;
+        // The effects volume 0x00495e73 as at start-up.
+        ambient.effects_volume = crate::persist::DEFAULT_VOLUMES[2];
         let ambient_out = MixerAmbientOutput::new(sys.mixer.clone());
         let music = Music::new(&sys);
         let menu_records = crate::ui::layout::MenuRecordTable::new(usize::from(
@@ -405,11 +432,14 @@ impl Engine {
             trace: None,
             wam: Wam::default(),
             wam_name: String::new(),
+            wam_path: [0; WAM_PATH_LEN],
             current_place_id: None,
             current_place: None,
             next_place_id: None,
             arrival_scan_pending: false,
             arrival_from_vue: 0,
+            move_input_poll: false,
+            move_cyclo: None,
             arrival_after_load: false,
             last_vue: 0,
             chapter: 0,
@@ -419,6 +449,8 @@ impl Engine {
             music,
             abort: None,
             section_play: false,
+            escape_request: false,
+            pending_no_click_exit: None,
             vue_override: None,
             inventory: Vec::new(),
             bar_first: 0,
@@ -438,7 +470,7 @@ impl Engine {
             menu_records,
             cinema_captions: None,
             channel_test_voice: None,
-            voice_volume: 255,
+            voice_volume: crate::persist::mixer_volume(crate::persist::DEFAULT_VOLUMES[3]),
             players: Players::new(b"#New Player"),
             player: 0,
             saves: Rc::new(MemStore::new()),
@@ -583,10 +615,10 @@ impl Engine {
         self.enhancements().fix(BugFix::HeadOverlay)
     }
 
-    /// Frame 0 of a talking head's animation drawn with frame 1's pose
-    /// ([`BugFix::HeadFirstFrame`]).
-    pub fn head_rest_key_fix(&self) -> bool {
-        self.enhancements().fix(BugFix::HeadFirstFrame)
+    /// A cinematic's own sound starts over the sound of the cinematic
+    /// before it ([`BugFix::CinemaSound`]).
+    pub fn cinema_sound_fix(&self) -> bool {
+        self.enhancements().fix(BugFix::CinemaSound)
     }
 
     /// Each menu with its own click records ([`BugFix::MenuRecords`]).
@@ -603,6 +635,20 @@ impl Engine {
     /// ([`BugFix::SnakesFirstWin`]).
     pub fn snakes_first_run_fix(&self) -> bool {
         self.enhancements().fix(BugFix::SnakesFirstWin)
+    }
+
+    /// An Escape inside a puzzle latches 0x00496124 = 0 / 0x00496138 = 1,
+    /// as the original ([`BugFix::PuzzleEscape`] off).
+    pub fn puzzle_escape_latches(&self) -> bool {
+        !self.enhancements().fix(BugFix::PuzzleEscape)
+    }
+
+    /// A game over ends the place loop's pass at once, GAMEOVER cleared
+    /// as the screen ends ([`BugFix::GameOverPuzzle`]); off, GAMEOVER
+    /// stays set until the reload and a warp loop left without a click
+    /// still runs the zone under the pointer ([`Engine::no_click_exit`]).
+    pub fn game_over_cleared_at_once(&self) -> bool {
+        self.enhancements().fix(BugFix::GameOverPuzzle)
     }
 
     /// The hexagon puzzle forces OBJETENMAIN to 402 before its test: the
@@ -726,6 +772,22 @@ impl Engine {
         log::info!("{} cursor sprites", self.cursor_sprites.len());
     }
 
+    /// The WAM path buffer 0x006cdce0 rebuilt as the original does before
+    /// each WAM load (a new game @ 0x0042e250, ChangeWam= @ 0x0042a253, a
+    /// sub-WAM swap @ 0x00422b4c): strcpy(root, "" @ 0x0049619f), then
+    /// strcat("wam\\"), strcat(name). The name keeps the case of the
+    /// script line or the WAM record, and the bytes after the new NUL keep
+    /// what a longer path left there; the checkpoint writer copies the
+    /// whole buffer (0x104 bytes), so real checkpoints hold such tails
+    /// (`WAM\TRONE.WAM\0AM`).
+    pub fn set_wam_path(&mut self, name: &[u8]) {
+        let mut path = b"wam\\".to_vec();
+        path.extend_from_slice(name);
+        let n = path.len().min(WAM_PATH_LEN - 1);
+        self.wam_path[..n].copy_from_slice(&path[..n]);
+        self.wam_path[n] = 0;
+    }
+
     /// A WAM file, its centre table and sprite lists (`setupWAMByName`,
     /// `FUN_00421ebc`). The loader writes the fixed place records on every
     /// load, the chapter's WAM included (a new game @ 0x004237b5, a load
@@ -811,6 +873,9 @@ impl Engine {
         if !in_play {
             self.set_view(0.0, 0.0);
         }
+        // FUN_0042de5c's no-file branch (@ 0x0042e250..0x0042e279):
+        // `wam\` + *(0x004961e0) = "atlan1.wam".
+        self.set_wam_path(b"atlan1.wam");
         if !self.load_wam(NEW_GAME_WAM).await {
             log::error!("cannot start a new game: {NEW_GAME_WAM} missing");
             return;
@@ -870,6 +935,7 @@ impl Engine {
                 let mut arrivee = self.current_place_id.map_or(-1, i32::from);
                 let scan = self.take_arrival_after_load(&mut arrivee);
                 self.do_place_change().await;
+                self.end_of_move_input();
                 self.arrival_scan_pending = false;
                 if let (Some(vue), true) =
                     (self.current_place_id, scan && self.current_place.is_some())
@@ -878,6 +944,7 @@ impl Engine {
                 }
             } else if self.arrival_scan_pending {
                 // A script Vue= already entered the place (@ 0x00423b48).
+                self.end_of_move_input();
                 self.arrival_scan_pending = false;
                 let mut arrivee = i32::from(self.arrival_from_vue);
                 let scan = self.take_arrival_after_load(&mut arrivee);
@@ -901,6 +968,9 @@ impl Engine {
 
             let action = self.handle_warp(hooks).await;
             if action == WARP_ABORT {
+                if let Some(keep_running) = self.pending_no_click_exit.take() {
+                    self.no_click_exit(hooks, keep_running).await;
+                }
                 if self.should_abort() {
                     break;
                 }
@@ -982,6 +1052,7 @@ impl Engine {
                 if !self.should_abort() && !game_over {
                     self.transition_after_departure_vue(index).await;
                     self.vars.move_ended(); // 0x00424089
+                    self.move_input_poll = true; // 0x00424093
                 }
                 continue;
             }
@@ -994,10 +1065,29 @@ impl Engine {
                     self.clocks.time1_offset = 0;
                     self.execute_transition(dest).await;
                     self.vars.move_ended(); // 0x00424089
+                    self.move_input_poll = true; // 0x00424093
                 }
                 _ => {}
             }
         }
+    }
+
+    /// The end of every move of `FUN_00423ad8`, after the place load and
+    /// its sprites (0x00424068, 0x00424072) and DEPARTVUE = 0: one input
+    /// poll `FUN_0041a298` (@ 0x00424093), then 0x00496118, 0x0049611c,
+    /// 0x00496120, 0x00496138 = 0, 0x00496124 = 1 and 0x004960c4 = 0
+    /// (0x00424098..0x004240ca). A left or right press or an Escape made
+    /// during the video's last frame or the place load (the video's last
+    /// frame has no poll after it) is taken by that poll and cleared at
+    /// once: the warp loop's first poll sees no new press.
+    pub(crate) fn end_of_move_input(&mut self) {
+        if !std::mem::take(&mut self.move_input_poll) {
+            return;
+        }
+        while self.sys.poll_event().is_some() {}
+        self.turn_double_click.flag = false;
+        self.escape_request = false;
+        self.bar.flags_reset();
     }
 
     /// `FUN_00431e98` on the way out (0x004197a0).
@@ -1085,6 +1175,10 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
             // player's chapter byte (0x0041975d -> FUN_0042de5c), a new
             // game from play without one.
             Some(Abort::NewGame | Abort::Load) if !e.sys.should_quit() => {
+                // The checkpoint loader clears GAMEOVER (FUN_0042de5c ->
+                // FUN_00426c68), which BugFix::GameOverPuzzle off leaves
+                // set until here.
+                e.vars.set("gameover", 0);
                 e.load_checkpoint(hooks.as_mut(), true).await;
             }
             Some(Abort::Finished) if e.vars.get("exit") == 86 => break true,
@@ -1177,10 +1271,14 @@ impl Engine {
         self.music.duck(false, None);
         let outcome = self.ingame_menu().await;
         self.music.unduck(None);
+        // Every exit of FUN_0041c838, the load entry included (its
+        // `jmp 0x41ca75` @ 0x0041ca10), runs the tail that rebases the
+        // clocks (0x0041cb84..0x0041cbdc: FUN_00451cec, the Time1 / Time2 /
+        // ChapterTime bases = now, their offsets = TIME1 / TIME2). The
+        // reload then restarts ChapterTime and Time2 but not Time1
+        // (FUN_00427634), so Time1 does not count the menu's time.
+        self.rebase_con_clocks();
         match outcome {
-            // The clocks resume only when the play goes on: a reload, a
-            // quit or an abort leaves them as they are.
-            MenuOutcome::Resume if !self.should_abort() => self.rebase_con_clocks(),
             MenuOutcome::Resume => {}
             MenuOutcome::Reload => self.abort = Some(Abort::Load),
             MenuOutcome::Quit => self.abort = Some(Abort::Quit),
@@ -1232,14 +1330,15 @@ mod exit_and_menu_tests {
     use crate::sys::{Input, MouseButton, Runner};
     use crate::test_support::{button, with_engine};
 
-    /// The in-game menu ended by an abort (as a reload or a quit) leaves
-    /// the clocks alone; a resume rebases them.
+    /// Every exit of the in-game menu rebases the clocks, a load or an
+    /// abort as a resume (FUN_0041c838 @ 0x0041cb84..0x0041cbdc, reached
+    /// from the load entry @ 0x0041ca10).
     #[test]
-    fn ingame_menu_rebases_the_clocks_only_on_resume() {
+    fn ingame_menu_rebases_the_clocks_on_every_exit() {
         let got = Rc::new(RefCell::new(Vec::new()));
         let g2 = got.clone();
         let ran = with_engine(
-            "ingame_menu_rebases_the_clocks_only_on_resume",
+            "ingame_menu_rebases_the_clocks_on_every_exit",
             move |mut e| async move {
                 e.vars.set("time1", 7);
                 e.abort = Some(Abort::Load);
@@ -1261,7 +1360,7 @@ mod exit_and_menu_tests {
             return;
         }
         let got = got.borrow();
-        assert_eq!(*got, [0, 7]);
+        assert_eq!(*got, [7, 7]);
     }
 
     /// The game clock FUN_00451d0c counts from its epoch: the engine's
@@ -1354,5 +1453,71 @@ mod exit_and_menu_tests {
             return;
         };
         assert!(t.contains(&Event::Menu("SELEMENU.TXT".into())), "{t:?}");
+    }
+}
+
+#[cfg(test)]
+mod end_of_move_tests {
+    use super::*;
+    use crate::hooks::{ready, HookFuture};
+    use crate::sys::{Input, Key, MouseButton};
+    use crate::test_support::with_engine;
+    use std::cell::Cell;
+
+    struct Clicks(Rc<Cell<u32>>);
+
+    impl ScriptHooks for Clicks {
+        fn zone_click<'a>(&'a mut self, _e: &'a mut Engine, _z: u32) -> HookFuture<'a, ()> {
+            self.0.set(self.0.get() + 1);
+            ready(())
+        }
+    }
+
+    /// The zone clicks and the bar request after a place load, with a left
+    /// press, a right press and Escape queued during it; `moved`: the load
+    /// ends a move.
+    fn after_load(moved: bool) -> Option<(u32, bool)> {
+        let clicks = Rc::new(Cell::new(0));
+        let got = Rc::new(Cell::new(None));
+        let (c2, g2) = (clicks.clone(), got.clone());
+        let ran = with_engine(
+            "presses_during_a_move_end_are_lost",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.move_input_poll = moved;
+                // During the video's last frame and the place load.
+                let (x, y) = (320, 320);
+                for b in [MouseButton::Left, MouseButton::Right] {
+                    e.sys.push_input(Input::MouseDown { button: b, x, y });
+                    e.sys.push_input(Input::MouseUp { button: b, x, y });
+                }
+                e.sys.push_input(Input::KeyDown(Key::Escape));
+                e.sys.push_input(Input::KeyUp(Key::Escape));
+                let mut hooks = Clicks(c2);
+                e.game_step(&mut hooks).await;
+                g2.set(Some(e.bar.request));
+            },
+            |sys, f| {
+                if f == 30 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        ran.then(|| (clicks.get(), got.get().unwrap()))
+    }
+
+    /// FUN_00423ad8 polls once after a move's place load and clears every
+    /// input flag (0x00424093..0x004240ca): the warp loop sees none of the
+    /// presses made meanwhile. Without a move, the first warp pass takes
+    /// the queued click.
+    #[test]
+    fn presses_during_a_move_end_are_lost() {
+        let Some(moved) = after_load(true) else {
+            return;
+        };
+        assert_eq!(moved.0, 0, "a click after the move was handled");
+        let not_moved = after_load(false).unwrap();
+        assert_eq!(not_moved.0, 1);
     }
 }

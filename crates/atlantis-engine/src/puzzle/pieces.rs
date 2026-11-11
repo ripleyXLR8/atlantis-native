@@ -250,7 +250,7 @@ struct Host<'a> {
 
 impl PiecesIo for Host<'_> {
     fn read_input(&mut self) -> (i32, i32, bool) {
-        let m = self.h.read_input();
+        let m = self.h.read_input_held_pointer();
         (m.x, m.y, m.click)
     }
     fn draw_background(&mut self) {

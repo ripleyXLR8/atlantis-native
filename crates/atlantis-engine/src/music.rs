@@ -508,15 +508,12 @@ struct SoundTimer {
 impl SoundTimer {
     /// The music voice's volume: the AIL volume 0x00495e71 (clamped to 127)
     /// over the full scale; the music volume 0x00495e72 is the level the
-    /// fades move between.
+    /// fades move between. A music volume of 0 does not silence it: the
+    /// fade up steps before its test (`FUN_0042f974`), so it ends at 1.
     fn apply_music_volume(&self) {
         if let Some(v) = self.music_voice {
-            let level = if self.fade.vol == 0 {
-                0
-            } else {
-                u32::from(self.fade.cur.min(127)) * 255 / 127
-            };
-            self.mixer.set_volume(v, level as u8, 0);
+            self.mixer
+                .set_volume(v, crate::persist::mixer_volume(self.fade.cur), 0);
         }
     }
 
@@ -530,10 +527,11 @@ impl SoundTimer {
         }
         self.apply_music_volume();
         if std::mem::take(&mut self.fade.sfx_changed) {
+            // AIL_set_sample_volume(0x006ce110, 0x006ce128).
             if let Some(v) = self.new_sound_voice {
-                let vol0 = self.fade.sfx_vol0.max(1);
+                let level = self.fade.sfx_vol.clamp(0, 127) as u8;
                 self.mixer
-                    .set_volume(v, (self.fade.sfx_vol * 255 / vol0).clamp(0, 255) as u8, 0);
+                    .set_volume(v, crate::persist::mixer_volume(level), 0);
             }
         }
         if std::mem::take(&mut self.fade.sfx_stop) {
@@ -649,9 +647,11 @@ impl Music {
     }
 
     /// Starts the NewSound sample (`FUN_00432a64` step 5): at the effects
-    /// volume, the fade-out state 0x00495eb0 cleared, so a fade armed by a
-    /// video cut short (`FUN_0041bc74`) does not carry over to the new sound.
-    pub fn start_new_sound(&self, pcm: Pcm) {
+    /// volume `effects_volume` (0..127, 0x00495e73, AIL_set_sample_volume @
+    /// 0x00432d60), the fade-out state 0x00495eb0 cleared, so a fade armed
+    /// by a video cut short (`FUN_0041bc74`) does not carry over to the new
+    /// sound.
+    pub fn start_new_sound(&self, pcm: Pcm, effects_volume: u8) {
         let mut t = self.timer.borrow_mut();
         t.fade.sfx_mode = 0;
         t.fade.sfx_changed = false;
@@ -659,8 +659,23 @@ impl Music {
         if let Some(v) = t.new_sound_voice.take() {
             t.mixer.stop(v);
         }
-        let v = t.mixer.play(pcm, false, 255, 0);
+        let v = t
+            .mixer
+            .play(pcm, false, crate::persist::mixer_volume(effects_volume), 0);
         t.new_sound_voice = Some(v);
+    }
+
+    /// `AIL_set_sample_volume(0x006ce110, 0x00495e73)`: the sound menu's
+    /// OK (`FUN_0041d5f4` step 5) and the checkpoint load (`FUN_0042de5c`)
+    /// set the NewSound sample to the effects volume at once, a sample
+    /// playing included.
+    pub fn set_new_sound_volume(&self, effects_volume: u8) {
+        let t = self.timer.borrow();
+        if let Some(v) = t.new_sound_voice {
+            let balance = t.mixer.voice_volume(v).map_or(0, |x| x.1);
+            t.mixer
+                .set_volume(v, crate::persist::mixer_volume(effects_volume), balance);
+        }
     }
 
     pub fn stop_new_sound(&self) {
@@ -681,6 +696,22 @@ impl Music {
             f.sfx_mode = 2;
         });
     }
+}
+
+/// The rate of the voice sample 0x006ce0ec, set once at start-up
+/// (AIL_set_sample_playback_rate with 0x00495e84 = 22050 @ 0x00430e7b);
+/// the line players and the game-over narrator only give it each file's
+/// address, never a rate.
+pub const VOICE_RATE: u32 = 22050;
+
+/// A voice file (a dialog line, the game-over narrator) as the voice
+/// sample plays it: at [`VOICE_RATE`] whatever its header says (ten
+/// shipped silent lines say 44100 Hz and last twice as long).
+pub fn voice_pcm(data: &[u8]) -> Option<Pcm> {
+    apc_pcm(data).map(|p| Pcm {
+        rate: VOICE_RATE,
+        ..p
+    })
 }
 
 /// An APC file as mixer PCM.
@@ -745,10 +776,13 @@ impl Engine {
             log::warn!("music: track {track} '{name}' is not an APC file");
             return;
         };
+        // FUN_00432ea8 starts the sample at volume 0 (its callers then set
+        // 0x00495e71 = 0 and the fade up): not at the volume a previous
+        // track left.
         {
             let mut t = self.music.timer.borrow_mut();
+            t.mixer.set_volume(voice, 0, 0);
             t.music_voice = Some(voice);
-            t.apply_music_volume();
         }
         self.music.current_file = true;
         log::info!("music: track {track} '{name}'");
@@ -913,6 +947,15 @@ impl Engine {
             }
         }
         log::info!("loadmusik: track {} '{name}' copied", idx + 1);
+    }
+
+    /// StopSound (`FUN_0042b290`): the NewSound sample stops, NEWSOUND = 0
+    /// and the poller's playing flag 0x00772912 cleared (@ 0x0042b2d8), the
+    /// last value 0x006cd87c kept.
+    pub fn stop_sound_command(&mut self) {
+        self.vars.set("newsound", 0);
+        self.music.stop_new_sound();
+        self.music.new_sound_playing = false;
     }
 
     /// The effects volume byte 0x00495e73 (0..127).
@@ -1305,5 +1348,235 @@ mod fr688640_tests {
         }
         run("ATLANTIS_DATA", 1);
         run("ATLANTIS_DATA_FR1997_MAY", 0);
+    }
+}
+
+#[cfg(test)]
+mod original_sound_tests {
+    use super::*;
+    use crate::engine::Event;
+    use crate::enhancements::{BugFix, Enhancements};
+    use crate::persist::{mixer_volume, DEFAULT_VOLUMES};
+    use crate::scripts::Scripts;
+    use crate::test_support::with_engine;
+
+    fn pcm(seconds: usize) -> Pcm {
+        Pcm {
+            rate: 22050,
+            channels: 1,
+            samples: Arc::new(vec![0; 22050 * seconds]),
+        }
+    }
+
+    /// A fresh start has the original's volumes (the data bytes 0x7f, 0x6e,
+    /// 0x6e, 0x6e at 0x00495e70, 0x00495e72..0x00495e74), not 127 four
+    /// times.
+    #[test]
+    fn fresh_start_volumes_are_the_originals() {
+        assert_eq!(DEFAULT_VOLUMES, [0x7f, 0x6e, 0x6e, 0x6e]);
+        assert_eq!(Settings::default().volumes, DEFAULT_VOLUMES);
+    }
+
+    /// NewSound plays at the effects volume (FUN_00432a64 @ 0x00432d60) and
+    /// fades from it on the same scale; a music volume of 0 leaves the
+    /// music at the AIL volume the fade up ends on (1), not silent.
+    #[test]
+    fn sample_volumes_follow_the_original() {
+        let sys = Sys::new(Mixer::new());
+        let music = Music::new(&sys);
+        music.start_new_sound(pcm(1), 0x50);
+        let v = music.timer.borrow().new_sound_voice.unwrap();
+        assert_eq!(
+            sys.mixer.voice_volume(v).map(|x| x.0),
+            Some(mixer_volume(0x50))
+        );
+        music.fade_out_new_sound(0x50);
+        {
+            let mut t = music.timer.borrow_mut();
+            for _ in 0..5 {
+                t.fade.tick();
+            }
+            t.fade.sfx_changed = true;
+            t.last_ms = Some(0);
+            t.run(0);
+        }
+        assert_eq!(
+            sys.mixer.voice_volume(v).map(|x| x.0),
+            Some(mixer_volume(0x4e))
+        );
+        // Music volume 0: the fade up steps before its test.
+        let m = sys.mixer.play(pcm(1), true, 0, 0);
+        let mut t = music.timer.borrow_mut();
+        t.music_voice = Some(m);
+        t.fade.vol = 0;
+        t.fade.cur = 0;
+        t.fade.up_target = 0;
+        t.fade.mode = 1;
+        for _ in 0..6 {
+            t.fade.tick();
+        }
+        t.apply_music_volume();
+        assert_eq!(t.fade.cur, 1);
+        assert_eq!(
+            sys.mixer.voice_volume(m).map(|x| x.0),
+            Some(mixer_volume(1))
+        );
+    }
+
+    /// Voice files play at the voice sample's 22050 Hz whatever their
+    /// header (WAV\ATA0038B.APC says 44100 Hz).
+    #[test]
+    fn voice_lines_play_at_22050_hz() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "voice_lines_play_at_22050_hz",
+            move |e| async move {
+                let d = e.read("WAV\\ATA0038B.APC").await.expect("ATA0038B.APC");
+                let header = apc_pcm(&d).unwrap().rate;
+                // What the line players hand to the mixer.
+                let played = crate::dialog::line_voice(&e, "WAV\\ATA0038B.APC")
+                    .await
+                    .unwrap()
+                    .rate;
+                *g2.borrow_mut() = Some((header, played));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((44100, 22050)));
+        }
+    }
+
+    /// A new track starts at volume 0 (FUN_00432ea8), not at the volume
+    /// the track before left; the sound menu's OK sets the fade-up target
+    /// 0x006ce124 to the new music volume.
+    #[test]
+    fn track_start_and_sound_menu_volumes() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "track_start_and_sound_menu_volumes",
+            move |mut e| async move {
+                e.music.with_fade(|f| f.cur = 110);
+                e.music_play_track(1).await;
+                let v = e.music.timer.borrow().music_voice.unwrap();
+                let start = e.sys.mixer.voice_volume(v).map(|x| x.0);
+                e.music.with_fade(|f| f.up_target = 110);
+                e.commit_sound_volumes([127, 40, 50, 60]);
+                *g2.borrow_mut() = Some((start, e.music.fade().up_target, e.music.fade().vol));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((Some(0), 40, 40)));
+        }
+    }
+
+    /// The sound menu's OK sets a playing NewSound to the new effects
+    /// volume at once (FUN_0041d5f4 step 5, AIL_set_sample_volume on
+    /// 0x006ce110).
+    #[test]
+    fn sound_menu_ok_sets_a_playing_new_sound_volume() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "sound_menu_ok_sets_a_playing_new_sound_volume",
+            move |mut e| async move {
+                e.music.start_new_sound(pcm(30), 0x6e);
+                let v = e.music.timer.borrow().new_sound_voice.unwrap();
+                e.commit_sound_volumes([127, 110, 40, 110]);
+                *g2.borrow_mut() = e.sys.mixer.voice_volume(v).map(|x| x.0);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some(mixer_volume(40)));
+        }
+    }
+
+    /// The credits' music branch stops the NewSound sample (FUN_0042b290
+    /// @ 0x0041a863).
+    #[test]
+    fn credits_stop_the_new_sound() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "credits_stop_the_new_sound",
+            move |mut e| async move {
+                e.music.start_new_sound(pcm(60), 0x6e);
+                e.music.new_sound_playing = true;
+                e.music.new_sound_last = 5;
+                e.vars.set("newsound", 5);
+                e.music.handle_set = true;
+                e.music.open_track = 3;
+                e.play_credits(None).await;
+                *g2.borrow_mut() = Some((
+                    e.music.new_sound_active(),
+                    e.music.new_sound_playing,
+                    e.vars.get("newsound"),
+                ));
+            },
+            |sys, frame| {
+                if frame == 30 {
+                    sys.push_input(crate::sys::Input::KeyDown(crate::sys::Key::Escape));
+                }
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((false, false, 0)));
+        }
+    }
+
+    /// Two cinematics, the first one's sound still playing (CINEM053.APC
+    /// outlasts its film): in the original the second film is silent and
+    /// the first sound plays on (FUN_00432a64 sees the value 1 playing);
+    /// with BugFix::CinemaSound the second film's sound starts. A
+    /// cinematic without a sound stops another NewSound and clears
+    /// NEWSOUND (CHAPI033: NewSound=106, Cinema=68).
+    #[test]
+    fn cinematic_sounds_go_through_the_poller() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "cinematic_sounds_go_through_the_poller",
+            move |mut e| async move {
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(e.game.big.contains("WAV\\CINEM058.APC"));
+                assert!(!e.game.big.contains("WAV\\CINEM068.APC"));
+                for fix in [false, true] {
+                    e.set_enhancements(if fix {
+                        Enhancements::default()
+                    } else {
+                        Enhancements::all_but_fix(BugFix::CinemaSound)
+                    });
+                    e.music.start_new_sound(pcm(60), 0x6e);
+                    e.music.new_sound_playing = true;
+                    e.music.new_sound_last = 1;
+                    e.vars.set("newsound", 1);
+                    trace.borrow_mut().clear();
+                    e.play_cinema(58).await;
+                    let started = trace
+                        .borrow()
+                        .iter()
+                        .any(|ev| matches!(ev, Event::NewSound(1, n) if n.contains("CINEM058")));
+                    g2.borrow_mut().push((started, e.music.new_sound_active()));
+                }
+                e.music.start_new_sound(pcm(60), 0x6e);
+                e.music.new_sound_playing = true;
+                e.music.new_sound_last = 106;
+                e.vars.set("newsound", 106);
+                e.play_cinema(68).await;
+                g2.borrow_mut()
+                    .push((e.vars.get("newsound") != 0, e.music.new_sound_active()));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [(false, true), (true, true), (false, false)]);
+        }
     }
 }

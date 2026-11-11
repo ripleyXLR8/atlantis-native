@@ -123,7 +123,7 @@ fn the_fixes_of_each_game() {
         .into_iter()
         .filter(|f| f.of_every_build())
         .collect();
-    assert_eq!(every.len(), 8);
+    assert_eq!(every.len(), 10);
     for (var, build, own) in SETS {
         let Some(g) = game(var) else { continue };
         assert_eq!(g.exe.build.name, build, "{var}");
@@ -171,13 +171,15 @@ fn each_place_reads_its_own_fix() {
             let ctx = format!("{var} {fixes:?}");
             assert_eq!(e.music_through_ring(), !is(MusicLoop), "{ctx}");
             assert_eq!(e.head_overlay_drawn(), is(HeadOverlay), "{ctx}");
-            assert_eq!(e.head_rest_key_fix(), is(HeadFirstFrame), "{ctx}");
+            assert_eq!(e.cinema_sound_fix(), is(CinemaSound), "{ctx}");
             let bar = e.bar_state();
             assert_eq!(bar.slide_out_fix, is(BarSlideOut), "{ctx}");
             assert_eq!(bar.pickup_fix, is(PickupIcon), "{ctx}");
             assert_eq!(e.menus_own_records(), is(MenuRecords), "{ctx}");
             assert_eq!(e.keep_fifth_name(), is(FifthPlayer), "{ctx}");
             assert_eq!(e.snakes_first_run_fix(), is(SnakesFirstWin), "{ctx}");
+            assert_eq!(e.puzzle_escape_latches(), !is(PuzzleEscape), "{ctx}");
+            assert_eq!(e.game_over_cleared_at_once(), is(GameOverPuzzle), "{ctx}");
             assert!(!build.hexa_forces_402);
             assert_eq!(e.hexa_forces_402(), is(HexagonPieces), "{ctx}");
             assert_eq!(e.loadmusik_track_by_track(), is(LoadMusik), "{ctx}");

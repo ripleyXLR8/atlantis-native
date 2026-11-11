@@ -17,8 +17,8 @@
 //! 100), which only happens when the truncated difference is 0
 //! (`FUN_00451d6e` rounds toward zero). The kept values start uninitialised
 //! in the original (stack left-overs); they are taken here as matching
-//! nothing on the first frame. Phase 2 is five more frames. 0x00496124 is
-//! assumed set (phase 1 runs).
+//! nothing on the first frame. Phase 2 is five more frames. Phase 1 runs
+//! while 0x00496124 is set ([`TransitionTurn`]).
 
 /// The FOV `FUN_004212cc` starts its zoom from and sets at its end
 /// (0x42965fbe).
@@ -35,78 +35,142 @@ pub struct TurnFrame {
 }
 
 /// The frames of the turn from (alpha, beta) to (src_alpha, src_beta) and
-/// the angles it reaches. `pi` is the float `FUN_0045179a` stores at
-/// 0x00bcb594.
+/// the angles it reaches, 0x00496124 set all along. `pi` is the float
+/// `FUN_0045179a` stores at 0x00bcb594.
 pub fn transition_turn(
     pi: f32,
-    mut alpha: f32,
-    mut beta: f32,
+    alpha: f32,
+    beta: f32,
     src_alpha: f32,
     src_beta: f32,
     zoom: bool,
 ) -> (Vec<TurnFrame>, f32, f32) {
-    let two_pi = (f64::from(pi) * 2.0) as f32;
-    let mut fov = TURN_END_FOV_DEG;
-    let (mut speed_x, mut speed_y) = (0.0f32, 0.0f32); // 0x006ce05c, 0x006ce060
-                                                       // [EBP-0x18], [EBP-0x14]: never r * 1000 on the first frame.
-    let (mut kept_a, mut kept_b) = (-1i32, -1i32);
-    let (mut stall_a, mut stall_b) = (0u8, 0u8); // [EBP-0x4], [EBP-0xc]
+    let mut turn = TransitionTurn::new(pi, alpha, beta, src_alpha, src_beta, zoom);
     let mut frames = Vec::new();
-    for phase in 1..=2 {
-        let mut n = 0;
-        while phase == 1 || n < 5 {
-            n += 1;
-            step(
-                pi,
-                two_pi,
-                &mut alpha,
-                &mut beta,
-                src_alpha,
-                src_beta,
-                &mut speed_x,
-                &mut speed_y,
-            );
-            if zoom {
-                fov = (f64::from(fov) + f64::from(-3.0f32)) as f32;
-            }
-            frames.push(TurnFrame {
-                alpha,
-                beta,
-                fov_set: zoom,
-                fov,
-            });
-            if phase == 2 {
-                continue;
-            }
-            let mut da = (f64::from(alpha) - f64::from(src_alpha)) as f32;
-            if 0.0 > da {
-                da = -da;
-            }
-            let mut db = (f64::from(beta) - f64::from(src_beta)) as f32;
-            if 0.0 > db {
-                db = -db;
-            }
-            // FUN_00451d6e: FRNDINT with RC = chop.
-            let (ra, rb) = (da as i32, db as i32);
-            if ra.wrapping_mul(1000) == kept_a {
-                stall_a = stall_a.wrapping_add(1);
-            } else {
-                kept_a = ra.wrapping_mul(100);
-            }
-            if rb.wrapping_mul(1000) == kept_b {
-                stall_b = stall_b.wrapping_add(1);
-            } else {
-                kept_b = rb.wrapping_mul(100);
-            }
-            if f64::from(da) < 0.05 && f64::from(db) < 0.05 {
-                break;
-            }
-            if stall_a == 5 || stall_b == 5 {
-                break;
-            }
+    while let Some(f) = turn.next_frame(true) {
+        frames.push(f);
+    }
+    (frames, turn.alpha, turn.beta)
+}
+
+/// The turn frame by frame, for a caller whose input poll can clear
+/// 0x00496124 between two frames: phase 1 runs only while it is set (its
+/// test at the head of each pass, 0x00421376), so an Escape there ends
+/// phase 1 and the five frames of phase 2 follow from where the view is.
+#[derive(Clone, Debug)]
+pub struct TransitionTurn {
+    pi: f32,
+    two_pi: f32,
+    pub alpha: f32,
+    pub beta: f32,
+    src_alpha: f32,
+    src_beta: f32,
+    zoom: bool,
+    fov: f32,
+    speed_x: f32, // 0x006ce05c
+    speed_y: f32, // 0x006ce060
+    // [EBP-0x18], [EBP-0x14]: never r * 1000 on the first frame.
+    kept_a: i32,
+    kept_b: i32,
+    stall_a: u8, // [EBP-0x4]
+    stall_b: u8, // [EBP-0xc]
+    phase: u8,
+    n: u8,
+}
+
+impl TransitionTurn {
+    pub fn new(
+        pi: f32,
+        alpha: f32,
+        beta: f32,
+        src_alpha: f32,
+        src_beta: f32,
+        zoom: bool,
+    ) -> TransitionTurn {
+        TransitionTurn {
+            pi,
+            two_pi: (f64::from(pi) * 2.0) as f32,
+            alpha,
+            beta,
+            src_alpha,
+            src_beta,
+            zoom,
+            fov: TURN_END_FOV_DEG,
+            speed_x: 0.0,
+            speed_y: 0.0,
+            kept_a: -1,
+            kept_b: -1,
+            stall_a: 0,
+            stall_b: 0,
+            phase: 1,
+            n: 0,
         }
     }
-    (frames, alpha, beta)
+
+    /// The next frame, `running` the flag 0x00496124 as the input poll
+    /// after the previous frame left it; `None` once the turn is over.
+    pub fn next_frame(&mut self, running: bool) -> Option<TurnFrame> {
+        if self.phase == 1 && !running {
+            self.phase = 2;
+        }
+        if self.phase == 2 {
+            if self.n >= 5 {
+                return None;
+            }
+            self.n += 1;
+        }
+        step(
+            self.pi,
+            self.two_pi,
+            &mut self.alpha,
+            &mut self.beta,
+            self.src_alpha,
+            self.src_beta,
+            &mut self.speed_x,
+            &mut self.speed_y,
+        );
+        if self.zoom {
+            self.fov = (f64::from(self.fov) + f64::from(-3.0f32)) as f32;
+        }
+        let frame = TurnFrame {
+            alpha: self.alpha,
+            beta: self.beta,
+            fov_set: self.zoom,
+            fov: self.fov,
+        };
+        if self.phase == 1 && self.phase1_ends() {
+            self.phase = 2;
+        }
+        Some(frame)
+    }
+
+    /// Phase 1's stop tests after a frame.
+    fn phase1_ends(&mut self) -> bool {
+        let mut da = (f64::from(self.alpha) - f64::from(self.src_alpha)) as f32;
+        if 0.0 > da {
+            da = -da;
+        }
+        let mut db = (f64::from(self.beta) - f64::from(self.src_beta)) as f32;
+        if 0.0 > db {
+            db = -db;
+        }
+        // FUN_00451d6e: FRNDINT with RC = chop.
+        let (ra, rb) = (da as i32, db as i32);
+        if ra.wrapping_mul(1000) == self.kept_a {
+            self.stall_a = self.stall_a.wrapping_add(1);
+        } else {
+            self.kept_a = ra.wrapping_mul(100);
+        }
+        if rb.wrapping_mul(1000) == self.kept_b {
+            self.stall_b = self.stall_b.wrapping_add(1);
+        } else {
+            self.kept_b = rb.wrapping_mul(100);
+        }
+        if f64::from(da) < 0.05 && f64::from(db) < 0.05 {
+            return true;
+        }
+        self.stall_a == 5 || self.stall_b == 5
+    }
 }
 
 /// One step, 0x00421383..0x00421514 (the negated compares keep the

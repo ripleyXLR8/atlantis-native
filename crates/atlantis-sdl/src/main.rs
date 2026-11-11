@@ -97,7 +97,9 @@ fn options(saves: Rc<dyn SaveStore>, original: bool, start: Start) -> Options {
         } else {
             settings.enhancements
         },
-        subtitles: settings.subtitles,
+        // `--original` starts with SUBTITLES off, as every start of the
+        // original (0x004960a8 = 0), whatever settings.ini keeps.
+        subtitles: settings.subtitles && !original,
         saves,
         start,
         ..Options::default()

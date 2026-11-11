@@ -68,6 +68,9 @@ pub trait HexaIo {
     fn aborted(&self) -> bool {
         false
     }
+    /// `FUN_00440bfc` @ 0x00440c99: the bar request 0x004960c4 back to 0
+    /// once the handler has taken it.
+    fn right_handled(&mut self) {}
 }
 
 /// The hexagon's state.
@@ -256,10 +259,15 @@ impl HexaGame {
         (0..17).any(|k| self.place_piece(i, x + i32::from(DROP_DX[k]), y + i32::from(DROP_DY[k])))
     }
 
-    /// `FUN_00440bfc`, on the right flag of `FUN_0041a298` (one pass per
-    /// press, so the repeat counter never passes 1).
+    /// `FUN_00440bfc`, on the bar request 0x004960c4 that `FUN_0041a298`
+    /// toggles on a right press (`cmp [0x4960c4], 1` @ 0x00440c14, not the
+    /// right flag 0x00496120), which it puts back to 0 (@ 0x00440c99): one
+    /// pass per press, so the repeat counter never passes 1. After an
+    /// Escape latch (0x00496138 = 1) the poll no longer toggles the
+    /// request, so no right press turns a piece until the puzzle is left.
     fn right_button(&mut self, io: &mut impl HexaIo) {
         if self.right {
+            io.right_handled();
             if self.repeat == 0 && self.held != 0 {
                 let pc = &mut self.pieces[(self.held - 1) as usize];
                 self.grab_y = 0;
@@ -417,7 +425,11 @@ struct Host<'a>(PuzzleHost<'a>);
 impl HexaIo for Host<'_> {
     fn start_input(&mut self) -> (i32, i32, bool, bool) {
         let m = self.0.read_input();
-        (m.x, m.y, m.click, m.right)
+        // The handler reads the bar request the poll toggled.
+        (m.x, m.y, m.click, self.0.e.bar.request)
+    }
+    fn right_handled(&mut self) {
+        self.0.e.bar.request = false;
     }
     fn boundary(&mut self, _g: &HexaGame) -> (i32, i32, bool, bool) {
         self.start_input()
@@ -515,5 +527,72 @@ mod tests {
         assert_eq!(set_up(false, 0x192, 0), (all.clone(), 1, 0));
         assert_eq!(set_up(false, 0, 2), (all.clone(), 2, 0));
         assert_eq!(set_up(false, 0x101, 2), (all, 2, 0));
+    }
+}
+
+#[cfg(test)]
+mod latch_tests {
+    use super::*;
+    use crate::enhancements::{BugFix, Enhancements};
+    use crate::sys::{Input, Key, MouseButton};
+    use crate::test_support::{button, with_engine};
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// The turns of a held piece after three right presses through the
+    /// real input of the hexagon (`FUN_0041a298` then `FUN_00440bfc`),
+    /// with an Escape before them (`escape`), the Escape latched as the
+    /// original (`latch`, [`BugFix::PuzzleEscape`] off) or not.
+    fn turns(escape: bool, latch: bool) -> Option<i16> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "hexa_right_presses_after_an_escape",
+            move |mut e| async move {
+                if latch {
+                    e.set_enhancements(Enhancements::all_but_fix(BugFix::PuzzleEscape));
+                }
+                let mut hooks = crate::hooks::NoScripts;
+                let mut host = Host(PuzzleHost::new(&mut e, &mut hooks));
+                let mut g = HexaGame::new(Vec::new(), Vec::new());
+                g.held = 1;
+                for _ in 0..20 {
+                    g.read_boundary(&mut host);
+                    g.right_button(&mut host);
+                    host.0.e.sys.frame().await;
+                }
+                let latched = host.0.e.escape_request;
+                assert_eq!(latched, escape && latch);
+                g2.set(Some(g.pieces[0].orient - PIECES[0].orient));
+            },
+            move |sys, frame| match frame {
+                2 if escape => sys.push_input(Input::KeyDown(Key::Escape)),
+                3 if escape => sys.push_input(Input::KeyUp(Key::Escape)),
+                5 | 9 | 13 => button(sys, MouseButton::Right, true),
+                7 | 11 | 15 => button(sys, MouseButton::Right, false),
+                _ => {}
+            },
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// FUN_00440bfc turns on the bar request 0x004960c4 (@ 0x00440c14),
+    /// which FUN_0041a298 toggles only while 0x00496138 is 0: after an
+    /// Escape latch no right press turns a piece (confirmed under
+    /// emulation, real FUN_0041a298 and FUN_00440bfc). With
+    /// [`BugFix::PuzzleEscape`] the Escape is not latched: every press
+    /// turns the piece.
+    #[test]
+    fn hexa_right_presses_after_an_escape() {
+        let Some(free) = turns(false, true) else {
+            return;
+        };
+        assert_eq!(free, 3);
+        assert_eq!(turns(true, true), Some(0));
+        assert_eq!(turns(true, false), Some(3));
     }
 }

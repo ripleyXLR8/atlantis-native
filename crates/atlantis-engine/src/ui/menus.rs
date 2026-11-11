@@ -607,10 +607,8 @@ impl Engine {
         }
         self.wait_buttons_up().await;
         if commit {
-            for t in 0..4 {
-                self.settings.volumes[t] = menu_volume_from_knob(self.son_knob_x[t]);
-            }
-            self.apply_volumes();
+            let volumes = self.son_knob_x.map(menu_volume_from_knob);
+            self.commit_sound_volumes(volumes);
             self.save_settings();
         }
     }
@@ -732,13 +730,15 @@ impl Engine {
             let mi = self.poll_menu_input();
             let (mx, my) = self.sys.mouse();
             let down = self.sys.buttons().0;
-            // Port keys (the original reads none here; Escape does
-            // nothing, as in the original): Enter is OK, Up / Down a row
-            // click.
-            if mi.enter {
+            // Port keys, with Enhancements::arrow_keys (the original's
+            // loop, FUN_0041cf78, reads no key: its exit tests only the
+            // click flags; Escape does nothing, as in the original): Enter
+            // is OK, Up / Down a row click.
+            let keys = self.enhancements().arrow_keys;
+            if keys && mi.enter {
                 return 6;
             }
-            if count > 0 && (mi.up || mi.down) {
+            if keys && count > 0 && (mi.up || mi.down) {
                 let i = match selected {
                     None => 0,
                     Some(i) if mi.up => i.saturating_sub(1),
@@ -896,6 +896,9 @@ impl Engine {
             skip.menu_request = i.menu_request;
         }
         if self.music.handle_set && self.music.open_track != 22 {
+            // The branch stops the NewSound sample (FUN_0042b290 @
+            // 0x0041a863, after the ambient stop), then fades the music out.
+            self.stop_sound_command();
             // The same branch clears the input flags (0x0041a8b1..0x0041a8e3).
             skip.bar_request = false;
             skip.menu_request = false;
@@ -1104,5 +1107,51 @@ mod record_table_tests {
                 (true, first),
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod picker_key_tests {
+    use crate::enhancements::Enhancements;
+    use crate::sys::{Input, Key};
+    use crate::test_support::with_engine;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// The load picker's result after Enter, then a quit, under `x`.
+    fn after_enter(x: Enhancements) -> Option<u8> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "load_picker_keys_are_port_keys",
+            move |mut e| async move {
+                e.load_interface().await;
+                e.set_enhancements(x);
+                let bg = vec![0u16; crate::warp::SCREEN_W * crate::warp::SCREEN_H];
+                g2.set(Some(e.load_picker(&bg).await));
+            },
+            |sys, f| match f {
+                5 => sys.push_input(Input::KeyDown(Key::Enter)),
+                60 => sys.push_input(Input::Quit),
+                _ => {}
+            },
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// Enter is the picker's OK with the port keys
+    /// (`Enhancements::arrow_keys`); with `--original` the picker reads no
+    /// key (`FUN_0041cf78`), so only the quit ends it.
+    #[test]
+    fn load_picker_keys_are_port_keys() {
+        let Some(default) = after_enter(Enhancements::default()) else {
+            return;
+        };
+        assert_eq!(default, 6);
+        assert_eq!(after_enter(Enhancements::original()), Some(7));
     }
 }

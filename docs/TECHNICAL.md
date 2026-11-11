@@ -34,13 +34,71 @@ composited over the panorama, the voices, the subtitles
 (`subtitles.rs`), the subject menu, the error box of a head that cannot be
 opened and the game-over screen.
 
+The sounds follow the original's few samples (`music.rs`, `place.rs`): the
+voices play on its one voice sample, at the 22050 Hz it is set to at
+start-up whatever a file's header says (ten silent lines say 44100 Hz and
+so last twice as long); NewSound and a cinematic's own sound go through
+its NewSound poller, at the effects volume, so a cinematic whose sound
+does not open stops the NewSound that plays. The poller runs where the
+original runs it: after every item a section executes (`after_item`,
+`FUN_00428da8`), at every frame of a video, of a turn, of the warp
+loop and the bar, of every dialog line player and of the subject menu
+(`FUN_00432178`, which also keeps the ambient sounds going), so a
+sound that ends during a line is seen as done before the next
+`Cinema=`, which then starts its own; `NewSound=` itself only stores
+the value. A music track starts at volume 0 and fades up; the sound
+menu's OK (and a checkpoint load) also sets a playing NewSound to the
+effects volume, and the level the music next climbs back to; a fresh
+start has the original's volumes (master 127, music, effects and
+voices 110) and SUBTITLES off.
+
+Escape pressed in a loop of the original that does not end on it, the
+turn before a move and the subject menu, is kept as the original keeps
+it, its run flag cleared and the menu requested (`Engine::escape_request`):
+the turn ends its approach there, the move's video then shows its first
+frame only, and after the subject menu (whose guests are then no longer
+drawn) the next voice-only line, narration or video stops at once; the
+game-over narration's Escape is gated by the bar request and bow mode as
+every other; the place sprites go on moving under the subject menu.
+The guests' portraits are not drawn while the latch stands, by any
+caller (`draw_guests` tests it, as `FUN_0042bc58` does), so not in the
+rest of the turn nor on the move's video frame either. A `Cinema=`
+clears it before its film (`0x0042a775`). Escape in a puzzle is
+latched the same way by the puzzles' input poll
+(`puzzle::assets::poll_flags`, with the right press's toggle of the bar
+request and its gate), kept through the reload and /sel scan that
+follow the puzzle and cleared only then (`run_puzzle_zone`): the
+hexagon's right button, which turns a piece on that toggle, no longer
+turns one, and the first voice-only line or game-over narration of the
+scan stops at once. That is the original's behaviour, with
+`fix_puzzle_escape` off; the fix (on by default) does not latch an
+Escape inside a puzzle at all, the narrowest change that removes both
+effects: no puzzle reads the latch, and the latch of a puzzle never
+opens the menu (it is cleared before the next warp loop). A
+move ends as the original's does: after the
+place load one input poll whose presses are all cleared, so a click,
+right click or Escape made during the video's last frame or the load
+does nothing (`Engine::end_of_move_input`). A bar request left by a
+timer section's line opens the bar in the next warp pass even when that
+pass reads a click, which is then lost.
+A click in the view ends the warp loop as the original's next loop head
+does: no clock update, cursor step, timer scan or sprite step comes
+between the click and its handling. The still frame of a voice-only line
+(`[Seth,off]`) carries the warp cursor over what is under the pointer,
+as the original's one present of it does (`Engine::still_frame_cursor`).
+
 The 3D talking heads are in `crates/atlantis-engine/src/head/`: the dialog
 video leaves the speaker's mouth empty, and the line player draws a
 textured 3D lower face there every frame, posed by the head animation at
 the video's frame and shaped by the line's lip-sync track at the voice's
 time (`mod.rs`: animation, camera, tree walk, culling and projection;
 `raster.rs`: the original's span rasteriser, flat, affine and perspective
-texture fills). The files (`.3DC` meshes, `.3DA` animations and mouth
+texture fills). As in the original, the line player builds frame 0 of
+each loop of the video (the first of the line) and does not show it, so
+the rest pose some head animations hold there (Meljanz, Actyon, Servage,
+the Queen, Gimbas) is never seen and the line opens on frame 1; an
+earlier `fix_head_first_frame` drew that frame with frame 1's pose, and
+a `settings.ini` line for it is now ignored. The files (`.3DC` meshes, `.3DA` animations and mouth
 shapes, `.S3D` tables and cameras, `.SYC` lip-sync tracks, `.3DM` texture
 maps) are parsed in `crates/atlantis-data/src/head.rs`. The arithmetic is
 the original's, operation for operation (32-bit fixed point, x87 doubles
@@ -58,14 +116,32 @@ inventory bar, the object picked up, bow mode and the guests' portraits
 (`bar.rs`, `mod.rs`). The players and checkpoints are in
 `crates/atlantis-engine/src/checkpoint.rs`, their file formats in
 `crates/atlantis-data/src/saves.rs`, the save folder and the settings file
-in `crates/atlantis-engine/src/persist.rs`.
+in `crates/atlantis-engine/src/persist.rs`. A checkpoint's WAM path is
+the original's 260-byte buffer whole (`Engine::set_wam_path`): rebuilt
+by string copies, it keeps the case the script or the WAM record wrote
+and, after its end, what a longer path left there, as the original's
+files do. Every exit of the in-game menu, a load included, restarts
+the clocks from the values they stood at, so Time1 does not count the
+time spent in the menu.
+
+A move shows the panorama its click named in the WAM it leaves: for a
+move into another WAM that is the source WAM's picture of the
+destination, which differs from the new WAM's only from BIBLION to
+PALAIS3's place 192 (ATL16192, not ATN16192). A departure section that
+ran a `Vue=` takes the move's tail: the place it entered is loaded
+again (the warp field of view back to 75.137 after the turn, the
+pointer centred) and its sprites restart.
 
 The puzzles are in `crates/atlantis-engine/src/puzzle/`. `mod.rs` holds the
 dispatcher (StartPuzzle n run by zone 1000 + n: its checks, the result
 set in FinPuzzle), the cursor animation and the random generators the
 puzzles share, and what the original keeps from one puzzle to the next;
 `assets.rs` the PUZZLES\ files, the work screen, the input read at the
-frame boundaries and the puzzle samples. Each puzzle is one file: its
+frame boundaries and the puzzle samples. On the pass that reads a click
+the original's input poll returns before its message pump, which alone
+moves the pointer, so the eclipse, the rotating pieces, the hens, the
+snakes, the rat and the ogre handle a click (and draw that pass's
+cursor) at the previous pass's pointer. Each puzzle is one file: its
 state and loop, translated line for line, behind a trait of its own for
 the input, drawing and sounds, which the engine implements and the tests
 replay the original's runs through, pass by pass (`throne.rs`,
@@ -82,8 +158,9 @@ with three groups, those of the ScummVM port:
 | `fixes` (`BugFixes`) | all on | the fixes of minor bugs of the original, each its own switch (`BugFix`, below) |
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and May 1997 English and French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
+| `arrow_keys` | on | the arrow keys turn the view as F5 to F8 do in the warp loop (the original's input poll reads F5 to F8 only), and the LOAD list takes Enter as OK and Up / Down as a row click (the original's list reads no key); off with `--original` |
 
-The bug fixes, each with its `settings.ini` key; the last seven fix a
+The bug fixes, each with its `settings.ini` key; the last nine fix a
 bug of some games only (`BugFix::applies`: the build's tables, and for
 two of them the game's data, `FixData`), and the options menu lists only
 those of the game played (`BugFix::of_game`; the web build fetches the
@@ -94,13 +171,15 @@ its executable's language:
 | Fix (`settings.ini` key) | Builds | Where in the code | What it changes |
 |---|---|---|---|
 | `fix_music_loop` | all | `Engine::music_play_track` | the music loops seamlessly (the original's streaming ring has audible seams; read at each track start) |
+| `fix_cinema_sound` | all | `Engine::play_transition_video` | a cinematic plays its own sound when the sound of the cinematic before it still plays, which stops (the original's NewSound poller sees the value 1 still playing and starts nothing, so the second film is silent: CINEM053's sound outlasts its film by a second and CINEM058 follows it in five sections) |
 | `fix_head_overlay` | all | `dialog/mod.rs`, the SPF overlay | the SPF overlay of some talking heads (the guards' coif, the pilot's scarf) is drawn over the head (the original draws it where the next copy erases it) |
-| `fix_head_first_frame` | all | `DialogHead::set_rest_key_fix` | the 3D lower face of some talking heads (Meljanz, Actyon, Servage, the Queen, Gimbas) no longer jumps away from the face on the first frame of each loop of the video (frame 0 of their head animation is a rest pose; it is drawn with frame 1's pose) |
 | `fix_bar_slide_out` | all | `ui::bar::slide_out_record_drawn` | the inventory bar's slide-out draws no icon once the slots are at y 506 (the original reads the y of a record from 9 on past its 9-entry slot table, so a scrolled bar leaves 1 to 4 rows of those icons at the bottom of the screen) |
 | `fix_pickup_icon` | all | `ui::bar::slot_x` | after a pick-up the new object's icon is drawn in its slot (the original draws it 7 pixels left, in the hold loop and the slide-out, until the next slide-in) |
 | `fix_menu_records` | all | `Engine::menu_table` | each menu keeps its own click records, from zero at every visit (the original keeps one record table for the whole session, with 16 records per menu in the May 1997 English and French builds and 20 in the others: in those two builds the sound menu's last two records spill over the ARE YOU SURE ? menu's and move its left ornament off screen for the session, and in every build the LOAD scrollbar's knob, hidden by a visit with 11 checkpoints or fewer, stays hidden on the later visits) |
 | `fix_fifth_player` | all | `ui::player_screen::player_screen_exit` | with five players, OK on the fifth starts it with its name (the original runs the commit of a typed name, empty, over the fifth name: that player stays listed with no name and cannot be chosen) |
 | `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
+| `fix_puzzle_escape` | all | `puzzle::assets::poll_flags`, `Engine::puzzle_escape_latches` | an Escape inside a puzzle is not latched (the original clears its run flag and sets the menu request, which no puzzle reads and the place loop clears only after the puzzle's /sel scan: the hexagon then turns no piece on a right click, and the first voice-only line or game-over narration after the puzzle stops at once: Muria's hint, the rat's meow, the crab's /941 narration) |
+| `fix_gameover_puzzle` | all | `Engine::no_click_exit`, `Scripts::play_section`, `Engine::game_over_cleared_at_once` | a game over that leaves the warp loop without a click (a timer section's, one after the inventory bar) ends the place loop's pass at once, GAMEOVER cleared as its screen ends (the original's warp loop returns the zone under the pointer whatever ended it, and its place loop runs the puzzle armed there, the view reload and a /sel scan, or the zone-999 scan, before it tests GAMEOVER, which stays set until the reload: the scan's section meets the executor's game-over test after its first line and shows the picture again; reachable in CHAPI044, whose guards' timer can fire with the throne lock armed under the pointer at view 281; the in-game menu's LOAD and QUIT take the same exit, without the puzzle: a zone 999 under the pointer runs its scan, its lines cut at their first poll) |
 | `fix_hexagon_pieces` | the 1997, Chinese, DVD and Perfect Edition builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
 | `fix_sharp_s` | (not the Czech and Brazilian CDs, whose 0xe1 is `á` with a glyph) a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
@@ -120,8 +199,9 @@ original game (the tests run each fix alone where the data shows it:
 `tests/spanish_italian_cd.rs`, `tests/fix_menu.rs`, which also checks
 which fixes each edition lists). Each place a fix changes reads it
 through one `Engine` method (`music_through_ring`, `head_overlay_drawn`,
-`head_rest_key_fix`, `bar_state`, `menus_own_records`,
-`keep_fifth_name`, `snakes_first_run_fix`, `hexa_forces_402`,
+`cinema_sound_fix`, `bar_state`, `menus_own_records`,
+`keep_fifth_name`, `snakes_first_run_fix`, `puzzle_escape_latches`,
+`game_over_cleared_at_once`, `hexa_forces_402`,
 `loadmusik_track_by_track`, `sharp_s_as_ss`, `current_disc_copy`,
 `menu_rules`, `chinese_row_fix`): `tests/fix_menu.rs` sets each fix
 alone, then every fix but one, and checks that every reading follows its
@@ -212,6 +292,10 @@ the state it asked for); `--fullscreen` forces full screen for
 the run without writing it; the browser goes full screen only on a user
 gesture). With both, the menu's rows are 20 pixels high instead of 24
 (`OptionsMenu::layout`), to keep a margin on the 640 x 480 screen. The
+bug fixes' box does the same with its rows (`OptionsMenu::fix_layout`):
+24 pixels high, else 20, else 18 (`DENSE_ROW_H`: only the boxes of the
+Simplified Chinese CD and the May 1997 German CD, which list the most
+fixes), the first height that leaves 8 pixels around the box. The
 engine's own save of `settings.ini` (the game's options page) keeps the
 front end's keys as stored: the graphics mode, the HD options, the
 enhancements and full screen.

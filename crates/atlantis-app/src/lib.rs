@@ -1437,7 +1437,8 @@ impl ApplicationHandler for App {
 
 /// The options of a run with its saves in `saves`: the subtitles and the
 /// enhancements read from the store's `settings.ini` (written with the
-/// defaults when there is none); `original` turns the enhancements off.
+/// defaults when there is none); `original` turns the enhancements and
+/// the subtitles off.
 pub fn options_with_settings(
     saves: Rc<dyn SaveStore>,
     original: bool,
@@ -1454,7 +1455,9 @@ pub fn options_with_settings(
         } else {
             settings.enhancements
         },
-        subtitles: settings.subtitles,
+        // `--original` starts with SUBTITLES off, as every start of the
+        // original (0x004960a8 = 0), whatever settings.ini keeps.
+        subtitles: settings.subtitles && !original,
         saves,
         start,
         ..atlantis_engine::Options::default()

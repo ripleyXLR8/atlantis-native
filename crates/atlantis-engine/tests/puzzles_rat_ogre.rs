@@ -487,6 +487,9 @@ impl Engine {
 /// timer counts them. The C rand differs (it only picks the ambient
 /// sounds).
 ///
+/// The mouse reaches a click's place one pass before the click (see the
+/// loop below).
+///
 /// The scripted players set the held flag directly, which a button cannot
 /// do: the window procedure sets it from the button's messages, one a pass
 /// and none on a press edge, so it goes up the pass after a press and down
@@ -508,6 +511,14 @@ fn rat_in_engine(name: &str) -> (i32, usize) {
     let mut colours = 0;
     let mut n = 0;
     for (i, &(x, y, click, _, _)) in input.iter().enumerate() {
+        // The golden sets the pointer of every pass; through the engine's
+        // input a click is handled at the pointer of the pass before it
+        // (FUN_0041a298 returns before its message pump on a press edge),
+        // so the mouse moves to a click's place one pass early.
+        let (x, y) = match input.get(i + 1) {
+            Some(&(nx, ny, true, _, _)) if !click => (nx, ny),
+            _ => (x, y),
+        };
         e.pass(x, y, click, held(i) || held(i + 1));
         n += 1;
         if e.result().is_some() {

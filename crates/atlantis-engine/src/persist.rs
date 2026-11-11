@@ -185,16 +185,29 @@ impl Graphics {
     }
 }
 
+/// The volumes at start-up, before the sound menu's OK or a checkpoint
+/// writes them: master 0x7f, music, effects and voices 0x6e (the data
+/// bytes at 0x00495e70 and 0x00495e72..0x00495e74; atlantis-cd-en-714240
+/// sets the voice sample to 0x6e at start-up, @ 0x00430e82).
+pub const DEFAULT_VOLUMES: [u8; 4] = [0x7f, 0x6e, 0x6e, 0x6e];
+
+/// A volume 0..127 of the original on the mixer's 0..255 scale.
+pub fn mixer_volume(x: u8) -> u8 {
+    (u32::from(x.min(127)) * 255 / 127) as u8
+}
+
 /// The options of the original's menus, and the port's enhancements.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Settings {
-    /// SUBTITLES (0x004960a8).
+    /// SUBTITLES (0x004960a8): off at a fresh start, as the original
+    /// starts every run; then as the options menu leaves it.
     pub subtitles: bool,
     /// OMNI 3D MODE 2 (0x004960ac == 1): the pitch follows the mouse
     /// (y - prevY); MODE 1, the original's default, inverts it.
     pub omni3d_mode2: bool,
     /// Master, music, effects and voices volumes, 0..127 (0x00495e70,
-    /// 0x00495e72..0x00495e74).
+    /// 0x00495e72..0x00495e74); a fresh start has the original's
+    /// [`DEFAULT_VOLUMES`].
     pub volumes: [u8; 4],
     pub enhancements: Enhancements,
     /// The music tracks the original would find copied in its install
@@ -213,9 +226,12 @@ pub struct Settings {
 impl Default for Settings {
     fn default() -> Self {
         Settings {
-            subtitles: true,
+            // Off, as every start of the original (0x004960a8 is 0 in the
+            // data; only the options' toggle @ 0x0041d736 and a
+            // checkpoint load write it).
+            subtitles: false,
             omni3d_mode2: false,
-            volumes: [127; 4],
+            volumes: DEFAULT_VOLUMES,
             enhancements: Enhancements::default(),
             music_on_disk: 0,
             graphics: Graphics::Original,
@@ -299,6 +315,7 @@ impl Settings {
                 ("minor_bug_fixes", Some(b), _) => all_fixes = Some(b),
                 ("restored_content", Some(b), _) => s.enhancements.restored_content = b,
                 ("ui_ux", Some(b), _) => s.enhancements.ui_ux = b,
+                ("arrow_keys", Some(b), _) => s.enhancements.arrow_keys = b,
                 ("hd_sharpen", Some(b), _) => s.hd.sharpen = b,
                 ("hd_sharp_subtitles", Some(b), _) => s.hd.sharp_subtitles = b,
                 ("hd_widescreen", Some(b), _) => s.hd.widescreen = b,
@@ -330,9 +347,9 @@ impl Settings {
              volume_voices = {}\n\
              # Enhancements: where the port may differ from the original game\n\
              # Bug fixes (off: as the original; options menu, F10, \"Choose the\n\
-             # bug fixes...\"): the music loops seamlessly; the talking heads'\n\
-             # overlay (the guards' coif, the pilot's scarf); the lower face's\n\
-             # first frame; no icons left as the inventory bar slides out; a\n\
+             # bug fixes...\"): the music loops seamlessly; the second\n\
+             # cinematic's sound; the talking heads' overlay (the guards' coif,\n\
+             # the pilot's scarf); no icons left as the inventory bar slides out; a\n\
              # picked-up object's icon in its slot; each menu its own click\n\
              # areas; OK on the fifth player; the snakes puzzle's false first\n\
              # win; and those of some builds: the hexagon puzzle's pieces (1997\n\
@@ -344,6 +361,8 @@ impl Settings {
              # Content the original never shows, interface changes\n\
              restored_content = {}\n\
              ui_ux = {}\n\
+             # The arrow keys turn the view (off: F5..F8 only, as the original)\n\
+             arrow_keys = {}\n\
              # The music tracks LoadMusik copied (hexadecimal bit set)\n\
              music_on_disk = {:x}\n\
              # The port's graphics (options menu, F10): original or hd\n\
@@ -374,6 +393,7 @@ impl Settings {
                 .join("\n"),
             b(self.enhancements.restored_content),
             b(self.enhancements.ui_ux),
+            b(self.enhancements.arrow_keys),
             self.music_on_disk,
             self.graphics.name(),
             self.hd.panorama.name(),
@@ -457,7 +477,7 @@ mod tests {
         assert_eq!(
             Settings::parse("volume_music = 300\nbad"),
             Settings {
-                volumes: [127; 4],
+                volumes: DEFAULT_VOLUMES,
                 ..Settings::default()
             }
         );
