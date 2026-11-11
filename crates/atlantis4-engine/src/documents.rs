@@ -221,6 +221,15 @@ pub struct Diary {
 }
 
 impl Diary {
+    /// The pages back from a save's `<Diary>` (0x0056dfa0): each `<Page
+    /// id>` in order (0x0056dce0 makes its layout).
+    pub fn load_xml(&mut self, el: &atlantis4_data::xml::Element) {
+        self.pages = el
+            .children_named("Page")
+            .map(|p| p.attr("id").unwrap_or_default().to_string())
+            .collect();
+    }
+
     pub fn to_xml(&self) -> XmlNode {
         let mut d = XmlNode::new("Diary");
         d.children = self
@@ -240,6 +249,31 @@ pub struct PuzzleTimer {
 }
 
 impl PuzzleTimer {
+    /// The fields back from a save's `<PuzzleTimer>` (0x00521720):
+    /// `PuzzleEnCours` and `TimeLeft`'s `value`s; read as `%d`
+    /// `[INFERRED]` (the reader @ 0x00507be0 is not walked). A running
+    /// timer would load `Puzzles/PuzzleTimer/PuzzleTimer.lua`: no script
+    /// starts one (`DATA`), so it is only logged.
+    pub fn load_xml(&mut self, el: &atlantis4_data::xml::Element) {
+        let read = |name: &str| {
+            el.child(name)
+                .and_then(|c| c.attr("value"))
+                .and_then(|v| crate::saves::scan_int(v.as_bytes()))
+        };
+        if let Some(v) = read("PuzzleEnCours") {
+            self.in_progress = v;
+        }
+        if let Some(v) = read("TimeLeft") {
+            self.time_left = v;
+        }
+        if self.in_progress != 0 {
+            log::warn!(
+                "save: a puzzle timer is running ({} left): not done",
+                self.time_left
+            );
+        }
+    }
+
     pub fn to_xml(&self) -> XmlNode {
         let mut t = XmlNode::new("PuzzleTimer");
         t.children

@@ -27,13 +27,14 @@ pub mod tolua;
 pub mod trace;
 
 pub use engine::{
-    Arg, BootValue, Call, Engine, ErrorSite, Event, GuiKey, GuiValue, Reply, SavedGlobal,
-    SavedValue, Value,
+    Arg, BootValue, Call, Engine, ErrorSite, Event, GuiKey, GuiValue, LoadedValue, Reply, SaveOpen,
+    SavedGlobal, SavedValue, Value,
 };
 pub use rilua;
 pub use runtime::{
-    new_game, normalise_path, read_boot_vars, with_extension, BootVars, Collector, EngineRef,
-    ErrorMode, GuiState, Options, Script, ScriptError, BOOT_FILES, GUI_CLASSES, RESET_CALLBACKS,
+    load_game, new_game, normalise_path, read_boot_vars, with_extension, BootVars, Collector,
+    EngineRef, ErrorMode, GuiState, Options, Script, ScriptError, BOOT_FILES, GUI_CLASSES,
+    RESET_CALLBACKS,
 };
 
 /// A fresh Lua 5.1 state with the standard libraries, as `luaL_newstate`

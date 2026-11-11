@@ -41,7 +41,13 @@
 //! the inventory's box names the selected object. The layers draw in the
 //! original's order (the HUD, the inventory menu, the dialog, the
 //! answers, the notification, the cursor) and the clicks go to the top
-//! one: a dialog takes them over the HUD.
+//! one: a dialog takes them over the HUD. The saves are written as the
+//! original's (`SaveGame`, the autosave at every node change) under
+//! Native's data folder, `atlantis4/Documents/Atlantis Evolution/`; a
+//! `node` ending in `.xml` loads that save instead (`save.xml`, `0.xml`..
+//! `5.xml`) through `Game::load`'s save branch. `FinishGame` closes the
+//! planks; then the game is left (its autosave) and the viewer closes,
+//! where the original shows its main menu.
 
 use std::cell::RefCell;
 use std::num::NonZeroU32;
@@ -92,6 +98,8 @@ struct Viewer {
     shown: Option<u64>,
     /// Frame time statistics, logged every few seconds.
     stats: Stats,
+    /// The game ended (`FinishGame`): the window closes.
+    quit: bool,
 }
 
 /// Where the frame time goes: the game's update, the drawing, the copy to
@@ -171,6 +179,13 @@ impl Viewer {
         // The shown document's alarm and the notification's fades.
         self.game.borrow_mut().update_gui(now);
         self.gui_callbacks();
+        // `FinishGame`'s planks closed: `Game::leave` (the autosave), then
+        // the original's main menu, which the viewer does not have.
+        if self.game.borrow_mut().take_ended() {
+            Game::leave(&self.game, Some(&self.script));
+            log::info!("the end: the original goes to its main menu; the viewer stops");
+            self.quit = true;
+        }
     }
 
     /// The callbacks the screens raised (`OnDocumentClosed`, …).
@@ -340,6 +355,10 @@ impl ApplicationHandler for Viewer {
             }
             self.stats.log();
         }
+        if self.quit {
+            el.exit();
+            return;
+        }
         el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
     }
 
@@ -483,14 +502,24 @@ pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
         ..Options::default()
     };
     let boot = read_boot_vars(&engine, options).map_err(|e| e.to_string())?;
-    let first = match (node, &boot.first_warp_path) {
+    let first = match (node.filter(|n| !n.ends_with(".xml")), &boot.first_warp_path) {
         (Some(n), _) => n.as_bytes().to_vec(),
         (None, Some(BootValue::Str(s))) => s.clone(),
         (None, other) => return Err(format!("no firstWarpPath ({other:?})")),
     };
     let audio = start_sound(game.borrow().sounds.core());
     game.borrow_mut().sounds.headless = audio.is_none();
-    let script = new_game(&engine, options, &first).map_err(|e| e.to_string())?;
+    // The saves under Native's data folder, laid out as the original's
+    // `<Documents>/<applicationTitle>/`.
+    game.borrow_mut()
+        .configure_saves(&boot, Some(&crate::desktop::data_dir().join("atlantis4")));
+    let script = match node.filter(|n| n.ends_with(".xml")) {
+        Some(save) => Game::load_from(&game, None, options, save).map_err(|e| e.to_string())?,
+        None => {
+            game.borrow_mut().enter_game();
+            new_game(&engine, options, &first).map_err(|e| e.to_string())?
+        }
+    };
     let mut app = Viewer {
         _audio: audio,
         game,
@@ -506,6 +535,7 @@ pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
         next_frame: Instant::now(),
         shown: None,
         stats: Stats::default(),
+        quit: false,
     };
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     el.run_app(&mut app)

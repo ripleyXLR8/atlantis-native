@@ -4,13 +4,13 @@
 //! rules are in [`crate::inventory`], [`crate::documents`] and
 //! [`crate::screens`]).
 
-use atlantis4_script::{SavedGlobal, Value};
+use atlantis4_script::Value;
 
 use crate::documents::{self, DocAction};
 use crate::game::Game;
 use crate::gui;
 use crate::inventory::{Inventory, ObjectClick};
-use crate::savexml::{save_text, SaveParts};
+use crate::savexml::SaveParts;
 use crate::screens::{Action, Screens};
 
 /// `AddToBag`'s sound (0x005284e0).
@@ -128,6 +128,10 @@ impl Game {
     /// Whether the warp takes the pointer (`App+0x7a10`, and no document
     /// covering it).
     pub fn warp_takes_input(&self) -> bool {
+        // `FinishGame` clears `game+0x4038` (@ 0x0052bc7e).
+        if self.planks.is_some() {
+            return false;
+        }
         self.screens
             .as_ref()
             .is_none_or(|s| s.warp_input && self.documents.shown.is_none())
@@ -279,22 +283,9 @@ impl Game {
             warp_name: self.warp_name.clone(),
             orientation: (self.view.yaw, self.view.pitch),
             music: self.sounds.music.path().as_bytes().to_vec(),
-            // `[UNKNOWN]` the played time's own clock (`game+0x4608` and
-            // the timer at `+0x4610`): the engine clock here.
-            played_time: self.now_ms / 1000.0,
+            // `game+0x4608` + the timer since `Game::enter` / 1,000,000
+            // (@ 0x00524535..0x00524558).
+            played_time: self.played_time(),
         }
-    }
-
-    /// The `SaveGame` worker's text for `file` with `globals`; kept in
-    /// [`Game::last_save`] (writing it is M4).
-    pub fn build_save(&mut self, file: &str, globals: &[SavedGlobal]) {
-        let parts = self.save_parts();
-        let text = save_text(&parts, globals);
-        log::info!(
-            "SaveGame({file}): {} bytes, {} globals, not written (saves are M4)",
-            text.len(),
-            globals.len()
-        );
-        self.last_save = Some((file.to_string(), text));
     }
 }
