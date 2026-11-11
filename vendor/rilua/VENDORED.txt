@@ -1,0 +1,42 @@
+rilua 0.1.27, vendored for atlantis4-script (Atlantis Evolution's Lua 5.1
+scripts).
+
+Origin: https://crates.io/api/v1/crates/rilua/0.1.27/download
+SHA-256 of the .crate: 275971987852cab64d21d060e310b52982a7d9ffbac51acd654a1fd47ebad28b
+Upstream: https://github.com/wowemulation-dev/rilua
+Licence: MIT OR Apache-2.0 (LICENSE-MIT, LICENSE-APACHE), unchanged.
+
+Kept from the package: Cargo.toml (as published), Cargo.toml.orig,
+Cargo.lock, the licences, README.md, CHANGELOG.md, src/, tests/,
+examples/, benches/. Left out: repository tooling (.github, .cargo,
+.config, docs, scripts, rust-toolchain.toml and dot files).
+
+The crate is excluded from the Native workspace (its dev-dependencies stay
+out of Native's lock file). Its own test suite runs from this directory:
+  cargo test --manifest-path vendor/rilua/Cargo.toml
+
+Changes made in Native, each in its own commit with a reproducer test in
+crates/atlantis4-script/tests/table_order.rs, so that tables iterate in
+PUC-Rio Lua 5.1.4's order: see PATCHES below.
+
+PATCHES
+
+1. src/vm/table.rs, src/vm/execute.rs: `SETLIST` growing the array part
+   rebuilds the hash part as PUC-Rio's `luaH_resizearray` does (it calls
+   `resize`, which reinserts the hash nodes from last to first). rilua
+   only extended the array, so constructors whose last item is a call
+   (most nested layouts) iterated in another order.
+
+2. src/vm/table.rs (`new_key`): a main position whose value is nil is
+   taken by the new key, as in PUC-Rio's `newkey`. rilua reused it only
+   once the old key's string had been collected, so a global set to nil
+   and a later new global (ChangeWarp's callback resets) ended in another
+   order.
+
+3. src/vm/state.rs, src/stdlib/mod.rs, src/stdlib/package.rs: the
+   globals table is created with `luaH_new(L, 0, 2)` and the libraries are
+   opened in Lua 5.1.4's `linit.c` order, each registering its globals in
+   PUC-Rio's order (`_G`, `base_funcs`, `_VERSION`, `ipairs`, `pairs`,
+   `newproxy`; `package`, `module`, `require`); `package.loaded` receives
+   the libraries opened after `package` at the end. A fresh `pairs(_G)`
+   then walks in Lua 5.1.4's order.

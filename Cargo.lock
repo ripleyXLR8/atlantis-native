@@ -311,6 +311,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "atlantis4-script"
+version = "0.6.0"
+dependencies = [
+ "atlantis4-data",
+ "rilua",
+]
+
+[[package]]
 name = "atomic-waker"
 version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2046,6 +2054,10 @@ dependencies = [
  "web-sys",
  "windows-sys 0.61.2",
 ]
+
+[[package]]
+name = "rilua"
+version = "0.1.27"
 
 [[package]]
 name = "rustc-hash"

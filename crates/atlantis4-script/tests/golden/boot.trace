@@ -1,0 +1,28 @@
+LOAD Texts/Full/ApplicationTitle.lua
+READ applicationTitle h:cb9227505cce9d4c/18
+LOAD Texts/PC/BackupPathTemplate.lua
+READ backupPathTemplate h:677f77715c870724/28
+LOAD Texts/Version.lua
+READ versionString "1.0.1"
+LOAD Texts/Full/FirstWarpPath.lua
+READ firstWarpPath "3D/Bateau_CA/0001.wp"
+GAME
+LOAD 3D/OnGameEnter.lua
+LOAD Diary/Diary.lua
+LOAD Inventory/InventoryScripts.lua
+WARP 3D/Bateau_CA/0001.wp
+SCENE 3D/Bateau_CA/0001.xml
+LOAD 3D/Bateau_CA/0001.lua
+ENTER OnWarpEnter()
+CALL PlayMusic("Sounds/Musiques/muzik20.ogg")
+CALL PlaySound("Sounds/Ambiances/Bateau.ogg",-1)
+CALL SetMarker("Bateau_CO\0003.wp",0,0)
+CALL SetMarker("Bateau_CA\0002.wp",0,0)
+CALL PlayMovie("Videos/intro.ogv","Videos/intro.ogg")
+CALL SetMarker("hua2",4,0)
+CALL StartAnimationPart("hua2",14,15,-1,true)
+CALL StartAnimationPart("mla2",0,1,-1,false)
+SAVE String "warpName" "3D/Bateau_CA/0001.wp"
+SAVE Boolean "INTRO" 1
+SAVE String "_VERSION" h:4de6a7b0bcdb941f/7
+SAVE count 3
