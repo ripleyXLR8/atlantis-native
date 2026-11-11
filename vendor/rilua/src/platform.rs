@@ -703,11 +703,13 @@ unsafe extern "C" {
 #[cfg_attr(target_env = "msvc", link(name = "ucrt"))]
 unsafe extern "C" {
     // Windows reverses parameter order and returns errno_t.
-    // On 64-bit MSVC, `localtime_s`/`gmtime_s` are header-level wrappers
-    // that resolve to `_localtime64_s`/`_gmtime64_s` in ucrtbase.dll.
-    #[cfg_attr(target_env = "msvc", link_name = "_localtime64_s")]
+    // `localtime_s`/`gmtime_s` are header-level wrappers that resolve to
+    // `_localtime64_s`/`_gmtime64_s` (64-bit `time_t`, as `TimeT`): in
+    // ucrtbase.dll with MSVC, in MinGW-w64's libmsvcrt.a with GNU, which
+    // has no `localtime_s`/`gmtime_s` symbol of its own.
+    #[link_name = "_localtime64_s"]
     fn localtime_s(result: *mut Tm, timep: *const TimeT) -> i32;
-    #[cfg_attr(target_env = "msvc", link_name = "_gmtime64_s")]
+    #[link_name = "_gmtime64_s"]
     fn gmtime_s(result: *mut Tm, timep: *const TimeT) -> i32;
 }
 
