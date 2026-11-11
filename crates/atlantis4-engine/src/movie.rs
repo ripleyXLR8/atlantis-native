@@ -320,14 +320,22 @@ pub fn codec_fps(num: u32, den: u32) -> f32 {
     (f64::from(num) / f64::from(den)) as f32
 }
 
-/// GL's `GL_LINEAR` of four taps at fractions (`a`, `b`), rounded to 8
-/// bits per channel.
-fn bilinear(t: [[u8; 4]; 4], a: f64, b: f64) -> [u8; 4] {
-    let w = [(1.0 - a) * (1.0 - b), a * (1.0 - b), (1.0 - a) * b, a * b];
-    std::array::from_fn(|c| {
-        let v: f64 = t.iter().zip(&w).map(|(p, w)| f64::from(p[c]) * w).sum();
-        (v + 0.5).floor().clamp(0.0, 255.0) as u8
-    })
+/// The four weights of fractions (`a`, `b`).
+#[inline]
+fn weights(a: f64, b: f64) -> [f64; 4] {
+    [(1.0 - a) * (1.0 - b), a * (1.0 - b), (1.0 - a) * b, a * b]
+}
+
+/// Channel `c` of the taps `t` weighted by `w`, rounded half up to 8 bits
+/// (`(v + ½)` then floor, clamped to 0..=255: what the saturating cast
+/// does, NaN to 0 included).
+#[inline]
+fn channel(t: &[[u8; 4]; 4], w: &[f64; 4], c: usize) -> u8 {
+    let v = f64::from(t[0][c]) * w[0]
+        + f64::from(t[1][c]) * w[1]
+        + f64::from(t[2][c]) * w[2]
+        + f64::from(t[3][c]) * w[3];
+    (v + 0.5) as u8
 }
 
 /// How a quad's colour reaches the window.
@@ -354,7 +362,33 @@ pub fn draw_stretched(
     pic: &Picture,
     rect: Rect,
     mode: Mode,
-    tap: &dyn Fn(i64, i64) -> [u8; 4],
+    tap: &(dyn Fn(i64, i64) -> [u8; 4] + Sync),
+) {
+    draw_stretched_around(out, width, height, pic, rect, mode, tap, None);
+}
+
+/// The pixels whose centre is inside `rect` in a `width × height`
+/// window: columns `i0..i1`, rows `j0..j1` (empty when off screen).
+fn pixel_box(rect: Rect, width: u32, height: u32) -> (i64, i64, i64, i64) {
+    let i0 = (rect.left - 0.5).ceil().max(0.0) as i64;
+    let i1 = ((rect.left + rect.width - 0.5).ceil() as i64).min(i64::from(width));
+    let j0 = (rect.top - 0.5).ceil().max(0.0) as i64;
+    let j1 = ((rect.top + rect.height - 0.5).ceil() as i64).min(i64::from(height));
+    (i0, i1, j0, j1)
+}
+
+/// [`draw_stretched`] leaving out the pixels of `hole` (columns, rows as
+/// [`pixel_box`]): those an opaque picture drawn next covers entirely.
+#[allow(clippy::too_many_arguments)]
+fn draw_stretched_around(
+    out: &mut [u32],
+    width: u32,
+    height: u32,
+    pic: &Picture,
+    rect: Rect,
+    mode: Mode,
+    tap: &(dyn Fn(i64, i64) -> [u8; 4] + Sync),
+    hole: Option<(i64, i64, i64, i64)>,
 ) {
     if pic.width == 0 || pic.height == 0 || rect.width <= 0.0 || rect.height <= 0.0 {
         return;
@@ -363,35 +397,75 @@ pub fn draw_stretched(
         f64::from(pic.width) / rect.width,
         f64::from(pic.height) / rect.height,
     );
-    let i0 = (rect.left - 0.5).ceil().max(0.0) as i64;
-    let i1 = ((rect.left + rect.width - 0.5).ceil() as i64).min(i64::from(width));
-    let j0 = (rect.top - 0.5).ceil().max(0.0) as i64;
-    let j1 = ((rect.top + rect.height - 0.5).ceil() as i64).min(i64::from(height));
-    for j in j0..j1 {
+    let (i0, i1, j0, j1) = pixel_box(rect, width, height);
+    if i0 >= i1 || j0 >= j1 {
+        return;
+    }
+    // A column's texel and fraction do not depend on the row: computed
+    // once, with the same arithmetic.
+    let cols: Vec<(i64, f64)> = (i0..i1)
+        .map(|i| {
+            let tx = (i as f64 + 0.5 - rect.left) * sx - 0.5;
+            (tx.floor() as i64, tx - tx.floor())
+        })
+        .collect();
+    let w = width as usize;
+    let (j0, j1) = (j0 as usize, j1 as usize);
+    let i0 = i0 as usize;
+    let (pw, ph) = (i64::from(pic.width), i64::from(pic.height));
+    let rgba = &pic.rgba;
+    crate::render::rows(&mut out[j0 * w..j1 * w], w, j1 - j0, |r, line| {
+        let j = j0 + r;
         let ty = (j as f64 + 0.5 - rect.top) * sy - 0.5;
         let (fy, b) = (ty.floor(), ty - ty.floor());
         let y0 = fy as i64;
-        for i in i0..i1 {
-            let tx = (i as f64 + 0.5 - rect.left) * sx - 0.5;
-            let (fx, a) = (tx.floor(), tx - tx.floor());
-            let x0 = fx as i64;
-            let c = bilinear(
+        // The columns of the hole on this row, as indices into `cols`.
+        let skip = match hole {
+            Some((h0, h1, v0, v1)) if (v0..v1).contains(&(j as i64)) => {
+                let lo = (h0 - i0 as i64).clamp(0, cols.len() as i64) as usize;
+                let hi = (h1 - i0 as i64).clamp(0, cols.len() as i64) as usize;
+                lo..hi
+            }
+            _ => 0..0,
+        };
+        // Rows `y0`, `y0 + 1` inside the picture: the taps of columns
+        // inside are read straight (what `tap` gives there).
+        let rows_in = y0 >= 0 && y0 + 1 < ph;
+        let (r0, r1) = if rows_in {
+            let o = y0 as usize * pw as usize * 4;
+            (o, o + pw as usize * 4)
+        } else {
+            (0, 0)
+        };
+        let px4 = |o: usize| -> [u8; 4] { [rgba[o], rgba[o + 1], rgba[o + 2], rgba[o + 3]] };
+        for (c, (px, &(x0, a))) in line[i0..].iter_mut().zip(&cols).enumerate() {
+            if skip.contains(&c) {
+                continue;
+            }
+            let t = if rows_in && x0 >= 0 && x0 + 1 < pw {
+                let x = x0 as usize * 4;
+                [px4(r0 + x), px4(r0 + x + 4), px4(r1 + x), px4(r1 + x + 4)]
+            } else {
                 [
                     tap(x0, y0),
                     tap(x0 + 1, y0),
                     tap(x0, y0 + 1),
                     tap(x0 + 1, y0 + 1),
-                ],
-                a,
-                b,
-            );
-            let px = &mut out[j as usize * width as usize + i as usize];
+                ]
+            };
+            let wt = weights(a, b);
             *px = match mode {
-                Mode::Opaque => u32::from(c[0]) << 16 | u32::from(c[1]) << 8 | u32::from(c[2]),
-                Mode::Blend => crate::sprite::blend(*px, c),
+                Mode::Opaque => {
+                    u32::from(channel(&t, &wt, 0)) << 16
+                        | u32::from(channel(&t, &wt, 1)) << 8
+                        | u32::from(channel(&t, &wt, 2))
+                }
+                Mode::Blend => {
+                    crate::sprite::blend(*px, std::array::from_fn(|k| channel(&t, &wt, k)))
+                }
             };
         }
-    }
+    });
 }
 
 /// Where the movie's layouts land in a `width × height` window.
@@ -596,8 +670,16 @@ impl Movie {
     ) {
         let skip_size = skip_up.map_or((75, 75), |p| (p.width, p.height));
         let l = self.layout(width, height, skip_size);
+        // An opaque video replaces every pixel of its box: the background
+        // is not computed there.
+        let video = self.sprite.as_ref().and_then(|s| {
+            let pic = s.picture()?;
+            let opaque = !s.has_alpha() && pic.width > 0 && pic.height > 0;
+            (opaque && l.video.width > 0.0 && l.video.height > 0.0)
+                .then(|| pixel_box(l.video, width, height))
+        });
         match background {
-            Some(bg) => draw_stretched(
+            Some(bg) => draw_stretched_around(
                 out,
                 width,
                 height,
@@ -605,6 +687,7 @@ impl Movie {
                 l.background,
                 Mode::Opaque,
                 &|x, y| bg.texel_clamped(x, y),
+                video,
             ),
             None => fill(out, width, height, l.background, 0),
         }

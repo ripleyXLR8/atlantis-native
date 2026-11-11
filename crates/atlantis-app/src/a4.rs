@@ -46,8 +46,10 @@ use winit::window::{Window, WindowId};
 const WIDTH: u32 = 1365;
 const HEIGHT: u32 = 768;
 
-/// The time between two frames of the viewer.
-const FRAME: Duration = Duration::from_millis(33);
+/// The time between two updates of the viewer (a 60 Hz display's): a
+/// frame is drawn only when its picture changed, so a 25 fps movie shows
+/// each of its pictures within one period of its time.
+const FRAME: Duration = Duration::from_micros(16_667);
 
 struct Viewer {
     game: Rc<RefCell<Game>>,
@@ -61,6 +63,49 @@ struct Viewer {
     down: Option<(f64, f64)>,
     last: (f64, f64),
     size: (u32, u32),
+    /// When the next frame is due (the game's update, then a draw if the
+    /// picture changed).
+    next_frame: Instant,
+    /// The [`Game::frame_key`] of the picture on screen.
+    shown: Option<u64>,
+    /// Frame time statistics, logged every few seconds.
+    stats: Stats,
+}
+
+/// Where the frame time goes: the game's update, the drawing, the copy to
+/// the window.
+#[derive(Default)]
+struct Stats {
+    frames: u32,
+    draws: u32,
+    tick: Duration,
+    draw: Duration,
+    present: Duration,
+    since: Option<Instant>,
+}
+
+impl Stats {
+    fn log(&mut self) {
+        let now = Instant::now();
+        let since = *self.since.get_or_insert(now);
+        if now - since < Duration::from_secs(5) {
+            return;
+        }
+        let per = |d: Duration, n: u32| d.as_secs_f64() * 1e3 / f64::from(n.max(1));
+        log::info!(
+            "frames: {} updates ({:.2} ms each), {} drawn ({:.2} ms draw, {:.2} ms present) in {:.1} s",
+            self.frames,
+            per(self.tick, self.frames),
+            self.draws,
+            per(self.draw, self.draws),
+            per(self.present, self.draws),
+            (now - since).as_secs_f64()
+        );
+        *self = Stats {
+            since: Some(now),
+            ..Stats::default()
+        };
+    }
 }
 
 impl Viewer {
@@ -118,13 +163,19 @@ impl Viewer {
             return;
         }
         if let Ok(mut buf) = surface.buffer_mut() {
+            let t0 = Instant::now();
             {
                 let mut g = self.game.borrow_mut();
                 g.height = h;
                 g.draw(&mut buf, w, h, self.pointer);
+                self.shown = Some(g.frame_key(w, h, self.pointer));
             }
+            let t1 = Instant::now();
             window.pre_present_notify();
             let _ = buf.present();
+            self.stats.draws += 1;
+            self.stats.draw += t1 - t0;
+            self.stats.present += t1.elapsed();
         }
     }
 
@@ -186,21 +237,44 @@ impl ApplicationHandler for Viewer {
         let s = window.inner_size();
         self.size = (s.width, s.height);
         self.window = Some(window);
-        el.set_control_flow(ControlFlow::WaitUntil(Instant::now() + FRAME));
+        self.next_frame = Instant::now();
+        el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
     }
 
+    /// Once per frame period (not after every input event): the game's
+    /// update, then a redraw only when the picture changed. The movie and
+    /// the animations pick their frame from the clock, so a late frame
+    /// skips pictures instead of slowing the game down.
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
-        self.tick();
-        if let Some(w) = &self.window {
-            w.request_redraw();
+        let now = Instant::now();
+        if now >= self.next_frame {
+            let t0 = Instant::now();
+            self.tick();
+            self.stats.frames += 1;
+            self.stats.tick += t0.elapsed();
+            self.next_frame += FRAME;
+            if self.next_frame <= now {
+                self.next_frame = now + FRAME;
+            }
+            let (w, h) = self.size;
+            let key = self.game.borrow().frame_key(w, h, self.pointer);
+            if self.shown != Some(key) {
+                if let Some(win) = &self.window {
+                    win.request_redraw();
+                }
+            }
+            self.stats.log();
         }
-        el.set_control_flow(ControlFlow::WaitUntil(Instant::now() + FRAME));
+        el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => el.exit(),
-            WindowEvent::Resized(s) => self.size = (s.width, s.height),
+            WindowEvent::Resized(s) => {
+                self.size = (s.width, s.height);
+                self.shown = None;
+            }
             WindowEvent::RedrawRequested => self.draw(),
             WindowEvent::CursorLeft { .. } => self.pointer = None,
             WindowEvent::CursorMoved { position, .. } => {
@@ -339,6 +413,9 @@ pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
         down: None,
         last: (0.0, 0.0),
         size: (WIDTH, HEIGHT),
+        next_frame: Instant::now(),
+        shown: None,
+        stats: Stats::default(),
     };
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     el.run_app(&mut app)

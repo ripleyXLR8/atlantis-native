@@ -26,7 +26,7 @@
 
 use atlantis4_data::anim::TileRange;
 
-use crate::camera::Camera;
+use crate::camera::{Camera, WorldDirs};
 use crate::cube::{cell_texel, face_point, FACE_PICTURE};
 use crate::package::Picture;
 use crate::sprite::blend;
@@ -52,23 +52,27 @@ pub fn bilinear(pic: &[u32], x: f64, y: f64, weights: Weights) -> u32 {
         b = (b * k).floor() / k;
     }
     let (x0, y0) = (fx as i64, fy as i64);
-    let at = |x: i64, y: i64| pic[(y.clamp(0, n - 1) * n + x.clamp(0, n - 1)) as usize];
-    let t = [
-        at(x0, y0),
-        at(x0 + 1, y0),
-        at(x0, y0 + 1),
-        at(x0 + 1, y0 + 1),
-    ];
+    let t = if x0 >= 0 && y0 >= 0 && x0 + 1 < n && y0 + 1 < n {
+        let o = (y0 * n + x0) as usize;
+        let u = n as usize;
+        [pic[o], pic[o + 1], pic[o + u], pic[o + u + 1]]
+    } else {
+        let at = |x: i64, y: i64| pic[(y.clamp(0, n - 1) * n + x.clamp(0, n - 1)) as usize];
+        [
+            at(x0, y0),
+            at(x0 + 1, y0),
+            at(x0, y0 + 1),
+            at(x0 + 1, y0 + 1),
+        ]
+    };
     let w = [(1.0 - a) * (1.0 - b), a * (1.0 - b), (1.0 - a) * b, a * b];
     let mut out = 0u32;
     for shift in [16, 8, 0] {
-        let v: f64 = t
-            .iter()
-            .zip(&w)
-            .map(|(&p, &w)| f64::from((p >> shift) & 0xff) * w)
-            .sum();
-        let c = (v + 0.5).floor().clamp(0.0, 255.0) as u32;
-        out |= c << shift;
+        let ch = |p: u32| f64::from((p >> shift) & 0xff);
+        let v = ch(t[0]) * w[0] + ch(t[1]) * w[1] + ch(t[2]) * w[2] + ch(t[3]) * w[3];
+        // `(v + ½)` floored and clamped to 0..=255: the saturating cast
+        // (NaN to 0 included).
+        out |= u32::from((v + 0.5) as u8) << shift;
     }
     out
 }
@@ -90,17 +94,43 @@ pub fn sample_background(faces: &[Vec<u32>; 6], d: [f64; 3], weights: Weights) -
 pub fn render(cam: &Camera, faces: &[Vec<u32>; 6], out: &mut [u32], weights: Weights) {
     let (w, h) = (cam.width as usize, cam.height as usize);
     assert!(out.len() >= w * h, "output smaller than {w}x{h}");
-    let row = |j: usize, line: &mut [u32]| {
-        let ny = 1.0 - (j as f64 + 0.5) / h as f64 * 2.0;
-        for (i, px) in line.iter_mut().enumerate() {
-            let nx = (i as f64 + 0.5) / w as f64 * 2.0 - 1.0;
-            let d = cam.to_world(cam.camera_dir(nx, ny));
-            *px = sample_background(faces, d, weights);
+    let dirs = cam.world_dirs();
+    let cols = columns(&dirs, w);
+    let cz = dirs.cam_z();
+    rows(&mut out[..w * h], w, h, |j, line| {
+        let cy = dirs.cam_y(1.0 - (j as f64 + 0.5) / h as f64 * 2.0);
+        for (px, &cx) in line.iter_mut().zip(&cols) {
+            *px = sample_background(faces, dirs.turn([cx, cy, cz]), weights);
         }
-    };
+    });
+}
+
+/// Each column's camera-space x, `nx = (i + ½)/W·2 − 1` through
+/// [`WorldDirs::cam_x`].
+fn columns(dirs: &WorldDirs, w: usize) -> Vec<f64> {
+    (0..w)
+        .map(|i| dirs.cam_x((i as f64 + 0.5) / w as f64 * 2.0 - 1.0))
+        .collect()
+}
+
+/// Runs `row(j, line)` for each row of `out` (`w × h`, rows top-down),
+/// in bands of rows on the processor's threads when the picture is large
+/// (each row's result does not depend on the order).
+pub fn rows<T: Send>(out: &mut [T], w: usize, h: usize, row: impl Fn(usize, &mut [T]) + Sync) {
+    rows_of(out, w, h, w * h, row);
+}
+
+/// [`rows`] with the work counted as `pixels` pixels.
+fn rows_of<T: Send>(
+    out: &mut [T],
+    w: usize,
+    h: usize,
+    pixels: usize,
+    row: impl Fn(usize, &mut [T]) + Sync,
+) {
     let out = &mut out[..w * h];
-    let threads = threads(w * h);
-    if threads <= 1 || h == 0 {
+    let threads = threads(pixels);
+    if threads <= 1 || h == 0 || w == 0 {
         for (j, line) in out.chunks_mut(w.max(1)).enumerate() {
             row(j, line);
         }
@@ -138,8 +168,11 @@ pub fn bilinear_rgba(pic: &Picture, x: f64, y: f64, weights: Weights) -> [u8; 4]
     ];
     let w = [(1.0 - a) * (1.0 - b), a * (1.0 - b), (1.0 - a) * b, a * b];
     std::array::from_fn(|c| {
-        let v: f64 = t.iter().zip(&w).map(|(p, w)| f64::from(p[c]) * w).sum();
-        (v + 0.5).floor().clamp(0.0, 255.0) as u8
+        let v = f64::from(t[0][c]) * w[0]
+            + f64::from(t[1][c]) * w[1]
+            + f64::from(t[2][c]) * w[2]
+            + f64::from(t[3][c]) * w[3];
+        (v + 0.5) as u8
     })
 }
 
@@ -231,6 +264,21 @@ pub fn range_visible(cam: &Camera, range: &TileRange) -> bool {
         .any(|t| triangle_box(cam, &[v(t[0]), v(t[1]), v(t[2])]).is_some())
 }
 
+/// A triangle of a mesh, prepared for [`draw_mesh`].
+struct Tri {
+    bbox: (i64, i64, i64, i64),
+    p0: D3,
+    e1: D3,
+    e2: D3,
+    n: D3,
+    np0: f64,
+    d11: f64,
+    d12: f64,
+    d22: f64,
+    det: f64,
+    uvs: [[f64; 2]; 3],
+}
+
 /// Draws the triangles of `range` textured with `pic` over `out` (the
 /// view of `cam`, XRGB, rows top-down).
 pub fn draw_mesh(
@@ -246,9 +294,10 @@ pub fn draw_mesh(
     let (pw, ph) = (f64::from(pic.width), f64::from(pic.height));
     let vert = |i: u32| range.vertices.get(i as usize).copied().unwrap_or([0.0; 3]);
     let uv = |i: u32| range.uvs.get(i as usize).copied().unwrap_or([0.0; 2]);
+    let mut tris = Vec::new();
     for t in range.indices.as_chunks::<3>().0 {
         let v = [vert(t[0]), vert(t[1]), vert(t[2])];
-        let Some((x0, x1, y0, y1)) = triangle_box(cam, &v) else {
+        let Some(bbox) = triangle_box(cam, &v) else {
             continue;
         };
         let p: [D3; 3] = v.map(|p| p.map(f64::from));
@@ -260,43 +309,82 @@ pub fn draw_mesh(
         if det == 0.0 {
             continue;
         }
-        let np0 = dot3(n, p[0]);
-        for j in y0..y1 {
-            let ny = 1.0 - (j as f64 + 0.5) / h as f64 * 2.0;
+        tris.push(Tri {
+            bbox,
+            p0: p[0],
+            e1,
+            e2,
+            n,
+            np0: dot3(n, p[0]),
+            d11,
+            d12,
+            d22,
+            det,
+            uvs,
+        });
+    }
+    if tris.is_empty() {
+        return;
+    }
+    let (y_lo, y_hi) = tris.iter().fold((i64::MAX, i64::MIN), |(lo, hi), t| {
+        (lo.min(t.bbox.2), hi.max(t.bbox.3))
+    });
+    let current = cover.current;
+    let dirs = cam.world_dirs();
+    let cols = columns(&dirs, w);
+    let cz = dirs.cam_z();
+    // Rows are independent: each runs every triangle in order over its
+    // own pixels and stamps.
+    let (y_lo, y_hi) = (y_lo as usize, y_hi as usize);
+    let mut lines: Vec<(&mut [u32], &mut [u32])> = out[y_lo * w..y_hi * w]
+        .chunks_mut(w)
+        .zip(cover.stamp[y_lo * w..y_hi * w].chunks_mut(w))
+        .collect();
+    let n_rows = lines.len();
+    rows_of(&mut lines, 1, n_rows, n_rows * w, |r, slot| {
+        let (line, stamp) = &mut slot[0];
+        let j = (y_lo + r) as i64;
+        for t in &tris {
+            let (x0, x1, y0, y1) = t.bbox;
+            if j < y0 || j >= y1 {
+                continue;
+            }
+            let cy = dirs.cam_y(1.0 - (j as f64 + 0.5) / h as f64 * 2.0);
             for i in x0..x1 {
-                let k = j as usize * w + i as usize;
-                if cover.stamp[k] == cover.current {
+                let k = i as usize;
+                if stamp[k] == current {
                     continue;
                 }
-                let nx = (i as f64 + 0.5) / w as f64 * 2.0 - 1.0;
-                let d = cam.to_world(cam.camera_dir(nx, ny));
-                let den = dot3(n, d);
+                let d = dirs.turn([cols[k], cy, cz]);
+                let den = dot3(t.n, d);
                 if den == 0.0 {
                     continue;
                 }
-                let s = np0 / den;
+                let s = t.np0 / den;
                 if s <= 0.0 {
                     continue;
                 }
-                let q = sub3([d[0] * s, d[1] * s, d[2] * s], p[0]);
-                let (q1, q2) = (dot3(q, e1), dot3(q, e2));
-                let b1 = (d22 * q1 - d12 * q2) / det;
-                let b2 = (d11 * q2 - d12 * q1) / det;
+                let q = sub3([d[0] * s, d[1] * s, d[2] * s], t.p0);
+                let (q1, q2) = (dot3(q, t.e1), dot3(q, t.e2));
+                let b1 = (t.d22 * q1 - t.d12 * q2) / t.det;
+                let b2 = (t.d11 * q2 - t.d12 * q1) / t.det;
                 let b0 = 1.0 - b1 - b2;
                 if b0 < 0.0 || b1 < 0.0 || b2 < 0.0 {
                     continue;
                 }
-                cover.stamp[k] = cover.current;
+                stamp[k] = current;
+                let uvs = &t.uvs;
                 let u = b0 * uvs[0][0] + b1 * uvs[1][0] + b2 * uvs[2][0];
                 let vv = b0 * uvs[0][1] + b1 * uvs[1][1] + b2 * uvs[2][1];
                 let texel = bilinear_rgba(pic, u * pw - 0.5, (1.0 - vv) * ph - 0.5, weights);
-                out[k] = blend(out[k], texel);
+                line[k] = blend(line[k], texel);
             }
         }
-    }
+    });
 }
 
-fn threads(pixels: usize) -> usize {
+/// How many threads draw a picture of `pixels` pixels.
+pub(crate) fn threads(pixels: usize) -> usize {
     #[cfg(target_arch = "wasm32")]
     {
         let _ = pixels;

@@ -168,6 +168,20 @@ impl Camera {
         std::array::from_fn(|i| r[i][0] * d[0] + r[i][1] * d[1] + r[i][2] * d[2])
     }
 
+    /// [`Camera::camera_dir`] then [`Camera::to_world`] with their
+    /// matrices taken once: the same operations in the same order, so
+    /// the same bits, for a loop over many pixels.
+    pub fn world_dirs(&self) -> WorldDirs {
+        let m = self.m.map(f64::from);
+        WorldDirs {
+            m0: m[0],
+            m5: m[5],
+            m11: m[11],
+            w: m[10] / m[11] - 1.0,
+            r: rotation(self.q),
+        }
+    }
+
     /// `getRay` (`0x004fa030`): the world ray through the integer screen
     /// point (`x`, `y_up`), `y_up` counted from the bottom; origin 0,
     /// direction normalised (floats).
@@ -196,6 +210,50 @@ impl Camera {
             ((clip[1] / clip[3] + 1.0) * hy) as f32,
             (clip[2] / clip[3]) as f32,
         ]
+    }
+}
+
+/// A camera's [`Camera::camera_dir`] and [`Camera::to_world`] prepared
+/// once ([`Camera::world_dirs`]).
+#[derive(Clone, Copy, Debug)]
+pub struct WorldDirs {
+    m0: f64,
+    m5: f64,
+    m11: f64,
+    w: f64,
+    r: [[f64; 3]; 3],
+}
+
+impl WorldDirs {
+    /// The world direction through (`nx`, `ny`).
+    #[inline]
+    pub fn at(&self, nx: f64, ny: f64) -> [f64; 3] {
+        self.turn([self.cam_x(nx), self.cam_y(ny), self.cam_z()])
+    }
+
+    /// The camera-space x of [`Camera::camera_dir`] (a column's).
+    #[inline]
+    pub fn cam_x(&self, nx: f64) -> f64 {
+        nx / self.m0 / self.w
+    }
+
+    /// The camera-space y (a row's).
+    #[inline]
+    pub fn cam_y(&self, ny: f64) -> f64 {
+        ny / self.m5 / self.w
+    }
+
+    /// The camera-space z (the same for every pixel).
+    #[inline]
+    pub fn cam_z(&self) -> f64 {
+        1.0 / self.m11 / self.w
+    }
+
+    /// [`Camera::to_world`] of a camera-space direction.
+    #[inline]
+    pub fn turn(&self, d: [f64; 3]) -> [f64; 3] {
+        let r = &self.r;
+        std::array::from_fn(|i| r[i][0] * d[0] + r[i][1] * d[1] + r[i][2] * d[2])
     }
 }
 

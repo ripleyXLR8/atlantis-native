@@ -71,6 +71,8 @@ pub struct Game {
     cover: Coverage,
     /// Decoded 2-D pictures by path (`None`: missing or broken).
     sprites: HashMap<String, Option<Picture>>,
+    /// The movie's fixed pictures as [`movie::resolve`] found them.
+    resolved: HashMap<&'static str, String>,
     /// The `PlayMovie` in progress (`game+0x4038` clear while it is).
     pub movie: Option<Movie>,
     /// The movies' sound events, for the sound side to take.
@@ -149,6 +151,7 @@ impl Game {
             background: None,
             cover: Coverage::new(),
             sprites: HashMap::new(),
+            resolved: HashMap::new(),
             movie: None,
             movie_cues: Vec::new(),
             clock_us: None,
@@ -202,8 +205,7 @@ impl Game {
 
     /// The skip button's picture size (75 × 75 in the data).
     fn skip_size(&mut self) -> (u32, u32) {
-        let p = movie::resolve(&self.files, movie::SKIP_PICTURE);
-        let p = p.unwrap_or_else(|| movie::SKIP_PICTURE.to_string());
+        let p = self.resolved(movie::SKIP_PICTURE);
         self.load_sprite(&p);
         match self.sprites.get(&p) {
             Some(Some(pic)) => (pic.width, pic.height),
@@ -257,10 +259,21 @@ impl Game {
             movie::SKIP_DOWN_PICTURE,
         ]
         .map(|p| {
-            let r = movie::resolve(&self.files, p).unwrap_or_else(|| p.to_string());
+            let r = self.resolved(p);
             self.load_sprite(&r);
             r
         })
+    }
+
+    /// [`movie::resolve`] of one of the movie's fixed pictures, looked up
+    /// once (the path itself when no variant exists).
+    fn resolved(&mut self, path: &'static str) -> String {
+        if let Some(r) = self.resolved.get(path) {
+            return r.clone();
+        }
+        let r = movie::resolve(&self.files, path).unwrap_or_else(|| path.to_string());
+        self.resolved.insert(path, r.clone());
+        r
     }
 
     fn load_sprite(&mut self, path: &str) {
@@ -271,6 +284,47 @@ impl Game {
             }
             self.sprites.insert(path.to_string(), pic);
         }
+    }
+
+    /// A digest of everything [`Game::draw`] reads for a `width × height`
+    /// frame with the cursor at `pointer`: two equal keys give the same
+    /// picture, so a frame whose key did not change need not be drawn
+    /// again (the view, the node, each animation's frame, each marker's
+    /// band, the movie's frame and buttons, the cursor).
+    pub fn frame_key(&self, width: u32, height: u32, pointer: Option<(f64, f64)>) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (width, height, self.serial, self.weights == Weights::Exact).hash(&mut h);
+        (
+            self.fov.to_bits(),
+            self.view.yaw.to_bits(),
+            self.view.pitch.to_bits(),
+        )
+            .hash(&mut h);
+        pointer
+            .map(|(x, y)| (x.to_bits(), y.to_bits()))
+            .hash(&mut h);
+        self.sprites.len().hash(&mut h);
+        if let Some(w) = &self.warp {
+            w.markers_shown.hash(&mut h);
+            for a in &w.anims {
+                (&a.name, a.package.is_some(), a.anim.frame).hash(&mut h);
+            }
+            for m in &w.markers {
+                m.point.map(f32::to_bits).hash(&mut h);
+                m.sprite
+                    .map(|s| (s.image, s.frame(self.now_ms)))
+                    .hash(&mut h);
+            }
+        }
+        if let Some(m) = &self.movie {
+            (&m.path, m.skip_shown, m.skip_pressed).hash(&mut h);
+            m.sprite
+                .as_ref()
+                .map(|s| (s.anim.frame, s.picture().is_some()))
+                .hash(&mut h);
+        }
+        h.finish()
     }
 
     /// The frame of a `width × height` window into `out` (XRGB, rows
