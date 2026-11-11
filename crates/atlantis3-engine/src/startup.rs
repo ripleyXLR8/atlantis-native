@@ -16,6 +16,8 @@
 use atlantis3_data::cfg::Config;
 use atlantis3_data::A3Files;
 
+use crate::fixes::Fixes;
+
 pub use atlantis3_data::install::install_registry;
 
 /// The settings the game starts with.
@@ -29,8 +31,14 @@ pub struct Startup {
 
 impl Startup {
     /// The settings of the install `files`: its `Atlantis3.cfg` (none: the
-    /// defaults) and its registry values.
+    /// defaults) and its registry values, every bug fix on.
     pub fn read(files: &A3Files) -> Startup {
+        Startup::read_with(files, Fixes::default())
+    }
+
+    /// [`Startup::read`] with the bug fixes `fixes` ([`Fixes::apply`],
+    /// after the registry values).
+    pub fn read_with(files: &A3Files, fixes: Fixes) -> Startup {
         let mut config = match files.read("Atlantis3.cfg") {
             Some(data) => Config::parse(&data),
             None => {
@@ -45,6 +53,7 @@ impl Startup {
             String::from_utf8_lossy(&install)
         );
         config.apply_install(&language, &install);
+        fixes.apply(&mut config, files);
         Startup {
             config,
             install_language: language,
@@ -57,7 +66,8 @@ impl Startup {
         (w.max(1) as usize, h.max(1) as usize)
     }
 
-    /// The warp view's size (640 x 480 with the 512-pixel faces).
+    /// The warp view's size (640 x 480 with the 512-pixel faces; the 3D
+    /// dialogs' surface).
     pub fn warp_view(&self) -> (usize, usize) {
         let (w, h) = self.config.warp_view();
         (w as usize, h as usize)

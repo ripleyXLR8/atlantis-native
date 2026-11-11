@@ -100,6 +100,11 @@ impl A3Files {
         self.src.size(&format!("{DATAS}/{name}"))
     }
 
+    /// Whether folder `dir` of `Datas\` exists (any case).
+    pub fn has_dir(&self, dir: &str) -> bool {
+        self.src.has_dir(&format!("{DATAS}/{dir}"))
+    }
+
     /// The names of the entries of folder `dir` of `Datas\`.
     pub fn list(&self, dir: &str) -> Vec<String> {
         self.src.list(&format!("{DATAS}/{dir}"))

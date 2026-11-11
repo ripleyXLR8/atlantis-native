@@ -15,8 +15,9 @@
 //! original reads the mouse through DirectInput and draws its own).
 //!
 //! The saves (`save/game<P>_<N>.sav` with their thumbnails, the scripts'
-//! quick saves) and `Atlantis3.cfg` (the original's settings, which its
-//! options page writes) live in the `atlantis3` folder of the per-user
+//! quick saves), `Atlantis3.cfg` (the original's settings, which its
+//! options page writes) and `settings.ini` (the port's bug fixes,
+//! [`atlantis3_engine::fixes`]; `--original` turns them off) live in the `atlantis3` folder of the per-user
 //! data folder, never in the game's folder: the original's `Datas\Atlantis3.cfg`
 //! is read until the menus write the player's own.
 //!
@@ -37,7 +38,7 @@ use std::time::{Duration, Instant};
 use atlantis3_data::files::OpenError;
 use atlantis3_data::A3Files;
 use atlantis3_engine::px::Surface;
-use atlantis3_engine::{Game, Mode};
+use atlantis3_engine::{Fixes, Game, Mode};
 use atlantis_data::{FileSource, StdDir};
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -113,10 +114,32 @@ impl FileSource for WithCfg {
     }
 }
 
-/// The game in `dir`, its saves and `Atlantis3.cfg` in `base`; with the
-/// edition's name.
-pub fn open_in(dir: &Path, base: &Path) -> Result<(Game, String), String> {
+/// The bug fixes of `base`'s `settings.ini` (written with the defaults
+/// when there is none); `original` (`--original`) turns them all off
+/// without writing the file.
+pub fn fixes_in(base: &Path, original: bool) -> Fixes {
+    if original {
+        return Fixes::original();
+    }
+    let path = base.join(atlantis3_engine::fixes::SETTINGS_FILE);
+    match std::fs::read(&path) {
+        Ok(d) => Fixes::parse(&String::from_utf8_lossy(&d)),
+        Err(_) => {
+            let f = Fixes::default();
+            if let Err(e) = std::fs::write(&path, f.to_text()) {
+                log::warn!("{}: {e}", path.display());
+            }
+            f
+        }
+    }
+}
+
+/// The game in `dir`, its saves, `Atlantis3.cfg` and `settings.ini` in
+/// `base`; with the edition's name. `original` (`--original`): every bug
+/// fix off ([`fixes_in`]).
+pub fn open_in(dir: &Path, base: &Path, original: bool) -> Result<(Game, String), String> {
     let _ = std::fs::create_dir_all(base);
+    let fixes = fixes_in(base, original);
     let cfg_path = base.join("Atlantis3.cfg");
     let files = A3Files::new(Arc::new(WithCfg {
         install: StdDir::new(dir),
@@ -125,11 +148,11 @@ pub fn open_in(dir: &Path, base: &Path) -> Result<(Game, String), String> {
     let label = files
         .edition_label()
         .map_err(|e| crate::setup::explain_atlantis3(dir, &e))?;
-    let mut game = Game::new(files).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let mut game = Game::with_fixes(files, fixes).map_err(|e| format!("{}: {e}", dir.display()))?;
     game.save_dir = Some(base.join("save"));
     game.menus_mut().cfg_path = Some(cfg_path);
     log::info!(
-        "{label}, {}; saves and settings in {}",
+        "{label}, {}; saves and settings in {}; {fixes:?}",
         crate::version_string(),
         base.display()
     );
@@ -137,8 +160,8 @@ pub fn open_in(dir: &Path, base: &Path) -> Result<(Game, String), String> {
 }
 
 /// The game in `dir`, its saves and settings in [`data_dir`].
-pub fn open(dir: &Path) -> Result<(Game, String), String> {
-    open_in(dir, &data_dir())
+pub fn open(dir: &Path, original: bool) -> Result<(Game, String), String> {
+    open_in(dir, &data_dir(), original)
 }
 
 /// The game's picture as PNG.
@@ -161,8 +184,9 @@ pub fn headless(
     frames: u64,
     screenshot: Option<&Path>,
     no_intro: bool,
+    original: bool,
 ) -> Result<(), String> {
-    let (mut game, label) = open_in(dir, base)?;
+    let (mut game, label) = open_in(dir, base, original)?;
     println!("{label}, {}", crate::version_string());
     let mut intro_done = no_intro;
     if no_intro {
@@ -563,7 +587,7 @@ mod tests {
         assert_eq!(label(&dir).unwrap(), "Atlantis III, GOG.com, French");
         let base = std::env::temp_dir().join(format!("atlantis-a3-desktop-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&base);
-        let (mut game, label) = open_in(&dir, &base).unwrap();
+        let (mut game, label) = open_in(&dir, &base, false).unwrap();
         assert_eq!(label, "Atlantis III, GOG.com, French");
         assert_eq!(game.save_dir.as_deref(), Some(base.join("save").as_path()));
         assert_eq!(
@@ -573,9 +597,27 @@ mod tests {
         assert!(game.show_start_page());
         assert_eq!(game.mode(), Mode::Menu);
         let shot = base.join("a3.png");
-        headless(&dir, &base, 30, Some(&shot), true).unwrap();
+        headless(&dir, &base, 30, Some(&shot), true, false).unwrap();
         assert!(std::fs::read(&shot).unwrap().starts_with(b"\x89PNG"));
         let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// `settings.ini`: written with every fix on when missing, read back,
+    /// and `--original` turns the fixes off without writing it.
+    #[test]
+    fn fixes_from_settings_ini() {
+        let d = std::env::temp_dir().join(format!("atlantis-a3-fixes-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        assert_eq!(fixes_in(&d, true), Fixes::original());
+        assert!(!d.join("settings.ini").exists());
+        assert_eq!(fixes_in(&d, false), Fixes::default());
+        assert!(std::fs::read_to_string(d.join("settings.ini"))
+            .unwrap()
+            .contains("fix_warpres_cd = 1"));
+        std::fs::write(d.join("settings.ini"), "fix_warpres_cd = off\n").unwrap();
+        assert!(!fixes_in(&d, false).warpres_cd);
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[test]

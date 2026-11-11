@@ -430,10 +430,12 @@ pub struct Running {
     pub voice_start: f64,
     /// The loop mode to go back to (@ 0x0074f34c).
     pub back: crate::game::Mode,
-    /// The dialog surface (640 x 480; the screen's size for a voice-over),
+    /// The dialog surface (the warp view, 640 x 480 with WarpRes 512; the
+    /// screen's size for a voice-over),
     /// in the display's format.
     pub surface: Surface,
 }
 
-/// The dialog surface's size (@ 0x00714f1c, @ 0x00714f20, WarpRes 512).
+/// The dialog surface's size with WarpRes 512 (@ 0x00714f1c, @ 0x00714f20;
+/// the game takes the warp view, `Startup::warp_view`).
 pub const SURFACE: (usize, usize) = (640, 480);

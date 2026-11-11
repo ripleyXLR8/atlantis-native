@@ -76,3 +76,66 @@ fn warp_res_1024_reads_the_1024_folders_as_the_original() {
     g.run_command("(Cinema=93)");
     assert_ne!(g.mode(), Mode::Video);
 }
+
+/// GOG.com's Spanish install (`ATLANTIS3_GOG_ES`): its `Atlantis3.cfg`
+/// says `WarpRes = 1024`, its folders are the 512 / 640 ones.
+fn spanish(fixes: atlantis3_engine::Fixes) -> Option<Game> {
+    let dir = atlantis3_data::testing::dir_of("ATLANTIS3_GOG_ES")?;
+    let mut g = Game::with_fixes(A3Files::open_dir(&dir).unwrap().0, fixes).unwrap();
+    g.set_world(1);
+    assert!(g.load_place("hoggar.wam"));
+    Some(g)
+}
+
+/// `fix_warpres_cd` on (the default): the options page's `Version = CD`
+/// rule at start-up, so WarpRes 512 and the 640 x 480 view before the
+/// first cube; the shipped folders play.
+#[test]
+fn spanish_gog_fix_on_starts_at_512() {
+    let Some(mut g) = spanish(atlantis3_engine::Fixes::default()) else {
+        return;
+    };
+    assert_eq!(g.startup.config.version, b"CD");
+    assert_eq!(g.startup.config.warp_res, 512);
+    assert_eq!(g.startup.warp_view(), (640, 480));
+    assert!(walk(&mut g), "the travel video plays");
+    assert!(g.board_cube().0.starts_with("warp/Warp512/hoggar/"));
+    assert!(!g.slots().slots.is_empty());
+}
+
+/// `fix_warpres_cd` off (`--original`): the reader's 1024 and 800 x 600
+/// stay, and every builder takes the 1024 / 800 folders GOG.com does not
+/// ship, as the original until its options page is opened. Then that
+/// page's `Version = CD` branch (@ 0x00456041) sets WarpRes 512 alone:
+/// the view stays 800 x 600, and the next view entry reads `Warp512\`.
+/// (How the original draws those 512 faces in the 1024 x 1024 surfaces
+/// its start-up made is not known; the port's faces take the file's size.)
+#[test]
+fn spanish_gog_fix_off_takes_the_1024_paths() {
+    let Some(mut g) = spanish(atlantis3_engine::Fixes::original()) else {
+        return;
+    };
+    assert_eq!(g.startup.config.warp_res, 1024);
+    assert_eq!(g.startup.warp_view(), (800, 600));
+    assert!(!walk(&mut g), "no travel video (hnmtraj\\HNM800\\)");
+    assert_eq!(g.board_cube().0, "warp/Warp1024/hoggar/ho0005.hnm");
+    // The debug colour of face 0 on its 32-bit display (`PixelFormat =
+    // 32bits`).
+    let faces = g.place_faces().as_x888().expect("32-bit faces");
+    assert_eq!(faces[0][0], 0xff00_0080, "debug colours");
+    assert!(g.slots().slots.is_empty(), "no place animation");
+    g.run_command("(Cinema=93)");
+    assert_ne!(g.mode(), Mode::Video, "no film (hnm\\HNM800\\)");
+    // The options page, sub-state 0.
+    assert!(g.open_menu());
+    g.menus_mut().open(atlantis3_engine::menu::PAGE_OPTIONS);
+    let mut t = 100.0;
+    for _ in 0..4 {
+        t += 1.0 / 30.0;
+        g.step(t);
+    }
+    assert_eq!(g.startup.config.warp_res, 512, "the CD branch");
+    assert_eq!(g.startup.warp_view(), (800, 600), "the view stays");
+    g.menu_back();
+    assert_eq!(g.board_cube().0, "warp/Warp512/hoggar/ho0005.hnm");
+}

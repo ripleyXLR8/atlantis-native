@@ -175,6 +175,8 @@ struct Place {
 pub struct Game {
     files: A3Files,
     pub startup: Startup,
+    /// The port's bug fixes the game started with ([`crate::Fixes`]).
+    pub fixes: crate::Fixes,
     width: usize,
     height: usize,
     /// The screen, in the display's format (`PixelFormat`).
@@ -374,9 +376,16 @@ pub struct Game {
 impl Game {
     /// The game of the install `files`: its settings and the start-up's
     /// script part (chapter 0's boot state, the funeral chamber). Nothing
-    /// is shown before [`Game::start_intro`] or [`Game::new_game`].
+    /// is shown before [`Game::start_intro`] or [`Game::new_game`]. Every
+    /// bug fix on.
     pub fn new(files: A3Files) -> Result<Game, GameError> {
-        let startup = Startup::read(&files);
+        Game::with_fixes(files, crate::Fixes::default())
+    }
+
+    /// [`Game::new`] with the bug fixes `fixes` (`--original`:
+    /// [`crate::Fixes::original`]).
+    pub fn with_fixes(files: A3Files, fixes: crate::Fixes) -> Result<Game, GameError> {
+        let startup = Startup::read_with(&files, fixes);
         let (width, height) = startup.screen();
         let defnames = files
             .read("scenar/defnames.con")
@@ -389,6 +398,7 @@ impl Game {
             smooth: startup.config.smooth,
         });
         let startup_smooth = startup.config.smooth;
+        let dialog_size = startup.warp_view();
         // The display in the format of `PixelFormat` (@ 0x004074d0).
         let depth = if startup.config.pixel_format.bits() > 16 {
             Depth::Xrgb8888
@@ -408,6 +418,7 @@ impl Game {
         let mut game = Game {
             files,
             startup,
+            fixes,
             width,
             height,
             screen: Surface::new(depth, width * height),
@@ -467,7 +478,7 @@ impl Game {
             dialogs: None,
             running: None,
             dialog_renderer: {
-                let (w, h) = crate::dialog::SURFACE;
+                let (w, h) = dialog_size;
                 let mut r = Renderer::new(Variant::PII, Fpu::Double, w, h);
                 r.a3 = Some(A3Raster {
                     smooth: startup_smooth,
@@ -2704,13 +2715,20 @@ impl Game {
             log::warn!("CDialogue::Open() : le dialogue {n} n'existe pas");
         }
         self.dialogs = Some(dialogs);
-        // The dialog's body surface: 640 × 480 for a 3D dialog, the
-        // screen's size for a voice-over (@ 0x0040cfe0: `new
+        // The dialog's body surface: the warp view for a 3D dialog (640 ×
+        // 480 with WarpRes 512, 800 × 600 when the start-up's WarpRes was
+        // 1024), the screen's size for a voice-over (@ 0x0040cfe0: `new
         // CDialogue(w, h, voixoff)`).
         let (sw, sh) = if voixoff {
             (self.width, self.height)
         } else {
-            crate::dialog::SURFACE
+            let view = self.startup.warp_view();
+            if view != self.dialog_size() {
+                self.dialog_renderer.resize(view.0, view.1);
+                // The heads are made for the surface's size.
+                self.heads.clear();
+            }
+            view
         };
         self.running = Some(crate::dialog::Running {
             dialog: n,
@@ -2876,7 +2894,7 @@ impl Game {
             self.draw_warp_only();
             r.surface.copy_from(&self.screen);
         } else {
-            let (sw, sh) = crate::dialog::SURFACE;
+            let (sw, sh) = self.dialog_size();
             // Viewport(640, 480) (@ 0x0043f760): centre and projection.
             let fov = self.camera_fov;
             (self.camera.cx, self.camera.cy) = ((sw / 2) as f32, (sh / 2) as f32);
@@ -3070,7 +3088,7 @@ impl Game {
             let src = r.surface.clone();
             self.screen.copy_from(&src);
         } else {
-            let (sw, sh) = crate::dialog::SURFACE;
+            let (sw, sh) = self.dialog_size();
             let (w, h) = (self.width, self.height);
             // The body surface into the destination, then the head over it
             // with a Z buffer cleared to 0 (@ 0x00467c70), then the stretch.
@@ -3117,6 +3135,12 @@ impl Game {
         self.flip_texts();
     }
 
+    /// The 3D dialogs' surface size (the warp view, [`Startup::warp_view`],
+    /// taken at each dialog's open).
+    fn dialog_size(&self) -> (usize, usize) {
+        (self.dialog_renderer.width(), self.dialog_renderer.height())
+    }
+
     /// The current speaker's head (`AddStand` @ 0x004782c0), loaded at its
     /// first use: `mesh\<mesh>s<stand>.db`, `map\Stand<stand>\<mesh>.tga`
     /// and its eye maps.
@@ -3130,7 +3154,7 @@ impl Game {
                     .read(&format!("map/Stand{stand}/{n}.tga"))
                     .and_then(|d| atlantis2_data::tga::Tga::parse(&d).ok())
             };
-            let (sw, sh) = crate::dialog::SURFACE;
+            let (sw, sh) = self.dialog_size();
             let head = files
                 .read(&format!("mesh/{mesh}s{stand}.db"))
                 .and_then(|d| atlantis3_data::db::parse(&d).ok())
@@ -3203,6 +3227,7 @@ impl Game {
             r.lipsync.as_mut().and_then(|l| l.eval(t))
         });
         let humeur = self.startup.config.humeur;
+        let (sw, sh) = self.dialog_size();
         let Some(h) = self.head(&e.speaker, e.stand) else {
             return;
         };
@@ -3216,7 +3241,6 @@ impl Game {
         };
         let factors = weights.map_or([0.0; 9], |w| crate::lipsync::lerp_factors(fpu, &w));
         h.mouth_a3(mood, weights.as_ref(), &factors);
-        let (sw, sh) = crate::dialog::SURFACE;
         let mut z = vec![0u32; sw * sh];
         let cam = e.camera.max(1) as usize;
         match dest {

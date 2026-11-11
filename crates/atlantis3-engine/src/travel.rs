@@ -53,7 +53,8 @@ pub fn transition_paths(
         .collect()
 }
 
-/// The transition banks' folder (the static constructors' strings):
+/// The transition banks' folder (the builder @ 0x00417ac0, the seventh
+/// that tests WarpRes; the static constructors' strings):
 /// `spf\` (0x00755b68) + `SPF800\` (0x00755c70) when WarpRes
 /// (0x00789d34, the panorama faces' size) is 1024, else `SPF640\`
 /// (0x00755cd0). The screen size plays no part. The GOG install ships

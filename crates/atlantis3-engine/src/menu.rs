@@ -1809,6 +1809,8 @@ impl Menus {
                     it.el.clickable = false;
                     it.el.selectable = false;
                 }
+                // WarpRes only (@ 0x00456041): the warp view (the 3D
+                // dialogs' surface) stays, no pending flag, no new cube.
                 cfg.warp_res = 512;
                 if let Some(it) = self.item(PAGE_OPTIONS, b"BT_LANGUE") {
                     it.el.clickable = true;
@@ -1886,8 +1888,11 @@ impl Menus {
                 cfg.subtitle_on = frame != 0;
                 ev.push(Event::Options);
             }
+            // Frame 0: 512 and the 640 x 480 warp view, else 1024 and 800
+            // x 600 (@ 0x0045591d..0x0045595c).
             b"BT_TEXTURE" => {
                 cfg.warp_res = if frame == 0 { 512 } else { 1024 };
+                cfg.view = atlantis3_data::cfg::Config::view_of(cfg.warp_res);
                 self.depth_pending = true;
                 ev.push(Event::Options);
             }

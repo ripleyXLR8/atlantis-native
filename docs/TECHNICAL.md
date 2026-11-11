@@ -4238,10 +4238,34 @@ Fixed after 0.6.0, from a review of the port against the original's code:
   (`hnm\` @ 0x00416880, `loc\hnm\` @ 0x00416c60), the dialogs' body
   videos (`hnmdial\` @ 0x00417280) and the travel videos (`hnmtraj\`
   @ 0x00417670), else `Warp512`, `SPW512`, `HNM640`
-  (`travel::warp_folder`, `spw_folder`, `hnm_folder`). GOG.com ships only
-  the latter, so with 1024 the port, like the original, shows the cube's
-  debug colours and finds no place animation, film or travel video;
-  0.6.0 switched only the transition sprites (`tests/warp_res.rs`).
+  (`travel::warp_folder`, `spw_folder`, `hnm_folder`), and the
+  transition banks `spf\SPF800\` / `SPF640\` (@ 0x00417ac0,
+  `travel::spf_folder`): seven builders, none with an exists test or a
+  fallback. GOG.com ships only the latter, so with 1024 the port, like
+  the original, shows the cube's debug colours and finds no place
+  animation, film or travel video; 0.6.0 switched only the transition
+  sprites (`tests/warp_res.rs`). The reader also sets the warp view
+  (0x00714f1c / 0x00714f20: 800 x 600 for 1024, else 640 x 480, right
+  after the defaults @ 0x00406f4c and after the file @ 0x00407c9f),
+  which is the 3D dialogs' stretch surface (@ 0x0040cfe0): `Config::view`,
+  `Startup::warp_view`, taken at each dialog's open (0.6.0: always 640 x
+  480). The options' texture button sets both; the options page's
+  `Version = CD` branch (@ 0x00455f25..0x004560bf: `LED_text` and
+  `BT_TEXTURE` not clickable, WarpRes := 512 @ 0x00456041) sets WarpRes
+  alone, with no new cube and the view kept.
+
+### Atlantis III's bug fixes
+
+`atlantis3_engine::Fixes` (`crates/atlantis3-engine/src/fixes.rs`), each
+fix its own switch, all on by default and off with `--original`; kept in
+`settings.ini` in the `atlantis3` folder of the per-user data folder
+(the web build: the browser's storage), written with the defaults when
+there is none. Atlantis III has no F10 options menu: the file is the way
+to change them.
+
+| Fix (`settings.ini` key) | Where in the code | What it changes |
+|---|---|---|
+| `fix_warpres_cd` | `Fixes::apply` (`Startup::read_with`, `Game::with_fixes`) | GOG.com's Spanish `Datas\Atlantis3.cfg` says `WarpRes = 1024` (37 bytes, not the writer's format), and no GOG.com install ships the 1024 / 800 folders. The original reads the file once at start-up (@ 0x004d5e9c → 0x00406ea0), so for the whole first session a Spanish player gets the cube's debug colours, no place animation and no film but the intro, until the options page's `Version = CD` branch sets WarpRes to 512 (its menus then write `WarpRes = 512`). With the fix, the start-up applies that same rule after the registry values and before any cube or path: `Version = CD` (every GOG.com install), or no `Datas\warp\Warp1024\` folder (any case), gives WarpRes 512 and the 640 x 480 view; `Atlantis3.cfg` is left as it is until the menus write it. Off, the original's behaviour, the options page's mid-session reset included: the 512 faces are then read at the next view entry with the 800 x 600 view kept; how the original draws them into the 1024 x 1024 face surfaces its start-up made is not known (not emulated), the port's faces take the file's size (`tests/warp_res.rs`: the Spanish install with the fix on and off) |
 - A save's `DateAndTime` is the local time, as `_strdate` / `_strtime`
   give it (@ 0x00459ee0): `Game::utc_offset`, the system's time zone on
   the desktop (`a2::utc_offset_now`), the browser's on the web, for the
