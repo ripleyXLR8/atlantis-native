@@ -66,44 +66,6 @@ pub fn spf_folder(warp_res: i32) -> &'static str {
     }
 }
 
-/// The other folders WarpRes chooses, each path builder testing
-/// 0x00789d34 = 1024 exactly (the static constructors' strings
-/// @ 0x004155f0..0x00415730): the cube `warp\` + `Warp1024\` or
-/// `Warp512\` (@ 0x00415a30, the view entry and its re-entry), the
-/// place animations `spw\` + `SPW1024\` or `SPW512\` (@ 0x004164c0), and
-/// `HNM800\` or `HNM640\` for the videos: the cinematics (`hnm\`
-/// @ 0x00416880, `loc\hnm\` @ 0x00416c60), the dialogs' body videos
-/// (`hnmdial\` @ 0x00417280) and the travel videos (`hnmtraj\`
-/// @ 0x00417670). GOG.com ships only the 512 and 640 folders, so with
-/// WarpRes 1024 the original finds none of these files: the cube's debug
-/// colours, no place animation, no film, no body video, no travel video.
-pub fn warp_folder(warp_res: i32) -> &'static str {
-    if warp_res == 1024 {
-        "Warp1024"
-    } else {
-        "Warp512"
-    }
-}
-
-/// The place animations' folder under `spw\` ([`warp_folder`]).
-pub fn spw_folder(warp_res: i32) -> &'static str {
-    if warp_res == 1024 {
-        "SPW1024"
-    } else {
-        "spw512"
-    }
-}
-
-/// The videos' folder under `hnm\`, `loc\hnm\`, `hnmdial\` and
-/// `hnmtraj\` ([`warp_folder`]).
-pub fn hnm_folder(warp_res: i32) -> &'static str {
-    if warp_res == 1024 {
-        "HNM800"
-    } else {
-        "HNM640"
-    }
-}
-
 /// The transition bank of entity prefix `prefix` for the move `old` →
 /// `next` of world folder `folder` (`%s%03d%03d.spr`, @ 0x00717de8).
 pub fn transition_path(warp_res: i32, folder: &str, prefix: &str, old: u32, next: u32) -> String {

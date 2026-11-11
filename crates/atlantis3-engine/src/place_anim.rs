@@ -123,9 +123,6 @@ pub struct Slots {
     pub slots: Vec<Slot>,
     /// The display's format the banks are prepared for.
     pub depth: Depth,
-    /// The place animations' folder under `spw\`: `spw512`, `SPW1024`
-    /// with WarpRes 1024 (@ 0x004164c0, [`crate::travel::spw_folder`]).
-    pub spw: &'static str,
 }
 
 impl Slots {
@@ -179,12 +176,10 @@ impl Slots {
             now,
             shown,
             Depth::Rgb565,
-            crate::travel::spw_folder(512),
         )
     }
 
-    /// [`Slots::load_with`] for a display of format `depth`, the place
-    /// animations read from `spw\<spw>\<world>\`.
+    /// [`Slots::load_with`] for a display of format `depth`.
     #[allow(clippy::too_many_arguments)]
     pub fn load_depth(
         files: &A3Files,
@@ -196,12 +191,10 @@ impl Slots {
         _now: f64,
         shown: impl Fn(i32, i32) -> Option<bool>,
         depth: Depth,
-        spw: &'static str,
     ) -> Slots {
         let mut out = Slots {
             slots: Vec::new(),
             depth,
-            spw,
         };
         for e in &wam.entities {
             for s in e.state_records().filter(|s| s.view == view) {
@@ -236,7 +229,7 @@ impl Slots {
     ) {
         let out = &mut self.slots;
         let depth = self.depth;
-        let path = format!("spw/{}/{world}/{name}", self.spw);
+        let path = format!("spw/spw512/{world}/{name}");
         let key = match depth {
             Depth::Rgb565 => path.clone(),
             Depth::Xrgb8888 => format!("{path}#x888"),
