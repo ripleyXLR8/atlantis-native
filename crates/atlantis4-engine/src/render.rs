@@ -17,9 +17,9 @@
 //!
 //! Over the background, [`draw_mesh`] draws an object's or an animation's
 //! tile range: the original's `TeMesh::draw` of its triangles (material
-//! mode 1, `GL_MODULATE` with white, alpha blended, `[CONFIRMED-DYN]`,
-//! experiment 05), here per pixel: the ray of the pixel's centre meets the
-//! triangle's plane at a point whose barycentric coordinates interpolate
+//! mode 1, `GL_MODULATE` with white, alpha blended, as a GL trace of the
+//! original shows), here per pixel: the ray of the pixel's centre meets
+//! the triangle's plane at a point whose barycentric coordinates interpolate
 //! the UVs (GL's perspective-correct interpolation), the picture is
 //! sampled `GL_LINEAR` at `(u·w, (1 − v)·h)` (texel centres at half
 //! integers) and blended over the frame.

@@ -1,10 +1,10 @@
 //! 2-D sprites over the warp: the markers (the 480 × 320 layer, origin
 //! bottom-left) and the cursor (the 1365 × 768 GUI layer, origin at the
-//! window centre, y down), drawn after the warp in that order
-//! `[CONFIRMED-DYN]` (atlantis4-re experiment 05: warp → markers → GUI →
-//! cursor), each in material mode 1 (`GL_MODULATE`, white) with alpha
-//! blending `GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA` and `GL_LINEAR`
-//! textures clamped to the edge.
+//! window centre, y down), drawn after the warp in that order (a GL
+//! trace of the original: warp → markers → GUI → cursor), each in
+//! material mode 1 (`GL_MODULATE`, white) with alpha blending
+//! `GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA` and `GL_LINEAR` textures
+//! clamped to the edge.
 //!
 //! Both layers are stretched to the window, and both sprites keep their
 //! own pixel size, so a sprite is an axis-aligned `w × h` quad in window
@@ -13,7 +13,7 @@
 //! integers), bilinear.
 //!
 //! The picture sits in a power-of-two texture **bottom row first**, as the
-//! background atlases (warp.md § 5): beyond its left column and its bottom
+//! background atlases: beyond its left column and its bottom
 //! row the taps clamp to the edge; beyond its right column and its top row
 //! they reach the texture's padding, taken here as transparent black
 //! (`[UNKNOWN]`: what the padding holds is not read).

@@ -18,7 +18,8 @@
 //!   8` (with no loop limit the `k ≥ last` branch also takes the modulo);
 //!   the quad's texture band is `count − frame − 1` (`0x005040d5`) from
 //!   texture row 0, `v0 = band · h/8 / H`. Textures hold the pictures
-//!   bottom row first (the background atlases' rows, warp.md § 5), so
+//!   bottom row first (as the background atlases' rows, which the data
+//!   shows), so
 //!   frame `k` is the `k`-th 48-pixel band from the top of the file
 //!   [INFERRED: PNGs uploaded as the JPEGs].
 //! - Placement each frame (`0x00569b60`): `p = project(point)`; if `p.z >

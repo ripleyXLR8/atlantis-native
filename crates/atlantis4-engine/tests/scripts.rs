@@ -5,8 +5,7 @@
 //! `ATLANTIS4_SKIP_DATA_TESTS=1`.
 //!
 //! The call orders compared here are the original's, from the live Lua
-//! trace of a new game (atlantis4-re experiment 05, session s1,
-//! `CONFIRMED-DYN`), without their arguments.
+//! trace of a new game in the original, without their arguments.
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};

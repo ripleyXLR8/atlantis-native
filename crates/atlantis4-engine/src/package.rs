@@ -24,7 +24,7 @@
 //!   texture with the matrix `scale(w/W, h/H)` (and, for Theora frames,
 //!   the vertical flip), so a UV reaches the picture's texel
 //!   `(u·w, (1 − v)·h)` counted from its top row, as the background
-//!   atlases' (warp.md § 5, § 10.2).
+//!   atlases'.
 
 use atlantis4_data::anim::{Anim, PickMesh, TileRange};
 use atlantis4_data::image::decode_jpeg;
