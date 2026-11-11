@@ -123,7 +123,7 @@ fn the_fixes_of_each_game() {
         .into_iter()
         .filter(|f| f.of_every_build())
         .collect();
-    assert_eq!(every.len(), 8);
+    assert_eq!(every.len(), 9);
     for (var, build, own) in SETS {
         let Some(g) = game(var) else { continue };
         assert_eq!(g.exe.build.name, build, "{var}");
@@ -178,6 +178,7 @@ fn each_place_reads_its_own_fix() {
             assert_eq!(e.menus_own_records(), is(MenuRecords), "{ctx}");
             assert_eq!(e.keep_fifth_name(), is(FifthPlayer), "{ctx}");
             assert_eq!(e.snakes_first_run_fix(), is(SnakesFirstWin), "{ctx}");
+            assert_eq!(e.puzzle_escape_latches(), !is(PuzzleEscape), "{ctx}");
             assert!(!build.hexa_forces_402);
             assert_eq!(e.hexa_forces_402(), is(HexagonPieces), "{ctx}");
             assert_eq!(e.loadmusik_track_by_track(), is(LoadMusik), "{ctx}");

@@ -542,8 +542,14 @@ pub const SMALL_ROW_H: i32 = 20;
 const FIX_FOOTER_H: i32 = 12 + FIX_TEXT_LINES as i32 * 18 + 32;
 
 /// The space kept around the bug fixes' box on the 640x480 screen; its
-/// rows are 20 pixels high when 24 would not leave it.
+/// rows are 20 pixels high when 24 would not leave it, 18 when 20 would
+/// not ([`DENSE_ROW_H`]).
 const FIX_MARGIN: i32 = 8;
+
+/// The rows' height of a bug fixes' box too high for [`SMALL_ROW_H`] (the
+/// boxes with the most fixes): the 16-pixel text keeps a pixel above and
+/// below.
+pub const DENSE_ROW_H: i32 = 18;
 
 /// The keys' line of the bug fixes' box.
 pub const FIX_KEYS: &str = "Arrows, Enter or click; Escape goes back";
@@ -560,6 +566,7 @@ impl BugFix {
             BugFix::MenuRecords => "Menus: each its own click areas",
             BugFix::FifthPlayer => "Players: OK on the fifth player",
             BugFix::SnakesFirstWin => "Snakes puzzle: the false first win",
+            BugFix::PuzzleEscape => "Puzzles: Escape stays without effect",
             BugFix::HexagonPieces => "Hexagon puzzle: its pieces always there",
             BugFix::LoadMusik => "Music: tracks copied one by one",
             BugFix::SharpS => "German: the sharp s in the LOAD list",
@@ -615,6 +622,11 @@ impl BugFix {
                 "On a first visit to the four snakes puzzle, the",
                 "original takes the first piece carried to the",
                 "screen's top left corner for the solution.",
+            ],
+            BugFix::PuzzleEscape => &[
+                "After Escape in a puzzle, the original's hexagon",
+                "turns no piece on a right click, and the first line",
+                "after the puzzle stops at once.",
             ],
             BugFix::HexagonPieces => &[
                 "This build places the hexagon puzzle's pieces only",
@@ -850,7 +862,8 @@ impl OptionsMenu {
     }
 
     /// The bug fixes' box's layout: rows of 24 pixels, or of 20 when that
-    /// would not leave [`FIX_MARGIN`] around it on the screen.
+    /// would not leave [`FIX_MARGIN`] around it on the screen, or of 18
+    /// ([`DENSE_ROW_H`]) when 20 would not either.
     pub fn fix_layout(&self) -> BoxLayout<'_> {
         let mut l = BoxLayout {
             title: &self.fix_title,
@@ -859,8 +872,12 @@ impl OptionsMenu {
             gaps: &self.fix_gaps,
             footer_h: FIX_FOOTER_H,
         };
-        if l.box_h(self.fix_rows().len()) + 2 * FIX_MARGIN > SCREEN_H as i32 {
-            l.row_h = SMALL_ROW_H;
+        let n = self.fix_rows().len();
+        for row_h in [SMALL_ROW_H, DENSE_ROW_H] {
+            if l.box_h(n) + 2 * FIX_MARGIN <= SCREEN_H as i32 {
+                break;
+            }
+            l.row_h = row_h;
         }
         l
     }
@@ -1297,7 +1314,7 @@ mod tests {
                 ..DEFAULTS
             }
         );
-        assert_eq!(x.fixes.count(), BugFix::ALL.len() - 8);
+        assert_eq!(x.fixes.count(), BugFix::ALL.len() - 9);
         // "Choose the bug fixes...": a button, its box.
         m.key(Key::Down, ORIG);
         assert_eq!(m.selected(), Entry::ChooseFixes);
@@ -1524,9 +1541,9 @@ mod tests {
         assert_eq!(value(BugFixes::NONE), "Off");
         assert_eq!(
             value(BugFixes::all_but(BugFix::SnakesFirstWin)),
-            "Custom (9/10)"
+            "Custom (10/11)"
         );
-        assert_eq!(value(BugFixes::only(BugFix::LoadMusik)), "Custom (1/10)");
+        assert_eq!(value(BugFixes::only(BugFix::LoadMusik)), "Custom (1/11)");
         // The fixes of other builds do not count.
         assert_eq!(value(BugFixes::all_but(BugFix::SharpS)), "On");
         assert_eq!(value(BugFixes::only(BugFix::SharpS)), "Off");
@@ -1540,10 +1557,10 @@ mod tests {
         let off = game_fixes_set(&m, BugFixes::ALL, false);
         assert_eq!(press(&mut m, BugFixes::ALL), off);
         assert!(off.get(BugFix::SharpS) && !off.get(BugFix::LoadMusik));
-        assert_eq!(off.count(), BugFix::ALL.len() - 10);
+        assert_eq!(off.count(), BugFix::ALL.len() - 11);
         let on = game_fixes_set(&m, BugFixes::NONE, true);
         assert_eq!(press(&mut m, BugFixes::NONE), on);
-        assert_eq!(on.count(), 10);
+        assert_eq!(on.count(), 11);
         assert!(!on.get(BugFix::SharpS) && on.get(BugFix::LoadMusik));
         let mix = BugFixes::all_but(BugFix::HexagonPieces);
         assert_eq!(press(&mut m, mix), BugFixes::ALL);
@@ -1555,7 +1572,7 @@ mod tests {
         let mut s = vec![0u16; SCREEN_W * SCREEN_H];
         let mut t = HdText::default();
         m.draw_recording(&mut s, &font, with_fixes(mix), Some(&mut t));
-        assert!(t.items.iter().any(|i| i.text == b"< Custom (9/10) >"));
+        assert!(t.items.iter().any(|i| i.text == b"< Custom (10/11) >"));
     }
 
     /// The bug fixes' box by the keys: its rows (the game's fixes only),
@@ -1584,7 +1601,7 @@ mod tests {
             game_fixes_set(&m, BugFixes::ALL, false)
         );
         let fixes = m.game_fixes().to_vec();
-        assert_eq!(fixes.len(), 10);
+        assert_eq!(fixes.len(), 11);
         for &f in &fixes {
             m.key(Key::Down, ORIG);
             assert_eq!(m.fix_selected(), FixRow::Fix(f));
@@ -1631,8 +1648,8 @@ mod tests {
         let rows = m.fix_rows();
         let (fx, fy, row_y) = {
             let layout = m.fix_layout();
-            assert_eq!(layout.row_h, ROW_H, "ten fixes: rows of 24 pixels");
-            assert_eq!(layout.row_y(2), TITLE_H + 2 * ROW_H + GAP_H);
+            assert_eq!(layout.row_h, SMALL_ROW_H, "eleven fixes: rows of 20 pixels");
+            assert_eq!(layout.row_y(2), TITLE_H + 2 * SMALL_ROW_H + GAP_H);
             let (fx, fy) = layout.origin(rows.len(), SCREEN_W, SCREEN_H);
             let row_y: Vec<i32> = (0..rows.len()).map(|i| layout.row_y(i)).collect();
             (fx, fy, row_y)
@@ -1642,7 +1659,7 @@ mod tests {
             assert_eq!(m.fix_selected(), row);
         }
         // The gap above the fixes is no row.
-        m.pointer(fx + 30, fy + TITLE_H + 2 * ROW_H + 2);
+        m.pointer(fx + 30, fy + TITLE_H + 2 * SMALL_ROW_H + 2);
         assert_eq!(m.fix_selected(), FixRow::Back);
         let i = rows
             .iter()
@@ -1669,7 +1686,8 @@ mod tests {
         use atlantis_data::exe::BUILDS;
         let font = SubtitleFont::new();
         // The data's fixes, one or the other (the patch 1.01's data is the
-        // German or the Dutch CD's, not both).
+        // German or the Dutch CD's), or both (the May 1997 German CD's,
+        // the only data that holds both).
         let plain = crate::enhancements::FixData::default();
         let data = [
             plain,
@@ -1681,9 +1699,16 @@ mod tests {
                 disc_revisions: true,
                 ..plain
             },
+            crate::enhancements::FixData {
+                sharp_s: true,
+                disc_revisions: true,
+            },
         ];
         for b in BUILDS.iter() {
             for data in &data {
+                if data.sharp_s && data.disc_revisions && b.name != "atlantis-cd-de-693248" {
+                    continue;
+                }
                 let fixes: Vec<BugFix> = BugFix::ALL
                     .into_iter()
                     .filter(|f| f.applies(b, data))
@@ -1707,6 +1732,16 @@ mod tests {
                 let (bx, by) = layout.origin(n, SCREEN_W, SCREEN_H);
                 assert!(bx >= 8 && by >= 8, "{}", b.name);
                 assert!(by + layout.box_h(n) + 8 <= SCREEN_H as i32, "{}", b.name);
+                // The highest rows that fit: 24, else 20, else 18 pixels.
+                let fits = |row_h| {
+                    let l = BoxLayout { row_h, ..layout };
+                    l.box_h(n) + 2 * FIX_MARGIN <= SCREEN_H as i32
+                };
+                let want = [ROW_H, SMALL_ROW_H, DENSE_ROW_H]
+                    .into_iter()
+                    .find(|&h| fits(h))
+                    .unwrap();
+                assert_eq!(layout.row_h, want, "{}", b.name);
                 let mut s = vec![0x1234u16; SCREEN_W * SCREEN_H];
                 let mut t = HdText::default();
                 m.draw_recording(&mut s, &font, ORIG, Some(&mut t));
@@ -1766,7 +1801,7 @@ mod tests {
     #[test]
     fn without_a_game_the_fixes_of_every_build() {
         let m = OptionsMenu::new();
-        assert_eq!(m.game_fixes().len(), 8);
+        assert_eq!(m.game_fixes().len(), 9);
         assert!(m.game_fixes().iter().all(|f| f.of_every_build()));
         assert_eq!(m.fix_title, "Original bug fixes");
     }

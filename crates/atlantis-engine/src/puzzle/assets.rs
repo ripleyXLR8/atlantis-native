@@ -310,6 +310,10 @@ impl PuzzleInput {
 /// - Escape, with no talking head (0x00496188 is 0 in a puzzle), no bow
 ///   mode, no bar request and an empty hand, clears 0x00496124 and sets
 ///   0x00496138 (0x0041a3c0..0x0041a423): [`Engine::escape_request`].
+///
+/// With [`crate::enhancements::BugFix::PuzzleEscape`] the Escape is not
+/// latched: nothing in a puzzle reads the latch, which only stops the
+/// hexagon's right presses and cuts the first line after the puzzle.
 pub(crate) fn poll_flags(e: &mut Engine, m: &PuzzleMouse) {
     if m.click {
         return;
@@ -317,7 +321,7 @@ pub(crate) fn poll_flags(e: &mut Engine, m: &PuzzleMouse) {
     if m.right {
         e.bar.right_pressed(e.section_play, e.escape_request);
     }
-    if m.escape && e.escape_gate_open() {
+    if m.escape && e.escape_gate_open() && e.puzzle_escape_latches() {
         e.escape_request = true;
     }
 }

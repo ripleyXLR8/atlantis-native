@@ -1011,7 +1011,8 @@ impl Scripts {
         // (0x004241d3); 0x00496120 stays, and so does an Escape latch
         // (0x00496124 = 0, 0x00496138 = 1, crate::puzzle::assets::poll_flags):
         // no puzzle function resets it, so the first voice-only line or
-        // game-over narration of the scan stops at its first poll.
+        // game-over narration of the scan stops at its first poll (with
+        // BugFix::PuzzleEscape a puzzle latches no Escape).
         e.bar.request = false;
         e.reload_current_view().await;
         e.vars.set("startpuzzle", 0);
@@ -1922,7 +1923,7 @@ mod tests {
     /// with Escape pressed in the puzzle first (`escape`): the post-puzzle
     /// scan plays /941, Hona's talking head, then GameOver=20. The time
     /// from the narrator's voice to the end of the puzzle zone, in ms.
-    fn crab_narration_ms(test: &str, escape: bool) -> Option<u64> {
+    fn crab_narration_ms(test: &str, escape: bool, latch: bool) -> Option<u64> {
         use crate::sys::{Input, Key, MouseButton};
         let end = Rc::new(std::cell::Cell::new(None::<u64>));
         let voice = Rc::new(std::cell::Cell::new(None::<u64>));
@@ -1931,6 +1932,11 @@ mod tests {
         let ran = with_engine(
             test,
             move |mut e| async move {
+                if latch {
+                    e.set_enhancements(crate::enhancements::Enhancements::all_but_fix(
+                        crate::enhancements::BugFix::PuzzleEscape,
+                    ));
+                }
                 let mut s = Scripts::with_dialog(Box::new(crate::dialog::Dialogs::new()));
                 e.new_game(&mut s, false).await;
                 s.load_con_script(&mut e, 66).await;
@@ -1978,15 +1984,18 @@ mod tests {
     /// (FUN_0041a298 @ 0x0041a419 / 0x0041a423); FUN_004240fc resets them
     /// only after its /sel scan (0x00424224, 0x00424238), so the game-over
     /// narration that scan reaches stops at its first poll (FUN_00426590's
-    /// wait leaves on 0x00496124 != 1). Without the Escape it plays.
+    /// wait leaves on 0x00496124 != 1). Without the Escape it plays, and
+    /// with [`crate::enhancements::BugFix::PuzzleEscape`] too.
     #[test]
     fn a_puzzle_escape_cuts_the_crab_game_over_narration() {
         let t = "a_puzzle_escape_cuts_the_crab_game_over_narration";
-        let Some(cut) = crab_narration_ms(t, true) else {
+        let Some(cut) = crab_narration_ms(t, true, true) else {
             return;
         };
-        let full = crab_narration_ms(t, false).unwrap();
+        let full = crab_narration_ms(t, false, true).unwrap();
         assert!(cut < 200, "cut narration lasted {cut} ms");
         assert!(full > 2000, "full narration lasted {full} ms");
+        let fixed = crab_narration_ms(t, true, false).unwrap();
+        assert!(fixed > 2000, "fixed: the narration lasted {fixed} ms");
     }
 }

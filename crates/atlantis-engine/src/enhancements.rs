@@ -68,6 +68,17 @@ pub enum BugFix {
     /// carried to the screen's (0, 0) wins
     /// ([`crate::puzzle::snakes::SnakesGame::frame`]).
     SnakesFirstWin,
+    /// An Escape inside a puzzle is not latched. Off, as the original
+    /// (`FUN_0041a298` @ 0x0041a419 / 0x0041a423 in the puzzles' poll,
+    /// [`crate::puzzle::assets::poll_flags`]), it clears 0x00496124 and
+    /// sets the menu request 0x00496138, which no puzzle reads or resets
+    /// and `FUN_004240fc` clears only after its /sel scan (0x00424224,
+    /// 0x00424238): in the hexagon puzzle no right press turns a piece
+    /// any more (the poll no longer toggles the bar request
+    /// `FUN_00440bfc` reads), and the first voice-only line or game-over
+    /// narration after the puzzle stops at its first poll (Muria's hint,
+    /// the rat's meow, the crab's /941 narration).
+    PuzzleEscape,
     /// The hexagon puzzle always places its pieces, as the 2001 entry does
     /// (OBJETENMAIN set to 402 before its test). Off, as the 1997 and the
     /// Chinese builds (atlantis-cd-en-688128 FUN_0043c570), the pieces are
@@ -145,7 +156,7 @@ pub enum BugFix {
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 17] = [
+    pub const ALL: [BugFix; 18] = [
         BugFix::MusicLoop,
         BugFix::CinemaSound,
         BugFix::HeadOverlay,
@@ -154,6 +165,7 @@ impl BugFix {
         BugFix::MenuRecords,
         BugFix::FifthPlayer,
         BugFix::SnakesFirstWin,
+        BugFix::PuzzleEscape,
         BugFix::HexagonPieces,
         BugFix::LoadMusik,
         BugFix::SharpS,
@@ -176,6 +188,7 @@ impl BugFix {
             BugFix::MenuRecords => "fix_menu_records",
             BugFix::FifthPlayer => "fix_fifth_player",
             BugFix::SnakesFirstWin => "fix_snakes_first_win",
+            BugFix::PuzzleEscape => "fix_puzzle_escape",
             BugFix::HexagonPieces => "fix_hexagon_pieces",
             BugFix::LoadMusik => "fix_loadmusik",
             BugFix::SharpS => "fix_sharp_s",

@@ -533,6 +533,7 @@ mod tests {
 #[cfg(test)]
 mod latch_tests {
     use super::*;
+    use crate::enhancements::{BugFix, Enhancements};
     use crate::sys::{Input, Key, MouseButton};
     use crate::test_support::{button, with_engine};
     use std::cell::Cell;
@@ -540,13 +541,17 @@ mod latch_tests {
 
     /// The turns of a held piece after three right presses through the
     /// real input of the hexagon (`FUN_0041a298` then `FUN_00440bfc`),
-    /// with an Escape before them (`escape`).
-    fn turns(escape: bool) -> Option<i16> {
+    /// with an Escape before them (`escape`), the Escape latched as the
+    /// original (`latch`, [`BugFix::PuzzleEscape`] off) or not.
+    fn turns(escape: bool, latch: bool) -> Option<i16> {
         let got = Rc::new(Cell::new(None));
         let g2 = got.clone();
         let ran = with_engine(
             "hexa_right_presses_after_an_escape",
             move |mut e| async move {
+                if latch {
+                    e.set_enhancements(Enhancements::all_but_fix(BugFix::PuzzleEscape));
+                }
                 let mut hooks = crate::hooks::NoScripts;
                 let mut host = Host(PuzzleHost::new(&mut e, &mut hooks));
                 let mut g = HexaGame::new(Vec::new(), Vec::new());
@@ -557,7 +562,7 @@ mod latch_tests {
                     host.0.e.sys.frame().await;
                 }
                 let latched = host.0.e.escape_request;
-                assert_eq!(latched, escape);
+                assert_eq!(latched, escape && latch);
                 g2.set(Some(g.pieces[0].orient - PIECES[0].orient));
             },
             move |sys, frame| match frame {
@@ -578,13 +583,16 @@ mod latch_tests {
     /// FUN_00440bfc turns on the bar request 0x004960c4 (@ 0x00440c14),
     /// which FUN_0041a298 toggles only while 0x00496138 is 0: after an
     /// Escape latch no right press turns a piece (confirmed under
-    /// emulation, real FUN_0041a298 and FUN_00440bfc).
+    /// emulation, real FUN_0041a298 and FUN_00440bfc). With
+    /// [`BugFix::PuzzleEscape`] the Escape is not latched: every press
+    /// turns the piece.
     #[test]
     fn hexa_right_presses_after_an_escape() {
-        let Some(free) = turns(false) else {
+        let Some(free) = turns(false, true) else {
             return;
         };
         assert_eq!(free, 3);
-        assert_eq!(turns(true), Some(0));
+        assert_eq!(turns(true, true), Some(0));
+        assert_eq!(turns(true, false), Some(3));
     }
 }

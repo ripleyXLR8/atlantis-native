@@ -381,6 +381,15 @@ change an entry; Escape, F10 or O close it. Its entries:
   - **Snakes puzzle: the false first win**: on a first visit to the four
     snakes puzzle, the original takes the first piece carried to the
     screen's top left corner for the solution.
+  - **Puzzles: Escape stays without effect**: Escape does nothing in a
+    puzzle, but the original remembers it until the puzzle is left and
+    its scripts have run: in the hexagon puzzle a right click no longer
+    turns a piece, and the first line after the puzzle stops as soon as
+    it starts (Muria's hint, the rat's meow, the narration after the
+    crab). The fix makes Escape in a puzzle do nothing at all: since no
+    puzzle reads it, ignoring it there changes nothing else (Escape
+    still opens the menu in the view and skips the lines and videos it
+    skips in the original).
 
   Those of some editions:
   - **Hexagon puzzle: its pieces always there** (the 1997 and Chinese
@@ -848,9 +857,10 @@ them in each checkpoint and sets them again when one is loaded) and the [enhance
 each: one per bug fix (`fix_music_loop`, `fix_cinema_sound`, `fix_head_overlay`,
 `fix_bar_slide_out`, `fix_pickup_icon`,
 `fix_menu_records`, `fix_fifth_player`, `fix_snakes_first_win`,
+`fix_puzzle_escape`,
 `fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
 `fix_disc_revision`, `fix_menu_line_width`, `fix_chinese_rows`,
-`fix_subtitles_toggle`), `restored_content`, `ui_ux` and `arrow_keys`
+`fix_subtitles_toggle`, `fix_dos_letters`, `fix_startup_logos`), `restored_content`, `ui_ux` and `arrow_keys`
 (the arrow keys turn the view and the LOAD list takes Enter and ↑ ↓,
 `on` by default). SUBTITLES is off at first, as every start of the
 original; `--original` starts with it off whatever `settings.ini`
@@ -938,7 +948,9 @@ not kept, erase saves you no longer need.
   ornament, and on every CD the LOAD list's scrollbar knob, hidden while
   11 checkpoints or fewer were listed, stays hidden); with five players,
   OK on the fifth starts it with its name (the original empties that
-  name, and the nameless player can no longer be chosen); and the
+  name, and the nameless player can no longer be chosen); Escape in a
+  puzzle does nothing (the original then refuses the hexagon's right
+  click and cuts the first line after the puzzle); and the
   others of [the options menu](#the-options-menu). Each can be turned
   off alone in the options menu's "Choose the bug fixes...";
   `--original` turns them all off.

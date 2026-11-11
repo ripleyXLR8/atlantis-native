@@ -630,6 +630,12 @@ impl Engine {
         self.enhancements().fix(BugFix::SnakesFirstWin)
     }
 
+    /// An Escape inside a puzzle latches 0x00496124 = 0 / 0x00496138 = 1,
+    /// as the original ([`BugFix::PuzzleEscape`] off).
+    pub fn puzzle_escape_latches(&self) -> bool {
+        !self.enhancements().fix(BugFix::PuzzleEscape)
+    }
+
     /// The hexagon puzzle forces OBJETENMAIN to 402 before its test: the
     /// build's rule, or [`BugFix::HexagonPieces`].
     pub fn hexa_forces_402(&self) -> bool {
