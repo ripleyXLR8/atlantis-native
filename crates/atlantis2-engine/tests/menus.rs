@@ -19,7 +19,7 @@ use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::crt::Rand;
 use atlantis2_engine::engine::PASS;
 use atlantis2_engine::menu::{action, state, Menu, PageKind, Rect, WidgetKind};
-use atlantis2_engine::{Engine, Fpu, LoopType, Variant};
+use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 
 fn game() -> Option<A2Files> {
     let (Some(dir), Some(discs)) = (
@@ -354,6 +354,59 @@ fn the_main_menu_its_slides_and_the_options() {
     // The options are in atlant2.cfg's form.
     let cfg = r.e.cfg();
     assert_eq!((cfg.subtitles, cfg.centre_marker, cfg.invert_y), (0, 0, 1));
+}
+
+/// A click during a slide (FUN_00486eb0 states 1-4 never call the page
+/// input FUN_00472320, the click byte @ 0x006569c9 stays set) is taken
+/// by the first frame that reads it: a second click on the disc, on the
+/// load icon shown since the slide's start, opens the load page when
+/// the panel is in (golden `input_ui.txt`, `latch`).
+#[test]
+fn a_click_during_a_slide_is_kept_for_its_end() {
+    let Some(files) = game() else { return };
+    let mut r = Run::new(files, None);
+    r.new_game();
+    r.e.escape();
+    r.press_widget("a_disc.spr");
+    assert_eq!(r.menu().state, state::DISC_SLIDE);
+    r.press_widget("a_load.spr");
+    assert_eq!(r.menu().state, state::DISC_SLIDE);
+    assert!(r.menu().input.click);
+    for _ in 0..40 {
+        if r.page() == Some(PageKind::Load) {
+            break;
+        }
+        r.step();
+    }
+    assert_eq!((r.page(), r.menu().state), (Some(PageKind::Load), 0));
+    assert!(!r.menu().input.click);
+}
+
+/// Escape during a slide closes the menu with the click byte still set:
+/// the next warp frame takes it as a click on the world (FUN_0049ca80
+/// and the click scan test @ 0x006569c9).
+#[test]
+fn escape_during_a_slide_leaves_the_click_to_the_game() {
+    let Some(files) = game() else { return };
+    let mut r = Run::new(files, None);
+    r.new_game();
+    r.e.escape();
+    r.press_widget("a_disc.spr");
+    r.press(5, 470);
+    assert_eq!(r.menu().state, state::DISC_SLIDE);
+    r.e.trace = true;
+    r.e.events.clear();
+    r.e.escape();
+    assert_eq!((r.page(), r.e.loop_type), (None, LoopType::Warp));
+    r.step();
+    assert!(
+        r.e.events.iter().any(|x| matches!(
+            x,
+            Event::ClickScan(_) | Event::ZoneClick { .. } | Event::DepartScan(_)
+        )),
+        "{:?}",
+        r.e.events
+    );
 }
 
 #[test]

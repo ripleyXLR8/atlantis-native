@@ -1601,7 +1601,15 @@ impl Engine {
     /// The end of the dialog (@ 0x004808a0): the music back to 100 %, the
     /// previous loop type back, then the script section the dialog
     /// interrupted goes on (`CLICPERSO` = 0, `SUJET` = −2 first).
+    /// The click flag @ 0x006569c9 is the game's: a click no dialog tick
+    /// has taken (Escape, which ends the dialog from the key callback
+    /// @ 0x0047635c, before the next tick) is left set, and the next warp
+    /// frame takes it as a click on the world (0x004808a0 does not clear
+    /// it; only the script section it resumes may, by its own lines).
     pub fn end_dialog(&mut self) {
+        if self.dialog.as_mut().is_some_and(|d| d.take_click()) {
+            self.click = true;
+        }
         let running = self.dialog.is_some();
         self.stop_dialog();
         if running {
@@ -2195,6 +2203,11 @@ impl Engine {
             if self.sprite_state != 0 {
                 self.cursor
                     .choose(0, self.sprite_state, &mut self.cursor_flag);
+            } else if self.web.hover(self.camera.fpu, &self.camera).is_some() {
+                // FUN_00491450 (@ 0x0045aa65): the centre on a spider's
+                // click quad (loaded, pickable; any puzzle mode) gives the
+                // character cursor, frames 25..39 (@ 0x0045aa6e).
+                self.cursor.choose(0x63, 2, &mut self.cursor_flag);
             } else if let Some(kind) = zone_kind {
                 self.cursor.choose(kind, 0, &mut self.cursor_flag);
             } else {

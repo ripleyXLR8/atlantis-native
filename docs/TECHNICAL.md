@@ -1274,8 +1274,11 @@ walks to the next view as the original does (the turn, the transition
 video, the arrival), and the scans of the warp frame run the scripts: the
 first click sends the game to chapter 75, the first arrival in view 7
 plays the shaman's greeting (dialog 360) and the section goes on after
-it. A left click ends a film and goes to a dialog's next line; Escape ends
-a dialog, and in the panorama opens the main menu (options, volumes,
+it. A left click ends a film and goes to a dialog's next line (at the
+dialog's next tick); Escape ends a dialog at once, and a click no tick
+has taken yet is then the next panorama frame's, a click on the world,
+as the original's one click flag (@ 0x006569c9) leaves it; in the
+panorama Escape opens the main menu (options, volumes,
 load and save, quit; below); the right button opens and closes the bag
 bar; a left click on a character with subjects opens the menu of the
 subjects to ask him about (below). The mandalas are laid in the shaman's
@@ -1863,7 +1866,8 @@ back) into `yucatan-*.png`.
   half(half(dst))`; `Engine::spr_dll` chooses `spr_p5.dll`'s) at the
   screen centre: 1..12 over a move zone, 25..39 over
   another zone (none from type 1000 on), 13..24 or 25..39 over a
-  clickable object or character, one frame on per tick, chosen after the
+  clickable object or character, 25..39 over a creature of the spider's
+  web, one frame on per tick, chosen after the
   frame is drawn so it shows on the next one. The object in hand (its
   sprite in the world's objects bank, `spr\objtibet.spr` for Tibet) is
   drawn under the cursor; right after a take the cursor itself shows the
@@ -2721,7 +2725,9 @@ back) into `yucatan-*.png`.
   blow (film 48, four steps held); a click on a spider (its quads around
   it, @ 0x00491e40, picked at the screen's centre @ 0x00458fe0, before
   the zone's own click @ 0x0049caf2) asks about it (dialogs 187-189) or,
-  with the sword, strikes it. No randomness. The creatures are drawn over
+  with the sword, strikes it; with the centre on those quads the cursor
+  is the character cursor, frames 25..39, instead of the zone's (the
+  warp draw's FUN_00491450 @ 0x0045aa65). No randomness. The creatures are drawn over
   the cube, under the cursor and the marker, by `atl3d/warp.rs`: the scene's
   objects posed by their tracks at the model's frame, the pipeline with
   the warp camera (76°, near 1.5) and the Pentium II's rasteriser, the
@@ -3771,8 +3777,16 @@ back) into `yucatan-*.png`.
   when the mouse enters the box of an enabled widget, and a disabled
   widget still notes whether the mouse is in its box, so once enabled it
   keeps its count (FUN_0046d750, against the original run under
-  emulation, `tests/input_ui.rs`). Each frame the
-  widgets are asked in order and the first action wins; the state machine
+  emulation, `tests/input_ui.rs`). Each frame of the states that read
+  the input (the pages, the questions, the load / save choice, the
+  credits; not the slides, the CD wait or the player's start, FUN_00486eb0
+  @ 0x00488fac) the widgets are asked in order and the first action wins.
+  The click is the game's one click flag (@ 0x006569c9): a click made
+  during a slide stays set until the first frame that reads it, which
+  gives it to the widget under the pointer (a double click on the disc
+  opens the load page); Escape during a slide closes the menu with it
+  still set, and the next panorama frame takes it as a click on the world.
+  The state machine
   then slides the main page's panels (1 + 2 + ... pixels a frame: 30
   moves for the options and the disc, 40 for the sound, the state
   changing at the frame after the last move, as the original's; the disc

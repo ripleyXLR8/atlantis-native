@@ -535,8 +535,9 @@ square's, and on the landing stage starts the canoe; a right click turns
 the held or pointed tile a quarter; Escape leaves the puzzle. On the
 spider's web the view turns as usual and a left click on a way moves
 along it once the spiders stand still; with the feather in hand the click
-lays it there, and a click on a spider asks about it (or strikes it with
-the sword). In Atlantis the centre shows a crosshair; in the octopus's
+lays it there, and a click on a spider (the cursor over it is a
+character's) asks about it (or strikes it with the sword). In Atlantis
+the centre shows a crosshair; in the octopus's
 view, a tentacle that strikes is shot by a click on it, but only with
 the sunken crystal in the bag (six shots a tentacle); a strike not shot
 in time lands, crystal or not, and the blows wear the hero down.

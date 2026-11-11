@@ -471,6 +471,11 @@ impl Dialog {
         self.click = true;
     }
 
+    /// The click no tick has taken yet (@ 0x006569c9), cleared.
+    pub fn take_click(&mut self) -> bool {
+        std::mem::take(&mut self.click)
+    }
+
     /// The voice's samples and start time.
     pub fn voice(&self) -> Option<(&[i16], f64)> {
         self.voice.as_ref().map(|v| (&v.samples[..], v.start))

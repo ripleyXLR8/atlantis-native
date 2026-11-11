@@ -137,6 +137,82 @@ fn the_menu_slides_match_the_original() {
     }
 }
 
+/// The click byte across the slides (`latch` sections): FUN_00486eb0
+/// calls the page input FUN_00472320 only in states 0, 5-8 and 11, so a
+/// click made during a slide stays set until the first frame that reads
+/// it, which gives it to the widget under the pointer (the golden's
+/// model of FUN_00472320: with the byte set, cleared and the case's
+/// action; here the same closure in place of the widgets). The click
+/// goes through the engine's left button.
+#[test]
+fn a_click_is_latched_through_the_slides_as_the_originals() {
+    let Some(_) = game() else { return };
+    let cases = sections("latch: ");
+    assert_eq!(cases.len(), 4);
+    for (head, rows) in cases {
+        // "<slide> (action N), a click at fK <where> (A)"
+        let at: usize = head
+            .split(" at f")
+            .nth(1)
+            .unwrap()
+            .split(' ')
+            .next()
+            .unwrap()
+            .parse()
+            .unwrap();
+        let a = head.rsplit_once('(').unwrap().1.trim_end_matches(')');
+        let click_action = match a.strip_prefix("0x") {
+            Some(h) => i32::from_str_radix(h, 16).unwrap(),
+            None => a.parse().unwrap(),
+        };
+        let mut e = Engine::new_game(game().unwrap(), Variant::PII, Fpu::Chop, 640, 480).unwrap();
+        e.end_video();
+        e.open_main_menu();
+        for (n, row) in rows.iter().enumerate() {
+            // f<n> action <a>: input <i> click <c> state <s> counter <k> | calls
+            let (lhs, rhs) = row.split_once(": ").unwrap();
+            let act: i32 = lhs.split_whitespace().nth(2).unwrap().parse().unwrap();
+            let (st, calls) = rhs.split_once(" | ").unwrap_or((rhs, ""));
+            let w: Vec<i32> = st
+                .split_whitespace()
+                .filter_map(|t| t.parse().ok())
+                .collect();
+            if n == at {
+                e.click(n as f64);
+                e.release();
+            }
+            let called = e.menu_step_input(|input| {
+                if input.click {
+                    input.click = false;
+                    click_action
+                } else {
+                    act
+                }
+            });
+            let m = e.menu().unwrap();
+            assert_eq!(
+                (
+                    i32::from(called),
+                    i32::from(m.input.click),
+                    m.state,
+                    m.counter
+                ),
+                (w[0], w[1], w[2], w[3]),
+                "{head}: {row}"
+            );
+            for call in calls.split("; ") {
+                let want = match call {
+                    "build_options" => PageKind::Options,
+                    "build_sound" => PageKind::Sound,
+                    "build_load" => PageKind::Load,
+                    _ => continue,
+                };
+                assert_eq!(kind(&e), Some(want), "{head}: {row}");
+            }
+        }
+    }
+}
+
 /// FUN_0046d750 through the widget's draw: the count restarts when the
 /// mouse enters the box of an enabled widget; the in-the-box flag follows
 /// the mouse while the widget is disabled, so a widget enabled with the

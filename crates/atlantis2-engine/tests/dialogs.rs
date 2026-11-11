@@ -42,7 +42,7 @@ use atlantis2_engine::sound::{
     DEFAULT_MASTER, DEFAULT_MUSIC_VOLUME, DEFAULT_VOICE_VOLUME,
 };
 use atlantis2_engine::subtitle::{layout, SubtitleFont};
-use atlantis2_engine::{Engine, Fpu, LoopType, Variant};
+use atlantis2_engine::{Engine, Event, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
 
 #[path = "common/dialog_loop.rs"]
@@ -1151,4 +1151,65 @@ fn a_film_that_does_not_start_leaves_its_dialog_to_the_next_video() {
     assert!(played, "dialog 360 does not play over film 8");
     e.end_video();
     assert!(e.film_dialog().is_none());
+}
+
+/// A click no dialog tick has taken yet when Escape ends the dialog (the
+/// key callback ends it at once, @ 0x0047635c → 0x004808a0) stays in the
+/// click flag @ 0x006569c9, which neither the end nor the loop type's
+/// change clears: the next warp frame takes it as a click on the world
+/// (the zone click FUN_0049ca80, the click scan @ 0x0045a870). A click
+/// the tick took goes to the dialog only.
+#[test]
+fn a_click_just_before_escape_reaches_the_world() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.start_new_game().unwrap();
+    e.end_video();
+    for _ in 0..30 {
+        e.tick();
+        e.pass(None);
+    }
+    assert_eq!(e.loop_type, LoopType::Warp);
+    e.run_command(b"(monde=1)");
+    let script = DialogScript::load(e.files(), World::of_monde(1).unwrap(), Fpu::Double).unwrap();
+    let numbers: std::collections::BTreeSet<u32> = script
+        .com
+        .iter()
+        .filter_map(|l| l.id.split_once('_')?.0.trim().parse().ok())
+        .collect();
+    // The first that starts, ended again.
+    let n = numbers
+        .into_iter()
+        .find(|&n| {
+            let ok = e.start_dialog(n).is_ok();
+            e.end_dialog();
+            ok
+        })
+        .unwrap();
+    let world_click = |e: &Engine| {
+        e.events.iter().any(|x| {
+            matches!(
+                x,
+                Event::ClickScan(_) | Event::ZoneClick { .. } | Event::DepartScan(_)
+            )
+        })
+    };
+    e.trace = true;
+    for taken in [false, true] {
+        e.start_dialog(n).unwrap();
+        e.pass(None);
+        e.click(if taken { 100.0 } else { 200.0 });
+        if taken {
+            e.tick();
+        }
+        e.events.clear();
+        e.escape();
+        assert_eq!(e.loop_type, LoopType::Warp);
+        e.pass(None);
+        assert_eq!(world_click(&e), !taken, "taken by a tick: {taken}");
+        for _ in 0..30 {
+            e.tick();
+            e.pass(None);
+        }
+    }
 }
