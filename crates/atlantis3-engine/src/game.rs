@@ -2246,7 +2246,8 @@ impl Game {
             _ => Vec::new(),
         };
         if let (Some(d), false) = (dest, self.double_click) {
-            let path = format!("hnmtraj/HNM640/{folder}/{}", d.video);
+            let hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
+            let path = format!("hnmtraj/{hnm}/{folder}/{}", d.video);
             // The sprites are there before the video starts, so that its
             // first frame has them.
             if self.files.size(&path).is_some() {
@@ -2287,13 +2288,17 @@ impl Game {
         let name = view.name.clone();
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
-        let path = format!("warp/Warp512/{folder}/{name}");
+        let warp = crate::travel::warp_folder(self.startup.config.warp_res);
+        let path = format!("warp/{warp}/{folder}/{name}");
         if self.place.cube != path {
             let depth = self.depth();
             match self.files.read(&path).map(|d| faces_of(&d, depth)) {
                 Some(Ok(faces)) => self.place.faces = faces,
                 Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
+                None => {
+                    let dir = format!("warp/{warp}/{folder}");
+                    self.place.faces = missing_cube(&self.files, &dir, &name, depth);
+                }
             }
             self.place.cube = path.clone();
         }
@@ -2326,12 +2331,16 @@ impl Game {
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         if let Some(name) = self.place.wam.view(id).map(|v| v.name.clone()) {
-            let path = format!("warp/Warp512/{folder}/{name}");
+            let warp = crate::travel::warp_folder(self.startup.config.warp_res);
+            let path = format!("warp/{warp}/{folder}/{name}");
             let depth = self.depth();
             match self.files.read(&path).map(|d| faces_of(&d, depth)) {
                 Some(Ok(faces)) => self.place.faces = faces,
                 Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
+                None => {
+                    let dir = format!("warp/{warp}/{folder}");
+                    self.place.faces = missing_cube(&self.files, &dir, &name, depth);
+                }
             }
             self.place.cube = path;
         }
@@ -2360,6 +2369,7 @@ impl Game {
         // values first: tests replaying the original's run).
         let (queue, rand) = (&mut self.rand_queue, &mut self.rand);
         let depth = self.screen.depth();
+        let spw = crate::travel::spw_folder(self.startup.config.warp_res);
         self.slots = Slots::load_depth(
             &self.files,
             &mut self.spw_cache,
@@ -2375,6 +2385,7 @@ impl Game {
                     .map(|r| r.shown)
             },
             depth,
+            spw,
         );
     }
 
@@ -2654,8 +2665,10 @@ impl Game {
         } else {
             &mut self.rand
         };
-        self.dialogs = Some(crate::dialog::Dialogs::load(
+        let hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
+        self.dialogs = Some(crate::dialog::Dialogs::load_in(
             &self.files,
+            hnm,
             folder,
             &lang,
             rand,
@@ -2678,6 +2691,8 @@ impl Game {
             self.load_dialogs(w);
         }
         let mut dialogs = self.dialogs.take().unwrap();
+        // The body videos' folder as WarpRes is now (@ 0x00417280).
+        dialogs.hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
         let mut stub = Rand::new(0);
         let rand = if self.stub_rand {
             &mut stub
@@ -3636,7 +3651,7 @@ pub fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
 /// game: chapter 0's boot state (`CFuner.wam` view 4 with world 1, at
 /// start-up) asks for `warp\Warp512\hoggar\cf0004.hnm`, which is in
 /// `ldm\`; the boot state is never drawn.
-fn missing_cube(files: &A3Files, folder: &str, name: &str, depth: Depth) -> Faces {
+fn missing_cube(files: &A3Files, dir: &str, name: &str, depth: Depth) -> Faces {
     const DEBUG: [u32; 6] = [
         0xff00_0080,
         0xff80_0000,
@@ -3648,16 +3663,12 @@ fn missing_cube(files: &A3Files, folder: &str, name: &str, depth: Depth) -> Face
     let stem = name.split_once('.').map_or(name, |(s, _)| s);
     let cut = stem.len().min(2);
     for side in ["ft", "bk", "up", "dn", "rt", "lf"] {
-        let tga = format!(
-            "warp/Warp512/{folder}/{}{side}{}.tga",
-            &stem[..cut],
-            &stem[cut..]
-        );
+        let tga = format!("{dir}/{}{side}{}.tga", &stem[..cut], &stem[cut..]);
         if files.size(&tga).is_some() {
             log::warn!("{tga}: the cube's TGA faces are not ported");
         }
     }
-    log::debug!("warp/Warp512/{folder}/{name}: not found (debug colours)");
+    log::debug!("{dir}/{name}: not found (debug colours)");
     match depth {
         Depth::Rgb565 => {
             Faces::Rgb565(DEBUG.map(|c| vec![<u16 as PagePixel>::from_argb(c); 512 * 512]))
@@ -3936,10 +3947,11 @@ impl Host for Game {
         // The cue file decides the folder (@ 0x00420f3c..0x00421089).
         let localised = self.files.size(&format!("hnm/{subtitles}")).is_some();
         let lang = self.startup.voice_language();
+        let hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
         let path = if localised {
-            format!("loc/hnm/HNM640/{lang}/{folder}/{video}")
+            format!("loc/hnm/{hnm}/{lang}/{folder}/{video}")
         } else {
-            format!("hnm/HNM640/{folder}/{video}")
+            format!("hnm/{hnm}/{folder}/{video}")
         };
         let back = self.mode;
         let started = self.start_video(&path, fps.max(0) as u32, false, back, Vec::new());
