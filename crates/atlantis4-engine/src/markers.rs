@@ -135,6 +135,9 @@ mod tests {
         assert_eq!(m.frame(2125.0), 1);
         // Before the start (a clock that went back): the first frame.
         assert_eq!(m.frame(0.0), 0);
-        assert_eq!((0..8).map(MarkerSprite::band).collect::<Vec<_>>(), (0..8).collect::<Vec<_>>());
+        assert_eq!(
+            (0..8).map(MarkerSprite::band).collect::<Vec<_>>(),
+            (0..8).collect::<Vec<_>>()
+        );
     }
 }

@@ -280,7 +280,15 @@ impl Warp {
         } else {
             (first, last)
         };
-        self.play(files, name, f as u32, l.wrapping_sub(f) as u32, loops, clickable, now_ms)
+        self.play(
+            files,
+            name,
+            f as u32,
+            l.wrapping_sub(f) as u32,
+            loops,
+            clickable,
+            now_ms,
+        )
     }
 
     /// `PutObject(name, clickable)` (`0x004f4c70`): frame 0 alone, no end.
@@ -304,7 +312,13 @@ impl Warp {
     }
 
     /// `SetMarker(name, image, n)` at `now_ms`.
-    pub fn set_marker(&mut self, name: &str, image: i32, n: u32, now_ms: f64) -> Result<(), WarpNote> {
+    pub fn set_marker(
+        &mut self,
+        name: &str,
+        image: i32,
+        n: u32,
+        now_ms: f64,
+    ) -> Result<(), WarpNote> {
         let full = format!("3D\\{name}");
         let marker = if let Some(e) = self.exits.iter().find(|e| e.name == full) {
             e.marker
@@ -354,7 +368,9 @@ impl Warp {
                     clickable: a.clickable,
                     triangles: p
                         .indices
-                        .as_chunks::<3>().0.iter()
+                        .as_chunks::<3>()
+                        .0
+                        .iter()
                         .map(|t| [v(t[0]), v(t[1]), v(t[2])])
                         .collect(),
                 })
@@ -409,7 +425,9 @@ impl Warp {
         }
         for m in &self.markers {
             let Some(s) = m.sprite else { continue };
-            let Some(pic) = sprites(s.image) else { continue };
+            let Some(pic) = sprites(s.image) else {
+                continue;
+            };
             let (w, h) = (pic.width, pic.height / MARKER_FRAMES);
             let Some((x, y_up)) = place(cam, m.point, w as f32, h as f32) else {
                 continue;

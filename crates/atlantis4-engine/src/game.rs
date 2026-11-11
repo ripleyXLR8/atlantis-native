@@ -233,7 +233,10 @@ impl Game {
         match m.release(&l, x, y) {
             Click::Skipped => Some(self.end_movie()),
             Click::Toggled => {
-                log::info!("skip button {}", if m.skip_shown { "shown" } else { "hidden" });
+                log::info!(
+                    "skip button {}",
+                    if m.skip_shown { "shown" } else { "hidden" }
+                );
                 None
             }
             Click::None => None,
@@ -242,7 +245,12 @@ impl Game {
 
     /// The movie's pictures loaded; their resolved paths.
     fn movie_pictures(&mut self) -> [String; 3] {
-        [movie::BACKGROUND_PICTURE, movie::SKIP_PICTURE, movie::SKIP_DOWN_PICTURE].map(|p| {
+        [
+            movie::BACKGROUND_PICTURE,
+            movie::SKIP_PICTURE,
+            movie::SKIP_DOWN_PICTURE,
+        ]
+        .map(|p| {
             let r = movie::resolve(&self.files, p).unwrap_or_else(|| p.to_string());
             self.load_sprite(&r);
             r

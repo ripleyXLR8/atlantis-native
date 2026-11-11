@@ -225,7 +225,9 @@ pub fn range_visible(cam: &Camera, range: &TileRange) -> bool {
     let v = |i: u32| range.vertices.get(i as usize).copied().unwrap_or([0.0; 3]);
     range
         .indices
-        .as_chunks::<3>().0.iter()
+        .as_chunks::<3>()
+        .0
+        .iter()
         .any(|t| triangle_box(cam, &[v(t[0]), v(t[1]), v(t[2])]).is_some())
 }
 

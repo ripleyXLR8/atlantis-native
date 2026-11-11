@@ -50,7 +50,12 @@ impl Picture {
             return [0; 4];
         }
         let o = 4 * (y as usize * self.width as usize + x as usize);
-        [self.rgba[o], self.rgba[o + 1], self.rgba[o + 2], self.rgba[o + 3]]
+        [
+            self.rgba[o],
+            self.rgba[o + 1],
+            self.rgba[o + 2],
+            self.rgba[o + 3],
+        ]
     }
 
     /// The texel at (`x`, `y`), clamped to the edge (`GL_CLAMP_TO_EDGE`).
@@ -114,7 +119,12 @@ impl Tile {
 impl Codec {
     /// The picture to draw at `frame` (Theora: decoded up to it once;
     /// `name` for the log).
-    pub fn picture(&mut self, name: &str, frame: i32, table: Option<&RgbTable>) -> Option<&Picture> {
+    pub fn picture(
+        &mut self,
+        name: &str,
+        frame: i32,
+        table: Option<&RgbTable>,
+    ) -> Option<&Picture> {
         match self {
             Codec::Still(p) => Some(p),
             Codec::Theora {
@@ -185,7 +195,9 @@ impl Package {
                     let rgba = match img.channels {
                         3 => img
                             .pixels
-                            .as_chunks::<3>().0.iter()
+                            .as_chunks::<3>()
+                            .0
+                            .iter()
                             .flat_map(|c| [c[0], c[1], c[2], 255])
                             .collect(),
                         _ => return Err(bad(&n, &"not RGB")),

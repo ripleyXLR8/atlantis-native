@@ -97,7 +97,10 @@ fn the_first_node_is_set_up_by_its_scripts_as_the_original() {
     {
         let g = game.borrow();
         let w = g.warp.as_ref().unwrap();
-        assert_eq!(w.node.path, WarpPath::parse("3D/Bateau_CA/0001.wp").unwrap());
+        assert_eq!(
+            w.node.path,
+            WarpPath::parse("3D/Bateau_CA/0001.wp").unwrap()
+        );
         // `StartAnimationPart("hua2", 14, 15, -1, true)` (the porthole
         // open), then `("mla2", 0, 1, -1, false)` (the trunk shut): last
         // in the list, one frame each.
@@ -178,7 +181,10 @@ fn the_first_node_is_set_up_by_its_scripts_as_the_original() {
     );
     let g = game.borrow();
     let w = g.warp.as_ref().unwrap();
-    assert_eq!(w.node.path, WarpPath::parse("3D/Bateau_CA/0002.wp").unwrap());
+    assert_eq!(
+        w.node.path,
+        WarpPath::parse("3D/Bateau_CA/0002.wp").unwrap()
+    );
     // `ChangeWarp` keeps the angles and resets the limits.
     assert_eq!((g.view.yaw, g.view.pitch), (0.0, -30.0));
     assert_eq!((g.view.pitch_plus, g.view.pitch_minus), (75.0, 25.0));
@@ -207,7 +213,11 @@ fn nodes(dir: &Path) -> Vec<WarpPath> {
             .collect();
         xs.sort();
         for x in xs {
-            let rel = x.strip_prefix(dir).unwrap().to_string_lossy().replace('\\', "/");
+            let rel = x
+                .strip_prefix(dir)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
             out.push(WarpPath::parse(rel.strip_suffix(".xml").unwrap()).unwrap());
         }
     }
@@ -235,7 +245,9 @@ fn some_tiles_start_after_frame_0() {
             let Some(Ok(pkg)) = Wpa::open(src, &pkg_name) else {
                 continue;
             };
-            let raw = pkg.read(src, &pkg_name, pkg.entry("anim.anim").unwrap()).unwrap();
+            let raw = pkg
+                .read(src, &pkg_name, pkg.entry("anim.anim").unwrap())
+                .unwrap();
             let anim = Anim::parse(&raw).unwrap();
             packages += 1;
             for t in &anim.tiles {
@@ -249,7 +261,10 @@ fn some_tiles_start_after_frame_0() {
             }
         }
     }
-    assert_eq!((packages, tiles, late_tiles, late_picks), (1951, 4195, 77, 0));
+    assert_eq!(
+        (packages, tiles, late_tiles, late_picks),
+        (1951, 4195, 77, 0)
+    );
 }
 
 /// The objects' pictures (`X.rgb.jpg` + `X.alpha.jpg`) are addressed as
@@ -290,7 +305,8 @@ fn object_pictures_are_read_from_the_bottom_as_the_atlases() {
                         .iter()
                         .map(|&i| atlantis4_engine::cube::st_of(f, r.vertices[i]))
                         .collect();
-                    let uv: Vec<[f64; 2]> = ids[..3].iter().map(|&i| r.uvs[i].map(f64::from)).collect();
+                    let uv: Vec<[f64; 2]> =
+                        ids[..3].iter().map(|&i| r.uvs[i].map(f64::from)).collect();
                     let key = (f, (s * 13.0).floor() as i32, (t * 13.0).floor() as i32);
                     cells.insert(key, (st, uv));
                 }
@@ -302,7 +318,9 @@ fn object_pictures_are_read_from_the_bottom_as_the_atlases() {
                     let (es, et) = (ps - st[0].0, pt - st[0].1);
                     let k1 = (es * dt2 - ds2 * et) / det;
                     let k2 = (ds1 * et - es * dt1) / det;
-                    let g = |c: usize| uv[0][c] + k1 * (uv[1][c] - uv[0][c]) + k2 * (uv[2][c] - uv[0][c]);
+                    let g = |c: usize| {
+                        uv[0][c] + k1 * (uv[1][c] - uv[0][c]) + k2 * (uv[2][c] - uv[0][c])
+                    };
                     (g(0), g(1))
                 };
                 let sample = |cell, ps, pt, flip: bool| {
@@ -312,7 +330,9 @@ fn object_pictures_are_read_from_the_bottom_as_the_atlases() {
                     bilinear_rgba(pic, u * f64::from(pic.width) - 0.5, y - 0.5, Weights::Exact)
                 };
                 let diff = |a: [u8; 4], b: [u8; 4]| -> f64 {
-                    (0..3).map(|k| (f64::from(a[k]) - f64::from(b[k])).abs()).sum()
+                    (0..3)
+                        .map(|k| (f64::from(a[k]) - f64::from(b[k])).abs())
+                        .sum()
                 };
                 let inside = 1.0 / (13.0 * 60.0);
                 for (&(f, ci, cj), a) in &cells {
@@ -325,12 +345,20 @@ fn object_pictures_are_read_from_the_bottom_as_the_atlases() {
                             let along = (f64::from(k) + 0.5) / 24.0 / 13.0;
                             let (es, et) = (f64::from(ci + di) / 13.0, f64::from(cj + dj) / 13.0);
                             let (pa, pb) = if di == 1 {
-                                ((es - inside, f64::from(cj) / 13.0 + along), (es + inside, f64::from(cj) / 13.0 + along))
+                                (
+                                    (es - inside, f64::from(cj) / 13.0 + along),
+                                    (es + inside, f64::from(cj) / 13.0 + along),
+                                )
                             } else {
-                                ((f64::from(ci) / 13.0 + along, et - inside), (f64::from(ci) / 13.0 + along, et + inside))
+                                (
+                                    (f64::from(ci) / 13.0 + along, et - inside),
+                                    (f64::from(ci) / 13.0 + along, et + inside),
+                                )
                             };
-                            let (ra, rb) = (sample(a, pa.0, pa.1, false), sample(b, pb.0, pb.1, false));
-                            let (fa, fb) = (sample(a, pa.0, pa.1, true), sample(b, pb.0, pb.1, true));
+                            let (ra, rb) =
+                                (sample(a, pa.0, pa.1, false), sample(b, pb.0, pb.1, false));
+                            let (fa, fb) =
+                                (sample(a, pa.0, pa.1, true), sample(b, pb.0, pb.1, true));
                             if [ra, rb, fa, fb].iter().any(|p| p[3] < 250) {
                                 continue;
                             }
