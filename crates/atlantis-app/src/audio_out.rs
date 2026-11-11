@@ -11,7 +11,24 @@ pub fn start(mixer: Mixer) -> Option<cpal::Stream> {
 
 /// The same for any mixer: `fill(out, rate, channels)` writes interleaved
 /// samples.
-pub fn start_with<F>(mut fill: F) -> Option<cpal::Stream>
+pub fn start_with<F>(fill: F) -> Option<cpal::Stream>
+where
+    F: FnMut(&mut [f32], u32, usize) + Send + 'static,
+{
+    start_config(fill, None)
+}
+
+/// The same, asking the device for `rate` when it offers it (in any of
+/// its supported ranges), else its default rate.
+#[cfg_attr(not(feature = "atlantis4"), allow(dead_code))]
+pub fn start_with_rate<F>(fill: F, rate: u32) -> Option<cpal::Stream>
+where
+    F: FnMut(&mut [f32], u32, usize) + Send + 'static,
+{
+    start_config(fill, Some(rate))
+}
+
+fn start_config<F>(mut fill: F, want: Option<u32>) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
 {
@@ -20,10 +37,21 @@ where
         log::warn!("no audio output device");
         None
     })?;
-    let config = device
+    let default = device
         .default_output_config()
         .map_err(|e| log::warn!("audio output: {e}"))
         .ok()?;
+    let config = want
+        .and_then(|rate| {
+            device.supported_output_configs().ok()?.find_map(|c| {
+                let ok = c.channels() == default.channels()
+                    && c.sample_format() == default.sample_format()
+                    && c.min_sample_rate().0 <= rate
+                    && rate <= c.max_sample_rate().0;
+                ok.then(|| c.with_sample_rate(cpal::SampleRate(rate)))
+            })
+        })
+        .unwrap_or(default);
     let rate = config.sample_rate().0;
     let channels = usize::from(config.channels());
     let stream = match config.sample_format() {

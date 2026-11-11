@@ -210,4 +210,12 @@ pub trait Engine {
 
     /// Something to log or trace.
     fn event(&mut self, _event: &Event<'_>) {}
+
+    /// Callbacks raised by the engine's own signals during its last call
+    /// (a sound's "stopped" signal calls `OnSoundStopped(name)` from
+    /// inside `StopSound` or the node change, @ 0x00524de0), run at once
+    /// in this order.
+    fn take_callbacks(&mut self) -> Vec<(String, Vec<Value>)> {
+        Vec::new()
+    }
 }

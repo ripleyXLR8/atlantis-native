@@ -429,6 +429,13 @@ fn binding_entry(state: &mut LuaState) -> LuaResult<u32> {
     };
     let engine = engine_of(state)?;
     let reply = engine.borrow_mut().call(&call);
+    let raised = engine.borrow_mut().take_callbacks();
+    for (name, args) in raised {
+        execute(state, &engine, &name, &args, None).map_err(|e| match e {
+            Stop::Lua(e) => e,
+            Stop::Fatal(f) => runtime_error(f.to_string()),
+        })?;
+    }
     match sig.binding {
         // SetCondition / UnsetCondition (@ 0x0052ba10 / 0x0052b970): the
         // global `name` = true / false through luaV_settable. A NULL name
@@ -694,6 +701,10 @@ fn change_warp(
         engine.borrow_mut().save_game(b"save.xml", &globals);
     }
     engine.borrow_mut().enter_scene(&path);
+    let raised = engine.borrow_mut().take_callbacks();
+    for (name, args) in raised {
+        execute(state, engine, &name, &args, top)?;
+    }
     for name in RESET_CALLBACKS {
         set_global(state, name.as_bytes(), Val::Nil)?;
     }
