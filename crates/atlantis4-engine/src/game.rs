@@ -15,10 +15,11 @@
 //! movie's start to its end or skip, the music cut meanwhile), and the
 //! sounds ([`crate::sound`]): `PlayMusic`, `PlaySound`, `StopSound` with
 //! `OnSoundStopped`, the node change's stop of the `PlaySound` sounds, and
-//! `AddToBag`'s notification sound. Every other binding is logged and does
-//! nothing (dialogs, inventory, documents, diary and saves belong to later
-//! milestones); `Selected` answers `false` (empty inventory) and
-//! `ObjectCount` 0.
+//! `AddToBag`'s notification sound, and the dialogs ([`crate::dialog`]):
+//! `DrawText`, `InitDialog`, `HideDialog`, `PushAnswer`, `HideAnswers`.
+//! Every other binding is logged and does nothing (inventory, documents,
+//! diary and saves belong to later milestones); `Selected` answers `false`
+//! (empty inventory) and `ObjectCount` 0.
 
 use std::collections::HashMap;
 
@@ -29,6 +30,7 @@ use atlantis4_script::tolua::Binding;
 use atlantis4_script::{normalise_path, Call, Engine, ErrorSite, Event, Reply, SavedGlobal, Value};
 
 use crate::camera::fov_for_height;
+use crate::dialog::{Action, Ctx, Dialogs};
 use crate::markers::sprite_path;
 use crate::movie::{self, Click, Movie, MovieCue};
 use crate::package::Picture;
@@ -82,6 +84,10 @@ pub struct Game {
     pub clock_us: Option<Box<dyn Fn() -> u64>>,
     /// The sound manager and the game's sound objects.
     pub sounds: Sounds,
+    /// The dialog bar, the conversation view and the answers.
+    pub dialogs: Dialogs,
+    /// `OnSoundStopped` callbacks raised and not yet run.
+    sound_pending: Vec<(String, Vec<Value>)>,
 }
 
 /// A PNG as RGBA.
@@ -155,6 +161,8 @@ impl Game {
             movie: None,
             movie_cues: Vec::new(),
             clock_us: None,
+            dialogs: Dialogs::default(),
+            sound_pending: Vec::new(),
         }
     }
 
@@ -317,6 +325,7 @@ impl Game {
                     .hash(&mut h);
             }
         }
+        self.dialogs.hash_into(&mut h);
         if let Some(m) = &self.movie {
             (&m.path, m.skip_shown, m.skip_pressed).hash(&mut h);
             m.sprite
@@ -389,6 +398,9 @@ impl Game {
                 m.draw(out, width, height, get(&bg), get(&up), get(&down));
             }
         }
+        // Above the HUD (and the inventory menu): the dialog, then the
+        // answers (`Game::load` @ 0x005294bf..0x00529712).
+        self.dialogs.draw(&self.files, out, width, height);
         if let Some((x, y)) = pointer {
             self.load_sprite(CURSOR_PATH);
             if let Some(Some(pic)) = self.sprites.get(CURSOR_PATH) {
@@ -418,10 +430,104 @@ impl Game {
         self.now_ms = now_ms;
         // `TeSoundManager::update` runs first in the frame (@ 0x0057c160).
         self.sounds.update(&self.files, now_ms);
-        self.warp
+        // Its signals: the voice's end reaches the dialog bar at once.
+        self.route_sound_events();
+        let finished = self
+            .warp
             .as_mut()
             .map(|w| w.update(now_ms))
-            .unwrap_or_default()
+            .unwrap_or_default();
+        let mut c = Ctx {
+            files: &self.files,
+            sounds: &mut self.sounds,
+            table: self.table.as_ref(),
+            now: now_ms,
+        };
+        self.dialogs.update(&mut c);
+        finished
+    }
+
+    /// The Lua callbacks the dialogs raised in the last update
+    /// (`OnDialogClosed`, `OnDialogFinished`), to run in this order after
+    /// the animations'.
+    pub fn dialog_callbacks(&mut self) -> Vec<(String, Vec<Value>)> {
+        self.dialogs.take_callbacks()
+    }
+
+    /// The sounds' events: `VoiceStopped` to the dialog bar
+    /// (`Dialog2::onVoiceStopped` @ 0x0052c220), `SoundStopped` kept for
+    /// `OnSoundStopped`.
+    fn route_sound_events(&mut self) {
+        for e in self.sounds.take_events() {
+            match e {
+                SoundEvent::SoundStopped(name) => self.sound_pending.push((
+                    "OnSoundStopped".to_string(),
+                    vec![Value::Str(name.into_bytes())],
+                )),
+                SoundEvent::VoiceStopped => {
+                    let now = self.clock_ms();
+                    let mut c = Ctx {
+                        files: &self.files,
+                        sounds: &mut self.sounds,
+                        table: self.table.as_ref(),
+                        now,
+                    };
+                    self.dialogs.voice_stopped(&mut c);
+                }
+            }
+        }
+    }
+
+    /// Whether a GUI layer above the view takes the pointer (the dialog's
+    /// or the answers' lock button is shown).
+    pub fn gui_shown(&self) -> bool {
+        self.dialogs.shown() || self.dialogs.answers_shown()
+    }
+
+    /// A press at window pixel (`x`, `y`): `true` when a GUI layer took it
+    /// (the view then neither turns nor clicks).
+    pub fn gui_press(&mut self, width: u32, height: u32, x: f64, y: f64) -> bool {
+        if !self.gui_shown() {
+            return false;
+        }
+        self.dialogs.layout(&self.files, width, height);
+        self.dialogs.press(x, y, width, height)
+    }
+
+    /// The pointer moved to (`x`, `y`): the buttons' pressed and roll-over
+    /// states.
+    pub fn gui_hover(&mut self, width: u32, height: u32, x: f64, y: f64) {
+        if self.gui_shown() {
+            self.dialogs.layout(&self.files, width, height);
+            self.dialogs.hover(x, y, width, height);
+        }
+    }
+
+    /// A release at (`x`, `y`): `None` when no GUI layer took it, else the
+    /// validated click's consequences to run in order (Lua callbacks, the
+    /// answers removed after `OnAnswered`).
+    pub fn gui_release(&mut self, width: u32, height: u32, x: f64, y: f64) -> Option<Vec<Action>> {
+        if !self.gui_shown() {
+            return None;
+        }
+        self.dialogs.layout(&self.files, width, height);
+        let now = self.clock_ms();
+        let mut c = Ctx {
+            files: &self.files,
+            sounds: &mut self.sounds,
+            table: self.table.as_ref(),
+            now,
+        };
+        let mut out = self.dialogs.release(&mut c, x, y, width, height)?;
+        // A click on the bar stopped the voice: its signal at once.
+        self.route_sound_events();
+        out.extend(
+            self.dialogs
+                .take_callbacks()
+                .into_iter()
+                .map(|(n, a)| Action::Lua(n, a)),
+        );
+        Some(out)
     }
 
     /// The camera of a `width × height` view.
@@ -444,19 +550,8 @@ impl Game {
     /// The Lua callbacks the sounds' signals raised (`OnSoundStopped`),
     /// to run in this order; the viewer calls it after [`Game::update`].
     pub fn sound_callbacks(&mut self) -> Vec<(String, Vec<Value>)> {
-        let mut out = Vec::new();
-        for e in self.sounds.take_events() {
-            match e {
-                SoundEvent::SoundStopped(name) => out.push((
-                    "OnSoundStopped".to_string(),
-                    vec![Value::Str(name.into_bytes())],
-                )),
-                // The dialog bar's end of line (`Dialog2::onVoiceStopped`)
-                // comes with the dialogs.
-                SoundEvent::VoiceStopped => log::info!("voice stopped"),
-            }
-        }
-        out
+        self.route_sound_events();
+        std::mem::take(&mut self.sound_pending)
     }
 
     /// A cut-scene starts (`PlayMovie`'s worker @ 0x005232b0): the music
@@ -561,6 +656,55 @@ impl Engine for Game {
                     .play_sound(&self.files, &name, &path, int(call.num(1)));
             }
             Binding::StopSound => self.sounds.stop_sound(&name),
+            Binding::DrawText => {
+                let voice = text(call.str(1));
+                let n = int(call.num(2));
+                let (video, bg) = (text(call.str(3)), text(call.str(4)));
+                let now = self.clock_ms();
+                let mut c = Ctx {
+                    files: &self.files,
+                    sounds: &mut self.sounds,
+                    table: self.table.as_ref(),
+                    now,
+                };
+                self.dialogs
+                    .draw_text(&mut c, &name, &voice, n, &video, &bg);
+            }
+            Binding::InitDialog => {
+                let video = text(call.str(1));
+                let now = self.clock_ms();
+                let mut c = Ctx {
+                    files: &self.files,
+                    sounds: &mut self.sounds,
+                    table: self.table.as_ref(),
+                    now,
+                };
+                self.dialogs.init_dialog(&mut c, &name, &video);
+            }
+            Binding::HideDialog => {
+                let now = self.clock_ms();
+                let mut c = Ctx {
+                    files: &self.files,
+                    sounds: &mut self.sounds,
+                    table: self.table.as_ref(),
+                    now,
+                };
+                self.dialogs.hide_dialog(&mut c);
+            }
+            Binding::PushAnswer => {
+                let layout = call
+                    .str(1)
+                    .map_or_else(|| crate::dialog::ANSWER_LUA.to_string(), |l| text(Some(l)));
+                let now = self.clock_ms();
+                let mut c = Ctx {
+                    files: &self.files,
+                    sounds: &mut self.sounds,
+                    table: self.table.as_ref(),
+                    now,
+                };
+                self.dialogs.push_answer(&mut c, &name, &layout);
+            }
+            Binding::HideAnswers => self.dialogs.hide_answers(),
             Binding::AddToBag => {
                 // The notification's sound (@ 0x00528706); the inventory
                 // and the notification text come later.
@@ -633,8 +777,12 @@ impl Engine for Game {
         }
     }
 
+    /// The callbacks a binding raised (`HideDialog`'s `OnDialogClosed`),
+    /// after the sounds'.
     fn take_callbacks(&mut self) -> Vec<(String, Vec<Value>)> {
-        self.sound_callbacks()
+        let mut out = self.sound_callbacks();
+        out.extend(self.dialogs.take_callbacks());
+        out
     }
 
     fn event(&mut self, event: &Event<'_>) {

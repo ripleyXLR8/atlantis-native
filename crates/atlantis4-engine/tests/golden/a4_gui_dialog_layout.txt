@@ -1,0 +1,33 @@
+# a4_gui_dialog_layout.txt: sizes (w h) and centre offsets from the parent centre (x y, y down) in pixels
+# numbers produced by the original executable under emulation; binary atlantis4-gog-en-2363910 MD5 f2de382af52f1d89e32ed7c286be8b4f; functions 0x004fc5b0, 0x004fc950 (parent()/xSize()/ySize() stubbed); button sizes = upLayout picture size (setUpLayout 0x004e4ce0, STATIC); bar / quit / text box assume that
+# picture sizes (DATA): DialogBar.png 830x162, btn_back.png 75x75, sujetN.png 110x110, TopicBox.png 423x108; dialog videos 800x448
+1365 768 dialogLockButton size 1378.65 775.68 pos 0 0
+1365 768 video size 1385.14 775.68 pos 137.865 0
+1365 768 dialog bar down size 830 162 pos 0 485.04
+1365 768 dialog bar up size 830 162 pos 0 306.84
+1365 768 text box size 747 105.3 pos in bar 0 20.25
+1365 768 quit size 75 75 pos 616.533 -342.583
+1024 768 dialogLockButton size 1034.24 775.68 pos 0 0
+1024 768 video size 1385.14 775.68 pos 103.424 0
+1024 768 dialog bar down size 830 162 pos 0 485.04
+1024 768 dialog bar up size 830 162 pos 0 306.84
+1024 768 text box size 747 105.3 pos in bar 0 20.25
+1024 768 quit size 75 75 pos 471.881 -342.583
+1280 1024 dialogLockButton size 1292.8 1034.24 pos 0 0
+1280 1024 video size 1731.43 1034.24 pos 129.28 0
+1280 1024 dialog bar down size 830 162 pos 0 614.32
+1280 1024 dialog bar up size 830 162 pos 0 436.12
+1280 1024 text box size 747 105.3 pos in bar 0 20.25
+1280 1024 quit size 75 75 pos 580.476 -469.278
+1920 1080 dialogLockButton size 1939.2 1090.8 pos 0 0
+1920 1080 video size 1947.86 1090.8 pos 193.92 0
+1920 1080 dialog bar down size 830 162 pos 0 642.6
+1920 1080 dialog bar up size 830 162 pos 0 464.4
+1920 1080 text box size 747 105.3 pos in bar 0 20.25
+1920 1080 quit size 75 75 pos 851.964 -496.992
+800 600 dialogLockButton size 808 606 pos 0 0
+800 600 video size 1082.14 606 pos 80.8 0
+800 600 dialog bar down size 830 162 pos 0 400.2
+800 600 dialog bar up size 830 162 pos 0 222
+800 600 text box size 747 105.3 pos in bar 0 20.25
+800 600 quit size 75 75 pos 376.86 -259.44

@@ -23,7 +23,13 @@
 //! channel from its start to its end or skip (the music cut meanwhile);
 //! the device is asked for 44,100 Hz, else the mix is resampled linearly
 //! to its rate (outside the exact part, like Windows' own audio engine
-//! after OpenAL). Dialogs and the inventory are not there yet (logged).
+//! after OpenAL). The dialogs run as the original's: `DrawText` lines in
+//! the bar that slides up from the bottom with their voice, the talking
+//! heads and backgrounds of a conversation (`InitDialog`), its topics
+//! (`PushAnswer`) stacked on the left, a click on a topic calling
+//! `OnAnswered`, a click on the bar skipping the line, `quit` closing the
+//! conversation; while they show, they take the clicks and the view does
+//! not turn. The inventory and the documents are not there yet (logged).
 
 use std::cell::RefCell;
 use std::num::NonZeroU32;
@@ -32,6 +38,7 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use atlantis4_data::A4Files;
+use atlantis4_engine::dialog::Action;
 use atlantis4_engine::pick::is_click;
 use atlantis4_engine::Game;
 use atlantis4_script::{
@@ -61,6 +68,8 @@ struct Viewer {
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
     pointer: Option<(f64, f64)>,
     down: Option<(f64, f64)>,
+    /// The press went to a GUI layer (the dialogs).
+    gui_down: bool,
     last: (f64, f64),
     size: (u32, u32),
     /// When the next frame is due (the game's update, then a draw if the
@@ -138,6 +147,28 @@ impl Viewer {
         if let Some(name) = ended {
             self.movie_finished(name);
         }
+        // The dialog bar's end of line (`OnDialogClosed`,
+        // `OnDialogFinished`).
+        let dialogs = self.game.borrow_mut().dialog_callbacks();
+        for (name, args) in dialogs {
+            if let Err(e) = self.script.callback(&name, &args) {
+                log::error!("{e}");
+            }
+        }
+    }
+
+    /// Runs what a click on the dialogs led to, in order.
+    fn run_actions(&mut self, actions: Vec<Action>) {
+        for a in actions {
+            match a {
+                Action::Lua(name, args) => {
+                    if let Err(e) = self.script.callback(&name, &args) {
+                        log::error!("{e}");
+                    }
+                }
+                Action::HideAnswers => self.game.borrow_mut().dialogs.hide_answers(),
+            }
+        }
     }
 
     fn movie_finished(&mut self, name: String) {
@@ -182,6 +213,18 @@ impl Viewer {
     fn release(&mut self) {
         let Some(down) = self.down.take() else { return };
         let Some(up) = self.pointer else { return };
+        let gui_down = std::mem::replace(&mut self.gui_down, false);
+        if gui_down || self.game.borrow().gui_shown() {
+            let (w, h) = self.size;
+            let actions = self.game.borrow_mut().gui_release(w, h, up.0, up.1);
+            if let Some(a) = actions {
+                self.run_actions(a);
+                return;
+            }
+            if gui_down {
+                return;
+            }
+        }
         if self.in_movie() {
             let (w, h) = self.size;
             let ended = self.game.borrow_mut().movie_release(w, h, up.0, up.1);
@@ -280,7 +323,13 @@ impl ApplicationHandler for Viewer {
             WindowEvent::CursorMoved { position, .. } => {
                 let p = (position.x, position.y);
                 self.pointer = Some(p);
-                if self.in_movie() {
+                {
+                    let (w, h) = self.size;
+                    self.game.borrow_mut().gui_hover(w, h, p.0, p.1);
+                }
+                if self.gui_down {
+                    // A press on the dialogs does not turn the view.
+                } else if self.in_movie() {
                     // The view update (0x0052ab40) does not run during a
                     // movie; a held press only changes the skip button's
                     // picture.
@@ -308,6 +357,11 @@ impl ApplicationHandler for Viewer {
                     if let Some(p) = self.pointer {
                         self.down = Some(p);
                         self.last = p;
+                        let (w, h) = self.size;
+                        self.gui_down = self.game.borrow_mut().gui_press(w, h, p.0, p.1);
+                        if self.gui_down {
+                            return;
+                        }
                         if self.in_movie() {
                             let (w, h) = self.size;
                             self.game.borrow_mut().movie_press(w, h, p.0, p.1);
@@ -411,6 +465,7 @@ pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
         surface: None,
         pointer: None,
         down: None,
+        gui_down: false,
         last: (0.0, 0.0),
         size: (WIDTH, HEIGHT),
         next_frame: Instant::now(),

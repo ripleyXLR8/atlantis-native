@@ -75,6 +75,12 @@ pub fn cp1252(b: &[u8]) -> String {
         .into_owned()
 }
 
+/// Text as Windows-1252 bytes (the inverse of [`cp1252`]; characters
+/// outside the code page become `?`).
+pub fn to_cp1252(s: &str) -> Vec<u8> {
+    encoding_rs::WINDOWS_1252.encode(s).0.into_owned()
+}
+
 struct Parser<'a> {
     s: &'a [u8],
     at: usize,
