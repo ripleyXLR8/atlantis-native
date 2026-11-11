@@ -19,9 +19,12 @@
 //! - [`package`]: an object's or animation's tiles, pictures and picks;
 //! - [`warp`]: the node in play: draw list, markers, exits;
 //! - [`sprite`]: the markers' and the cursor's 2-D sprites;
+//! - [`layout`]: the GUI layouts' sizes and positions;
+//! - [`movie`]: video sprites, `PlayMovie`'s full-screen movie and its
+//!   skip button;
 //! - [`game`]: the bindings' engine side for the scripts.
 //!
-//! Not here yet: sounds, videos, dialogs, the inventory and the GUI.
+//! Not here yet: sounds, dialogs, the inventory and the rest of the GUI.
 
 #![forbid(unsafe_code)]
 
@@ -29,7 +32,9 @@ pub mod camera;
 pub mod cube;
 pub mod frame_anim;
 pub mod game;
+pub mod layout;
 pub mod markers;
+pub mod movie;
 pub mod node;
 pub mod package;
 pub mod pick;

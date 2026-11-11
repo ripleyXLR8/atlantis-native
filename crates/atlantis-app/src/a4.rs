@@ -12,8 +12,12 @@
 //! Dragging with the left button turns the view (0.5° per pixel, the
 //! original's mouse look); a left click of less than 20 pixels calls the
 //! node's `OnWarpObjectHit` with what it hits, which leads through an exit
-//! with `ChangeWarp` as the original. Sounds, videos, dialogs and the
-//! inventory are not there yet (logged).
+//! with `ChangeWarp` as the original. `PlayMovie` plays its video full
+//! screen (the intro at a new game) over a black background: while it
+//! runs the view does not turn and clicks go to the movie's buttons (a
+//! click shows or hides the skip button at the top right, a click on it
+//! ends the movie), and its end calls `OnMovieFinished`. Sounds, dialogs
+//! and the inventory are not there yet (logged).
 
 use std::cell::RefCell;
 use std::num::NonZeroU32;
@@ -52,12 +56,14 @@ struct Viewer {
 }
 
 impl Viewer {
+    /// The engine clock: whole microseconds, divided by 1000.0 as the
+    /// original's animation clock is.
     fn now_ms(&self) -> f64 {
-        self.start.elapsed().as_secs_f64() * 1000.0
+        clock_us(self.start) as f64 / 1000.0
     }
 
     /// The frame animations, then the `OnAnimationFinished` callbacks of
-    /// those that finished.
+    /// those that finished; the movie, then `OnMovieFinished` if it ended.
     fn tick(&mut self) {
         let now = self.now_ms();
         let finished = self.game.borrow_mut().update(now);
@@ -67,6 +73,21 @@ impl Viewer {
                 log::error!("{e}");
             }
         }
+        let ended = self.game.borrow_mut().update_movie(now);
+        if let Some(name) = ended {
+            self.movie_finished(name);
+        }
+    }
+
+    fn movie_finished(&mut self, name: String) {
+        let arg = [Value::Str(name.into_bytes())];
+        if let Err(e) = self.script.callback("OnMovieFinished", &arg) {
+            log::error!("{e}");
+        }
+    }
+
+    fn in_movie(&self) -> bool {
+        self.game.borrow().movie.is_some()
     }
 
     fn draw(&mut self) {
@@ -94,6 +115,14 @@ impl Viewer {
     fn release(&mut self) {
         let Some(down) = self.down.take() else { return };
         let Some(up) = self.pointer else { return };
+        if self.in_movie() {
+            let (w, h) = self.size;
+            let ended = self.game.borrow_mut().movie_release(w, h, up.0, up.1);
+            if let Some(name) = ended {
+                self.movie_finished(name);
+            }
+            return;
+        }
         if !is_click((down.0 as f32, down.1 as f32), (up.0 as f32, up.1 as f32)) {
             return;
         }
@@ -161,7 +190,15 @@ impl ApplicationHandler for Viewer {
             WindowEvent::CursorMoved { position, .. } => {
                 let p = (position.x, position.y);
                 self.pointer = Some(p);
-                if self.down.is_some() {
+                if self.in_movie() {
+                    // The view update (0x0052ab40) does not run during a
+                    // movie; a held press only changes the skip button's
+                    // picture.
+                    if self.down.is_some() {
+                        let (w, h) = self.size;
+                        self.game.borrow_mut().movie_drag(w, h, p.0, p.1);
+                    }
+                } else if self.down.is_some() {
                     // Input pixels, y up.
                     let dx = p.0 - self.last.0;
                     let dy_up = self.last.1 - p.1;
@@ -181,6 +218,10 @@ impl ApplicationHandler for Viewer {
                     if let Some(p) = self.pointer {
                         self.down = Some(p);
                         self.last = p;
+                        if self.in_movie() {
+                            let (w, h) = self.size;
+                            self.game.borrow_mut().movie_press(w, h, p.0, p.1);
+                        }
                     }
                 }
                 ElementState::Released => self.release(),
@@ -190,11 +231,21 @@ impl ApplicationHandler for Viewer {
     }
 }
 
+/// Whole microseconds since `start` (the original's clock counts whole
+/// microseconds, @ 0x004faf40).
+fn clock_us(start: Instant) -> u64 {
+    u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX)
+}
+
 /// Opens the viewer on the game at `dir`, at `node` or the first node.
 pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
     let (files, build) = A4Files::open_dir(dir).map_err(|e| e.to_string())?;
     log::info!("Atlantis Evolution {}", build.id);
-    let game = Rc::new(RefCell::new(Game::new(files, HEIGHT)));
+    let start = Instant::now();
+    let mut g = Game::new(files, HEIGHT);
+    // `play()` reads the clock at the call (a movie started by a script).
+    g.clock_us = Some(Box::new(move || clock_us(start)));
+    let game = Rc::new(RefCell::new(g));
     let engine: EngineRef = game.clone();
     let options = Options {
         errors: ErrorMode::Log,
@@ -206,7 +257,6 @@ pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
         (None, Some(BootValue::Str(s))) => s.clone(),
         (None, other) => return Err(format!("no firstWarpPath ({other:?})")),
     };
-    let start = Instant::now();
     let script = new_game(&engine, options, &first).map_err(|e| e.to_string())?;
     let mut app = Viewer {
         game,
