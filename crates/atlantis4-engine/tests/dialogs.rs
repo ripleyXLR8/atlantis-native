@@ -348,10 +348,17 @@ fn a_conversation_offers_its_topics_and_a_click_answers() {
     game.borrow_mut().gui_press(W, H, x2, y2);
     let actions = game.borrow_mut().gui_release(W, H, x2, y2).unwrap();
     assert!(actions.is_empty());
-    // `quit` closes the conversation: `OnDialogClosed()` (with the
-    // topics hidden: their full-window lock button lies above it).
-    game.borrow_mut().dialogs.hide_answers();
+    // `quit` closes the conversation: `OnDialogClosed()`, with the topics
+    // shown (their full-window lock button lets clicks through, @
+    // 0x00567ef5) as without them.
     let (qx, qy) = (f64::from(W) * 0.92 + 30.0, f64::from(H) * 0.01 + 30.0);
+    script.run_chunk(b"ShowDialog()", b"test");
+    assert!(game.borrow().dialogs.answers_shown());
+    assert!(game.borrow_mut().gui_press(W, H, qx, qy));
+    let actions = game.borrow_mut().gui_release(W, H, qx, qy).unwrap();
+    assert_eq!(actions, [Action::Lua("OnDialogClosed".into(), vec![])]);
+    script.run_chunk(b"ShowDialog()", b"test");
+    game.borrow_mut().dialogs.hide_answers();
     assert!(game.borrow_mut().gui_press(W, H, qx, qy));
     let actions = game.borrow_mut().gui_release(W, H, qx, qy).unwrap();
     assert_eq!(actions, [Action::Lua("OnDialogClosed".into(), vec![])]);
