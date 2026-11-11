@@ -6,7 +6,7 @@
 
 Atlantis Native is a new engine: it does not include the game. The
 pictures, videos, voices and music of *Atlantis: The Lost Tales*,
-*Atlantis II* and *Atlantis III* belong to their publisher, so Atlantis
+*Atlantis II*, *Atlantis III* and *Atlantis Evolution* belong to their publisher, so Atlantis
 Native plays them from your own copy. It
 only reads the files and never changes them; it never runs the game's
 programs.
@@ -107,7 +107,9 @@ patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
 the GOG.com edition and the Italian *Atlantis Collection* DVD (see
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's French release
 only; other editions are unknown and untested (see
-[Atlantis III](#atlantis-iii)).
+[Atlantis III](#atlantis-iii)). For Atlantis Evolution: GOG.com's
+release, in English, French, German, Italian and Spanish (see
+[Atlantis Evolution](#atlantis-evolution)).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -148,8 +150,9 @@ few levels down for `atlantis.exe` (or Atlantis II's `atlantis2.exe` or
 ## Several editions: the game library
 
 Atlantis Native keeps a list of the game folders you have played: the
-game library, for the three games, Atlantis: The Lost Tales,
-[Atlantis II](#atlantis-ii) and [Atlantis III](#atlantis-iii). With one game in it, the game starts at
+game library, for the four games, Atlantis: The Lost Tales,
+[Atlantis II](#atlantis-ii), [Atlantis III](#atlantis-iii) and
+[Atlantis Evolution](#atlantis-evolution). With one game in it, the game starts at
 once, as before. With two or more (the GOG.com release and the CD, the
 English and the French CD, the first game and Atlantis II...), the
 program opens on the library's screen to choose the one to play, the
@@ -157,8 +160,8 @@ last played selected. Each game is shown as its name and edition,
 *Atlantis: The Lost Tales, GOG.com, French (1999 build)*, *Atlantis: The
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
-1.01)*, *Atlantis II, French CD (1999)* or *Atlantis III, GOG.com,
-French*, and its folder.
+1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
+French* or *Atlantis Evolution, GOG.com, English*, and its folder.
 
 | Action | Mouse | Keyboard |
 |---|---|---|
@@ -170,13 +173,13 @@ French*, and its folder.
 | Quit | **Quit** | Escape |
 
 **Find installations** looks where the first start looks (GOG.com's
-installations of the three games, the usual places, the mounted discs and
+installations of the four games, the usual places, the mounted discs and
 disc images, the copy made from the discs), adds the games not listed
 yet and says how many it found. The first start looks in the usual
 places only (not the drives) and keeps the first folder of each game
 that opens: one game found is offered to play at once, as before (a
 second copy of the same game is not offered: add it from the library);
-two or three games found are offered to the library, whose screen then
+two games or more found are offered to the library, whose screen then
 shows them. **Add a game folder...** takes the folder of any of the
 games, or a folder above it (a few levels up); when that folder holds
 more than one game, it asks which of the first two found to add (choose
@@ -239,9 +242,10 @@ whatever the counts say.
 
 The web page, **https://ripleyxlr8.github.io/atlantis-native/** (or the
 `atlantis-native-web.zip` of the nightly release, served over HTTP),
-plays the three games in Chrome, Edge, Firefox or Safari on a computer
+plays the four games in Chrome, Edge, Firefox or Safari on a computer
 with a mouse and a keyboard (Atlantis II has been tried in Chrome, Edge
-and Firefox, not yet in Safari; Atlantis III in Edge only). **Choose your game folder** and pick the
+and Firefox, not yet in Safari; Atlantis III and Atlantis Evolution in
+Edge only; Atlantis Evolution needs WebGL 2 for its full speed). **Choose your game folder** and pick the
 folder of your game; the browser asks to confirm that the page may read
 it. The
 files stay where they are: the page reads them inside the browser, a
@@ -764,6 +768,99 @@ player, and Load lists the newest first.
   game); Alt+Enter and F11 use the page's full screen; there is no F12
   screenshot; the menu's Quit returns to the page.
 
+## Atlantis Evolution
+
+*Atlantis Evolution* (2004) plays from its start to its end: the two
+splash screens, the main menu (new game, continue, the chapters to
+load, the options and the credits), then the whole story with its
+dialogs and voices, the inventory, the documents, the saves, the deaths
+and the ending, its videos and
+sounds decoded as the original decodes them, on Windows, macOS and Linux
+and in the browser (see [The web version](#the-web-version)). The
+GOG.com edition is a program of Tetraedge Engine, not of Cryo's engine:
+Atlantis Native plays it with an engine of its own, drawn by the
+graphics card (OpenGL 3.3, or OpenGL ES 3.0; WebGL 2 in the browser) or,
+without one, by the processor. It runs the original's own menus and
+options; Atlantis Native's options menu (F10) and HD mode are not part
+of it. The PortMaster build plays the first game only.
+
+**Edition.** Only GOG.com's release is known (*Atlantis Evolution*, its
+`Atlantis Evolution.exe` 2,363,910 bytes, MD5
+`f2de382af52f1d89e32ed7c286be8b4f`). Another program is refused with
+its size and MD5, which an issue on GitHub can report so that it is
+added.
+
+**Languages.** GOG.com's installation holds the five languages, English,
+French, German, Italian and Spanish, and one program for all of them;
+the language played is the one GOG.com's client installed (written in
+the folder's `lang.ini`), as in the original, which has no language
+menu. To play another, set `language` in Atlantis Evolution's
+`settings.ini` (below) to `de`, `en`, `es`, `fr` or `it` (`auto` gives
+`lang.ini`'s again), or start with `--atlantis4-view <folder> --lang fr`;
+in the browser add `?lang=fr` to the page's address.
+
+**How it was checked.** The port follows the original program's code,
+and automated tests check it against what that code gives: the scripts
+against the reference Lua, the layout formulas under emulation, every
+picture, sound and video decoded to the same pixels and samples as the
+original's decoders, and the whole story replayed from a new game to
+the end. Beyond those it has been tested by the developer's own play,
+not yet by many players: please report what looks wrong.
+
+**Finding it.** The [game library](#several-editions-the-game-library)
+finds GOG.com's installation (its entry in the Windows registry, and the
+usual folders), and **Add a game folder...** takes the installation
+folder, the one holding `Atlantis Evolution.exe` and `3D` (for example
+`C:\Program Files\GOG Galaxy\Games\Atlantis Evolution`). From the
+command line, give that folder:
+
+    atlantis-native "C:\Program Files\GOG Galaxy\Games\Atlantis Evolution"
+
+The game opens in its own window. As the original, it starts in full
+screen (at the screen's own size); `fullscreen = off` in `settings.ini`
+starts it in a window, of 1365 x 768 pixels (smaller when the screen
+is), that can be resized. The interface is laid out on the window's
+size, whatever it is, as the original lays it out on its window: the
+pictures keep their proportions, without black bars added. Started from
+the library, Shift held in its first two seconds goes back to the
+library's screen.
+
+### Atlantis Evolution controls
+
+| Input | In the game |
+|---|---|
+| Drag with the left button | turns the view |
+| Left click | goes, takes, uses (with the object selected in the inventory), talks; a topic of a conversation; the next line of a dialog; turns a document's page |
+| The bag (bottom right) | opens the inventory: a click selects an object, a second click (or the quit button) closes it; an object can be dragged to an empty slot; its menu button saves and goes back to the main menu |
+| F11 or Alt+Enter | full screen on and off (kept in `settings.ini`; the port's own keys) |
+
+The original has no Escape key: the way out of the game is the
+inventory's menu button (which saves, as the original's), then *Quit*
+in the main menu, or closing the window. Videos show a skip button at
+their top right after a click.
+
+### Settings and saves
+
+The game's own options are the original's: the four volumes (effects,
+music, dialogs, videos), the inverted look, the compass and the
+permanent help. They are kept, as the original keeps them, in
+`options.xml` beside the saves. The saves are the original's files:
+`save.xml` (continue), `0.xml` to `10.xml` (the chapters of the load
+screen) and the autosave of each place. All of them are in
+`atlantis4/Documents/Atlantis Evolution/` in the per-user data folder
+(see [Players, checkpoints and settings](#players-checkpoints-and-settings)),
+the original's `<My Documents>\Atlantis Evolution\`; the game's folder
+is never written.
+
+Atlantis Native's own settings for the game are in `atlantis4/settings.ini`
+there, written with the defaults at the first start:
+
+| Key | Values |
+|---|---|
+| `language` | `auto` (the installation's `lang.ini`, as the original), or `de`, `en`, `es`, `fr`, `it` |
+| `renderer` | `gpu` (the graphics card) or `cpu` (the processor: slower, used when no OpenGL 3.3 or ES 3.0 context can be made) |
+| `fullscreen` | `on` (the original's start) or `off`; F11 and Alt+Enter change it |
+
 ## Command line
 
 The game folder can be left out of each of these: the game library
@@ -813,6 +910,15 @@ shot.png]` plays the intro and the start page without a window (frames
 of 1/60 s) and writes the screen; the other games' options are refused
 (see [Atlantis III](#atlantis-iii)).
 
+With Atlantis Evolution, `--fullscreen` opens in full screen whatever
+`settings.ini` says; the other games' options are refused (see
+[Atlantis Evolution](#atlantis-evolution)). `--atlantis4-view <folder>`
+starts its development viewer, with shortcuts past the menus: `--node
+<node>` a new game at that node, `--save <file>` that save of the
+backup folder; `--lang <de|en|es|fr|it>` the language, `--cpu` the
+processor's renderer, `--gpu-check` a comparison of the graphics card's
+frames with the processor's once a second (in the log).
+
 `atlantis-native --fullscreen /path/to/game` opens the window in full
 screen (F, F11 or Alt+Enter switches it back): for a launcher such as the
 Ports of Batocera on a Raspberry Pi. The options menu's **Start in full
@@ -851,7 +957,9 @@ files are kept in a per-user folder, one per game build:
 [support screen](#the-support-screen), and `atlantis-native.log` are in
 the `atlantis-native` folder itself.)
 Atlantis II's saves and settings are in its `atlantis2` folder there,
-Atlantis III's in `atlantis3` (see [Atlantis III](#atlantis-iii)).
+Atlantis III's in `atlantis3` (see [Atlantis III](#atlantis-iii)),
+Atlantis Evolution's in `atlantis4` (see
+[Atlantis Evolution](#atlantis-evolution)).
 
 On its first start with a game whose folder holds an original
 `players.atl` (an installation the original game played), the port copies
@@ -900,7 +1008,7 @@ picked folder on its first start. Atlantis II's files there are under
 the original's files), `atlant2.cfg`, `settings.ini` and
 `music_copies.txt`, shared by its editions as on the desktop (the saves
 of the picked folder are not taken over, as on the desktop). A browser
-gives a site about 5 MB of this storage, shared by the three games (and,
+gives a site about 5 MB of this storage, shared by the four games (and,
 on GitHub Pages, by the other pages of the same site; Atlantis III's
 thumbnails make its saves a few KB each): an Atlantis II save
 takes one or two KB there (its file is compressed: the first one in

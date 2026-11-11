@@ -4,8 +4,8 @@
 # and copies the Chinese and Japanese subtitle fonts, which the page fetches
 # only for a Chinese or the Japanese release, into web/fonts.
 #
-# For development: FEATURES (cargo features of atlantis-app, e.g.
-# `atlantis4`) and WEB_OUT (the folder that receives pkg/ and fonts/
+# For development: FEATURES (cargo features of atlantis-app; none are
+# needed, Atlantis Evolution is in every build) and WEB_OUT (the folder that receives pkg/ and fonts/
 # instead of web/); cargo's CARGO_TARGET_DIR is followed.
 set -e
 cd "$(dirname "$0")/.."

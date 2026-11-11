@@ -5,8 +5,9 @@
 **Return to Atlantis, on today's machines.**
 
 A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997),
-*Atlantis II* (1999) and *Atlantis III: The New World* (2001), written in
-Rust, for Windows, macOS, Linux and your browser.
+*Atlantis II* (1999), *Atlantis III: The New World* (2001) and *Atlantis
+Evolution* (2004), written in Rust, for Windows, macOS, Linux and your
+browser.
 
 [![Build](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml/badge.svg)](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/ripleyXLR8/atlantis-native)](https://github.com/ripleyXLR8/atlantis-native/releases/latest)
@@ -42,6 +43,16 @@ is known so far (see [Atlantis III](docs/GUIDE.md#atlantis-iii)). It has
 been checked mostly by automated replays against the original's code and
 by the developer's own play, not yet by many players: reports are
 welcome.
+
+*Atlantis Evolution* (2004) is new: GOG.com's edition, in its five
+languages, from the splash screens and the main menu through the whole
+story to the end, with its dialogs, inventory, documents, saves and
+puzzles, its videos and sounds decoded as the original decodes them. Its
+engine is a new one (the GOG.com edition is a Tetraedge Engine program,
+not Cryo's), drawn by the graphics card with OpenGL (or WebGL 2 in the
+browser), or by the processor. It has been checked by automated replays
+of the whole story against the original's scripts and by the developer's
+own play (see [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution)).
 
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
@@ -112,12 +123,16 @@ contains none of them.</sub>
 - ⚙️ **Options menu** (F10, or O): graphics, HD settings and enhancements,
   changed at once while you play.
 - 📚 **Game library**: several editions (GOG.com, CD, DVD, disc
-  images...) of the three games in one list, to choose the one to play at
+  images...) of the four games in one list, to choose the one to play at
   start-up or switch from F10.
 - 🏜️ **Atlantis III** (new in 0.6.0): GOG.com's French edition, whole,
   with the original's own menus and options (640 x 480, 800 x 600 or
   1024 x 768, 16 or 32 bits), its saves kept apart from the game's
   folder, F12 screenshots; on the desktop and in the browser.
+- 🌊 **Atlantis Evolution** (new): GOG.com's edition in English, French,
+  German, Italian and Spanish, its interface laid out on any window size
+  as the original lays it out, full screen or windowed; on the desktop
+  and in the browser.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
   proportions, the mouse captured while you look around; full screen at
   a key, and on the desktop kept for the next start (F10, "Start in full
@@ -143,8 +158,8 @@ those of the latest commit:
 
 The web version of the latest commit is also online:
 **https://ripleyxlr8.github.io/atlantis-native/** (Chrome, Edge, Firefox
-or Safari), for the three games (Atlantis II not yet tried in Safari,
-Atlantis III tried in Edge only). Pick
+or Safari), for the four games (Atlantis II not yet tried in Safari,
+Atlantis III and Atlantis Evolution tried in Edge only). Pick
 your game folder there: its files are read inside your browser and never
 sent anywhere; the saves stay in that browser.
 
@@ -260,7 +275,17 @@ other languages, the retail CDs and DVDs) are unknown and untested:
 their `Game.exe` is refused with its size and MD5, so that it can be
 reported and added.
 
-The web version plays the three games: see
+For *Atlantis Evolution*:
+
+| Release | Languages | What to point it at |
+|---|---|---|
+| [GOG.com](https://www.gog.com/) (`Atlantis Evolution.exe` of 2,363,910 bytes, MD5 `f2de382af52f1d89e32ed7c286be8b4f`; one program for all five languages) | English, French, German, Italian, Spanish (the one GOG.com's client installed, or another chosen in `settings.ini`) | the installation folder (the one holding `Atlantis Evolution.exe` and `3D`) |
+
+This is the only edition the project knows; another `Atlantis
+Evolution.exe` is refused with its size and MD5, so that it can be
+reported and added. The PortMaster build plays the first game only.
+
+The web version plays the four games: see
 [The web version](docs/GUIDE.md#the-web-version).
 
 How to get the files from your CD or GOG.com: see
@@ -297,6 +322,10 @@ elsewhere with `--discs <folder>`). See
 game library or given on the command line. See
 [Atlantis III](docs/GUIDE.md#atlantis-iii).
 
+*Atlantis Evolution* (2004) as well: GOG.com's installation folder, found
+by the game library or given on the command line. See
+[Atlantis Evolution](docs/GUIDE.md#atlantis-evolution).
+
 ## Controls
 
 | Action | Control |
@@ -314,9 +343,11 @@ game library or given on the command line. See
 On the player screen, click the last row to type a new name, then Enter
 or OK.
 
-Atlantis II and Atlantis III have controls of their own: see
-[Atlantis II](docs/GUIDE.md#controls) and
-[Atlantis III](docs/GUIDE.md#atlantis-iii-controls) in the player's guide.
+Atlantis II, Atlantis III and Atlantis Evolution have controls of their
+own: see [Atlantis II](docs/GUIDE.md#controls),
+[Atlantis III](docs/GUIDE.md#atlantis-iii-controls) and
+[Atlantis Evolution](docs/GUIDE.md#atlantis-evolution-controls) in the
+player's guide.
 
 ## Build from source
 
@@ -430,5 +461,13 @@ the crate's, unchanged, on crates.io). It is a port of libtheora 1.2.0's
 decoder, Copyright (C) 2002-2009 Xiph.org Foundation, under a BSD licence
 whose notice is in `assets/licenses/LICENSE-libtheora`.
 
-*Atlantis: The Lost Tales*, *Atlantis II* and *Atlantis III* are trademarks of their owners. This project is not
+The Vorbis decoder of Atlantis Evolution's sounds (`atlantis4-data`,
+module `vorbis`) follows the structure of libvorbis 1.2.0 and libogg 1.1.3,
+Copyright (c) 2002-2007 Xiph.org Foundation, under a BSD licence whose
+notice is in `assets/licenses/LICENSE-libvorbis`. Every package carries
+these three files, `LICENSE-MPL-2.0`, `LICENSE-libtheora` and
+`LICENSE-libvorbis`, beside `LICENSE` (the PortMaster package, which plays
+the first game only, lists its Rust libraries instead).
+
+*Atlantis: The Lost Tales*, *Atlantis II*, *Atlantis III* and *Atlantis Evolution* are trademarks of their owners. This project is not
 affiliated with them.
