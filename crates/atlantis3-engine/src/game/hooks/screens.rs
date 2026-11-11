@@ -264,8 +264,6 @@ pub(super) fn start(h: &mut Hx, screen: Screen) {
         Screen::CraneBagdad | Screen::Telecommande => {
             h.g.pointer = maps::centre(h.g.width, h.g.height);
         }
-        // @ 0x00431da0: nothing the script sees besides the common part.
-        _ => {}
     }
 }
 
