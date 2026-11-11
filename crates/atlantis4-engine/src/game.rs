@@ -10,8 +10,9 @@
 //!
 //! Done here: `PutObject`, `RemoveObject`, `StartAnimation`,
 //! `StartAnimationPart`, `SetMarker`, `LookAt`, `SetViewAngleXLimits`,
-//! `SetViewAngleYLimits`, `SetFOV`, `ChangeWarp`. Every other binding is
-//! logged and does nothing (sounds, videos, dialogs, inventory,
+//! `SetViewAngleYLimits`, `SetFOV`, `ChangeWarp`, `PlayMovie` (the
+//! picture side; its sound is handed over as [`MovieCue`]s). Every other
+//! binding is logged and does nothing (sounds, dialogs, inventory,
 //! documents, diary and saves belong to later milestones); `Selected`
 //! answers `false` (empty inventory) and `ObjectCount` 0.
 
@@ -25,6 +26,7 @@ use atlantis4_script::{Call, Engine, ErrorSite, Event, Reply, SavedGlobal};
 
 use crate::camera::fov_for_height;
 use crate::markers::sprite_path;
+use crate::movie::{self, Click, Movie, MovieCue};
 use crate::package::Picture;
 use crate::render::{render, Coverage, Weights};
 use crate::sprite::{self, cursor_corner, CURSOR_PATH};
@@ -64,6 +66,13 @@ pub struct Game {
     cover: Coverage,
     /// Decoded 2-D pictures by path (`None`: missing or broken).
     sprites: HashMap<String, Option<Picture>>,
+    /// The `PlayMovie` in progress (`game+0x4038` clear while it is).
+    pub movie: Option<Movie>,
+    /// The movies' sound events, for the sound side to take.
+    pub movie_cues: Vec<MovieCue>,
+    /// The engine clock read at a binding call, in µs (`play()` reads the
+    /// clock itself, @ 0x004f592b); `None`: the frame's time, `now_ms`.
+    pub clock_us: Option<Box<dyn Fn() -> u64>>,
 }
 
 /// A PNG as RGBA.
@@ -126,7 +135,105 @@ impl Game {
             background: None,
             cover: Coverage::new(),
             sprites: HashMap::new(),
+            movie: None,
+            movie_cues: Vec::new(),
+            clock_us: None,
         }
+    }
+
+    /// The clock now, in ms (µs / 1000.0 as the original divides it).
+    pub fn clock_ms(&self) -> f64 {
+        match &self.clock_us {
+            Some(c) => c() as f64 / 1000.0,
+            None => self.now_ms,
+        }
+    }
+
+    /// `PlayMovie(video, sound)` (worker @ 0x005232b0): the background
+    /// shown, the skip button hidden, the music stopped and `sound`
+    /// started on the `video` channel, the `video` sprite loaded with
+    /// `video` and played from the clock's time.
+    pub fn play_movie(&mut self, video: &str, sound: &str) {
+        log::info!("PlayMovie({video}, {sound})");
+        self.movie_cues.push(MovieCue::Start {
+            sound: sound.to_string(),
+        });
+        let now = self.clock_ms();
+        self.movie = Some(Movie::start(&self.files, video, now, self.table.as_ref()));
+    }
+
+    /// The movie's frame at `now_ms`: the name for `OnMovieFinished` when
+    /// it ended there.
+    pub fn update_movie(&mut self, now_ms: f64) -> Option<String> {
+        self.now_ms = now_ms;
+        let ended = self.movie.as_mut()?.update(now_ms, self.table.as_ref());
+        ended.then(|| self.end_movie())
+    }
+
+    /// The end (@ 0x00524740): the movie's layouts hidden, the `video`
+    /// channel stopped and the music played again; the name for
+    /// `OnMovieFinished`.
+    fn end_movie(&mut self) -> String {
+        let m = self.movie.take().expect("a movie");
+        self.movie_cues.push(MovieCue::End);
+        let name = m.finished_name();
+        log::info!("movie {name} finished");
+        name
+    }
+
+    /// The skip button's picture size (75 × 75 in the data).
+    fn skip_size(&mut self) -> (u32, u32) {
+        let p = movie::resolve(&self.files, movie::SKIP_PICTURE);
+        let p = p.unwrap_or_else(|| movie::SKIP_PICTURE.to_string());
+        self.load_sprite(&p);
+        match self.sprites.get(&p) {
+            Some(Some(pic)) => (pic.width, pic.height),
+            _ => (75, 75),
+        }
+    }
+
+    /// A press at window pixel (`x`, `y`) of a `width × height` view
+    /// while a movie plays (the movie's buttons take it).
+    pub fn movie_press(&mut self, width: u32, height: u32, x: f64, y: f64) {
+        let skip = self.skip_size();
+        if let Some(m) = self.movie.as_mut() {
+            let l = m.layout(width, height, skip);
+            m.press(&l, x, y);
+        }
+    }
+
+    /// The pointer moved to (`x`, `y`) during a movie.
+    pub fn movie_drag(&mut self, width: u32, height: u32, x: f64, y: f64) {
+        let skip = self.skip_size();
+        if let Some(m) = self.movie.as_mut() {
+            let l = m.layout(width, height, skip);
+            m.drag(&l, x, y);
+        }
+    }
+
+    /// A release at (`x`, `y`) during a movie: the name for
+    /// `OnMovieFinished` when it skipped the movie.
+    pub fn movie_release(&mut self, width: u32, height: u32, x: f64, y: f64) -> Option<String> {
+        let skip = self.skip_size();
+        let m = self.movie.as_mut()?;
+        let l = m.layout(width, height, skip);
+        match m.release(&l, x, y) {
+            Click::Skipped => Some(self.end_movie()),
+            Click::Toggled => {
+                log::info!("skip button {}", if m.skip_shown { "shown" } else { "hidden" });
+                None
+            }
+            Click::None => None,
+        }
+    }
+
+    /// The movie's pictures loaded; their resolved paths.
+    fn movie_pictures(&mut self) -> [String; 3] {
+        [movie::BACKGROUND_PICTURE, movie::SKIP_PICTURE, movie::SKIP_DOWN_PICTURE].map(|p| {
+            let r = movie::resolve(&self.files, p).unwrap_or_else(|| p.to_string());
+            self.load_sprite(&r);
+            r
+        })
     }
 
     fn load_sprite(&mut self, path: &str) {
@@ -141,13 +248,18 @@ impl Game {
 
     /// The frame of a `width × height` window into `out` (XRGB, rows
     /// top-down), in the original's order: the warp (background, then the
-    /// draw list), the markers, the cursor at `pointer` (window pixels)
-    /// when given.
+    /// draw list), the markers, a movie's background, video and skip
+    /// button, the cursor at `pointer` (window pixels) when given.
     pub fn draw(&mut self, out: &mut [u32], width: u32, height: u32, pointer: Option<(f64, f64)>) {
         let n = width as usize * height as usize;
         let out = &mut out[..n];
         let cam = self.camera(width, height);
-        if let Some(w) = self.warp.as_mut() {
+        // Under a movie's background nothing of the warp shows: it is
+        // not drawn.
+        let covered = self.movie.as_ref().is_some_and(|m| m.covers(width, height));
+        if covered {
+            out.fill(0);
+        } else if let Some(w) = self.warp.as_mut() {
             let key = (
                 self.serial,
                 cam.fov.to_bits(),
@@ -177,11 +289,18 @@ impl Game {
         for i in images {
             self.load_sprite(&sprite_path(i, false));
         }
-        if let Some(w) = &self.warp {
+        if let Some(w) = self.warp.as_ref().filter(|_| !covered) {
             let sprites = &self.sprites;
             w.draw_markers(&cam, self.now_ms, out, |i| {
                 sprites.get(&sprite_path(i, false)).and_then(Option::as_ref)
             });
+        }
+        if self.movie.is_some() {
+            let [bg, up, down] = self.movie_pictures();
+            let get = |p: &str| self.sprites.get(p).and_then(Option::as_ref);
+            if let Some(m) = &self.movie {
+                m.draw(out, width, height, get(&bg), get(&up), get(&down));
+            }
         }
         if let Some((x, y)) = pointer {
             self.load_sprite(CURSOR_PATH);
@@ -297,6 +416,10 @@ impl Engine for Game {
             Binding::Selected => {
                 log::info!("Selected({name}): no inventory yet, false");
                 return Reply::Bool(false);
+            }
+            Binding::PlayMovie => {
+                let sound = text(call.str(1));
+                self.play_movie(&name, &sound);
             }
             Binding::TestObjectLimit => return Reply::Bool(false),
             Binding::ObjectCount => return Reply::Num(0.0),
