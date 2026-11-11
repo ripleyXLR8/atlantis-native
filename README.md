@@ -423,5 +423,12 @@ folder, for a Chinese or the Japanese release only); every package carries
 their licence files, `LICENSE-LiberationSans`, `LICENSE-NotoSerifCJK` and
 `LICENSE-NotoSansJP`, beside `LICENSE`.
 
+The Theora video decoder, the `theora-rs` crate 0.1.0
+(<https://github.com/xmoezzz/siglus_rs>), is licensed under the Mozilla
+Public License 2.0 (see `assets/licenses/LICENSE-MPL-2.0`; its source is
+the crate's, unchanged, on crates.io). It is a port of libtheora 1.2.0's
+decoder, Copyright (C) 2002-2009 Xiph.org Foundation, under a BSD licence
+whose notice is in `assets/licenses/LICENSE-libtheora`.
+
 *Atlantis: The Lost Tales*, *Atlantis II* and *Atlantis III* are trademarks of their owners. This project is not
 affiliated with them.

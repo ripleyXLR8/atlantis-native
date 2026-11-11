@@ -7,7 +7,7 @@
 //! +0x1af510). This module reads the container per RFC 3533 (page CRC
 //! checked) and the identification headers per the Vorbis I and Theora
 //! specifications; decoding the sound is [`crate::audio`]'s, decoding the
-//! pictures is the Theora decoder's to come.
+//! pictures is [`crate::video`]'s.
 
 use std::collections::BTreeMap;
 

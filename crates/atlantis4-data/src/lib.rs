@@ -21,6 +21,7 @@
 //! - [`jpeg`]: the JPEG decoder exact to libjpeg's defaults;
 //! - [`ogg`]: Ogg pages and the Vorbis, Theora and Skeleton headers;
 //! - [`audio`]: Vorbis decoding and WAVE headers;
+//! - [`video`]: Theora decoding, the original's Y'CbCr → RGBA and alpha;
 //! - [`testing`]: what a game-data test does when its data is missing.
 
 #![forbid(unsafe_code)]
@@ -37,6 +38,7 @@ pub mod ogg;
 pub mod scene;
 pub mod testing;
 pub mod texts;
+pub mod video;
 pub mod wpa;
 pub mod xml;
 

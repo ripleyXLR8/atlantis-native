@@ -1,0 +1,17 @@
+# Video goldens of the GOG.com install of Atlantis Evolution: hashes only,
+# tab-separated.
+# ycbcr: every frame of the 1,930 Theora streams decoded by libtheora 1.2.0
+# (post-processing 0), each frame's Y, Cb, Cr planes cropped to the picture
+# (rows top first) hashed; the lines "<file>[/<package entry>]\t<frame>\t<md5>\n"
+# sorted; their count and the MD5 of their concatenation.
+ycbcr	244494	343597ba3a5587a28c564c18c2242516
+# rgb-map: the MD5 of R, G, B for every (Y, Cb, Cr), index Y*65536 + Cb*256
+# + Cr, by the reference model of the original's conversion.
+rgb-map	04a9befb3a8d3e2a43b3c4afa9bce7fd
+# rgba: <file>[:<entry>], picture size, frames, MD5 of every RGBA frame in
+# order: libtheora's planes through the reference model, colour and alpha
+# paired by packet index (A = 0 without an alpha stream).
+rgba	Videos/Dialogs/PC-MacOSX/rf0001.ogv	800x448	50	5602717e7154b1cc6452bdbbba2b8feb
+rgba	3D/Bateau_CA/0001/PC-MacOSX/hua2.wpa:000000.ogv	960x64	19	786f18f15b1f458192591c74b6622b55
+rgba	Videos/PC-MacOSX/logo.ogv	704x394	59	c04f043c8aebdcb6db587b0ce4bf2e4d
+rgba	Videos/PC-MacOSX/clipcosmo.ogv	800x600	20	346d53f54a57dca8f75153678aeee08b
