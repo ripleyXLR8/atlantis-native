@@ -1108,6 +1108,7 @@ impl A2App {
         // [`A2App::sync_lock`]); the lock hides the pointer itself.
         #[cfg(target_arch = "wasm32")]
         {
+            self.web.lock_auto = false;
             if on {
                 self.web.lock_asked = Some(Instant::now());
                 a2_web::request_lock(w);
@@ -1133,6 +1134,20 @@ impl A2App {
         }
     }
 
+    /// Whether a pass out of the menus takes the pointer: always on the
+    /// desktop; in the browser, as the game leaves a menu (the player's
+    /// page, a load, the in-game menu closed), where a browser grants the
+    /// lock without a click when the page itself let it go (the menu's
+    /// `exitPointerLock`) or a click has just been made (the menu's own);
+    /// otherwise a click asks for it.
+    #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))]
+    fn may_grab(&self, in_menu: bool) -> bool {
+        #[cfg(target_arch = "wasm32")]
+        return !in_menu && self.web.in_menu && !self.web.lock_refused;
+        #[cfg(not(target_arch = "wasm32"))]
+        true
+    }
+
     fn step(&mut self) {
         // In the menus the pointer is the game's own, moved by the mouse
         // over the window; in the game the mouse turns the view.
@@ -1145,14 +1160,24 @@ impl A2App {
             if let Some(w) = &self.window {
                 w.set_cursor_visible(false);
             }
-        } else if !in_menu && !self.locked && self.focused && cfg!(not(target_arch = "wasm32")) {
-            // (in the browser the lock is asked for on a click only)
+        } else if !in_menu && !self.locked && self.focused && self.may_grab(in_menu) {
             self.grab(true);
             // A press after this pass is not the one that gave the focus:
             // grabbed, it reaches the game anyway; not grabbed (both grab
             // modes refused), the pointer stays free and every press is a
             // click, so the flag must not swallow a later one.
             self.refocused = false;
+            // The browser: asked for without a click (see `may_grab`); if
+            // refused, the next click only takes the lock
+            // ([`A2App::sync_lock`]).
+            #[cfg(target_arch = "wasm32")]
+            {
+                self.web.lock_auto = true;
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.web.in_menu = in_menu;
         }
         let (mx, my) = (self.motion.0.trunc(), self.motion.1.trunc());
         self.motion.0 -= mx;
@@ -1342,18 +1367,36 @@ impl A2App {
     /// A redraw at `now`: the game's pass when one is due and the game is
     /// not held; whether it ran.
     fn redraw(&mut self, now: Instant) -> bool {
-        // The browser paces the redraws itself (one a screen refresh): a
-        // pass is run when it is due within a few milliseconds, a pause of
-        // the redraws (the browser busy) not counted as game time; a
+        // The browser paces the redraws itself (one a screen refresh, at
+        // whatever rate the screen has): the passes due within a few
+        // milliseconds are run, each at the time it was due
+        // ([`crate::web_pace::steps_due`]), so that a screen below 60 Hz
+        // (a power saver, 50 Hz) keeps the desktop's pace; a pause of the
+        // redraws (the browser busy) is not counted as game time; a
         // hidden page holds the game ([`A2App::set_page_hidden`]).
         #[cfg(target_arch = "wasm32")]
-        let now = {
+        {
             if let Some((from, to)) = self.web.gap(now) {
                 self.clock.skip(from + FRAME, to);
                 self.next_frame = to;
             }
-            now + Duration::from_millis(4)
-        };
+            if self.clock.held() {
+                return false;
+            }
+            let mut next = self.next_frame;
+            let (n, first) =
+                crate::web_pace::steps_due(&mut next, now + crate::web_pace::SLACK, FRAME);
+            for i in 0..n {
+                self.next_frame = first + FRAME * i;
+                self.step();
+                if self.engine.quit() || self.clock.held() {
+                    break;
+                }
+            }
+            self.next_frame = next;
+            return n > 0;
+        }
+        #[allow(unreachable_code)]
         if now < self.next_frame || self.clock.held() {
             return false;
         }
@@ -1483,6 +1526,7 @@ impl A2App {
     fn sync_lock(&mut self) {
         if a2_web::pointer_locked() {
             self.web.lock_seen = true;
+            self.web.lock_auto = false;
             return;
         }
         if !self.locked {
@@ -1496,7 +1540,10 @@ impl A2App {
             return;
         }
         self.locked = false;
-        if self.web.lock_seen {
+        if self.web.lock_seen || std::mem::take(&mut self.web.lock_auto) {
+            // Lost, or the game's own request after a menu refused (no
+            // click was made): the next click only takes the lock back,
+            // instead of acting at the screen's centre.
             self.refocused = true;
         } else if !self.web.lock_refused {
             log::info!("pointer lock refused: clicks act at once, the arrow keys turn the view");
@@ -1694,6 +1741,13 @@ impl ApplicationHandler for A2App {
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
             if self.locked && !self.menu.is_open() {
+                // The browser: winit's motion back to the page's own
+                // counts, the same in every browser.
+                #[cfg(target_arch = "wasm32")]
+                let (dx, dy) = {
+                    let k = a2_web::motion_scale();
+                    (dx * k, dy * k)
+                };
                 self.motion.0 += dx;
                 self.motion.1 += dy;
             }
@@ -1813,6 +1867,12 @@ impl ApplicationHandler for A2App {
                 #[cfg(target_arch = "wasm32")]
                 if pressed {
                     self.gesture();
+                    // The game's own request after a menu not granted (yet):
+                    // this click only takes the lock.
+                    if std::mem::take(&mut self.web.lock_auto) && !a2_web::pointer_locked() {
+                        self.locked = false;
+                        self.refocused = true;
+                    }
                 }
                 let focus_click = self.focus_click(pressed);
                 if mouse_button(

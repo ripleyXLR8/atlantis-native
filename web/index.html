@@ -386,6 +386,12 @@
           : { position: "", left: "", top: "", width: "", height: "",
               aspectRatio: "" });
         full.style.display = on ? "none" : "block";
+        // In full screen, Escape goes to the game as on the desktop
+        // (Chromium's keyboard lock: holding Escape leaves full screen);
+        // elsewhere the browser keeps it to let the mouse go.
+        const kb = navigator.keyboard;
+        if (on) kb?.lock?.(["Escape"]).catch(() => {});
+        else kb?.unlock?.();
       };
       window.atlantisToggleFullscreen = () => {
         if (document.fullscreenElement) document.exitFullscreen();
