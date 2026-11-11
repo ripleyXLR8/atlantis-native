@@ -349,6 +349,60 @@ fn a_new_game_plays_the_intro_then_calls_on_movie_finished() {
     );
 }
 
+/// Peak of the mix's next `ms` milliseconds (the sound side runs on the
+/// game clock here: no output pulls it).
+fn mix_peak(game: &Rc<RefCell<Game>>, from_us: u64, ms_len: u64) -> i32 {
+    let core = game.borrow().sounds.core();
+    let mut peak = 0;
+    for k in 1..=ms_len / 50 {
+        game.borrow_mut().update(ms(from_us + k * 50_000));
+        let mut buf = vec![0i16; 2 * 2205];
+        core.lock().unwrap().pull(&mut buf);
+        peak = buf.iter().map(|&s| i32::from(s).abs()).fold(peak, i32::max);
+    }
+    peak
+}
+
+#[test]
+fn the_intros_sound_starts_and_stops_with_the_movie() {
+    let Some(dir) = install() else { return };
+    // Natural end, then skip.
+    for skip in [false, true] {
+        let (game, _script) = boot(&dir);
+        {
+            let mut g = game.borrow_mut();
+            // The node's `PlayMusic` then `PlayMovie("Videos/intro.ogv",
+            // "Videos/intro.ogg")`: the music cut, the sound file on the
+            // `video` channel.
+            assert_eq!(g.sounds.music.path(), "Sounds/Musiques/muzik20.ogg");
+            assert!(!g.sounds.music.is_playing());
+            assert_eq!(g.sounds.video.path(), "Videos/intro.ogg");
+            assert!(g.sounds.video.is_playing());
+            // The node's ambience goes on under the movie; silenced here so
+            // that the mix is the intro's sound alone.
+            g.sounds.stop_sound("Sounds/Ambiances/Bateau.ogg");
+        }
+        // The intro's sound is heard while the picture runs.
+        assert!(mix_peak(&game, T0, 2_000) > 0);
+        let name = if skip {
+            let (w, h) = (1365, 768);
+            let mut g = game.borrow_mut();
+            g.movie_press(w, h, 10.0, 10.0);
+            assert_eq!(g.movie_release(w, h, 10.0, 10.0), None);
+            g.movie_press(w, h, 1266.0, 37.0);
+            g.movie_release(w, h, 1266.0, 37.0)
+        } else {
+            game.borrow_mut().update_movie(ms(T0 + 1578 * 40_000))
+        };
+        assert_eq!(name.as_deref(), Some("Videos/intro.ogv"));
+        let g = game.borrow();
+        assert!(g.movie.is_none());
+        // The intro's sound stopped, the music played again.
+        assert!(!g.sounds.video.is_playing(), "skip {skip}");
+        assert!(g.sounds.music.is_playing(), "skip {skip}");
+    }
+}
+
 #[test]
 fn a_click_shows_the_skip_button_and_a_click_on_it_ends_the_intro() {
     let Some(dir) = install() else { return };

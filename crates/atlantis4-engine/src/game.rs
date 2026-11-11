@@ -10,8 +10,9 @@
 //!
 //! Done here: `PutObject`, `RemoveObject`, `StartAnimation`,
 //! `StartAnimationPart`, `SetMarker`, `LookAt`, `SetViewAngleXLimits`,
-//! `SetViewAngleYLimits`, `SetFOV`, `ChangeWarp`, `PlayMovie` (the
-//! picture side; its sound is handed over as [`MovieCue`]s), and the
+//! `SetViewAngleYLimits`, `SetFOV`, `ChangeWarp`, `PlayMovie` (picture
+//! and sound: its sound file plays on the `video` channel from the
+//! movie's start to its end or skip, the music cut meanwhile), and the
 //! sounds ([`crate::sound`]): `PlayMusic`, `PlaySound`, `StopSound` with
 //! `OnSoundStopped`, the node change's stop of the `PlaySound` sounds, and
 //! `AddToBag`'s notification sound. Every other binding is logged and does
@@ -171,6 +172,9 @@ impl Game {
         self.movie_cues.push(MovieCue::Start {
             sound: sound.to_string(),
         });
+        // The music stopped, then the sound on `video` (@ 0x00523435,
+        // 0x0052344e..0x00523573), before the sprite's load.
+        self.movie_started(Some(sound));
         let now = self.clock_ms();
         self.movie = Some(Movie::start(&self.files, video, now, self.table.as_ref()));
     }
@@ -189,6 +193,8 @@ impl Game {
     fn end_movie(&mut self) -> String {
         let m = self.movie.take().expect("a movie");
         self.movie_cues.push(MovieCue::End);
+        // `video` stopped, the music played again, then `OnMovieFinished`.
+        self.movie_finished();
         let name = m.finished_name();
         log::info!("movie {name} finished");
         name

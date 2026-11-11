@@ -19,7 +19,9 @@
 //! ends the movie), and its end calls `OnMovieFinished`. The sounds play
 //! as the original mixes them (`atlantis4_engine::sound`, `oalmix`): the
 //! music, the node's `PlaySound` sounds and ambiences, `OnSoundStopped`,
-//! the `AddToBag` notification; the device is asked for 44,100 Hz, else the mix is resampled linearly
+//! the `AddToBag` notification, and a movie's sound file on the `video`
+//! channel from its start to its end or skip (the music cut meanwhile);
+//! the device is asked for 44,100 Hz, else the mix is resampled linearly
 //! to its rate (outside the exact part, like Windows' own audio engine
 //! after OpenAL). Dialogs and the inventory are not there yet (logged).
 

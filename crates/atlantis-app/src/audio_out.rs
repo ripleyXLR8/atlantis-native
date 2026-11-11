@@ -20,7 +20,10 @@ where
 
 /// The same, asking the device for `rate` when it offers it (in any of
 /// its supported ranges), else its default rate.
-#[cfg_attr(not(feature = "atlantis4"), allow(dead_code))]
+#[cfg_attr(
+    any(not(feature = "atlantis4"), target_arch = "wasm32"),
+    allow(dead_code)
+)]
 pub fn start_with_rate<F>(fill: F, rate: u32) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
