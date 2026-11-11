@@ -118,7 +118,7 @@ fn the_globals_print_as_the_originals_writer() {
     script.run_chunk(chunk.as_bytes(), b"golden");
     let g = script.globals().unwrap();
     let text = save_text(&empty_parts(), &g);
-    // Decision 0004: the globals as a set. The game state holds `tolua`
+    // The globals as a set (their order follows the collector). The game state holds `tolua`
     // and the bindings too, all of types the save skips.
     let got = global_lines(&text);
     // (Its first line is the declaration.)
@@ -450,7 +450,7 @@ fn run_until(r: &mut Run, done: impl Fn(&Game, &[String]) -> bool) -> Vec<String
     panic!("not reached; movies {movies:?}, node {}", node(&r.game));
 }
 
-/// The nine reachable lose movies (puzzles-chases.md § 1): each from its
+/// The nine reachable lose movies of the node scripts: each from its
 /// node and condition, through the scripts and the engine (clicks,
 /// finite animations, dialog lines, movies) to the node it returns to.
 #[test]

@@ -1,5 +1,5 @@
 # a4_lua_save_globals.txt - the save's Lua globals writer, run unmodified
-# Producer: atlantis4-re tools/lua/save_emu.py (Unicorn 2) on
+# Producer: an emulator of the executable (Unicorn 2) run on
 #   atlantis4-gog-en-2363910 (MD5 f2de382af52f1d89e32ed7c286be8b4f).
 # Run unmodified: lua_newstate 0x004a4a50, luaL_openlibs 0x005821b0 (part B only),
 #   luaL_loadbuffer 0x004c3ce0, lua_pcall 0x004c50b0, TiXmlDocument ctor 0x00509740,
@@ -12,7 +12,7 @@
 # The file on disk is written by fopen_s(..,"w") (text mode): every "\n"
 #   below is "\r\n" on disk [INFERRED]. No BOM. Bytes >= 0x80 are shown as \xNN
 #   (written raw). Element order = luaH_next order of this state's globals
-#   (exact for these runs; decision 0004: game saves are compared as sets).
+#   (exact for these runs; game saves are compared as sets).
 # Synthetic globals only (no game data).
 == chunk
 flagTrue = true
