@@ -69,6 +69,8 @@ const T0: u64 = 5_000_000;
 const LONGEST: u64 = 600_000_000;
 /// The chapters: six ended by a chapter save, the last by `FinishGame`.
 const CHAPTERS: usize = 7;
+/// The stack the replay runs on: a Windows program's main thread's.
+const WINDOWS_MAIN_STACK: usize = 1 << 20;
 
 // ---------------------------------------------------------------------------
 // The walk
@@ -1051,7 +1053,19 @@ fn replay() -> Option<Vec<ChapterRun>> {
 
 fn outcome() -> Option<&'static [ChapterRun]> {
     static RUN: OnceLock<Option<Vec<ChapterRun>>> = OnceLock::new();
-    RUN.get_or_init(replay).as_deref()
+    RUN.get_or_init(|| {
+        // On a 1 MiB stack, Windows' main thread's (Linux gives 8 MiB, a
+        // test thread 2 MiB): the game runs on the main thread, so the
+        // story must fit there.
+        std::thread::Builder::new()
+            .name("story".into())
+            .stack_size(WINDOWS_MAIN_STACK)
+            .spawn(replay)
+            .unwrap()
+            .join()
+            .unwrap()
+    })
+    .as_deref()
 }
 
 fn chapter(k: usize) {

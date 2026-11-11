@@ -21,8 +21,17 @@ fn main() {
         println!("cargo:rustc-link-arg=-zstack-size=8388608");
     }
 
-    // The program file's icon on Windows.
+    // The program file's icon on Windows, and its main thread's stack:
+    // 16 MiB, as on the desktop elsewhere the games run on the main
+    // thread (winit's event loop must) with an 8 MiB stack, and Windows
+    // gives it 1 MiB unless the program file asks for more (Atlantis
+    // Evolution's movie opening once overflowed it: 1 MiB of frames).
     if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
+        if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+            println!("cargo:rustc-link-arg-bins=/STACK:16777216");
+        } else {
+            println!("cargo:rustc-link-arg-bins=-Wl,--stack,16777216");
+        }
         println!("cargo:rerun-if-changed=../../packaging/windows/atlantis-native.rc");
         println!("cargo:rerun-if-changed=../../assets/icon/atlantis-native.ico");
         embed_resource::compile(

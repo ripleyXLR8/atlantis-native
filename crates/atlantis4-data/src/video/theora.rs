@@ -102,7 +102,10 @@ pub struct Theora {
     full_range: bool,
     /// The data packets (the three headers excluded).
     packets: Vec<Vec<u8>>,
-    decoder: DecoderContext,
+    /// Boxed: the decoder's state is 85 KB, and a movie's opening moved
+    /// it through several frames of a 1 MiB stack (a Windows program's
+    /// main thread's), which overflowed.
+    decoder: Box<DecoderContext>,
     /// The index of the next frame [`Theora::next_frame`] decodes.
     next: usize,
 }
@@ -158,7 +161,7 @@ impl Theora {
         if parser.info.pixel_fmt != PixelFmt::Pf420 {
             return Err(VideoError::PixelFormat);
         }
-        let decoder = parser.decoder().map_err(|_| VideoError::Headers)?;
+        let decoder = Box::new(parser.decoder().map_err(|_| VideoError::Headers)?);
         let full_range = parser
             .comment
             .user_comments
@@ -213,7 +216,7 @@ impl Theora {
     /// Back to the first frame (a new decoder: every frame of the data
     /// depends on the frames since the previous intra frame).
     pub fn rewind(&mut self) -> Result<(), VideoError> {
-        self.decoder = theora_rs::decoder_from_headers(&self.info, &self.setup)
+        *self.decoder = theora_rs::decoder_from_headers(&self.info, &self.setup)
             .map_err(|_| VideoError::Headers)?;
         self.next = 0;
         Ok(())
