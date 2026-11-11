@@ -183,6 +183,8 @@ dependencies = [
  "atlantis2-engine",
  "atlantis3-data",
  "atlantis3-engine",
+ "atlantis4-data",
+ "atlantis4-engine",
  "console_error_panic_hook",
  "console_log",
  "cpal",
@@ -307,6 +309,17 @@ dependencies = [
  "lewton",
  "md-5",
  "miniz_oxide 0.8.9",
+ "png",
+]
+
+[[package]]
+name = "atlantis4-engine"
+version = "0.6.0"
+dependencies = [
+ "atlantis-data",
+ "atlantis4-data",
+ "libm",
+ "md-5",
  "png",
 ]
 
