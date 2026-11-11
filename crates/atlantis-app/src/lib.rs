@@ -59,6 +59,8 @@ pub mod watchdog;
 #[cfg(target_arch = "wasm32")]
 mod web;
 pub mod web_layout;
+#[cfg(any(target_arch = "wasm32", test))]
+mod web_pace;
 
 const W: usize = SCREEN_W;
 const H: usize = SCREEN_H;
@@ -219,6 +221,22 @@ pub struct App {
     audio: Option<cpal::Stream>,
     /// The browser starts sound only after a user gesture.
     audio_pending: bool,
+    /// In the browser until the sound starts (or without a sound
+    /// output): the samples the mixer has played out silently, at the
+    /// game's clock, so that its voices advance and end as with an output.
+    #[cfg(target_arch = "wasm32")]
+    silent_at: Option<u64>,
+    /// In the browser: when the page was hidden (the game held and
+    /// silent since then), and the last redraw (a longer pause of the
+    /// redraws is not game time).
+    #[cfg(target_arch = "wasm32")]
+    hidden_at: Option<Instant>,
+    #[cfg(target_arch = "wasm32")]
+    last_redraw: Option<Instant>,
+    /// In the browser: the keys held, let go when the page loses the
+    /// focus (no release reaches it then).
+    #[cfg(target_arch = "wasm32")]
+    keys_held: Vec<EngineKey>,
     /// The port's options menu (F10); the game is paused while it is open,
     /// since `paused_at`.
     menu: OptionsMenu,
@@ -344,6 +362,14 @@ impl App {
             rel_acc: (0.0, 0.0),
             audio: None,
             audio_pending: true,
+            #[cfg(target_arch = "wasm32")]
+            silent_at: Some(0),
+            #[cfg(target_arch = "wasm32")]
+            hidden_at: None,
+            #[cfg(target_arch = "wasm32")]
+            last_redraw: None,
+            #[cfg(target_arch = "wasm32")]
+            keys_held: Vec::new(),
             menu: {
                 let mut m = OptionsMenu::new();
                 m.set_fullscreen_entry(cfg!(not(target_arch = "wasm32")));
@@ -608,6 +634,11 @@ impl App {
             self.start += now.duration_since(t);
             self.next_frame = now;
         }
+        // (the menu's time is not a pause of the redraws)
+        #[cfg(target_arch = "wasm32")]
+        {
+            self.last_redraw = None;
+        }
         self.sys.mixer.set_paused(false);
         if let Some(w) = &self.window {
             if self.runner.is_some() {
@@ -682,7 +713,79 @@ impl App {
     fn start_audio(&mut self) {
         if self.audio_pending {
             self.audio_pending = false;
-            self.audio = audio_out::start(self.sys.mixer.clone());
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                self.audio = audio_out::start(self.sys.mixer.clone());
+            }
+            // The browser: silent while the page is hidden (its redraws
+            // stop, its sound output does not), even when the change was
+            // not seen as held; without an output the mixer goes on being
+            // played out silently.
+            #[cfg(target_arch = "wasm32")]
+            {
+                let mixer = self.sys.mixer.clone();
+                self.audio = audio_out::start_with(move |out, rate, channels| {
+                    if crate::a2_web::page_hidden() {
+                        out.fill(0.0);
+                    } else {
+                        mixer.fill(out, rate, channels);
+                    }
+                });
+                if self.audio.is_some() {
+                    self.silent_at = None;
+                }
+            }
+        }
+    }
+
+    /// In the browser before the sound starts: the mixer played out up to
+    /// `ms` of the game's clock and dropped, as the output would play it
+    /// (A2's `play_silent`): a line's voice ends, a sound started before
+    /// the first gesture is not heard all at once at it.
+    #[cfg(target_arch = "wasm32")]
+    fn play_silent(&mut self, ms: u64) {
+        const RATE: u32 = 44_100;
+        let Some(done) = self.silent_at else { return };
+        let due = ms * u64::from(RATE) / 1000;
+        let mut buf = vec![0.0f32; 2 * 1024];
+        let mut at = done;
+        while at < due {
+            let n = (due - at).min(1024) as usize;
+            self.sys.mixer.fill(&mut buf[..2 * n], RATE, 2);
+            at += n as u64;
+        }
+        self.silent_at = Some(at);
+    }
+
+    /// In the browser, the page hidden or shown again (another tab, the
+    /// browser minimised): hidden, the game is held and silent, as
+    /// Atlantis II and III hold it (the browser stops the redraws, not the
+    /// sound output); shown, it goes on where it was, the time away not
+    /// counted (the options menu's pause keeps its own).
+    #[cfg(target_arch = "wasm32")]
+    fn set_page_hidden(&mut self, hidden: bool) {
+        let now = Instant::now();
+        if hidden {
+            if self.hidden_at.is_none() {
+                self.hidden_at = Some(now);
+                self.sys.mixer.set_paused(true);
+                self.release_keys();
+            }
+        } else if let Some(t) = self.hidden_at.take() {
+            if !self.menu.is_open() {
+                self.start += now.duration_since(t);
+                self.next_frame = now;
+                self.sys.mixer.set_paused(false);
+            }
+            self.last_redraw = None;
+        }
+    }
+
+    /// In the browser: the keys held let go (the page lost the focus).
+    #[cfg(target_arch = "wasm32")]
+    fn release_keys(&mut self) {
+        for k in std::mem::take(&mut self.keys_held) {
+            self.sys.push_input(Input::KeyUp(k));
         }
     }
 
@@ -692,14 +795,16 @@ impl App {
         if self.menu.is_open() {
             return true; // paused
         }
+        self.step_paced()
+    }
+
+    /// The desktop's pace: a step when the window's timer says one is due.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn step_paced(&mut self) -> bool {
         let Some(runner) = &mut self.runner else {
             return true;
         };
         let now = Instant::now();
-        // The browser paces the frames itself (requestAnimationFrame, one
-        // RedrawRequested per screen refresh): a timer before the redraw
-        // made the two delays add up and dropped frames.
-        #[cfg(not(target_arch = "wasm32"))]
         if now < self.next_frame {
             return true;
         }
@@ -710,7 +815,6 @@ impl App {
         let ms = now.duration_since(self.start).as_millis() as u64;
         let alive = runner.step(ms);
         let took = now.elapsed();
-        #[cfg(not(target_arch = "wasm32"))]
         self.tick_play_time(now);
         if took > SLOW_STEP {
             // A step this long keeps the window from answering the system
@@ -718,6 +822,63 @@ impl App {
             log::warn!("slow engine step: {} ms at {ms} ms", took.as_millis());
         }
         self.apply_pointer();
+        alive
+    }
+
+    /// The browser's pace: it asks for a redraw per screen refresh
+    /// (`requestAnimationFrame`), at whatever rate the screen has (30 under
+    /// a power saver, 144 on a fast screen); each runs the steps of 1/60 s
+    /// due since the last ([`web_pace::steps_due`]), each at the time it
+    /// was due, so that the game keeps the desktop's 60 steps a second
+    /// (a timer before the redraw made the two delays add up and dropped
+    /// frames). A hidden page holds the game; a pause of the redraws
+    /// longer than [`crate::a2_web::GAP`] (the browser busy) is not game time.
+    #[cfg(target_arch = "wasm32")]
+    fn step_paced(&mut self) -> bool {
+        if self.runner.is_none() {
+            return true;
+        }
+        let now = Instant::now();
+        let (audio, held) = (self.audio.is_some(), self.hidden_at.is_some());
+        web::note_a1(|s| {
+            s.audio = audio;
+            s.held = held;
+        });
+        if held {
+            self.last_redraw = None;
+            return true;
+        }
+        if let Some(last) = self.last_redraw.replace(now) {
+            let gap = now.saturating_duration_since(last);
+            if gap > crate::a2_web::GAP {
+                self.start += gap.saturating_sub(FRAME);
+                self.next_frame = now;
+            }
+        }
+        let (n, first) = web_pace::steps_due(&mut self.next_frame, now + web_pace::SLACK, FRAME);
+        let mut alive = true;
+        for i in 0..n {
+            let at = (first + FRAME * i).min(now);
+            let ms = at.saturating_duration_since(self.start).as_millis() as u64;
+            self.play_silent(ms);
+            let Some(runner) = &mut self.runner else {
+                break;
+            };
+            let t = Instant::now();
+            alive = runner.step(ms);
+            web::note_a1(|s| {
+                s.steps += 1;
+                s.ms = ms;
+            });
+            let took = t.elapsed();
+            if took > SLOW_STEP {
+                log::warn!("slow engine step: {} ms at {ms} ms", took.as_millis());
+            }
+            self.apply_pointer();
+            if !alive || self.menu.is_open() {
+                break;
+            }
+        }
         alive
     }
 
@@ -769,6 +930,14 @@ impl App {
     fn grab(&mut self) {
         let Some(window) = &self.window else { return };
         self.confined = false;
+        // The browser: asked for with the raw motion where it has it
+        // ([`crate::a2_web::request_lock`]).
+        #[cfg(target_arch = "wasm32")]
+        {
+            crate::a2_web::request_lock(window);
+            return;
+        }
+        #[allow(unreachable_code)]
         if window.set_cursor_grab(CursorGrabMode::Locked).is_err() {
             match window.set_cursor_grab(CursorGrabMode::Confined) {
                 Ok(()) => self.confined = true,
@@ -1248,6 +1417,13 @@ impl ApplicationHandler for App {
             // 640x480 screen the original ran fullscreen in.
             if self.locked {
                 self.raw_motion = true;
+                // The browser: winit's motion back to the page's own
+                // counts, the same in every browser.
+                #[cfg(target_arch = "wasm32")]
+                let (dx, dy) = {
+                    let k = crate::a2_web::motion_scale();
+                    (dx * k, dy * k)
+                };
                 self.relative(dx, dy);
             }
         }
@@ -1310,10 +1486,21 @@ impl ApplicationHandler for App {
             // a resize: take it again.
             WindowEvent::Focused(f) => {
                 self.focused = f;
+                // The browser sends no key release to a page without the
+                // focus (Alt+Tab, a click on the page's buttons): the keys
+                // held are let go, or the view would go on turning.
+                #[cfg(target_arch = "wasm32")]
+                if !f {
+                    self.release_keys();
+                }
                 if f && self.locked {
                     self.grab();
                 }
             }
+            // The page hidden or shown (winit's `Occluded` comes with
+            // `visibilitychange`; `document.hidden` says which).
+            #[cfg(target_arch = "wasm32")]
+            WindowEvent::Occluded(_) => self.set_page_hidden(crate::a2_web::page_hidden()),
             WindowEvent::Moved(_) => {
                 if self.locked && self.focused {
                     self.grab();
@@ -1378,7 +1565,10 @@ impl ApplicationHandler for App {
                 // A browser grants the pointer lock only on a user gesture.
                 if self.locked {
                     if let Some(w) = &self.window {
+                        #[cfg(not(target_arch = "wasm32"))]
                         let _ = w.set_cursor_grab(CursorGrabMode::Locked);
+                        #[cfg(target_arch = "wasm32")]
+                        crate::a2_web::request_lock(w);
                     }
                 }
             }
@@ -1386,6 +1576,12 @@ impl ApplicationHandler for App {
             WindowEvent::KeyboardInput { event, .. } => {
                 let key = engine_key(&event.logical_key);
                 let pressed = event.state == ElementState::Pressed;
+                // A key is a user gesture too: the browser's sound starts
+                // on the first click or key, as Atlantis II's and III's.
+                #[cfg(target_arch = "wasm32")]
+                if pressed && !self.menu.is_open() {
+                    self.start_audio();
+                }
                 // F11 or Alt+Enter: full screen (the port's keys; in the
                 // browser the page takes every key, so F11 comes here).
                 let enter = matches!(event.logical_key, Key::Named(NamedKey::Enter));
@@ -1424,6 +1620,13 @@ impl ApplicationHandler for App {
                     return;
                 }
                 if let Some(k) = key {
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        self.keys_held.retain(|h| *h != k);
+                        if pressed {
+                            self.keys_held.push(k);
+                        }
+                    }
                     self.sys.push_input(match event.state {
                         ElementState::Pressed => Input::KeyDown(k),
                         ElementState::Released => Input::KeyUp(k),

@@ -140,6 +140,8 @@ struct A3App {
     /// The pointer lock: when it was asked for, whether it was refused.
     lock_asked: Option<Instant>,
     lock_refused: bool,
+    /// The fractions of the pointer-lock motion not yet sent.
+    motion_acc: (f64, f64),
     /// The page's pointer at the last move (canvas pixels).
     cursor: Option<PhysicalPosition<f64>>,
     alt: bool,
@@ -165,6 +167,7 @@ impl A3App {
             audio_pending: true,
             lock_asked: None,
             lock_refused: false,
+            motion_acc: (0.0, 0.0),
             cursor: None,
             alt: false,
             times: FrameTimes::default(),
@@ -277,6 +280,9 @@ impl A3App {
             return;
         };
         crate::web::fit_canvas(&window, false);
+        // The lock looked at every redraw: one granted and lost between
+        // two looks is not taken for a refusal.
+        self.locked();
         let t = Instant::now();
         if let Some(last) = self.last.replace(t) {
             let dt = t.saturating_duration_since(last).as_secs_f64();
@@ -364,7 +370,15 @@ impl ApplicationHandler for A3App {
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta: (dx, dy) } = event {
             if a2_web::pointer_locked() {
-                self.game.mouse_motion(dx as i32, dy as i32);
+                // winit's motion back to the page's own counts, the same
+                // in every browser; the fractions kept for the next motion
+                // (dropped, slow moves were lost at a page zoom or a
+                // devicePixelRatio of 1.25 or 1.5).
+                let k = a2_web::motion_scale();
+                let (x, y) = crate::web_pace::whole_motion(&mut self.motion_acc, dx * k, dy * k);
+                if x != 0 || y != 0 {
+                    self.game.mouse_motion(x, y);
+                }
             }
         }
     }
