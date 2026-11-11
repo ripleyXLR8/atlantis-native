@@ -989,7 +989,27 @@ before the game starts, unless the picked folder holds the player's own
 `mingliu.ttc`, `simsun.ttc` or `msgothic.ttc` (its first bytes those of a
 font), which the engine draws with; the other releases never load them. A browser grants
 the pointer capture only on a click: until then the view turns with the
-pointer's own motion. Sound starts on the first click. For Cryo's DVD
+pointer's own motion. The browser asks for one redraw per screen refresh
+(`requestAnimationFrame`: 60, 120 or 144 a second, 30 under a power
+saver); each runs the engine steps of 1/60 s due since the last, each at
+the time it was due (`web_pace::steps_due`: due within 4 ms, at most four
+a redraw, a longer backlog dropped as the desktop's gate drops it), so
+that the frame-counted rules (the turns, the bar's slide, F5..F8) keep
+the desktop's pace whatever the screen. The game is held and silent while
+the page is hidden (`document.hidden` at winit's `Occluded`; the sound
+output also checks it), its clock stopped; another pause of the redraws
+over 250 ms is not game time; the keys held are let go when the page
+loses the focus (the browser sends their release to no one). Sound starts
+on the first click or key (a browser allows sound only after one); until
+then the mixer is played out silently at the game's clock, so that a
+line's voice ends on time and the sounds started before are not heard
+all at once at the first click. Under the pointer lock the motion is
+asked for unaccelerated (`requestPointerLock({unadjustedMovement:
+true})`, Chromium; asked for again without the option where it is
+refused), and winit's motion is brought back to the page's
+`movementX/Y` in every browser (`web_pace::motion_scale`: winit
+multiplies Firefox's and Safari's by `devicePixelRatio`, not
+Chromium's); Atlantis II and III take the same motion. For Cryo's DVD
 (the drive or a copy of a side picked), `start` refuses a DVD of several
 languages with their list (`LANGUAGES:`), the page asks which one and
 calls `start` again with its folder, and the picked files are mapped as
@@ -1063,8 +1083,10 @@ refuses (a full storage) is logged, as the original logs a save it
 cannot write, and shown at the top of the page (`show_notice`). The
 window of the desktop (`a2.rs`) runs in the browser with its web side in
 `a2_web.rs`: the canvas fitted to the page as the first game's
-(`web::fit_canvas`), a pass at each of the browser's redraws once it is
-due (4 ms early allowed: the browser paces them), the game held while
+(`web::fit_canvas`), at each of the browser's redraws the passes due
+since the last, each at its due time (4 ms early allowed, at most four a
+redraw: `web_pace::steps_due`, the first game's rule), so that a screen
+below 60 Hz keeps the game's pace, the game held while
 the page is hidden (another tab, the browser minimised:
 `document.hidden` at winit's `Occluded`) as the desktop holds it without
 the focus, its clock stopped and its sound silent (the browser's sound
@@ -1072,7 +1094,10 @@ output goes on when the redraws stop), any other pause of the redraws
 over 250 ms not counted as game time, `atlant2.cfg` written when it
 changed (checked every two seconds: a page has no exit), the game's quit
 back to the page's start. The pointer lock is asked for on a click only
-(a gesture), its loss is seen from `document.pointerLockElement` (the
+(a gesture) or as the game leaves one of its menus (granted without a
+click where the page let the lock go itself or a click has just been
+made; refused, the next click only takes it back, with the interface
+conveniences on), its loss is seen from `document.pointerLockElement` (the
 next click then only takes it back), and a request not granted within
 600 ms is a refusal: clicks then act at once and the arrow keys turn the
 view. The sound starts on the first click or key; until then the voices
