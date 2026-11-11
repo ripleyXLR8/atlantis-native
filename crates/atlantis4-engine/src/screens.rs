@@ -80,6 +80,7 @@ pub const OBJECT_LUA: &str = "Inventory/InventoryObject.lua";
 pub const MENU_LUA: &str = "InventoryMenu/InventoryMenu.lua";
 pub const DOCUMENTS_LUA: &str = "DocumentsBrowser/DocumentsBrowser.lua";
 pub const NOTIFY_LUA: &str = "GUI/Notify.lua";
+pub const DIARY_LUA: &str = "Diary/DiaryGUI.lua";
 /// The HUD button's sound (0x00524cc0).
 pub const HUD_SOUND: &str = "Sounds/SFX/ChoixMenu.wav";
 /// The notification's text before the name (0x005284e0).
@@ -96,6 +97,16 @@ pub enum Target {
     Zoomed,
     Quit,
     MainMenu,
+    /// `inventoryMenu`'s three 1 × 1 buttons without picture at its centre
+    /// (declared diary, documents, inventory: the last on top).
+    InventoryTab,
+    DocumentsTab,
+    DiaryTab,
+    /// The diary's `quit`, `previousPage`, `nextPage`; its full-window
+    /// `diary` button swallows the rest.
+    DiaryQuit,
+    DiaryPage(i8),
+    Diary,
     Object(SlotRef),
     Exit,
     /// The inventory's background, an empty slot: swallowed.
@@ -112,6 +123,17 @@ pub enum Action {
     CloseMenu,
     HideInventory,
     MainMenu,
+    /// The inventory tab again (0x0057c300).
+    InventoryTab,
+    /// The documents browser's tab (0x0057c580), not ported: logged.
+    DocumentsTab,
+    /// `diaryButton` (0x0057cd80): the diary shown at its current page.
+    ShowDiary,
+    /// The diary's `quit`: hidden.
+    HideDiary,
+    /// The diary's page buttons: `[UNKNOWN]` their handlers (not read);
+    /// taken as one double page back or forward.
+    DiaryPage(i8),
     ObjectClicked(SlotRef),
     Dropped(SlotRef, SlotRef),
     ZoomedClicked,
@@ -138,6 +160,11 @@ pub struct Screens {
     pub menu: Gui,
     pub documents: Gui,
     pub notify: Gui,
+    /// `Diary/DiaryGUI.lua` (every picture commented out in the data).
+    pub diary: Gui,
+    /// The diary shown (`Diary+0xa88`) and its page's picture.
+    pub diary_shown: bool,
+    pub diary_picture: Option<String>,
     /// `LoadSprite`'s files in load order (a file loaded again is added
     /// again: the list is cleared only by `FinishGame` and the game's
     /// end, 0x00525f50).
@@ -198,6 +225,9 @@ impl Screens {
             menu: load(MENU_LUA),
             documents: load(DOCUMENTS_LUA),
             notify: load(NOTIFY_LUA),
+            diary: load(DIARY_LUA),
+            diary_shown: false,
+            diary_picture: None,
             sprites: Vec::new(),
             menu_shown: false,
             inventory_shown: false,
@@ -312,6 +342,7 @@ impl Screens {
             menu,
             documents,
             notify,
+            diary,
             sprites,
             ..
         } = self;
@@ -319,6 +350,7 @@ impl Screens {
             (&mut *in_game, "inGame"),
             (&mut *inventory, "inventory"),
             (&mut *menu, "inventoryMenu"),
+            (&mut *diary, "diary"),
             (&mut *documents, "zoomed"),
             (&mut *notify, "notify"),
         ] {
@@ -355,6 +387,12 @@ impl Screens {
             .map_while(|s| g.find(&format!("page{page}Slot{s}")))
             .map(|n| g.rect(n, width, height))
             .collect()
+    }
+
+    /// A button of the inventory menu (`mainMenuButton`, `quitButton`, …).
+    pub fn menu_button(&mut self, name: &str, width: u32, height: u32) -> Option<Rect> {
+        self.layout(width, height);
+        Self::rect_of(&self.menu, name, width, height)
     }
 
     /// The HUD's inventory button.
@@ -398,8 +436,27 @@ impl Screens {
         if in_movie {
             return None;
         }
+        if self.diary_shown {
+            for (name, t) in [
+                ("quit", Target::DiaryQuit),
+                ("nextPage", Target::DiaryPage(1)),
+                ("previousPage", Target::DiaryPage(-1)),
+            ] {
+                let hit = self.diary.find(name).is_some_and(|i| {
+                    let zone = self.diary.node(i).hit_zone.unwrap_or(i);
+                    self.diary.rect(zone, width, height).contains(x, y)
+                });
+                if hit {
+                    return Some(t);
+                }
+            }
+            return Some(Target::Diary);
+        }
         if self.menu_shown {
             for (name, t) in [
+                ("inventoryButton", Target::InventoryTab),
+                ("documentsButton", Target::DocumentsTab),
+                ("diaryButton", Target::DiaryTab),
                 ("quitButton", Target::Quit),
                 ("mainMenuButton", Target::MainMenu),
             ] {
@@ -528,6 +585,19 @@ impl Screens {
                 out.push(Action::MainMenu);
             }
             Target::Exit => out.push(Action::HideInventory),
+            Target::InventoryTab => out.push(Action::InventoryTab),
+            Target::DocumentsTab => out.push(Action::DocumentsTab),
+            Target::DiaryTab => out.push(Action::ShowDiary),
+            Target::DiaryQuit => {
+                out.extend(sound(&self.diary, "quit"));
+                out.push(Action::HideDiary);
+            }
+            Target::DiaryPage(d) => {
+                let name = if d > 0 { "nextPage" } else { "previousPage" };
+                out.extend(sound(&self.diary, name));
+                out.push(Action::DiaryPage(d));
+            }
+            Target::Diary => {}
             Target::Object(at) => {
                 out.extend(self.object_sound.clone().map(Action::Sound));
                 out.push(Action::ObjectClicked(at));
@@ -650,6 +720,8 @@ impl Screens {
                 .map(|d| (d.from, (d.at.0.to_bits(), d.at.1.to_bits()))),
             &self.zoomed_picture,
             self.press,
+            self.diary_shown,
+            &self.diary_picture,
         )
             .hash(h);
         for (g, root, shown) in [
@@ -749,6 +821,13 @@ impl Screens {
         if self.zoomed_picture.is_some() {
             self.load_pictures(|s| &s.documents, "zoomed");
         }
+        if self.diary_shown {
+            let pic = self.diary_picture.clone();
+            if let Some(i) = self.diary.find("leftPage") {
+                self.diary.node_mut(i).image = pic;
+            }
+            self.load_pictures(|s| &s.diary, "diary");
+        }
         let pics = Pics(&self.pictures);
         let get = |p: &str| self.pictures.get(p).and_then(Option::as_ref);
         if self.inventory_shown {
@@ -805,6 +884,12 @@ impl Screens {
         if self.menu_shown {
             if let Some(r) = self.menu.find("inventoryMenu") {
                 self.menu.draw(r, out, width, height, &pics);
+            }
+        }
+        // The diary (loaded after `inventoryMenu`, 0x0057d43d).
+        if self.diary_shown {
+            if let Some(r) = self.diary.find("diary") {
+                self.diary.draw(r, out, width, height, &pics);
             }
         }
         if self.zoomed_picture.is_some() {

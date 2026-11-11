@@ -30,9 +30,14 @@
 //!   timer, with their save elements ([`savexml`]);
 //! - [`screens`]: the HUD, the inventory menu, the shown document and
 //!   the object notification;
-//! - [`game`]: the bindings' engine side for the scripts.
-//!
-//! Not here yet: menus, saves on disk.
+//! - [`game`]: the bindings' engine side for the scripts;
+//! - [`menus`]: the front end (splashes, main menu, confirmations,
+//!   options, credits, load screen, the planks' transition);
+//! - [`options`]: `options.xml` and the volume steps;
+//! - [`saves`], [`game_saves`]: the saves on disk (`SaveGame`,
+//!   `Game::load`'s save branch, the chapter slots), `Game::leave` /
+//!   `Game::enter`, `FinishGame` ([`ending`]), and what the menus see of
+//!   them ([`saves::SaveStore`]).
 
 #![forbid(unsafe_code)]
 
@@ -40,19 +45,24 @@ pub mod camera;
 pub mod cube;
 pub mod dialog;
 pub mod documents;
+pub mod ending;
 pub mod frame_anim;
 pub mod game;
 mod game_gui;
+pub mod game_saves;
 pub mod gui;
 pub mod inventory;
 pub mod layout;
 pub mod markers;
+pub mod menus;
 pub mod movie;
 pub mod node;
 pub mod oalmix;
+pub mod options;
 pub mod package;
 pub mod pick;
 pub mod render;
+pub mod saves;
 pub mod savexml;
 pub mod screens;
 pub mod sound;

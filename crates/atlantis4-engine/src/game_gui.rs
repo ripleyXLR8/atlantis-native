@@ -4,13 +4,13 @@
 //! rules are in [`crate::inventory`], [`crate::documents`] and
 //! [`crate::screens`]).
 
-use atlantis4_script::{SavedGlobal, Value};
+use atlantis4_script::Value;
 
 use crate::documents::{self, DocAction};
 use crate::game::Game;
 use crate::gui;
 use crate::inventory::{Inventory, ObjectClick};
-use crate::savexml::{save_text, SaveParts};
+use crate::savexml::SaveParts;
 use crate::screens::{Action, Screens};
 
 /// `AddToBag`'s sound (0x005284e0).
@@ -128,6 +128,10 @@ impl Game {
     /// Whether the warp takes the pointer (`App+0x7a10`, and no document
     /// covering it).
     pub fn warp_takes_input(&self) -> bool {
+        // `FinishGame` clears `game+0x4038` (@ 0x0052bc7e).
+        if self.planks.is_some() {
+            return false;
+        }
         self.screens
             .as_ref()
             .is_none_or(|s| s.warp_input && self.documents.shown.is_none())
@@ -186,7 +190,33 @@ impl Game {
             Action::CloseMenu => self.gui().close_menu(),
             Action::HideInventory => self.gui().hide_inventory(),
             Action::MainMenu => {
-                log::info!("mainMenuButton: save.xml then the main menu (M4, not done)")
+                // 0x0057cc50: `save.xml`, the portrait planks, then the
+                // main menu: the application's part.
+                self.main_menu_requested = true;
+            }
+            Action::InventoryTab => {
+                let Game {
+                    screens, inventory, ..
+                } = self;
+                screens.as_mut().expect("screens").open_menu(inventory);
+            }
+            Action::DocumentsTab => {
+                log::info!("documentsButton: the documents browser (not ported, unreachable)")
+            }
+            Action::ShowDiary => {
+                let n = self.diary.current;
+                self.show_diary_page(n);
+            }
+            Action::HideDiary => {
+                self.diary.shown = false;
+                self.gui().diary_shown = false;
+            }
+            Action::DiaryPage(d) => {
+                log::info!("diary page button {d} ([UNKNOWN] handler: a double page)");
+                let n = self.diary.current as i64 + 2 * i64::from(d);
+                if n >= 0 && (n as usize) < self.diary.pages.len() {
+                    self.show_diary_page(n as usize);
+                }
             }
             Action::ObjectClicked(at) => {
                 let now = self.now_us();
@@ -215,6 +245,16 @@ impl Game {
                 }
             }
         }
+    }
+
+    /// `Diary::show(n)` (0x0056c690): the page current, its picture in
+    /// `leftPage`, the diary shown.
+    pub fn show_diary_page(&mut self, n: usize) {
+        self.diary.show(n);
+        let pic = self.diary.picture();
+        let s = self.gui();
+        s.diary_shown = true;
+        s.diary_picture = pic;
     }
 
     /// The HUD (before a movie's layouts).
@@ -279,22 +319,9 @@ impl Game {
             warp_name: self.warp_name.clone(),
             orientation: (self.view.yaw, self.view.pitch),
             music: self.sounds.music.path().as_bytes().to_vec(),
-            // `[UNKNOWN]` the played time's own clock (`game+0x4608` and
-            // the timer at `+0x4610`): the engine clock here.
-            played_time: self.now_ms / 1000.0,
+            // `game+0x4608` + the timer since `Game::enter` / 1,000,000
+            // (@ 0x00524535..0x00524558).
+            played_time: self.played_time(),
         }
-    }
-
-    /// The `SaveGame` worker's text for `file` with `globals`; kept in
-    /// [`Game::last_save`] (writing it is M4).
-    pub fn build_save(&mut self, file: &str, globals: &[SavedGlobal]) {
-        let parts = self.save_parts();
-        let text = save_text(&parts, globals);
-        log::info!(
-            "SaveGame({file}): {} bytes, {} globals, not written (saves are M4)",
-            text.len(),
-            globals.len()
-        );
-        self.last_save = Some((file.to_string(), text));
     }
 }

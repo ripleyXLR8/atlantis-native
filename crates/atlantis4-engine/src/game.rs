@@ -22,7 +22,9 @@
 //! `HideDocument` with `OnDocumentClosed`), `LoadSprite` /
 //! `UnloadSprite`, and the screens that show them ([`crate::screens`]:
 //! the HUD's inventory button, the inventory menu, the shown document).
-//! The save's text is built ([`crate::savexml`]) but not written (M4).
+//! The saves ([`crate::saves`], [`crate::game_saves`]): `SaveGame` and the
+//! autosave written to the backup folder, `Game::load`'s save branch,
+//! the loading menu's slots; `FinishGame` ([`crate::ending`]).
 //! The dialogs ([`crate::dialog`]): `DrawText`, `InitDialog`,
 //! `HideDialog`, `PushAnswer`, `HideAnswers`. Every other binding is
 //! logged and does nothing.
@@ -33,16 +35,20 @@ use atlantis4_data::image::decode_png;
 use atlantis4_data::video::RgbTable;
 use atlantis4_data::{A4Files, WarpPath};
 use atlantis4_script::tolua::Binding;
-use atlantis4_script::{normalise_path, Call, Engine, ErrorSite, Event, Reply, SavedGlobal, Value};
+use atlantis4_script::{
+    normalise_path, Call, Engine, ErrorSite, Event, Reply, SaveOpen, SavedGlobal, Value,
+};
 
 use crate::camera::fov_for_height;
 use crate::dialog::{Action, Ctx, Dialogs};
 use crate::documents::{Diary, Documents, PuzzleTimer};
+use crate::ending::Planks;
 use crate::inventory::Inventory;
 use crate::markers::sprite_path;
 use crate::movie::{self, Click, Movie, MovieCue};
 use crate::package::Picture;
 use crate::render::{render, Coverage, Weights};
+use crate::saves::BackupFolder;
 use crate::screens::Screens;
 use crate::sound::{SoundEvent, Sounds};
 use crate::sprite::{self, cursor_corner, CURSOR_PATH};
@@ -68,8 +74,10 @@ pub struct Game {
     pub height: u32,
     /// The engine clock, ms.
     pub now_ms: f64,
-    /// The global marker flag (`App+0x86b0`).
+    /// The global marker flag (`App+0x86b0`, the options' `PermanentHelp`).
     pub markers_shown: bool,
+    /// The options' `InverseLook` (`App+0x86b1`): the mouse look inverted.
+    pub inverse_look: bool,
     /// The bilinear weights' precision of the drawing.
     pub weights: Weights,
     /// When set, the files run, callbacks entered and bindings called, as
@@ -112,14 +120,40 @@ pub struct Game {
     /// `SetInventoryAvatar`'s picture name (the avatar is a 1 × 1 button
     /// without picture in this game's `Inventory.lua`).
     pub avatar: Option<String>,
-    /// The last save's file name and text (not written to disk yet).
+    /// The last save's file name and text (`"\n"` line ends, as TinyXML
+    /// prints it; the file has `"\r\n"`).
     pub last_save: Option<(String, Vec<u8>)>,
+    /// Where the saves go (`TeGetBackupPath`'s folder).
+    pub backup: BackupFolder,
+    /// `firstWarpPath` (a new game's first node).
+    pub first_warp_path: Vec<u8>,
+    /// The save `Game::load` parsed, until its parts are restored.
+    pub(crate) pending_save: Option<Vec<atlantis4_data::xml::Element>>,
+    /// `game+0x4608`: the seconds played before this session's timer.
+    pub played_base: f64,
+    /// The played-time timer's start (`game+0x4610`, started by
+    /// `Game::enter`), ms of the engine clock.
+    pub played_start_ms: f64,
+    /// `FinishGame`'s planks, closing or closed.
+    pub planks: Option<Planks>,
+    /// The planks closed after `FinishGame`: the application runs
+    /// `Game::leave` and its main menu ([`Game::take_ended`]).
+    pub(crate) ended: bool,
     /// The GUI layers are drawn (the HUD, the inventory menu, the shown
     /// document, the dialogs, the notification); off, a frame is the
     /// warp, the markers, a movie and the cursor only.
     pub draw_gui: bool,
     /// The GUI layer that took the last press (its release goes there).
     press_layer: Option<Layer>,
+    /// The inventory menu's `mainMenuButton` was clicked: the application
+    /// saves `save.xml` and runs the planks ([`Game::take_main_menu`]).
+    pub main_menu_requested: bool,
+    /// The application runs the planks itself (its front end's
+    /// `RotationAnim`): `FinishGame` then only raises
+    /// [`Game::take_finish`] instead of closing [`Game::planks`].
+    pub app_planks: bool,
+    /// `FinishGame` ran with [`Game::app_planks`] set.
+    pub(crate) finish_requested: bool,
 }
 
 /// A GUI layer that takes the pointer ([`Game::gui_press`]).
@@ -192,8 +226,18 @@ impl Game {
             warp_name: Vec::new(),
             avatar: None,
             last_save: None,
+            backup: BackupFolder::default(),
+            first_warp_path: Vec::new(),
+            pending_save: None,
+            played_base: 0.0,
+            played_start_ms: 0.0,
+            planks: None,
+            ended: false,
             draw_gui: true,
             press_layer: None,
+            main_menu_requested: false,
+            app_planks: false,
+            finish_requested: false,
             files,
             table,
             warp: None,
@@ -202,6 +246,7 @@ impl Game {
             height,
             now_ms: 0.0,
             markers_shown: true,
+            inverse_look: false,
             weights: Weights::Exact,
             trace: None,
             serial: 0,
@@ -381,6 +426,9 @@ impl Game {
             self.dialogs.hash_into(&mut h);
             self.gui_key(&mut h);
         }
+        if let Some(p) = &self.planks {
+            p.key(&mut h);
+        }
         if let Some(m) = &self.movie {
             (&m.path, m.skip_shown, m.skip_pressed).hash(&mut h);
             m.sprite
@@ -466,6 +514,21 @@ impl Game {
             self.dialogs.draw(&self.files, out, width, height);
             self.draw_notify(out, width, height);
         }
+        // The application's planks (`FinishGame`) over the game.
+        if let Some(p) = self.planks.as_mut() {
+            p.draw(&self.files, out, width, height);
+        }
+        self.draw_cursor(out, width, height, pointer);
+    }
+
+    /// The cursor (`2D/arrow6.png`) at `pointer`, above everything.
+    pub fn draw_cursor(
+        &mut self,
+        out: &mut [u32],
+        width: u32,
+        height: u32,
+        pointer: Option<(f64, f64)>,
+    ) {
         if let Some((x, y)) = pointer {
             self.load_sprite(CURSOR_PATH);
             if let Some(Some(pic)) = self.sprites.get(CURSOR_PATH) {
@@ -473,6 +536,48 @@ impl Game {
                 sprite::draw(out, width, height, pic, (0, 0, pic.width, pic.height), l, t);
             }
         }
+    }
+
+    /// Whether the inventory menu asked for the main menu (cleared).
+    pub fn take_main_menu(&mut self) -> bool {
+        std::mem::take(&mut self.main_menu_requested)
+    }
+
+    /// The settings' effects on the game (`App+0x86b0` the markers,
+    /// `+0x86b1` the inverted look, read by the view @ 0x0052a950) and
+    /// the channels' volumes.
+    pub fn apply_settings(&mut self, s: &crate::options::Settings) {
+        self.markers_shown = s.permanent_help;
+        self.inverse_look = s.inverse_look;
+        for (_, ch) in crate::options::VOLUMES {
+            self.sounds.set_channel_volume(ch, s.volume(ch));
+        }
+    }
+
+    /// The game's objects dropped with the scene by `Game::leave`
+    /// (0x00525f50, after [`crate::sound::Sounds::leave_game`]): the node,
+    /// the movie, the dialogs, the screens (their layouts, the inventory
+    /// and the documents are made again at their first use, as
+    /// `Game::enter` loads them), the pending input. `[INFERRED]` past the
+    /// steps [`Game::leave_game`] names.
+    pub(crate) fn drop_game_state(&mut self) {
+        self.warp = None;
+        self.movie = None;
+        self.movie_cues.clear();
+        self.dialogs = Dialogs::default();
+        self.inventory = Inventory::default();
+        self.documents = Documents::default();
+        self.diary = Diary::default();
+        self.puzzle_timer = PuzzleTimer::default();
+        self.screens = None;
+        self.callbacks.clear();
+        self.sound_pending.clear();
+        self.warp_name.clear();
+        self.avatar = None;
+        self.press_layer = None;
+        self.main_menu_requested = false;
+        self.serial += 1;
+        self.background = None;
     }
 
     fn note(r: Result<(), WarpNote>) {
@@ -509,6 +614,12 @@ impl Game {
             now: now_ms,
         };
         self.dialogs.update(&mut c);
+        if let Some(p) = self.planks.as_mut() {
+            if p.update(now_ms) {
+                log::info!("the planks closed: the end of the game");
+                self.ended = true;
+            }
+        }
         finished
     }
 
@@ -751,6 +862,17 @@ impl Engine for Game {
                 return Reply::Num(self.inventory.count(&name) as f64);
             }
             Binding::PrintDebugMessage => log::info!("PrintDebugMessage: {name}"),
+            Binding::SetDiaryPage => {
+                // 0x005814c0: the page set, then shown.
+                let n = call.num(0).max(0.0) as usize;
+                let file = text(call.str(1));
+                self.diary.set_page(n, &file);
+                self.show_diary_page(n);
+            }
+            Binding::ShowDiaryPage => {
+                let n = call.num(0).max(0.0) as usize;
+                self.show_diary_page(n);
+            }
             Binding::PlayMusic => {
                 let path = text(Some(&normalise_path(call.str(0).unwrap_or_default())));
                 self.sounds.play_music(&self.files, &path);
@@ -837,6 +959,7 @@ impl Engine for Game {
                 log::info!("SetInventoryAvatar({name})");
                 self.avatar = Some(name);
             }
+            Binding::FinishGame => self.finish_game(),
             // Empty in the original (@ 0x0057e030, 0x0057df60).
             Binding::ClearImportantDocuments | Binding::SetImportantDocument => {}
             other => log::info!("{other:?}({name}): not done in the warp view yet"),
@@ -872,7 +995,15 @@ impl Engine for Game {
     }
 
     fn save_game(&mut self, file: &[u8], globals: &[SavedGlobal]) {
-        self.build_save(&text(Some(file)), globals);
+        self.save_to(&text(Some(file)), globals);
+    }
+
+    fn open_save(&mut self, file: &[u8]) -> SaveOpen {
+        self.open_backup(&text(Some(file)))
+    }
+
+    fn restore_save(&mut self) -> Vec<u8> {
+        self.restore_backup()
     }
 
     /// The new scene (`0x00526c70` @ 0x0052703c..0x00527265, then the XML

@@ -13,8 +13,8 @@ use rilua::vm::value::{Userdata, Val};
 use rilua::{Lua, LuaApi, LuaApiMut, LuaError, LuaResult, RuntimeError};
 
 use crate::engine::{
-    Arg, BootValue, Call, Engine, ErrorSite, Event, GuiKey, GuiValue, Reply, SavedGlobal,
-    SavedValue, Value,
+    Arg, BootValue, Call, Engine, ErrorSite, Event, GuiKey, GuiValue, LoadedValue, Reply, SaveOpen,
+    SavedGlobal, SavedValue, Value,
 };
 use crate::tolua::{Binding, Check, Conversion, Signature, SIGNATURES};
 
@@ -929,6 +929,19 @@ impl Script {
         )
     }
 
+    /// Sets the global `name` as `TeLuaContext::load` does (@ `0x004c1aa0`:
+    /// the key interned, `luaV_settable` on the globals table).
+    pub fn set_global(&mut self, name: &[u8], value: &LoadedValue) -> Result<(), ScriptError> {
+        let state = self.lua.state_mut();
+        let v = match value {
+            LoadedValue::Boolean(b) => Val::Bool(*b),
+            LoadedValue::Number(x) => Val::Num(*x),
+            LoadedValue::String(s) => str_val(state, s),
+            LoadedValue::Nil => Val::Nil,
+        };
+        Ok(set_global(state, name, v)?)
+    }
+
     /// The globals the save writes, in `lua_next` order.
     pub fn globals(&self) -> Result<Vec<SavedGlobal>, ScriptError> {
         Ok(save_walk(self.lua.state())?)
@@ -1013,5 +1026,41 @@ pub fn new_game(
     script.run_file(b"Diary/Diary.lua");
     script.run_file(b"Inventory/InventoryScripts.lua");
     script.change_warp(first_warp_path)?;
+    Ok(script)
+}
+
+/// `Game::load(file)` (@ `0x00529e30`) with a save name: the new game
+/// state and `3D/OnGameEnter.lua` as a new game; then `Backup/<file>`:
+/// missing, the new game ([`new_game`]'s node change to
+/// `first_warp_path`); unreadable, nothing more (the state holds only
+/// `OnGameEnter.lua`, no node); else its globals set in file order over
+/// what `OnGameEnter.lua` left, the engine's parts restored
+/// ([`Engine::restore_save`]), `Diary/Diary.lua`,
+/// `Inventory/InventoryScripts.lua` and the node change to the saved warp
+/// (the engine has no scene then: `OnWarpEnter` only, no `OnWarpLeave`,
+/// no autosave).
+pub fn load_game(
+    engine: &EngineRef,
+    options: Options,
+    file: &[u8],
+    first_warp_path: &[u8],
+) -> Result<Script, ScriptError> {
+    event(engine, &Event::Game);
+    let mut script = Script::new(engine, options)?;
+    script.run_file(b"3D/OnGameEnter.lua");
+    let open = engine.borrow_mut().open_save(file);
+    let path = match open {
+        SaveOpen::Missing => first_warp_path.to_vec(),
+        SaveOpen::Broken => return Ok(script),
+        SaveOpen::Globals(globals) => {
+            for (name, value) in &globals {
+                script.set_global(name, value)?;
+            }
+            engine.borrow_mut().restore_save()
+        }
+    };
+    script.run_file(b"Diary/Diary.lua");
+    script.run_file(b"Inventory/InventoryScripts.lua");
+    script.change_warp(&path)?;
     Ok(script)
 }

@@ -214,13 +214,59 @@ impl Documents {
     }
 }
 
-/// The diary: the pages `SetDiaryPage` set (never, in this game).
+/// The diary: the pages `SetDiaryPage` set (never, in this game), the
+/// page shown (`+0xa60`) and whether it shows (`+0xa88`).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Diary {
     pub pages: Vec<String>,
+    pub current: usize,
+    pub shown: bool,
 }
 
+/// The diary's folder of pages (`Diary/Pages/` @ 0x005b8dd4).
+pub const DIARY_PAGES: &str = "Diary/Pages/";
+
 impl Diary {
+    /// The pages back from a save's `<Diary>` (0x0056dfa0): each `<Page
+    /// id>` in order (0x0056dce0 makes its layout).
+    pub fn load_xml(&mut self, el: &atlantis4_data::xml::Element) {
+        self.pages = el
+            .children_named("Page")
+            .map(|p| p.attr("id").unwrap_or_default().to_string())
+            .collect();
+    }
+
+    /// `SetDiaryPage(n, file)` (0x0056dce0): the list padded with
+    /// `EmptyLeft` / `EmptyRight` (by the parity of the length) until it
+    /// holds `n` and has an even length, then page `n` set; the binding
+    /// then shows it.
+    pub fn set_page(&mut self, n: usize, file: &str) {
+        while n >= self.pages.len() || !self.pages.len().is_multiple_of(2) {
+            let pad = if self.pages.len().is_multiple_of(2) {
+                "EmptyLeft"
+            } else {
+                "EmptyRight"
+            };
+            self.pages.push(pad.to_string());
+        }
+        self.pages[n] = file.to_string();
+    }
+
+    /// `Diary::show(n)` (0x0056c690): page `n` current, the diary shown;
+    /// its picture is `Diary/Pages/<name>.png` in `leftPage` and its
+    /// buttons `Diary/Pages/<name>.lua` (folder absent from the install).
+    pub fn show(&mut self, n: usize) {
+        self.current = n;
+        self.shown = true;
+    }
+
+    /// The shown page's picture, if any.
+    pub fn picture(&self) -> Option<String> {
+        self.pages
+            .get(self.current)
+            .map(|p| format!("{DIARY_PAGES}{p}.png"))
+    }
+
     pub fn to_xml(&self) -> XmlNode {
         let mut d = XmlNode::new("Diary");
         d.children = self
@@ -240,6 +286,31 @@ pub struct PuzzleTimer {
 }
 
 impl PuzzleTimer {
+    /// The fields back from a save's `<PuzzleTimer>` (0x00521720):
+    /// `PuzzleEnCours` and `TimeLeft`'s `value`s; read as `%d`
+    /// `[INFERRED]` (the reader @ 0x00507be0 is not walked). A running
+    /// timer would load `Puzzles/PuzzleTimer/PuzzleTimer.lua`: no script
+    /// starts one (`DATA`), so it is only logged.
+    pub fn load_xml(&mut self, el: &atlantis4_data::xml::Element) {
+        let read = |name: &str| {
+            el.child(name)
+                .and_then(|c| c.attr("value"))
+                .and_then(|v| crate::saves::scan_int(v.as_bytes()))
+        };
+        if let Some(v) = read("PuzzleEnCours") {
+            self.in_progress = v;
+        }
+        if let Some(v) = read("TimeLeft") {
+            self.time_left = v;
+        }
+        if self.in_progress != 0 {
+            log::warn!(
+                "save: a puzzle timer is running ({} left): not done",
+                self.time_left
+            );
+        }
+    }
+
     pub fn to_xml(&self) -> XmlNode {
         let mut t = XmlNode::new("PuzzleTimer");
         t.children
@@ -290,6 +361,13 @@ mod tests {
             "<DocumentsBrowser>\n    <Page>\n        <Slot>\n            <Document id=\"A\" />\n        </Slot>\n    </Page>\n    <Page>\n        <Slot>\n            <Document id=\"B\" />\n        </Slot>\n    </Page>\n</DocumentsBrowser>"
         );
         assert_eq!(Diary::default().to_xml().print(0), "<Diary />");
+        let mut d = Diary::default();
+        d.set_page(2, "P2");
+        assert_eq!(d.pages, ["EmptyLeft", "EmptyRight", "P2", "EmptyRight"]);
+        d.set_page(0, "P0");
+        assert_eq!(d.pages[0], "P0");
+        d.show(2);
+        assert_eq!(d.picture().as_deref(), Some("Diary/Pages/P2.png"));
         assert_eq!(
             PuzzleTimer::default().to_xml().print(0),
             "<PuzzleTimer>\n    <PuzzleEnCours value=\"0\" />\n    <TimeLeft value=\"0\" />\n</PuzzleTimer>"

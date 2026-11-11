@@ -627,6 +627,19 @@ impl Sounds {
         self.played.clear();
     }
 
+    /// `Game::leave` (@ 0x00525f50): the music stopped; the scene's
+    /// sounds, the voice and a movie's sound go with the scene and the
+    /// dialogs `[INFERRED]`; their signals are dropped with the Lua state
+    /// (closed after the scene, @ 0x00526440). The free sounds play on.
+    pub fn leave_game(&mut self) {
+        self.leave_node();
+        for w in [Which::Music, Which::Voice, Which::Video] {
+            self.list.retain(|&x| x != w);
+            self.stop(w);
+        }
+        self.take_events();
+    }
+
     /// `playFreeSound(path, volume)` (@ 0x00506040): a `TeSFX` decoded
     /// whole, played once, deleted when it has played. Missing files are
     /// silent.
@@ -765,7 +778,7 @@ impl Sounds {
 
 /// C's `atof` on a decimal number (leading spaces, sign, digits, point,
 /// exponent; the rest ignored); 0 when nothing parses.
-fn atof(s: &str) -> f32 {
+pub(crate) fn atof(s: &str) -> f32 {
     let t = s.trim_start();
     let b = t.as_bytes();
     let mut end = 0;
