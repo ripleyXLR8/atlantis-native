@@ -276,14 +276,45 @@ What to pick:
 - A folder holding more than one game: the page asks which one to play.
 
 The sound starts with the first click or key (browsers allow sound only
-after one). In Atlantis II the mouse turns the view once a click has
-taken it (the browser's pointer lock); Escape lets it go (the browser's
-own key for that; press it again for the game's menu if the browser kept
-the first one), and the next click takes it back without acting in the
-game. Where the lock is refused, clicks act at once
-and the arrow keys turn the view. F or F11 (or the page's **Full screen**
-button) switches full screen; F10 or O opens the options menu, with the
-HD mode, widescreen and the bug fixes, as on the desktop.
+after one); until then the game goes on silently at its pace. The games
+keep the desktop's pace whatever the screen's refresh rate (30 Hz under
+a power saver, 144 Hz on a fast screen), and stop, silent, while the
+page is hidden (another tab, the browser minimised); they go on where
+they were when it is shown again.
+
+The mouse turns the view once the browser has given the game the
+pointer (its pointer lock): in the first game and Atlantis III after a
+click, in Atlantis II as the game leaves its menus (or, if the browser
+asks for a click, the next one, which then only takes it, with the
+interface conveniences on). The motion is the mouse's own where the
+browser allows it (Chrome and Edge: no pointer acceleration), and the
+same in every browser whatever the screen's scale; Firefox and Safari
+still apply the system's pointer speed and acceleration. Escape is the
+browser's own key for letting the pointer go: outside full screen the
+first Escape may only do that (press it again for the game's menu or to
+skip a talking head; in Atlantis II the next click takes the pointer
+back without acting). In full screen Chrome and Edge give Escape to the
+game, as on the desktop (hold Escape to leave full screen; F or F11 also
+do). Where the lock is refused, clicks act at once and the arrow keys
+turn the view. F or F11 (or the page's **Full screen** button) switches
+full screen; F10 or O opens the options menu, with the HD mode,
+widescreen and the bug fixes, as on the desktop.
+
+Other differences of the browser:
+
+- Atlantis II and III read a large file (a cinematic) in one go: the
+  music or the ambience can break off for a moment as it starts.
+- Atlantis II goes on while the page is shown without the focus (the
+  page's own buttons take it); it stops only while the page is hidden.
+  Its `atlant2.cfg` is written within two seconds of a change, and
+  closing the tab does not write the mandala's solution log (a page has
+  no exit); full screen from F11 or Alt+Enter is not stored in it.
+- Atlantis III: Alt+Enter does not change `Atlantis3.cfg`'s full screen
+  setting (the browser cannot open a page in full screen anyway); a
+  pause of the page over a quarter of a second, a long file read
+  included, is not counted as game time (the play time in the saves); a
+  browser without WebGL 2 shows no picture; an unknown edition is
+  reported without the desktop's help text.
 
 In the HD mode the graphics card draws the panorama and composes the
 picture (as for the first game), at most 1280 x 960 pixels, which it
@@ -728,8 +759,9 @@ player, and Load lists the newest first.
   original sets a DirectDraw display mode), as is the window keeping the
   mouse.
 - In the browser: the sound starts with the first click or key; with
-  the mouse taken, Escape first lets it go (press it again for the
-  menu); Alt+Enter and F11 use the page's full screen; there is no F12
+  the mouse taken, Escape first lets it go outside full screen (press it
+  again for the menu; in full screen Chrome and Edge give it to the
+  game); Alt+Enter and F11 use the page's full screen; there is no F12
   screenshot; the menu's Quit returns to the page.
 
 ## Command line

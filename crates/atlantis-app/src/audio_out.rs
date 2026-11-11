@@ -1,10 +1,13 @@
 //! Sound output: a cpal stream pulling samples from the engine's mixer.
 
+#[cfg(not(target_arch = "wasm32"))]
 use atlantis_engine::audio::Mixer;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
 /// Opens the default output device; `None` (logged) when there is none.
-/// The stream plays while it is kept alive.
+/// The stream plays while it is kept alive. (The browser's goes through
+/// [`start_with`], silent while the page is hidden.)
+#[cfg(not(target_arch = "wasm32"))]
 pub fn start(mixer: Mixer) -> Option<cpal::Stream> {
     start_with(move |out, rate, channels| mixer.fill(out, rate, channels))
 }

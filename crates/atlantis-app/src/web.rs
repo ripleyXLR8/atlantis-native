@@ -253,6 +253,46 @@ pub fn version() -> String {
     crate::version_string()
 }
 
+/// The first game's state as the end-to-end runs read it: engine steps
+/// run, the game's clock (ms) at the last, the sound started, the game
+/// held (the page hidden).
+#[derive(Clone, Copy, Default)]
+pub(crate) struct A1State {
+    pub steps: u64,
+    pub ms: u64,
+    pub audio: bool,
+    pub held: bool,
+}
+
+thread_local! {
+    static A1_STATE: std::cell::Cell<A1State> = std::cell::Cell::new(A1State::default());
+}
+
+/// Updates the first game's state ([`atlantis1_state`]).
+pub(crate) fn note_a1(f: impl FnOnce(&mut A1State)) {
+    A1_STATE.with(|c| {
+        let mut s = c.get();
+        f(&mut s);
+        c.set(s);
+    });
+}
+
+/// The first game's state for the end-to-end runs (a testing aid):
+/// `{steps, ms, audio, held}`.
+#[wasm_bindgen]
+pub fn atlantis1_state() -> JsValue {
+    let s = A1_STATE.with(|c| c.get());
+    let o = js_sys::Object::new();
+    let set = |k: &str, v: JsValue| {
+        let _ = js_sys::Reflect::set(&o, &k.into(), &v);
+    };
+    set("steps", JsValue::from_f64(s.steps as f64));
+    set("ms", JsValue::from_f64(s.ms as f64));
+    set("audio", JsValue::from_bool(s.audio));
+    set("held", JsValue::from_bool(s.held));
+    o.into()
+}
+
 /// The files of language `l` of the DVD whose root is `root` in `all`, as
 /// its program reads them ([`atlantis_data::dvd::DvdFiles`]): the shared
 /// folders from the side's folder, the rest from the language's.

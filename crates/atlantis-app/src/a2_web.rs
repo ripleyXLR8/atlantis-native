@@ -32,7 +32,7 @@ pub const HD_MAX_TILE: usize = 24;
 /// holds the game as the desktop holds it without the focus, its sound
 /// silent too ([`page_hidden`], `A2App::set_page_hidden`): the browser
 /// stops the redraws but not the sound output.
-const GAP: Duration = Duration::from_millis(250);
+pub const GAP: Duration = Duration::from_millis(250);
 
 /// How long a pointer lock request may take before the page's state is
 /// believed.
@@ -59,6 +59,11 @@ pub struct WebFront {
     pub lock_asked: Option<Instant>,
     pub lock_seen: bool,
     pub lock_refused: bool,
+    /// The last request was the game's own, without a click (after a
+    /// menu): its refusal is not the browser's lack of a lock.
+    pub lock_auto: bool,
+    /// The last pass was in a menu (to see the game leave one).
+    pub in_menu: bool,
     /// The canvas's size at the last presentation.
     presented: (u32, u32),
     /// The redraws until the state is recorded again.
@@ -91,6 +96,8 @@ impl WebFront {
             lock_asked: None,
             lock_seen: false,
             lock_refused: false,
+            lock_auto: false,
+            in_menu: false,
             presented: (0, 0),
             state_in: 0,
             cfg_written: Vec::new(),
@@ -332,9 +339,17 @@ pub fn pointer_locked() -> bool {
 
 /// Asks the browser for the pointer lock on the window's canvas (granted
 /// on a user gesture only; its refusal is seen by [`pointer_locked`],
-/// not reported as an error).
+/// not reported as an error), with the mouse's own motion
+/// (`unadjustedMovement`: no pointer acceleration, as the desktop's raw
+/// motion and the original's DirectInput counts) where the browser has
+/// it. A browser without it either ignores the option (Firefox, Safari) or
+/// refuses it (`NotSupportedError`): the lock is then asked for again
+/// without it, at once and from then on.
 pub fn request_lock(window: &Window) {
     use winit::platform::web::WindowExtWebSys;
+    thread_local! {
+        static PLAIN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    }
     let Some(canvas) = window.canvas() else {
         return;
     };
@@ -342,21 +357,95 @@ pub fn request_lock(window: &Window) {
         .ok()
         .and_then(|f| f.dyn_into::<js_sys::Function>().ok());
     let Some(ask) = ask else { return };
-    match ask.call0(&canvas) {
+    let plain = PLAIN.with(|p| p.get());
+    let result = if plain {
+        ask.call0(&canvas)
+    } else {
+        let options = js_sys::Object::new();
+        let _ = js_sys::Reflect::set(&options, &"unadjustedMovement".into(), &true.into());
+        ask.call1(&canvas, &options)
+    };
+    match result {
         // (newer browsers answer with a promise)
         Ok(r) => {
             if let Ok(p) = r.dyn_into::<js_sys::Promise>() {
-                thread_local! {
-                    static IGNORE: Closure<dyn FnMut(JsValue)> =
-                        Closure::new(|_: JsValue| {});
-                }
-                IGNORE.with(|c| {
-                    let _ = p.catch(c);
+                let canvas = canvas.clone();
+                let retry = Closure::once(move |e: JsValue| {
+                    let name = js_sys::Reflect::get(&e, &"name".into())
+                        .ok()
+                        .and_then(|n| n.as_string());
+                    if plain || name.as_deref() != Some("NotSupportedError") {
+                        return;
+                    }
+                    log::info!("pointer lock: no unadjusted motion in this browser");
+                    PLAIN.with(|p| p.set(true));
+                    let ask = js_sys::Reflect::get(&canvas, &"requestPointerLock".into())
+                        .ok()
+                        .and_then(|f| f.dyn_into::<js_sys::Function>().ok());
+                    if let Some(ask) = ask {
+                        if let Ok(r) = ask.call0(&canvas) {
+                            if let Ok(p) = r.dyn_into::<js_sys::Promise>() {
+                                thread_local! {
+                                    static IGNORE: Closure<dyn FnMut(JsValue)> =
+                                        Closure::new(|_: JsValue| {});
+                                }
+                                IGNORE.with(|c| {
+                                    let _ = p.catch(c);
+                                });
+                            }
+                        }
+                    }
                 });
+                let _ = p.catch(&retry);
+                // (called once at most, by the browser)
+                retry.forget();
             }
         }
         Err(e) => log::debug!("pointer lock: {e:?}"),
     }
+}
+
+/// Whether the browser is a Chromium one (Chrome, Edge, Opera...), as
+/// winit tells them apart: `navigator.userAgentData`'s brands, else the
+/// user agent.
+fn chromium() -> bool {
+    thread_local! {
+        static CHROMIUM: bool = find_chromium();
+    }
+    CHROMIUM.with(|c| *c)
+}
+
+fn find_chromium() -> bool {
+    let Some(w) = web_sys::window() else {
+        return false;
+    };
+    let Ok(nav) = js_sys::Reflect::get(&w, &"navigator".into()) else {
+        return false;
+    };
+    let data = js_sys::Reflect::get(&nav, &"userAgentData".into()).unwrap_or(JsValue::UNDEFINED);
+    if !data.is_undefined() && !data.is_null() {
+        let brands = js_sys::Reflect::get(&data, &"brands".into()).unwrap_or(JsValue::UNDEFINED);
+        return js_sys::Array::from(&brands).iter().any(|b| {
+            js_sys::Reflect::get(&b, &"brand".into())
+                .ok()
+                .and_then(|n| n.as_string())
+                .as_deref()
+                == Some("Chromium")
+        });
+    }
+    js_sys::Reflect::get(&nav, &"userAgent".into())
+        .ok()
+        .and_then(|u| u.as_string())
+        .is_some_and(|u| u.contains("Chrome/"))
+}
+
+/// The factor for winit's pointer-lock motion in this browser
+/// ([`crate::web_pace::motion_scale`]), at the page's current
+/// `devicePixelRatio` (the one winit multiplied by: it changes with the
+/// page's zoom and the screen).
+pub fn motion_scale() -> f64 {
+    let dpr = web_sys::window().map_or(1.0, |w| w.device_pixel_ratio());
+    crate::web_pace::motion_scale(chromium(), dpr)
 }
 
 /// Lets the pointer lock go.
