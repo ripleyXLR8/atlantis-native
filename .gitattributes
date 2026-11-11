@@ -1,0 +1,4 @@
+# Atlantis Evolution's goldens are compared byte for byte or split on
+# "\n": no end-of-line conversion on a Windows checkout (core.autocrlf).
+crates/atlantis4-*/tests/golden/** -text
+crates/atlantis4-*/tests/story/** -text
