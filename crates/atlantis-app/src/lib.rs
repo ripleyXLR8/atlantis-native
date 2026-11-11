@@ -44,6 +44,8 @@ mod a4_gl;
 #[cfg(all(feature = "atlantis4", target_arch = "wasm32"))]
 #[path = "a4_gl_web.rs"]
 mod a4_gl;
+#[cfg(all(feature = "atlantis4", target_arch = "wasm32"))]
+mod a4_prefetch;
 #[cfg(all(test, feature = "atlantis4", target_arch = "wasm32"))]
 mod a4_wasm_tests;
 mod audio_out;

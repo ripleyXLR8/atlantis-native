@@ -858,10 +858,17 @@ impl Drop for Viewer {
     }
 }
 
+/// The sound's output: cpal's stream on the desktop, the page's own in
+/// the browser ([`crate::audio_out::web_out`]).
+#[cfg(not(target_arch = "wasm32"))]
+type SoundOut = cpal::Stream;
+#[cfg(target_arch = "wasm32")]
+type SoundOut = crate::audio_out::web_out::WebOutput;
+
 /// The sound output: the 44,100 Hz stereo mix to the device, as is when
 /// the device runs at 44,100 Hz, else linearly resampled. (In the browser:
 /// silent while the page is hidden, the game held.)
-fn start_sound(core: atlantis4_engine::sound::Core) -> Option<cpal::Stream> {
+fn start_sound(core: atlantis4_engine::sound::Core) -> Option<SoundOut> {
     const RATE: u32 = atlantis4_engine::oalmix::RATE;
     // Resampler state: source frames not yet used, position in them.
     let mut src: Vec<i16> = Vec::new();
@@ -914,7 +921,7 @@ fn start_sound(core: atlantis4_engine::sound::Core) -> Option<cpal::Stream> {
     #[cfg(not(target_arch = "wasm32"))]
     let stream = crate::audio_out::start_with_rate(fill, RATE);
     #[cfg(target_arch = "wasm32")]
-    let stream = crate::audio_out::start_with_rate_buffer(fill, RATE, web::OUTPUT_FRAMES);
+    let stream = crate::audio_out::web_out::start(fill, RATE);
     stream
 }
 
