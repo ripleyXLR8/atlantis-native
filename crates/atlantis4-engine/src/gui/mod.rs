@@ -51,7 +51,9 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::canvas::{Canvas, CpuCache, CpuCanvas};
 use crate::movie::{draw_stretched, Mode};
+use crate::render::Weights;
 
 use atlantis4_data::image::decode_jpeg;
 use atlantis4_data::A4Files;
@@ -321,17 +323,9 @@ pub const STRING_GLOBALS: [&str; 9] = [
 pub trait Painter {
     /// The picture of a path given to a sprite, if loaded.
     fn picture(&self, path: &str) -> Option<&Picture>;
-    /// Draws a video sprite's frame over `rect`; `false` when the sprite
-    /// has no video.
-    fn video(
-        &self,
-        gui: &Gui,
-        id: Id,
-        out: &mut [u32],
-        width: u32,
-        height: u32,
-        rect: Rect,
-    ) -> bool;
+    /// Draws a video sprite's frame over `rect` on `c`; `false` when the
+    /// sprite has no video.
+    fn video(&self, gui: &Gui, id: Id, c: &mut dyn Canvas, rect: Rect) -> bool;
 }
 
 /// The file a logical path stands for: as written, else in `PC-MacOSX/`
@@ -1222,8 +1216,15 @@ impl Gui {
 
     /// Draws `root`'s tree into `out` (`width × height` XRGB).
     pub fn draw(&self, root: Id, out: &mut [u32], width: u32, height: u32, painter: &dyn Painter) {
+        let mut cache = CpuCache::default();
+        let mut c = CpuCanvas::new(out, width, height, &mut cache, Weights::Exact);
+        self.draw_on(root, &mut c, painter);
+    }
+
+    /// Draws `root`'s tree on `c`.
+    pub fn draw_on(&self, root: Id, c: &mut dyn Canvas, painter: &dyn Painter) {
         let tint = self.inherited_colour(root);
-        self.draw_node(root, out, width, height, painter, None, tint);
+        self.draw_node(root, c, painter, None, tint);
     }
 
     /// The colour `id`'s ancestors pass down (the product of theirs).
@@ -1237,17 +1238,15 @@ impl Gui {
         c
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn draw_node(
         &self,
         id: Id,
-        out: &mut [u32],
-        width: u32,
-        height: u32,
+        c: &mut dyn Canvas,
         painter: &dyn Painter,
         clip: Option<Clip>,
         tint: [u8; 4],
     ) {
+        let (width, height) = c.size();
         let n = &self.nodes[id];
         if !n.visible {
             return;
@@ -1257,10 +1256,10 @@ impl Gui {
         let mut clip = clip;
         match n.class {
             Class::Sprite => {
-                if !painter.video(self, id, out, width, height, rect) {
+                if !painter.video(self, id, c, rect) {
                     let pic = n.image.as_deref().and_then(|p| painter.picture(p));
                     if let (Some(pic), true) = (pic, n.rotation != 0.0) {
-                        draw_rotated(out, width, height, pic, rect, n.rotation, tint);
+                        c.rotated(pic, rect, n.rotation, tint);
                     } else if let Some(pic) = pic {
                         let r = if n.size_percent {
                             rect
@@ -1268,7 +1267,7 @@ impl Gui {
                             let c = crate::layout::pixel_snap(n.world);
                             crate::layout::window_rect(c, n.computed_size, width, height)
                         };
-                        draw_picture(out, width, height, pic, r, clip, tint);
+                        c.picture(pic, r, clip, tint);
                     }
                 }
             }
@@ -1282,17 +1281,7 @@ impl Gui {
                     let half = |s: u32| if s % 2 == 1 { 0.5 } else { 0.0 };
                     let ox = f64::from(width) / 2.0 + f64::from(left.floor()) + half(width);
                     let oy = f64::from(height) / 2.0 + f64::from(top.floor()) + half(height);
-                    text::draw(
-                        out,
-                        width,
-                        height,
-                        font,
-                        b,
-                        ox.round() as i64,
-                        oy.round() as i64,
-                        clip,
-                        tint,
-                    );
+                    c.text(font, b, ox.round() as i64, oy.round() as i64, clip, tint);
                 }
             }
             Class::Clip => {
@@ -1306,16 +1295,16 @@ impl Gui {
         }
         if matches!(n.class, Class::Button | Class::Checkbox) {
             if let Some(s) = n.state_layout() {
-                self.draw_node(s, out, width, height, painter, clip, tint);
+                self.draw_node(s, c, painter, clip, tint);
             }
-            for &c in &n.children {
-                if !n.is_state_layout(c) {
-                    self.draw_node(c, out, width, height, painter, clip, tint);
+            for &k in &n.children {
+                if !n.is_state_layout(k) {
+                    self.draw_node(k, c, painter, clip, tint);
                 }
             }
         } else {
-            for &c in &n.children {
-                self.draw_node(c, out, width, height, painter, clip, tint);
+            for &k in &n.children {
+                self.draw_node(k, c, painter, clip, tint);
             }
         }
     }

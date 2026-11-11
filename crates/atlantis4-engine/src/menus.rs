@@ -97,11 +97,13 @@ use std::collections::HashMap;
 
 use atlantis4_data::A4Files;
 
+use crate::canvas::{Canvas, CpuCache, CpuCanvas};
 use crate::gui::text::FontCache;
 use crate::gui::{self, Class, Gui, Id, Painter, State};
 use crate::layout::Rect;
 use crate::options::{self, Settings};
 use crate::package::Picture;
+use crate::render::Weights;
 use crate::saves::{self, SaveStore};
 
 pub const MAIN_MENU_LUA: &str = "GUI/MainMenu.lua";
@@ -297,7 +299,7 @@ impl Painter for Pics<'_> {
         self.0.get(path).and_then(Option::as_ref)
     }
 
-    fn video(&self, _: &Gui, _: Id, _: &mut [u32], _: u32, _: u32, _: Rect) -> bool {
+    fn video(&self, _: &Gui, _: Id, _: &mut dyn Canvas, _: Rect) -> bool {
         false
     }
 }
@@ -988,6 +990,14 @@ impl Front {
     /// Draws the front end's layers, bottom first: the screen, the
     /// confirmation, the planks, the splash.
     pub fn draw(&mut self, out: &mut [u32], width: u32, height: u32) {
+        let mut cache = CpuCache::default();
+        let mut c = CpuCanvas::new(out, width, height, &mut cache, Weights::Exact);
+        self.draw_on(&mut c);
+    }
+
+    /// [`Front::draw`] on `c`.
+    pub fn draw_on(&mut self, c: &mut dyn Canvas) {
+        let (width, height) = c.size();
         self.layout(width, height);
         let mut paths = Vec::new();
         for (_, s) in self.layers() {
@@ -1026,7 +1036,7 @@ impl Front {
         }
         layers.extend(splash.as_ref());
         for s in layers {
-            s.gui.draw(s.root, out, width, height, &pics);
+            s.gui.draw_on(s.root, c, &pics);
         }
     }
 

@@ -65,6 +65,7 @@ use atlantis4_data::xml::to_cp1252;
 use atlantis4_data::A4Files;
 use atlantis4_script::Value;
 
+use crate::canvas::Canvas;
 use crate::gui::text::FontCache;
 use crate::gui::{self, Gui, Id, Painter};
 use crate::layout::Rect;
@@ -623,8 +624,9 @@ impl Dialogs {
         }
     }
 
-    /// Draws the dialog, then the answers, into `out`.
-    pub fn draw(&mut self, files: &A4Files, out: &mut [u32], width: u32, height: u32) {
+    /// Draws the dialog, then the answers, on `c`.
+    pub fn draw_on(&mut self, files: &A4Files, c: &mut dyn Canvas) {
+        let (width, height) = c.size();
         if !self.shown() && !self.answers_shown() {
             return;
         }
@@ -637,7 +639,7 @@ impl Dialogs {
         };
         if let (Some(g), Some(ids)) = (&self.gui, self.ids) {
             if g.node(ids.lock).visible {
-                g.draw(ids.lock, out, width, height, &painter);
+                g.draw_on(ids.lock, c, &painter);
             }
         }
         if self.answers_shown() {
@@ -647,7 +649,7 @@ impl Dialogs {
                 video_node: None,
             };
             for a in &self.answers {
-                a.gui.draw(a.button, out, width, height, &none);
+                a.gui.draw_on(a.button, c, &none);
             }
         }
     }
@@ -793,21 +795,13 @@ impl Painter for Paint<'_> {
         self.pictures.get(path).and_then(Option::as_ref)
     }
 
-    fn video(
-        &self,
-        _gui: &Gui,
-        id: Id,
-        out: &mut [u32],
-        width: u32,
-        height: u32,
-        rect: Rect,
-    ) -> bool {
+    fn video(&self, _gui: &Gui, id: Id, c: &mut dyn Canvas, rect: Rect) -> bool {
         if Some(id) != self.video_node {
             return false;
         }
         match self.video {
             Some(v) => {
-                v.draw(out, width, height, rect);
+                v.draw_on(c, rect);
                 true
             }
             None => false,

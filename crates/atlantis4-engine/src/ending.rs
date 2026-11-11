@@ -30,6 +30,7 @@ use std::collections::HashMap;
 use atlantis4_data::A4Files;
 use atlantis4_script::{BootValue, EngineRef, GuiState, Options};
 
+use crate::canvas::Canvas;
 use crate::gui::{self, Gui, Id, Painter};
 use crate::layout::Rect;
 use crate::package::Picture;
@@ -63,7 +64,7 @@ impl Painter for Pics<'_> {
         self.0.get(path).and_then(Option::as_ref)
     }
 
-    fn video(&self, _: &Gui, _: Id, _: &mut [u32], _: u32, _: u32, _: Rect) -> bool {
+    fn video(&self, _: &Gui, _: Id, _: &mut dyn Canvas, _: Rect) -> bool {
         false
     }
 }
@@ -134,7 +135,8 @@ impl Planks {
     }
 
     /// Draws the planks over the frame.
-    pub fn draw(&mut self, files: &A4Files, out: &mut [u32], width: u32, height: u32) {
+    pub fn draw_on(&mut self, files: &A4Files, c: &mut dyn Canvas) {
+        let (width, height) = c.size();
         let Some(r) = self.root else { return };
         self.gui
             .update(r, (width as f32, height as f32), (0.0, 0.0), None);
@@ -145,7 +147,7 @@ impl Planks {
                 .entry(p.clone())
                 .or_insert_with(|| gui::load_picture(files, &p));
         }
-        self.gui.draw(r, out, width, height, &Pics(&self.pictures));
+        self.gui.draw_on(r, c, &Pics(&self.pictures));
     }
 
     /// What the frame shows, for the frame key.

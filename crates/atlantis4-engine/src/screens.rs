@@ -68,8 +68,9 @@ use std::collections::{HashMap, VecDeque};
 use atlantis4_data::xml::to_cp1252;
 use atlantis4_data::A4Files;
 
+use crate::canvas::Canvas;
 use crate::gui::text::FontCache;
-use crate::gui::{self, draw_picture, Gui, Id, Painter, State};
+use crate::gui::{self, Gui, Id, Painter, State};
 use crate::inventory::{Inventory, SlotRef};
 use crate::layout::{percent_size, RatioMode, Rect};
 use crate::package::Picture;
@@ -200,7 +201,7 @@ impl Painter for Pics<'_> {
         self.0.get(path).and_then(Option::as_ref)
     }
 
-    fn video(&self, _: &Gui, _: Id, _: &mut [u32], _: u32, _: u32, _: Rect) -> bool {
+    fn video(&self, _: &Gui, _: Id, _: &mut dyn Canvas, _: Rect) -> bool {
         false
     }
 }
@@ -736,7 +737,8 @@ impl Screens {
 
     /// The HUD (on-screen sprites and the inventory button with the
     /// selected object) into `out`.
-    pub fn draw_hud(&mut self, inv: &Inventory, out: &mut [u32], width: u32, height: u32) {
+    pub fn draw_hud(&mut self, inv: &Inventory, c: &mut dyn Canvas) {
+        let (width, height) = c.size();
         let selected = inv.selected_name().map(object_picture);
         if let Some(i) = self.in_game.find("currentObjectSprite") {
             self.in_game.node_mut(i).image = selected;
@@ -756,25 +758,23 @@ impl Screens {
         // The sprites go into `inGameSprites` (Percent 1 × 1 of the window).
         for (_, f) in &self.sprites {
             if let Some(r) = f.find("inGameSprite") {
-                f.draw(r, out, width, height, &pics);
+                f.draw_on(r, c, &pics);
             }
         }
         if let Some(b) = self.in_game.find("inventoryButton") {
-            self.in_game.draw(b, out, width, height, &pics);
+            self.in_game.draw_on(b, c, &pics);
         }
     }
 
     /// The inventory menu and the shown document.
-    #[allow(clippy::too_many_arguments)]
     pub fn draw_menu(
         &mut self,
         inv: &Inventory,
-        out: &mut [u32],
-        width: u32,
-        height: u32,
+        c: &mut dyn Canvas,
         now_ms: f64,
         pointer: Option<(f64, f64)>,
     ) {
+        let (width, height) = c.size();
         if self.inventory_shown {
             self.sync_text(inv, now_ms);
         }
@@ -832,7 +832,7 @@ impl Screens {
         let get = |p: &str| self.pictures.get(p).and_then(Option::as_ref);
         if self.inventory_shown {
             if let Some(r) = self.inventory.find("inventory") {
-                self.inventory.draw(r, out, width, height, &pics);
+                self.inventory.draw_on(r, c, &pics);
             }
             let dragged = self.drag.filter(|d| d.moving).map(|d| d.from);
             let sel_pic = self
@@ -858,7 +858,7 @@ impl Screens {
                     _ => *r,
                 };
                 if let Some(p) = get(&object_picture(&o.id)) {
-                    draw_picture(out, width, height, p, rect, None, [255; 4]);
+                    c.picture(p, rect, None, [255; 4]);
                 }
                 if inv.selected == Some(at) {
                     if let Some(p) = sel_pic.as_deref().and_then(get) {
@@ -876,39 +876,39 @@ impl Screens {
                             width: w,
                             height: h,
                         };
-                        draw_picture(out, width, height, p, sr, None, [255; 4]);
+                        c.picture(p, sr, None, [255; 4]);
                     }
                 }
             }
         }
         if self.menu_shown {
             if let Some(r) = self.menu.find("inventoryMenu") {
-                self.menu.draw(r, out, width, height, &pics);
+                self.menu.draw_on(r, c, &pics);
             }
         }
         // The diary (loaded after `inventoryMenu`, 0x0057d43d).
         if self.diary_shown {
             if let Some(r) = self.diary.find("diary") {
-                self.diary.draw(r, out, width, height, &pics);
+                self.diary.draw_on(r, c, &pics);
             }
         }
         if self.zoomed_picture.is_some() {
             if let Some(r) = self.documents.find("zoomed") {
-                self.documents.draw(r, out, width, height, &pics);
+                self.documents.draw_on(r, c, &pics);
             }
         }
     }
 
     /// The notification (its picture and text, faded).
-    pub fn draw_notify(&mut self, out: &mut [u32], width: u32, height: u32) {
+    pub fn draw_notify(&mut self, c: &mut dyn Canvas) {
+        let (width, height) = c.size();
         if self.phase.is_none() {
             return;
         }
         self.layout(width, height);
         self.load_pictures(|s| &s.notify, "notify");
         if let Some(r) = self.notify.find("notify") {
-            self.notify
-                .draw(r, out, width, height, &Pics(&self.pictures));
+            self.notify.draw_on(r, c, &Pics(&self.pictures));
         }
     }
 }

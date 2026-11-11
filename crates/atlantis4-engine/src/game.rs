@@ -40,6 +40,7 @@ use atlantis4_script::{
 };
 
 use crate::camera::fov_for_height;
+use crate::canvas::{Canvas, CpuCache, CpuCanvas};
 use crate::dialog::{Action, Ctx, Dialogs};
 use crate::documents::{Diary, Documents, PuzzleTimer};
 use crate::ending::Planks;
@@ -47,19 +48,13 @@ use crate::inventory::Inventory;
 use crate::markers::sprite_path;
 use crate::movie::{self, Click, Movie, MovieCue};
 use crate::package::Picture;
-use crate::render::{render, Coverage, Weights};
+use crate::render::Weights;
 use crate::saves::BackupFolder;
 use crate::screens::Screens;
 use crate::sound::{SoundEvent, Sounds};
-use crate::sprite::{self, cursor_corner, CURSOR_PATH};
+use crate::sprite::{cursor_corner, CURSOR_PATH};
 use crate::warp::{Warp, WarpNote};
 use crate::View;
-
-/// The background of the last frame, kept while the view does not move.
-struct BackgroundCache {
-    key: (u64, u32, u32, u32, u32, u32),
-    pixels: Vec<u32>,
-}
 
 /// The game as the scripts see it.
 pub struct Game {
@@ -86,8 +81,8 @@ pub struct Game {
     pub trace: Option<Vec<String>>,
     /// Counts the node changes (the background cache's key).
     serial: u64,
-    background: Option<BackgroundCache>,
-    cover: Coverage,
+    /// The processor's renderer's state between frames.
+    cpu: CpuCache,
     /// Decoded 2-D pictures by path (`None`: missing or broken).
     sprites: HashMap<String, Option<Picture>>,
     /// The movie's fixed pictures as [`movie::resolve`] found them.
@@ -250,8 +245,7 @@ impl Game {
             weights: Weights::Exact,
             trace: None,
             serial: 0,
-            background: None,
-            cover: Coverage::new(),
+            cpu: CpuCache::default(),
             sprites: HashMap::new(),
             resolved: HashMap::new(),
             movie: None,
@@ -440,45 +434,33 @@ impl Game {
     }
 
     /// The frame of a `width × height` window into `out` (XRGB, rows
-    /// top-down), in the original's order: the warp (background, then the
-    /// draw list), the markers, a movie's background, video and skip
-    /// button, the cursor at `pointer` (window pixels) when given.
+    /// top-down) drawn by the processor ([`CpuCanvas`]): see
+    /// [`Game::draw_on`].
     pub fn draw(&mut self, out: &mut [u32], width: u32, height: u32, pointer: Option<(f64, f64)>) {
-        let n = width as usize * height as usize;
-        let out = &mut out[..n];
+        let mut cache = std::mem::take(&mut self.cpu);
+        {
+            let mut c = CpuCanvas::new(out, width, height, &mut cache, self.weights);
+            self.draw_on(&mut c, pointer);
+        }
+        self.cpu = cache;
+    }
+
+    /// The frame on `c`, in the original's order: the warp (background,
+    /// then the draw list), the markers, a movie's background, video and
+    /// skip button, the cursor at `pointer` (window pixels) when given.
+    pub fn draw_on(&mut self, c: &mut dyn Canvas, pointer: Option<(f64, f64)>) {
+        let (width, height) = c.size();
         let cam = self.camera(width, height);
         // Under a movie's background nothing of the warp shows: it is
         // not drawn.
         let covered = self.movie.as_ref().is_some_and(|m| m.covers(width, height));
         if covered {
-            out.fill(0);
+            c.clear();
         } else if let Some(w) = self.warp.as_mut() {
-            let key = (
-                self.serial,
-                cam.fov.to_bits(),
-                self.view.yaw.to_bits(),
-                self.view.pitch.to_bits(),
-                width,
-                height,
-            );
-            let stale = self.background.as_ref().is_none_or(|b| b.key != key);
-            if stale {
-                let mut pixels = vec![0u32; n];
-                render(&cam, &w.node.faces, &mut pixels, self.weights);
-                self.background = Some(BackgroundCache { key, pixels });
-            }
-            if let Some(b) = &self.background {
-                out.copy_from_slice(&b.pixels);
-            }
-            w.draw_layers(
-                &cam,
-                self.table.as_ref(),
-                out,
-                &mut self.cover,
-                self.weights,
-            );
+            c.background(&cam, &w.node.faces, self.serial);
+            w.draw_layers(&cam, self.table.as_ref(), c);
         } else {
-            out.fill(0);
+            c.clear();
         }
         let images: Vec<u32> = self
             .warp
@@ -490,35 +472,35 @@ impl Game {
         }
         if let Some(w) = self.warp.as_ref().filter(|_| !covered) {
             let sprites = &self.sprites;
-            w.draw_markers(&cam, self.now_ms, out, |i| {
+            w.draw_markers(&cam, self.now_ms, c, |i| {
                 sprites.get(&sprite_path(i, false)).and_then(Option::as_ref)
             });
         }
         // The HUD (`inGame`: the sprites, the inventory button) under the
         // movie's layouts, which `InGame.lua` declares after it.
         if self.draw_gui {
-            self.draw_hud(out, width, height);
+            self.draw_hud(c);
         }
         if self.movie.is_some() {
             let [bg, up, down] = self.movie_pictures();
             let get = |p: &str| self.sprites.get(p).and_then(Option::as_ref);
             if let Some(m) = &self.movie {
-                m.draw(out, width, height, get(&bg), get(&up), get(&down));
+                m.draw_on(c, get(&bg), get(&up), get(&down));
             }
         }
         // The screens in `Game::load`'s order (@ 0x00528c10, 0x005294bf..
         // 0x00529712): the inventory menu (and the shown document), the
         // dialog, the answers, then the notification.
         if self.draw_gui {
-            self.draw_menu(out, width, height, pointer);
-            self.dialogs.draw(&self.files, out, width, height);
-            self.draw_notify(out, width, height);
+            self.draw_menu(c, pointer);
+            self.dialogs.draw_on(&self.files, c);
+            self.draw_notify(c);
         }
         // The application's planks (`FinishGame`) over the game.
         if let Some(p) = self.planks.as_mut() {
-            p.draw(&self.files, out, width, height);
+            p.draw_on(&self.files, c);
         }
-        self.draw_cursor(out, width, height, pointer);
+        self.draw_cursor_on(c, pointer);
     }
 
     /// The cursor (`2D/arrow6.png`) at `pointer`, above everything.
@@ -529,11 +511,18 @@ impl Game {
         height: u32,
         pointer: Option<(f64, f64)>,
     ) {
+        let mut cache = CpuCache::default();
+        let mut c = CpuCanvas::new(out, width, height, &mut cache, self.weights);
+        self.draw_cursor_on(&mut c, pointer);
+    }
+
+    /// [`Game::draw_cursor`] on `c`.
+    pub fn draw_cursor_on(&mut self, c: &mut dyn Canvas, pointer: Option<(f64, f64)>) {
         if let Some((x, y)) = pointer {
             self.load_sprite(CURSOR_PATH);
             if let Some(Some(pic)) = self.sprites.get(CURSOR_PATH) {
                 let (l, t) = cursor_corner(pic, x, y);
-                sprite::draw(out, width, height, pic, (0, 0, pic.width, pic.height), l, t);
+                c.sprite(pic, (0, 0, pic.width, pic.height), l, t);
             }
         }
     }
@@ -577,7 +566,7 @@ impl Game {
         self.press_layer = None;
         self.main_menu_requested = false;
         self.serial += 1;
-        self.background = None;
+        self.cpu.forget_background();
     }
 
     fn note(r: Result<(), WarpNote>) {

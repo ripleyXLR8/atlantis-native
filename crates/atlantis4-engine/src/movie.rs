@@ -70,6 +70,7 @@
 use atlantis4_data::video::{alpha_name, RgbTable, Video, VideoError};
 use atlantis4_data::A4Files;
 
+use crate::canvas::{Canvas, Edge};
 use crate::frame_anim::{Events, FrameAnim};
 use crate::layout::{
     percent_position, percent_size, pixel_snap, window_rect, RatioMode, Rect, SAFE_AREA_RATIO,
@@ -293,39 +294,26 @@ impl VideoSprite {
         self.picture.as_ref()
     }
 
-    /// Draws the texture stretched over `rect` (window pixels) into `out`
-    /// (`width × height` XRGB): blended through the alpha video when it
-    /// has one, else opaque. Nothing before the first frame.
-    pub fn draw(&self, out: &mut [u32], width: u32, height: u32, rect: Rect) {
+    /// What the texture holds beyond the picture: the first frame's
+    /// margin right and below, clamped left and above.
+    pub fn edge(&self) -> Edge<'_> {
+        match &self.margin {
+            Some((col, row)) => Edge::Margin { col, row },
+            None => Edge::Clamp,
+        }
+    }
+
+    /// Draws the texture stretched over `rect` (window pixels) on `c`:
+    /// blended through the alpha video when it has one, else opaque.
+    /// Nothing before the first frame.
+    pub fn draw_on(&self, c: &mut dyn Canvas, rect: Rect) {
         let Some(pic) = self.picture() else { return };
         let mode = if self.has_alpha() {
             Mode::Blend
         } else {
             Mode::Opaque
         };
-        draw_stretched(out, width, height, pic, rect, mode, &|x, y| {
-            self.tap(pic, x, y)
-        });
-    }
-
-    /// A tap of the texture at (`x`, `y`) of the picture: clamped at the
-    /// left and top edges (the texture's own), the first frame's edge in
-    /// the margin right and below.
-    fn tap(&self, pic: &Picture, x: i64, y: i64) -> [u8; 4] {
-        let (w, h) = (i64::from(pic.width), i64::from(pic.height));
-        let (x, y) = (x.max(0), y.max(0));
-        match &self.margin {
-            Some((col, row)) if x >= w || y >= h => {
-                if x >= w && y >= h {
-                    col[col.len() - 1]
-                } else if x >= w {
-                    col[y as usize]
-                } else {
-                    row[x as usize]
-                }
-            }
-            _ => pic.texel_clamped(x, y),
-        }
+        c.stretched(pic, rect, mode, self.edge(), None);
     }
 }
 
@@ -395,7 +383,7 @@ fn pixel_box(rect: Rect, width: u32, height: u32) -> (i64, i64, i64, i64) {
 /// [`draw_stretched`] leaving out the pixels of `hole` (columns, rows as
 /// [`pixel_box`]): those an opaque picture drawn next covers entirely.
 #[allow(clippy::too_many_arguments)]
-fn draw_stretched_around(
+pub(crate) fn draw_stretched_around(
     out: &mut [u32],
     width: u32,
     height: u32,
@@ -673,20 +661,18 @@ impl Movie {
 
     /// Draws the background, the video and, when shown, the skip button
     /// (`skip_up` / `skip_down`), in that order.
-    #[allow(clippy::too_many_arguments)]
-    pub fn draw(
+    pub fn draw_on(
         &self,
-        out: &mut [u32],
-        width: u32,
-        height: u32,
+        c: &mut dyn Canvas,
         background: Option<&Picture>,
         skip_up: Option<&Picture>,
         skip_down: Option<&Picture>,
     ) {
+        let (width, height) = c.size();
         let skip_size = skip_up.map_or((75, 75), |p| (p.width, p.height));
         let l = self.layout(width, height, skip_size);
         // An opaque video replaces every pixel of its box: the background
-        // is not computed there.
+        // need not be computed there.
         let video = self.sprite.as_ref().and_then(|s| {
             let pic = s.picture()?;
             let opaque = !s.has_alpha() && pic.width > 0 && pic.height > 0;
@@ -694,29 +680,11 @@ impl Movie {
                 .then(|| pixel_box(l.video, width, height))
         });
         match background {
-            Some(bg) => draw_stretched_around(
-                out,
-                width,
-                height,
-                bg,
-                l.background,
-                Mode::Opaque,
-                &|x, y| bg.texel_clamped(x, y),
-                video,
-            ),
-            None => fill(out, width, height, l.background, 0),
+            Some(bg) => c.stretched(bg, l.background, Mode::Opaque, Edge::Clamp, video),
+            None => c.fill(l.background, 0),
         }
         if let Some(s) = &self.sprite {
-            if let Some(pic) = s.picture() {
-                let mode = if s.has_alpha() {
-                    Mode::Blend
-                } else {
-                    Mode::Opaque
-                };
-                draw_stretched(out, width, height, pic, l.video, mode, &|x, y| {
-                    s.tap(pic, x, y)
-                });
-            }
+            s.draw_on(c, l.video);
         }
         if self.skip_shown {
             let pic = if self.skip_pressed {
@@ -725,16 +693,14 @@ impl Movie {
                 skip_up
             };
             if let Some(p) = pic {
-                draw_stretched(out, width, height, p, l.skip_drawn, Mode::Blend, &|x, y| {
-                    p.texel_clamped(x, y)
-                });
+                c.stretched(p, l.skip_drawn, Mode::Blend, Edge::Clamp, None);
             }
         }
     }
 }
 
 /// Fills the pixels whose centre is in `rect` with `colour`.
-fn fill(out: &mut [u32], width: u32, height: u32, rect: Rect, colour: u32) {
+pub(crate) fn fill(out: &mut [u32], width: u32, height: u32, rect: Rect, colour: u32) {
     let i0 = (rect.left - 0.5).ceil().max(0.0) as i64;
     let i1 = ((rect.left + rect.width - 0.5).ceil() as i64).min(i64::from(width));
     let j0 = (rect.top - 0.5).ceil().max(0.0) as i64;

@@ -13,6 +13,9 @@
 //! - [`pick`]: clicks on animations and exits;
 //! - [`markers`]: the markers' placement;
 //! - [`frame_anim`]: `TeFrameAnim`'s frame for a time;
+//! - [`canvas`]: the drawing primitives a frame is made of, and the
+//!   processor's renderer of them (the exact reference; the graphics
+//!   card's is `atlantis4-gl`);
 //! - [`render`]: the view drawn on the processor (GL's `GL_LINEAR` model),
 //!   background and tile meshes;
 //! - [`node`]: a node loaded from the install;
@@ -42,6 +45,7 @@
 #![forbid(unsafe_code)]
 
 pub mod camera;
+pub mod canvas;
 pub mod cube;
 pub mod dialog;
 pub mod documents;

@@ -6,6 +6,7 @@
 
 use atlantis4_script::Value;
 
+use crate::canvas::Canvas;
 use crate::documents::{self, DocAction};
 use crate::game::Game;
 use crate::gui;
@@ -258,25 +259,16 @@ impl Game {
     }
 
     /// The HUD (before a movie's layouts).
-    pub(crate) fn draw_hud(&mut self, out: &mut [u32], width: u32, height: u32) {
+    pub(crate) fn draw_hud(&mut self, c: &mut dyn Canvas) {
         self.gui();
         let Game {
             screens, inventory, ..
         } = self;
-        screens
-            .as_mut()
-            .expect("screens")
-            .draw_hud(inventory, out, width, height);
+        screens.as_mut().expect("screens").draw_hud(inventory, c);
     }
 
     /// The inventory menu and the shown document.
-    pub(crate) fn draw_menu(
-        &mut self,
-        out: &mut [u32],
-        width: u32,
-        height: u32,
-        pointer: Option<(f64, f64)>,
-    ) {
+    pub(crate) fn draw_menu(&mut self, c: &mut dyn Canvas, pointer: Option<(f64, f64)>) {
         self.gui();
         let now = self.now_ms;
         let Game {
@@ -285,13 +277,13 @@ impl Game {
         screens
             .as_mut()
             .expect("screens")
-            .draw_menu(inventory, out, width, height, now, pointer);
+            .draw_menu(inventory, c, now, pointer);
     }
 
     /// The object notification (above the dialogs).
-    pub(crate) fn draw_notify(&mut self, out: &mut [u32], width: u32, height: u32) {
+    pub(crate) fn draw_notify(&mut self, c: &mut dyn Canvas) {
         if let Some(s) = self.screens.as_mut() {
-            s.draw_notify(out, width, height);
+            s.draw_notify(c);
         }
     }
 

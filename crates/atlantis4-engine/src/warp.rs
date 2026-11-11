@@ -30,13 +30,13 @@ use atlantis4_data::{A4Files, WarpPath};
 use atlantis4_data::video::RgbTable;
 
 use crate::camera::Camera;
+use crate::canvas::Canvas;
 use crate::frame_anim::FrameAnim;
 use crate::markers::{place, MarkerSprite, MARKER_FRAMES};
 use crate::node::{Node, NodeError};
 use crate::package::{range_index, Package, Picture};
 use crate::pick::AnimPick;
-use crate::render::{draw_mesh, range_visible, Coverage, Weights};
-use crate::sprite;
+use crate::render::range_visible;
 
 /// `StartAnimation`'s frame count (`0x004f4180`): all frames.
 pub const ALL_FRAMES: u32 = 2_000_000_000;
@@ -382,14 +382,7 @@ impl Warp {
     /// @ 0x004f0b50: each animation in list order, each tile in file
     /// order, the range of the animation's frame; a tile none of whose
     /// triangles is on screen is neither decoded nor drawn).
-    pub fn draw_layers(
-        &mut self,
-        cam: &Camera,
-        table: Option<&RgbTable>,
-        out: &mut [u32],
-        cover: &mut Coverage,
-        weights: Weights,
-    ) {
+    pub fn draw_layers(&mut self, cam: &Camera, table: Option<&RgbTable>, c: &mut dyn Canvas) {
         for a in &mut self.anims {
             let Some(p) = a.package.as_mut() else {
                 continue;
@@ -404,7 +397,7 @@ impl Warp {
                     continue;
                 }
                 if let Some(pic) = t.codec.picture(&t.name, frame, table) {
-                    draw_mesh(cam, range, pic, out, cover, weights);
+                    c.mesh(cam, range, pic);
                 }
             }
         }
@@ -417,7 +410,7 @@ impl Warp {
         &self,
         cam: &Camera,
         now_ms: f64,
-        out: &mut [u32],
+        c: &mut dyn Canvas,
         mut sprites: impl FnMut(u32) -> Option<&'p Picture>,
     ) {
         if !self.markers_shown {
@@ -434,15 +427,7 @@ impl Warp {
             };
             let band = MarkerSprite::band(s.frame(now_ms));
             let top = f64::from(cam.height) - f64::from(y_up) - f64::from(h);
-            sprite::draw(
-                out,
-                cam.width,
-                cam.height,
-                pic,
-                (0, band * h, w, h),
-                f64::from(x),
-                top,
-            );
+            c.sprite(pic, (0, band * h, w, h), f64::from(x), top);
         }
     }
 }
