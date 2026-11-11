@@ -308,6 +308,7 @@ dependencies = [
  "md-5",
  "miniz_oxide 0.8.9",
  "png",
+ "theora-rs",
 ]
 
 [[package]]
@@ -2370,6 +2371,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "theora-rs"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6b0009da581a0bb349c2e2b26e80d97cff7dbbbbddcd3e150c0d089a4702fe8"
 
 [[package]]
 name = "thiserror"
