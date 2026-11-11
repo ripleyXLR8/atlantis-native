@@ -211,7 +211,11 @@ impl Dialogs {
         }
         if let Some(mut g) = Gui::load(files, QUESTIONS_LUA) {
             if let (Some(lock), Some(list)) = (g.find("lockButton"), g.find("questionList")) {
+                // Hidden (@ 0x00567e66), and made click-through
+                // (@ 0x00567ef5, `+0x580 = 1`): the dialog's `quit`
+                // under it can be clicked while topics show.
                 g.node_mut(lock).visible = false;
+                g.node_mut(lock).click_pass_through = true;
                 self.q = Some((lock, list));
                 self.questions = Some(g);
             }
