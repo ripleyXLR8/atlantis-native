@@ -24,11 +24,11 @@ use atlantis4_script::{
     load_game, BootValue, BootVars, EngineRef, Options, SaveOpen, SavedGlobal, Script, ScriptError,
 };
 
-use crate::dialog::Dialogs;
-use crate::documents::{Diary, PuzzleTimer};
 use crate::ending::Planks;
 use crate::game::Game;
-use crate::saves::{self, BackupFolder, SaveSlot, AUTOSAVE, CHAPTER_SLOTS, NEW_GAME_REMOVES};
+use crate::saves::{
+    self, BackupFolder, SaveSlot, SaveStore, AUTOSAVE, CHAPTER_SLOTS, NEW_GAME_REMOVES,
+};
 use crate::savexml::save_text;
 
 fn text(b: &[u8]) -> String {
@@ -173,17 +173,9 @@ impl Game {
     /// layouts are loaded again by `Game::enter`), the movie gone.
     pub fn leave_game(&mut self) {
         self.sounds.leave_game();
-        self.warp = None;
-        self.movie = None;
-        self.dialogs = Dialogs::default();
-        self.screens = None;
-        self.callbacks.clear();
-        self.diary = Diary::default();
         // `game+0xda0` is not reset by `Game::leave` or `Game::enter`
-        // `[UNKNOWN]`; dormant in this game, reset here.
-        self.puzzle_timer = PuzzleTimer::default();
-        self.warp_name.clear();
-        self.avatar = None;
+        // `[UNKNOWN]`; dormant in this game, reset with the rest.
+        self.drop_game_state();
         self.pending_save = None;
     }
 
@@ -193,13 +185,23 @@ impl Game {
     pub fn enter_game(&mut self) {
         self.played_base = 0.0;
         self.played_start_ms = self.clock_ms();
+        // A new game's view (@ 0x005296bf): yaw = pitch = 0, the limits
+        // reset; a save's `Orientation` follows.
+        self.view = crate::view::View::default();
         self.ended = false;
         self.planks = None;
     }
 
     /// `FinishGame` (@ 0x0052bc30): the planks close over the game; their
-    /// end is [`Game::take_ended`].
+    /// end is [`Game::take_ended`]. With [`Game::app_planks`], the
+    /// application's planks instead ([`Game::take_finish`]): the portrait
+    /// close (0x0051f3c0) whose turn fires `App+0xdb0` (`RotationAnim`
+    /// `+0x700`), `Game::onFinished`'s signal.
     pub fn finish_game(&mut self) {
+        if self.app_planks {
+            self.finish_requested = true;
+            return;
+        }
         let now = self.clock_ms();
         let (planks, sound) = Planks::close(&self.files, now);
         self.planks = Some(planks);
@@ -214,6 +216,13 @@ impl Game {
     /// runs [`Game::leave`] and shows its main menu.
     pub fn take_ended(&mut self) -> bool {
         std::mem::take(&mut self.ended)
+    }
+
+    /// True once after `FinishGame` when the application runs the planks:
+    /// it closes them (portrait) and, at their turn, runs [`Game::leave`]
+    /// and enters its main menu, without the credits.
+    pub fn take_finish(&mut self) -> bool {
+        std::mem::take(&mut self.finish_requested)
     }
 
     /// The main menu's *continue* is offered (`Backup/save.xml` exists,
@@ -281,5 +290,51 @@ impl Game {
         // The name `Game::load` then gets is the menu's (`[UNKNOWN]`);
         // every save is gone, so it is a new game whatever it is.
         Game::load_from(game, None, options, AUTOSAVE)
+    }
+}
+
+/// The game's backup folder as the menus see it ([`SaveStore`]): the
+/// names are the folder's files (`save.xml`, `3.xml`), saving is the
+/// `SaveGame` worker ([`Game::save_to`]) and loading `Game::enter` +
+/// `Game::load` ([`Game::load_from`]; a missing file is a new game).
+pub struct GameSaves {
+    pub game: Rc<RefCell<Game>>,
+    /// The game scripts' options.
+    pub options: Options,
+}
+
+impl SaveStore for GameSaves {
+    fn exists(&self, name: &str) -> bool {
+        self.game.borrow().backup.exists(&format!("Backup/{name}"))
+    }
+
+    fn played_time(&self, name: &str) -> Option<f64> {
+        let bytes = self.game.borrow().backup.read(name)?;
+        let els = saves::parse(&bytes).ok()?;
+        saves::top(&els, "PlayedTime")
+            .and_then(|e| e.attr("value"))
+            .and_then(|v| saves::scan_double(v.as_bytes()))
+    }
+
+    fn delete(&mut self, name: &str) {
+        self.game.borrow_mut().backup.remove(&format!("Backup/{name}"));
+    }
+
+    fn save(
+        &mut self,
+        game: &Rc<RefCell<Game>>,
+        script: &mut Script,
+        name: &str,
+    ) -> Result<(), String> {
+        let globals = script.globals().map_err(|e| format!("SaveGame({name}): {e}"))?;
+        if game.borrow_mut().save_to(name, &globals) {
+            Ok(())
+        } else {
+            Err(format!("SaveGame({name}): nothing written"))
+        }
+    }
+
+    fn load(&mut self, game: &Rc<RefCell<Game>>, name: &str) -> Result<Script, String> {
+        Game::load_from(game, None, self.options, name).map_err(|e| format!("load {name}: {e}"))
     }
 }

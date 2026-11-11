@@ -74,8 +74,10 @@ pub struct Game {
     pub height: u32,
     /// The engine clock, ms.
     pub now_ms: f64,
-    /// The global marker flag (`App+0x86b0`).
+    /// The global marker flag (`App+0x86b0`, the options' `PermanentHelp`).
     pub markers_shown: bool,
+    /// The options' `InverseLook` (`App+0x86b1`): the mouse look inverted.
+    pub inverse_look: bool,
     /// The bilinear weights' precision of the drawing.
     pub weights: Weights,
     /// When set, the files run, callbacks entered and bindings called, as
@@ -143,6 +145,15 @@ pub struct Game {
     pub draw_gui: bool,
     /// The GUI layer that took the last press (its release goes there).
     press_layer: Option<Layer>,
+    /// The inventory menu's `mainMenuButton` was clicked: the application
+    /// saves `save.xml` and runs the planks ([`Game::take_main_menu`]).
+    pub main_menu_requested: bool,
+    /// The application runs the planks itself (its front end's
+    /// `RotationAnim`): `FinishGame` then only raises
+    /// [`Game::take_finish`] instead of closing [`Game::planks`].
+    pub app_planks: bool,
+    /// `FinishGame` ran with [`Game::app_planks`] set.
+    pub(crate) finish_requested: bool,
 }
 
 /// A GUI layer that takes the pointer ([`Game::gui_press`]).
@@ -224,6 +235,9 @@ impl Game {
             ended: false,
             draw_gui: true,
             press_layer: None,
+            main_menu_requested: false,
+            app_planks: false,
+            finish_requested: false,
             files,
             table,
             warp: None,
@@ -232,6 +246,7 @@ impl Game {
             height,
             now_ms: 0.0,
             markers_shown: true,
+            inverse_look: false,
             weights: Weights::Exact,
             trace: None,
             serial: 0,
@@ -503,6 +518,17 @@ impl Game {
         if let Some(p) = self.planks.as_mut() {
             p.draw(&self.files, out, width, height);
         }
+        self.draw_cursor(out, width, height, pointer);
+    }
+
+    /// The cursor (`2D/arrow6.png`) at `pointer`, above everything.
+    pub fn draw_cursor(
+        &mut self,
+        out: &mut [u32],
+        width: u32,
+        height: u32,
+        pointer: Option<(f64, f64)>,
+    ) {
         if let Some((x, y)) = pointer {
             self.load_sprite(CURSOR_PATH);
             if let Some(Some(pic)) = self.sprites.get(CURSOR_PATH) {
@@ -510,6 +536,48 @@ impl Game {
                 sprite::draw(out, width, height, pic, (0, 0, pic.width, pic.height), l, t);
             }
         }
+    }
+
+    /// Whether the inventory menu asked for the main menu (cleared).
+    pub fn take_main_menu(&mut self) -> bool {
+        std::mem::take(&mut self.main_menu_requested)
+    }
+
+    /// The settings' effects on the game (`App+0x86b0` the markers,
+    /// `+0x86b1` the inverted look, read by the view @ 0x0052a950) and
+    /// the channels' volumes.
+    pub fn apply_settings(&mut self, s: &crate::options::Settings) {
+        self.markers_shown = s.permanent_help;
+        self.inverse_look = s.inverse_look;
+        for (_, ch) in crate::options::VOLUMES {
+            self.sounds.set_channel_volume(ch, s.volume(ch));
+        }
+    }
+
+    /// The game's objects dropped with the scene by `Game::leave`
+    /// (0x00525f50, after [`crate::sound::Sounds::leave_game`]): the node,
+    /// the movie, the dialogs, the screens (their layouts, the inventory
+    /// and the documents are made again at their first use, as
+    /// `Game::enter` loads them), the pending input. `[INFERRED]` past the
+    /// steps [`Game::leave_game`] names.
+    pub(crate) fn drop_game_state(&mut self) {
+        self.warp = None;
+        self.movie = None;
+        self.movie_cues.clear();
+        self.dialogs = Dialogs::default();
+        self.inventory = Inventory::default();
+        self.documents = Documents::default();
+        self.diary = Diary::default();
+        self.puzzle_timer = PuzzleTimer::default();
+        self.screens = None;
+        self.callbacks.clear();
+        self.sound_pending.clear();
+        self.warp_name.clear();
+        self.avatar = None;
+        self.press_layer = None;
+        self.main_menu_requested = false;
+        self.serial += 1;
+        self.background = None;
     }
 
     fn note(r: Result<(), WarpNote>) {
@@ -794,6 +862,17 @@ impl Engine for Game {
                 return Reply::Num(self.inventory.count(&name) as f64);
             }
             Binding::PrintDebugMessage => log::info!("PrintDebugMessage: {name}"),
+            Binding::SetDiaryPage => {
+                // 0x005814c0: the page set, then shown.
+                let n = call.num(0).max(0.0) as usize;
+                let file = text(call.str(1));
+                self.diary.set_page(n, &file);
+                self.show_diary_page(n);
+            }
+            Binding::ShowDiaryPage => {
+                let n = call.num(0).max(0.0) as usize;
+                self.show_diary_page(n);
+            }
             Binding::PlayMusic => {
                 let path = text(Some(&normalise_path(call.str(0).unwrap_or_default())));
                 self.sounds.play_music(&self.files, &path);

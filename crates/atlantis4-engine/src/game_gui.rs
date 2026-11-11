@@ -190,7 +190,33 @@ impl Game {
             Action::CloseMenu => self.gui().close_menu(),
             Action::HideInventory => self.gui().hide_inventory(),
             Action::MainMenu => {
-                log::info!("mainMenuButton: save.xml then the main menu (M4, not done)")
+                // 0x0057cc50: `save.xml`, the portrait planks, then the
+                // main menu: the application's part.
+                self.main_menu_requested = true;
+            }
+            Action::InventoryTab => {
+                let Game {
+                    screens, inventory, ..
+                } = self;
+                screens.as_mut().expect("screens").open_menu(inventory);
+            }
+            Action::DocumentsTab => {
+                log::info!("documentsButton: the documents browser (not ported, unreachable)")
+            }
+            Action::ShowDiary => {
+                let n = self.diary.current;
+                self.show_diary_page(n);
+            }
+            Action::HideDiary => {
+                self.diary.shown = false;
+                self.gui().diary_shown = false;
+            }
+            Action::DiaryPage(d) => {
+                log::info!("diary page button {d} ([UNKNOWN] handler: a double page)");
+                let n = self.diary.current as i64 + 2 * i64::from(d);
+                if n >= 0 && (n as usize) < self.diary.pages.len() {
+                    self.show_diary_page(n as usize);
+                }
             }
             Action::ObjectClicked(at) => {
                 let now = self.now_us();
@@ -219,6 +245,16 @@ impl Game {
                 }
             }
         }
+    }
+
+    /// `Diary::show(n)` (0x0056c690): the page current, its picture in
+    /// `leftPage`, the diary shown.
+    pub fn show_diary_page(&mut self, n: usize) {
+        self.diary.show(n);
+        let pic = self.diary.picture();
+        let s = self.gui();
+        s.diary_shown = true;
+        s.diary_picture = pic;
     }
 
     /// The HUD (before a movie's layouts).

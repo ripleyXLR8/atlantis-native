@@ -778,7 +778,7 @@ impl Sounds {
 
 /// C's `atof` on a decimal number (leading spaces, sign, digits, point,
 /// exponent; the rest ignored); 0 when nothing parses.
-fn atof(s: &str) -> f32 {
+pub(crate) fn atof(s: &str) -> f32 {
     let t = s.trim_start();
     let b = t.as_bytes();
     let mut end = 0;

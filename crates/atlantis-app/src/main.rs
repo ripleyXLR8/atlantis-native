@@ -125,11 +125,16 @@ fn main() {
     #[cfg(feature = "atlantis4")]
     if args.first().map(String::as_str) == Some("--atlantis4-view") {
         let Some(dir) = args.get(1) else {
-            eprintln!("--atlantis4-view <game folder> [node | save.xml | N.xml]");
+            eprintln!("--atlantis4-view <game folder> [[--node] node]");
             std::process::exit(2);
         };
-        if let Err(e) = atlantis_app::a4::run_view(Path::new(dir), args.get(2).map(String::as_str))
-        {
+        // `[node]` or `--node <node>`: the development shortcut past the
+        // menus.
+        let node = match args.get(2).map(String::as_str) {
+            Some("--node") => args.get(3).map(String::as_str),
+            other => other,
+        };
+        if let Err(e) = atlantis_app::a4::run_view(Path::new(dir), node) {
             eprintln!("{e}");
             std::process::exit(1);
         }

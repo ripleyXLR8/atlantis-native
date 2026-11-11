@@ -2,8 +2,22 @@
 //! feature `atlantis4`, off by default and in every release: the game is
 //! not offered until its port is complete).
 //!
-//! `atlantis-native --atlantis4-view <game folder> [node]` boots the game's
-//! scripts as a new game does (the `Texts` boot files, `3D/OnGameEnter.lua`,
+//! `atlantis-native --atlantis4-view <game folder>` starts as the original
+//! does (`atlantis4_engine::menus`): the two splash screens (1.5 s each),
+//! then the main menu with its music; "new game", "continue" and a
+//! chapter of the load screen close the planks and start the game at
+//! their turn; the options' volumes, check boxes and credits work, and
+//! `options.xml` (in the player's data folder, `atlantis4/Backup/`) is
+//! read at the start and written when the window closes or "quit" is
+//! clicked. The saves are a stand-in until the save format is wired
+//! (`atlantis4_engine::saves::StubSaves`: the folder's files are listed,
+//! nothing is written or loaded; a load starts a new game). In the game,
+//! the inventory menu's "menu" button goes back to the main menu.
+//!
+//! `--atlantis4-view <game folder> <node>` (or `--node <node>`), the
+//! development shortcut, skips the menus: a new game at once, at `node`.
+//! A new game boots the game's
+//! scripts (the `Texts` boot files, `3D/OnGameEnter.lua`,
 //! `Diary/Diary.lua`, `Inventory/InventoryScripts.lua`, then the node
 //! change to `firstWarpPath`, or to `node` when given) and shows the node
 //! in a window of 1365 × 768 drawn on the processor by
@@ -57,7 +71,10 @@ use std::time::{Duration, Instant};
 
 use atlantis4_data::A4Files;
 use atlantis4_engine::dialog::Action;
+use atlantis4_engine::menus::{Front, FrontAction};
+use atlantis4_engine::options::{self, Settings};
 use atlantis4_engine::pick::is_click;
+use atlantis4_engine::saves::{SaveStore, StubSaves};
 use atlantis4_engine::Game;
 use atlantis4_script::{
     new_game, read_boot_vars, BootValue, EngineRef, ErrorMode, Options, Script, Value,
@@ -80,7 +97,16 @@ struct Viewer {
     game: Rc<RefCell<Game>>,
     /// The sound output, kept alive.
     _audio: Option<cpal::Stream>,
-    script: Script,
+    /// The game's script state (none in the menus).
+    script: Option<Script>,
+    /// The front end (splashes, menus, the planks).
+    front: Front,
+    saves: StubSaves,
+    /// Where `options.xml` is read and written.
+    options_path: std::path::PathBuf,
+    /// The node of a new game (`firstWarpPath`).
+    first: Vec<u8>,
+    script_options: Options,
     start: Instant,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
@@ -147,22 +173,25 @@ impl Viewer {
 
     /// The frame animations, then the `OnAnimationFinished` callbacks of
     /// those that finished; the movie, then `OnMovieFinished` if it ended.
-    fn tick(&mut self) {
+    fn tick(&mut self, el: &ActiveEventLoop) {
         let now = self.now_ms();
+        self.front.tick(now, &mut self.saves);
+        self.front_actions(el);
+        if self.script.is_none() {
+            // The menus: the sounds and the music still play.
+            self.game.borrow_mut().update(now);
+            return;
+        }
         let finished = self.game.borrow_mut().update(now);
         // `TeSoundManager::update` ran first in the frame: its signals'
         // callbacks (`OnSoundStopped`) come before the animations'.
         let sounds = self.game.borrow_mut().sound_callbacks();
         for (name, args) in sounds {
-            if let Err(e) = self.script.callback(&name, &args) {
-                log::error!("{e}");
-            }
+            self.callback(&name, &args);
         }
         for name in finished {
             let arg = [Value::Str(name.into_bytes())];
-            if let Err(e) = self.script.callback("OnAnimationFinished", &arg) {
-                log::error!("{e}");
-            }
+            self.callback("OnAnimationFinished", &arg);
         }
         let ended = self.game.borrow_mut().update_movie(now);
         if let Some(name) = ended {
@@ -172,19 +201,121 @@ impl Viewer {
         // `OnDialogFinished`).
         let dialogs = self.game.borrow_mut().dialog_callbacks();
         for (name, args) in dialogs {
-            if let Err(e) = self.script.callback(&name, &args) {
-                log::error!("{e}");
-            }
+            self.callback(&name, &args);
         }
         // The shown document's alarm and the notification's fades.
         self.game.borrow_mut().update_gui(now);
         self.gui_callbacks();
         // `FinishGame`'s planks closed: `Game::leave` (the autosave), then
-        // the original's main menu, which the viewer does not have.
+        // the main menu.
         if self.game.borrow_mut().take_ended() {
-            Game::leave(&self.game, Some(&self.script));
-            log::info!("the end: the original goes to its main menu; the viewer stops");
-            self.quit = true;
+            self.leave_game();
+            return;
+        }
+        self.main_menu_button(now);
+    }
+
+    /// The inventory menu's "menu" button (0x0057cc50): `save.xml`, then
+    /// the portrait planks.
+    fn main_menu_button(&mut self, now: f64) {
+        if !self.game.borrow_mut().take_main_menu() {
+            return;
+        }
+        if let Some(script) = self.script.as_mut() {
+            if let Err(e) = self.saves.save(&self.game, script, "save.xml") {
+                log::error!("{e}");
+            }
+        }
+        self.front.to_main_menu(now);
+    }
+
+    /// Runs a script callback when a game is in play.
+    fn callback(&mut self, name: &str, args: &[Value]) {
+        if let Some(s) = self.script.as_mut() {
+            if let Err(e) = s.callback(name, args) {
+                log::error!("{e}");
+            }
+        }
+    }
+
+    /// What the front end asked for, in order.
+    fn front_actions(&mut self, el: &ActiveEventLoop) {
+        for a in self.front.take_actions() {
+            log::info!("front end: {a:?}");
+            match a {
+                FrontAction::Sound(p) => {
+                    let mut g = self.game.borrow_mut();
+                    let files = g.files.clone();
+                    g.sounds.play_free_sound(&files, &p, 1.0);
+                }
+                FrontAction::Music(p) => {
+                    let mut g = self.game.borrow_mut();
+                    let files = g.files.clone();
+                    let same = g.sounds.music.is_playing() && g.sounds.music.path() == p;
+                    if !same {
+                        g.sounds.play_music(&files, &p);
+                    }
+                }
+                FrontAction::Volume(ch, v) => {
+                    self.game.borrow_mut().sounds.set_channel_volume(&ch, v)
+                }
+                FrontAction::TestSound(ch, p) => {
+                    // `PG813A01.ogg` is in no install: silent.
+                    log::info!("test sound {p} on {ch}");
+                }
+                FrontAction::Settings => {
+                    let s = self.front.settings.clone();
+                    self.game.borrow_mut().apply_settings(&s);
+                }
+                FrontAction::StartGame(name) => self.start_game(&name),
+                FrontAction::LeaveGame => self.leave_game(),
+                FrontAction::Quit => {
+                    self.write_options();
+                    el.exit();
+                }
+            }
+        }
+    }
+
+    /// `Game::leave` (0x00525f50: the autosave when a node is shown), the
+    /// script state dropped, then the main menu.
+    fn leave_game(&mut self) {
+        Game::leave(&self.game, self.script.as_ref());
+        self.script = None;
+        self.front.game_left(&self.saves);
+    }
+
+    /// `Game::enter` then `Game::load(name)` (0x00528c10, 0x00529e30): a
+    /// new game when the file is missing.
+    fn start_game(&mut self, name: &str) {
+        Game::leave(&self.game, self.script.take().as_ref());
+        let s = self.front.settings.clone();
+        self.game.borrow_mut().apply_settings(&s);
+        if self.saves.exists(name) {
+            match self.saves.load(&self.game, name) {
+                Ok(script) => {
+                    self.script = Some(script);
+                    return;
+                }
+                Err(e) => log::warn!("{e}; a new game instead"),
+            }
+        }
+        self.game.borrow_mut().enter_game();
+        let engine: EngineRef = self.game.clone();
+        match new_game(&engine, self.script_options, &self.first) {
+            Ok(s) => self.script = Some(s),
+            Err(e) => log::error!("new game: {e}"),
+        }
+    }
+
+    /// `options.xml` written (0x005766b0, at the application's end).
+    fn write_options(&self) {
+        let data = self.front.settings.write();
+        if let Some(d) = self.options_path.parent() {
+            let _ = std::fs::create_dir_all(d);
+        }
+        if let Err(e) = std::fs::write(&self.options_path, data) {
+            log::warn!("{}: {e}", self.options_path.display());
         }
     }
 
@@ -196,9 +327,7 @@ impl Viewer {
                 break;
             }
             for (name, args) in cbs {
-                if let Err(e) = self.script.callback(&name, &args) {
-                    log::error!("{e}");
-                }
+                self.callback(&name, &args);
             }
         }
     }
@@ -207,11 +336,7 @@ impl Viewer {
     fn run_actions(&mut self, actions: Vec<Action>) {
         for a in actions {
             match a {
-                Action::Lua(name, args) => {
-                    if let Err(e) = self.script.callback(&name, &args) {
-                        log::error!("{e}");
-                    }
-                }
+                Action::Lua(name, args) => self.callback(&name, &args),
                 Action::HideAnswers => self.game.borrow_mut().dialogs.hide_answers(),
             }
         }
@@ -219,9 +344,7 @@ impl Viewer {
 
     fn movie_finished(&mut self, name: String) {
         let arg = [Value::Str(name.into_bytes())];
-        if let Err(e) = self.script.callback("OnMovieFinished", &arg) {
-            log::error!("{e}");
-        }
+        self.callback("OnMovieFinished", &arg);
     }
 
     fn in_movie(&self) -> bool {
@@ -229,6 +352,7 @@ impl Viewer {
     }
 
     fn draw(&mut self) {
+        let key = self.frame_key();
         let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
             return;
         };
@@ -244,8 +368,19 @@ impl Viewer {
             {
                 let mut g = self.game.borrow_mut();
                 g.height = h;
-                g.draw(&mut buf, w, h, self.pointer);
-                self.shown = Some(g.frame_key(w, h, self.pointer));
+                if self.front.active() || self.front.in_transition() {
+                    if self.front.active() {
+                        buf.fill(0);
+                    } else {
+                        g.draw(&mut buf, w, h, None);
+                    }
+                    self.front.draw(&mut buf, w, h);
+                    g.draw_cursor(&mut buf, w, h, self.pointer);
+                } else {
+                    g.draw(&mut buf, w, h, self.pointer);
+                }
+                drop(g);
+                self.shown = Some(key);
             }
             let t1 = Instant::now();
             window.pre_present_notify();
@@ -256,9 +391,38 @@ impl Viewer {
         }
     }
 
+    /// What the picture depends on: the game's, the front end's.
+    fn frame_key(&mut self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let (w, h) = self.size;
+        let mut hs = std::collections::hash_map::DefaultHasher::new();
+        let menus = self.front.active();
+        menus.hash(&mut hs);
+        if menus {
+            self.pointer
+                .map(|(x, y)| (x.to_bits(), y.to_bits()))
+                .hash(&mut hs);
+        } else {
+            self.game
+                .borrow()
+                .frame_key(w, h, self.pointer)
+                .hash(&mut hs);
+        }
+        if menus || self.front.in_transition() {
+            self.front.key(&mut hs);
+        }
+        hs.finish()
+    }
+
     fn release(&mut self) {
         let Some(down) = self.down.take() else { return };
         let Some(up) = self.pointer else { return };
+        if self.front.active() || self.front.in_transition() {
+            let (w, h) = self.size;
+            let now = self.now_ms();
+            self.front.release(w, h, up.0, up.1, now, &mut self.saves);
+            return;
+        }
         let gui_down = std::mem::replace(&mut self.gui_down, false);
         if gui_down || self.game.borrow().gui_shown() {
             let (w, h) = self.size;
@@ -289,9 +453,7 @@ impl Viewer {
         if let Some(name) = hit {
             // The warp's click callback (`+0xbc`): `OnWarpObjectHit(name)`.
             let arg = [Value::Str(name.into_bytes())];
-            if let Err(e) = self.script.callback("OnWarpObjectHit", &arg) {
-                log::error!("{e}");
-            }
+            self.callback("OnWarpObjectHit", &arg);
         }
     }
 }
@@ -339,15 +501,14 @@ impl ApplicationHandler for Viewer {
         let now = Instant::now();
         if now >= self.next_frame {
             let t0 = Instant::now();
-            self.tick();
+            self.tick(el);
             self.stats.frames += 1;
             self.stats.tick += t0.elapsed();
             self.next_frame += FRAME;
             if self.next_frame <= now {
                 self.next_frame = now + FRAME;
             }
-            let (w, h) = self.size;
-            let key = self.game.borrow().frame_key(w, h, self.pointer);
+            let key = self.frame_key();
             if self.shown != Some(key) {
                 if let Some(win) = &self.window {
                     win.request_redraw();
@@ -364,7 +525,10 @@ impl ApplicationHandler for Viewer {
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
-            WindowEvent::CloseRequested => el.exit(),
+            WindowEvent::CloseRequested => {
+                self.write_options();
+                el.exit();
+            }
             WindowEvent::Resized(s) => {
                 self.size = (s.width, s.height);
                 self.shown = None;
@@ -374,6 +538,14 @@ impl ApplicationHandler for Viewer {
             WindowEvent::CursorMoved { position, .. } => {
                 let p = (position.x, position.y);
                 self.pointer = Some(p);
+                if self.front.active() || self.front.in_transition() {
+                    let (w, h) = self.size;
+                    let now = self.now_ms();
+                    let held = self.down.is_some();
+                    self.front.hover(w, h, p.0, p.1, held, now);
+                    self.last = p;
+                    return;
+                }
                 {
                     let (w, h) = self.size;
                     self.game.borrow_mut().gui_hover(w, h, p.0, p.1);
@@ -396,10 +568,9 @@ impl ApplicationHandler for Viewer {
                     // Input pixels, y up.
                     let dx = p.0 - self.last.0;
                     let dy_up = self.last.1 - p.1;
-                    self.game
-                        .borrow_mut()
-                        .view
-                        .drag(dx as f32, dy_up as f32, false);
+                    let mut g = self.game.borrow_mut();
+                    let inverse = g.inverse_look;
+                    g.view.drag(dx as f32, dy_up as f32, inverse);
                 }
                 self.last = p;
             }
@@ -413,6 +584,10 @@ impl ApplicationHandler for Viewer {
                         self.down = Some(p);
                         self.last = p;
                         let (w, h) = self.size;
+                        if self.front.active() || self.front.in_transition() {
+                            self.front.press(w, h, p.0, p.1);
+                            return;
+                        }
                         // The GUI above the warp first (the dialogs, a
                         // document, the inventory menu, the HUD); a movie's
                         // buttons when none takes it.
@@ -487,7 +662,14 @@ fn start_sound(core: atlantis4_engine::sound::Core) -> Option<cpal::Stream> {
     )
 }
 
-/// Opens the viewer on the game at `dir`, at `node` or the first node.
+/// Atlantis Evolution's folder in the per-user data folder: `Backup/`
+/// (the original's name for its saves and `options.xml`).
+pub fn data_dir() -> std::path::PathBuf {
+    crate::desktop::data_dir().join("atlantis4")
+}
+
+/// Opens the viewer on the game at `dir`: the splashes and the menus, or
+/// with `node` a new game there at once.
 pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
     let (files, build) = A4Files::open_dir(dir).map_err(|e| e.to_string())?;
     log::info!("Atlantis Evolution {}", build.id);
@@ -513,17 +695,36 @@ pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
     // `<Documents>/<applicationTitle>/`.
     game.borrow_mut()
         .configure_saves(&boot, Some(&crate::desktop::data_dir().join("atlantis4")));
-    let script = match node.filter(|n| n.ends_with(".xml")) {
-        Some(save) => Game::load_from(&game, None, options, save).map_err(|e| e.to_string())?,
-        None => {
-            game.borrow_mut().enter_game();
-            new_game(&engine, options, &first).map_err(|e| e.to_string())?
-        }
+    // `Backup/options.xml` (0x00577530), read before anything plays.
+    let backup = data_dir().join("Backup");
+    let options_path = backup.join(options::FILE);
+    let settings = std::fs::read(&options_path)
+        .map(|d| Settings::read(&d))
+        .unwrap_or_default();
+    game.borrow_mut().apply_settings(&settings);
+    let version = match &boot.version_string {
+        Some(BootValue::Str(s)) => s.iter().map(|&c| char::from(c)).collect(),
+        _ => String::new(),
+    };
+    let files = game.borrow().files.clone();
+    let mut front = Front::new(&files, settings, version);
+    let saves = StubSaves::from_dir(&backup);
+    let script = if node.is_some() {
+        game.borrow_mut().enter_game();
+        Some(new_game(&engine, options, &first).map_err(|e| e.to_string())?)
+    } else {
+        front.start(0.0, &saves);
+        None
     };
     let mut app = Viewer {
         _audio: audio,
         game,
         script,
+        front,
+        saves,
+        options_path,
+        first,
+        script_options: options,
         start,
         window: None,
         surface: None,
