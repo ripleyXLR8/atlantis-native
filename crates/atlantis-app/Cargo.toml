@@ -27,6 +27,13 @@ web-time = "1"
 md-5 = "0.10"
 atlantis3-data = { path = "../atlantis3-data" }
 atlantis3-engine = { path = "../atlantis3-engine" }
+# Atlantis Evolution's development viewer (feature `atlantis4`, off by
+# default, never in a release or the CI).
+atlantis4-data = { path = "../atlantis4-data", optional = true }
+atlantis4-engine = { path = "../atlantis4-engine", optional = true }
+
+[features]
+atlantis4 = ["dep:atlantis4-data", "dep:atlantis4-engine"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
