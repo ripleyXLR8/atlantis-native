@@ -2,46 +2,73 @@
 //! feature `atlantis4`, off by default and in every release: the game is
 //! not offered until its port is complete).
 //!
-//! `atlantis-native --atlantis4-view <game folder> [node]` opens the node
-//! (by default the first of a new game) in a window of 1365 × 768 drawn
-//! on the processor by `atlantis4_engine::render`: dragging with the left
-//! button turns the view (0.5° per pixel, the original's mouse look), a
-//! left click of less than 20 pixels logs what it hits; an exit's click
-//! opens the node it leads to. No scripts yet: the view shows the
-//! background only.
+//! `atlantis-native --atlantis4-view <game folder> [node]` boots the game's
+//! scripts as a new game does (the `Texts` boot files, `3D/OnGameEnter.lua`,
+//! `Diary/Diary.lua`, `Inventory/InventoryScripts.lua`, then the node
+//! change to `firstWarpPath`, or to `node` when given) and shows the node
+//! in a window of 1365 × 768 drawn on the processor by
+//! `atlantis4_engine`: the background, the objects and animations the
+//! node's `OnWarpEnter` puts there, the markers and the game's cursor.
+//! Dragging with the left button turns the view (0.5° per pixel, the
+//! original's mouse look); a left click of less than 20 pixels calls the
+//! node's `OnWarpObjectHit` with what it hits, which leads through an exit
+//! with `ChangeWarp` as the original. Sounds, videos, dialogs and the
+//! inventory are not there yet (logged).
 
+use std::cell::RefCell;
 use std::num::NonZeroU32;
 use std::path::Path;
 use std::rc::Rc;
+use std::time::{Duration, Instant};
 
-use atlantis4_data::{A4Files, WarpPath};
-use atlantis4_engine::camera::{fov_for_height, Camera};
-use atlantis4_engine::node::{first_warp_path, Node, FIRST_WARP_SCRIPT};
-use atlantis4_engine::pick::{click, is_click, Target};
-use atlantis4_engine::render::{render, Weights};
-use atlantis4_engine::View;
+use atlantis4_data::A4Files;
+use atlantis4_engine::pick::is_click;
+use atlantis4_engine::Game;
+use atlantis4_script::{
+    new_game, read_boot_vars, BootValue, EngineRef, ErrorMode, Options, Script, Value,
+};
 use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, MouseButton, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
 const WIDTH: u32 = 1365;
 const HEIGHT: u32 = 768;
 
+/// The time between two frames of the viewer.
+const FRAME: Duration = Duration::from_millis(33);
+
 struct Viewer {
-    files: A4Files,
-    node: Node,
-    view: View,
+    game: Rc<RefCell<Game>>,
+    script: Script,
+    start: Instant,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
-    pointer: (f64, f64),
+    pointer: Option<(f64, f64)>,
     down: Option<(f64, f64)>,
     last: (f64, f64),
     size: (u32, u32),
 }
 
 impl Viewer {
+    fn now_ms(&self) -> f64 {
+        self.start.elapsed().as_secs_f64() * 1000.0
+    }
+
+    /// The frame animations, then the `OnAnimationFinished` callbacks of
+    /// those that finished.
+    fn tick(&mut self) {
+        let now = self.now_ms();
+        let finished = self.game.borrow_mut().update(now);
+        for name in finished {
+            let arg = [Value::Str(name.into_bytes())];
+            if let Err(e) = self.script.callback("OnAnimationFinished", &arg) {
+                log::error!("{e}");
+            }
+        }
+    }
+
     fn draw(&mut self) {
         let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
             return;
@@ -53,9 +80,12 @@ impl Viewer {
         if surface.resize(nw, nh).is_err() {
             return;
         }
-        let cam = Camera::new(fov_for_height(h), w, h, self.view.yaw, self.view.pitch);
         if let Ok(mut buf) = surface.buffer_mut() {
-            render(&cam, &self.node.faces, &mut buf, Weights::Exact);
+            {
+                let mut g = self.game.borrow_mut();
+                g.height = h;
+                g.draw(&mut buf, w, h, self.pointer);
+            }
             window.pre_present_notify();
             let _ = buf.present();
         }
@@ -63,23 +93,18 @@ impl Viewer {
 
     fn release(&mut self) {
         let Some(down) = self.down.take() else { return };
-        let up = self.pointer;
+        let Some(up) = self.pointer else { return };
         if !is_click((down.0 as f32, down.1 as f32), (up.0 as f32, up.1 as f32)) {
             return;
         }
         let (w, h) = self.size;
-        let cam = Camera::new(fov_for_height(h), w, h, self.view.yaw, self.view.pitch);
-        let hit = click(&cam, up.0 as i32, up.1 as i32, &[], &self.node.exits);
+        let hit = self.game.borrow().click(w, h, up.0 as i32, up.1 as i32);
         log::info!("click at {up:?}: {hit:?}");
-        if let Some(Target::Exit(to)) = hit {
-            match WarpPath::parse(&to).map(|p| Node::load(&self.files, &p)) {
-                Some(Ok(n)) => {
-                    // `ChangeWarp` keeps the angles and resets the limits.
-                    self.node = n;
-                    self.view.reset_limits();
-                }
-                Some(Err(e)) => log::warn!("{to}: {e}"),
-                None => log::warn!("{to}: not a node"),
+        if let Some(name) = hit {
+            // The warp's click callback (`+0xbc`): `OnWarpObjectHit(name)`.
+            let arg = [Value::Str(name.into_bytes())];
+            if let Err(e) = self.script.callback("OnWarpObjectHit", &arg) {
+                log::error!("{e}");
             }
         }
     }
@@ -111,29 +136,41 @@ impl ApplicationHandler for Viewer {
                 return;
             }
         }
+        // The game draws its own cursor (`2D/arrow6.png`).
+        window.set_cursor_visible(false);
         let s = window.inner_size();
         self.size = (s.width, s.height);
         self.window = Some(window);
+        el.set_control_flow(ControlFlow::WaitUntil(Instant::now() + FRAME));
+    }
+
+    fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        self.tick();
+        if let Some(w) = &self.window {
+            w.request_redraw();
+        }
+        el.set_control_flow(ControlFlow::WaitUntil(Instant::now() + FRAME));
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => el.exit(),
-            WindowEvent::Resized(s) => {
-                self.size = (s.width, s.height);
-                self.request();
-            }
+            WindowEvent::Resized(s) => self.size = (s.width, s.height),
             WindowEvent::RedrawRequested => self.draw(),
+            WindowEvent::CursorLeft { .. } => self.pointer = None,
             WindowEvent::CursorMoved { position, .. } => {
-                self.pointer = (position.x, position.y);
+                let p = (position.x, position.y);
+                self.pointer = Some(p);
                 if self.down.is_some() {
                     // Input pixels, y up.
-                    let dx = position.x - self.last.0;
-                    let dy_up = self.last.1 - position.y;
-                    self.view.drag(dx as f32, dy_up as f32, false);
-                    self.request();
+                    let dx = p.0 - self.last.0;
+                    let dy_up = self.last.1 - p.1;
+                    self.game
+                        .borrow_mut()
+                        .view
+                        .drag(dx as f32, dy_up as f32, false);
                 }
-                self.last = self.pointer;
+                self.last = p;
             }
             WindowEvent::MouseInput {
                 state,
@@ -141,23 +178,14 @@ impl ApplicationHandler for Viewer {
                 ..
             } => match state {
                 ElementState::Pressed => {
-                    self.down = Some(self.pointer);
-                    self.last = self.pointer;
+                    if let Some(p) = self.pointer {
+                        self.down = Some(p);
+                        self.last = p;
+                    }
                 }
-                ElementState::Released => {
-                    self.release();
-                    self.request();
-                }
+                ElementState::Released => self.release(),
             },
             _ => {}
-        }
-    }
-}
-
-impl Viewer {
-    fn request(&self) {
-        if let Some(w) = &self.window {
-            w.request_redraw();
         }
     }
 }
@@ -166,22 +194,27 @@ impl Viewer {
 pub fn run_view(dir: &Path, node: Option<&str>) -> Result<(), String> {
     let (files, build) = A4Files::open_dir(dir).map_err(|e| e.to_string())?;
     log::info!("Atlantis Evolution {}", build.id);
-    let name = match node {
-        Some(n) => n.to_string(),
-        None => files
-            .read(FIRST_WARP_SCRIPT)
-            .and_then(|s| first_warp_path(&s))
-            .ok_or("no firstWarpPath")?,
+    let game = Rc::new(RefCell::new(Game::new(files, HEIGHT)));
+    let engine: EngineRef = game.clone();
+    let options = Options {
+        errors: ErrorMode::Log,
+        ..Options::default()
     };
-    let path = WarpPath::parse(&name).ok_or_else(|| format!("{name}: not a node"))?;
-    let node = Node::load(&files, &path).map_err(|e| e.to_string())?;
+    let boot = read_boot_vars(&engine, options).map_err(|e| e.to_string())?;
+    let first = match (node, &boot.first_warp_path) {
+        (Some(n), _) => n.as_bytes().to_vec(),
+        (None, Some(BootValue::Str(s))) => s.clone(),
+        (None, other) => return Err(format!("no firstWarpPath ({other:?})")),
+    };
+    let start = Instant::now();
+    let script = new_game(&engine, options, &first).map_err(|e| e.to_string())?;
     let mut app = Viewer {
-        files,
-        node,
-        view: View::default(),
+        game,
+        script,
+        start,
         window: None,
         surface: None,
-        pointer: (0.0, 0.0),
+        pointer: None,
         down: None,
         last: (0.0, 0.0),
         size: (WIDTH, HEIGHT),
