@@ -182,7 +182,7 @@ impl Decoder {
 /// file as named, else `dir/<language>/file`, else `dir/en/file`; the
 /// last candidate when none exists (opening it then fails).
 fn resolve(files: &A4Files, lang: &str, path: &str) -> String {
-    if files.read(path).is_some() {
+    if files.exists(path) {
         return path.to_string();
     }
     let (dir, file) = match path.rfind('/') {
@@ -190,7 +190,7 @@ fn resolve(files: &A4Files, lang: &str, path: &str) -> String {
         None => ("", path),
     };
     let local = format!("{dir}{lang}/{file}");
-    if files.read(&local).is_some() {
+    if files.exists(&local) {
         return local;
     }
     format!("{dir}en/{file}")
@@ -672,7 +672,7 @@ impl Sounds {
     /// file in any language; its end is [`SoundEvent::VoiceStopped`].
     pub fn play_voice(&mut self, files: &A4Files, voice: &str) {
         let mut path = format!("Sounds/Dialogs/{voice}");
-        if files.read(&resolve(files, &self.lang, &path)).is_none() {
+        if !files.exists(&resolve(files, &self.lang, &path)) {
             path = "Sounds/Dialogs/silence5s.ogg".to_string();
         }
         if self.load(Which::Voice, files, &path) {

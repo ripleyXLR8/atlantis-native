@@ -36,11 +36,16 @@ pub mod a3;
 #[cfg(target_arch = "wasm32")]
 mod a3_web;
 /// A development viewer of Atlantis Evolution's warp view (hidden: never in
-/// a release, see the module).
-#[cfg(all(feature = "atlantis4", not(target_arch = "wasm32")))]
+/// a release, see the module), on the desktop and in the browser.
+#[cfg(feature = "atlantis4")]
 pub mod a4;
 #[cfg(all(feature = "atlantis4", not(target_arch = "wasm32")))]
 mod a4_gl;
+#[cfg(all(feature = "atlantis4", target_arch = "wasm32"))]
+#[path = "a4_gl_web.rs"]
+mod a4_gl;
+#[cfg(all(test, feature = "atlantis4", target_arch = "wasm32"))]
+mod a4_wasm_tests;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;

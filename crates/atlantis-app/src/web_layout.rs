@@ -165,6 +165,20 @@ pub fn a3_install(paths: &[&str]) -> Option<String> {
         .map(str::to_string)
 }
 
+/// Atlantis Evolution's installed folder among `paths`: the shallowest
+/// holding `atlantis evolution.exe` and `3d/ongameenter.lua`
+/// ([`atlantis4_data::files::holds_atlantis4`]).
+#[cfg(feature = "atlantis4")]
+pub fn a4_install(paths: &[&str]) -> Option<String> {
+    paths
+        .iter()
+        .filter_map(|p| p.strip_suffix("3d/ongameenter.lua"))
+        .filter(|dir| dir.is_empty() || dir.ends_with('/'))
+        .filter(|dir| paths.contains(&format!("{dir}atlantis evolution.exe").as_str()))
+        .min_by_key(|dir| (depth(dir), dir.to_string()))
+        .map(str::to_string)
+}
+
 /// The folder names of a path list (its files' folders, each once), for
 /// messages.
 pub fn top_names(paths: &[&str], prefix: &str) -> Vec<String> {
@@ -239,6 +253,24 @@ mod tests {
         // No program beside the data: not the game.
         assert_eq!(a3_install(&paths[1..]), None);
         assert_eq!(a3_install(CD), None);
+    }
+
+    #[cfg(feature = "atlantis4")]
+    #[test]
+    fn atlantis_evolutions_installed_folder() {
+        let paths = [
+            "atlantis evolution/atlantis evolution.exe",
+            "atlantis evolution/3d/ongameenter.lua",
+            "atlantis evolution/3d/bateau_ca/0001.lua",
+            "atlantis evolution/videos/pc-macosx/intro.ogv",
+        ];
+        assert_eq!(a4_install(&paths).as_deref(), Some("atlantis evolution/"));
+        assert_eq!(picked(&paths), Picked::None);
+        assert_eq!(a3_install(&paths), None);
+        // The program alone, or the scripts alone: not the game.
+        assert_eq!(a4_install(&paths[..1]), None);
+        assert_eq!(a4_install(&paths[1..]), None);
+        assert_eq!(a4_install(CD), None);
     }
 
     #[test]

@@ -97,6 +97,12 @@ impl A4Files {
         self.src.read(name)
     }
 
+    /// Whether a file exists (what a read's success tells, without reading
+    /// it: in the browser a whole music file is about 60 ms of reading).
+    pub fn exists(&self, name: &str) -> bool {
+        self.src.size(name).is_some()
+    }
+
     /// The language code of `lang.ini` (`[lang]`, `lang=en`), lower case.
     ///
     /// The executable names `lang.ini` (file +0x1a7726); which of it and the

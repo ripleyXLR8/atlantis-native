@@ -302,7 +302,7 @@ impl Game {
     }
 
     /// The skip button's picture size (75 × 75 in the data).
-    fn skip_size(&mut self) -> (u32, u32) {
+    pub fn skip_size(&mut self) -> (u32, u32) {
         let p = self.resolved(movie::SKIP_PICTURE);
         self.load_sprite(&p);
         match self.sprites.get(&p) {
@@ -972,7 +972,7 @@ impl Engine for Game {
         }
         for sub in [&b"Texts/Full/"[..], b"Texts/PC/", b"Texts/"] {
             let p = [sub, file].concat();
-            if self.files.read(&text(Some(&p))).is_some() {
+            if self.files.exists(&text(Some(&p))) {
                 return p;
             }
         }

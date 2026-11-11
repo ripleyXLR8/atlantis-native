@@ -42,8 +42,12 @@ pub struct Events {
 }
 
 impl FrameAnim {
-    /// `0x0056e850` at `now_ms`.
+    /// `0x0056e850` at `now_ms`, as the global update `0x004f5950` calls
+    /// it: at `max(now, start)` (@ `0x004f59e5..0x004f5a54`), so that an
+    /// animation `play()`ed after the frame's clock was read (`play()`
+    /// reads the clock itself, at the call) does not see a negative time.
     pub fn update(&mut self, now_ms: f64) -> Events {
+        let now_ms = now_ms.max(self.start_ms);
         let mut ev = Events::default();
         let first = self.first.min(self.n);
         let end = first.wrapping_add(self.count).min(self.n);

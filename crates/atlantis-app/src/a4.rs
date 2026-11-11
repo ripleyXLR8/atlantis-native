@@ -64,13 +64,22 @@
 //! one: a dialog takes them over the HUD. The saves are written as the
 //! original's (`SaveGame`, the autosave at every node change) and read
 //! back through `Game::load`'s save branch.
+//!
+//! The same viewer runs in the browser ([`web`], `wasm32`): the game's
+//! files are the folder the player picked, read when the engine reads
+//! them; the frame is drawn by the graphics card through WebGL 2, by the
+//! processor on a 2D canvas without it; the redraws follow the screen's
+//! refresh while the game's updates keep the desktop's 60 a second; the
+//! saves and `options.xml` are kept in the page's storage; the sound
+//! starts at the first click or key; a hidden page holds the game.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::num::NonZeroU32;
+#[cfg(not(target_arch = "wasm32"))]
 use std::path::Path;
 use std::rc::Rc;
-use std::time::{Duration, Instant};
 
+#[cfg(not(target_arch = "wasm32"))]
 use atlantis4_data::A4Files;
 use atlantis4_engine::canvas::{Canvas, CpuCache, CpuCanvas};
 use atlantis4_engine::dialog::Action;
@@ -78,16 +87,26 @@ use atlantis4_engine::game_saves::GameSaves;
 use atlantis4_engine::menus::{Front, FrontAction};
 use atlantis4_engine::options::{self, Settings};
 use atlantis4_engine::pick::is_click;
-use atlantis4_engine::saves::{BackupFolder, SaveStore};
+#[cfg(not(target_arch = "wasm32"))]
+use atlantis4_engine::saves::BackupFolder;
+use atlantis4_engine::saves::SaveStore;
 use atlantis4_engine::Game;
-use atlantis4_script::{
-    new_game, read_boot_vars, BootValue, EngineRef, ErrorMode, Options, Script, Value,
-};
+#[cfg(not(target_arch = "wasm32"))]
+use atlantis4_script::{new_game, read_boot_vars, BootValue, EngineRef, ErrorMode};
+use atlantis4_script::{Options, Script, Value};
+use web_time::{Duration, Instant};
 use winit::application::ApplicationHandler;
+#[cfg(not(target_arch = "wasm32"))]
 use winit::dpi::PhysicalSize;
 use winit::event::{ElementState, MouseButton, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
+#[cfg(not(target_arch = "wasm32"))]
+use winit::event_loop::EventLoop;
+use winit::event_loop::{ActiveEventLoop, ControlFlow};
 use winit::window::{Window, WindowId};
+
+#[cfg(target_arch = "wasm32")]
+#[path = "a4_web.rs"]
+pub mod web;
 
 const WIDTH: u32 = 1365;
 const HEIGHT: u32 = 768;
@@ -96,6 +115,61 @@ const HEIGHT: u32 = 768;
 /// frame is drawn only when its picture changed, so a 25 fps movie shows
 /// each of its pictures within one period of its time.
 const FRAME: Duration = Duration::from_micros(16_667);
+
+/// The game's clock: the time since the start less the time held. On the
+/// desktop nothing is held: it is the time since the start. In the
+/// browser, a hidden page or a redraw gap is held, and so is the time the
+/// browser takes to read the player's files (a synchronous read of a
+/// picked file, about 12 ms a MB, which the desktop's disk does in a
+/// fraction of that): a movie started after a 30 MB read then starts at
+/// the clock the frame's update reads, as on the desktop. The clock never
+/// goes back.
+#[derive(Clone)]
+struct GameClock {
+    start: Instant,
+    held: Rc<Cell<Duration>>,
+    last: Rc<Cell<u64>>,
+    /// The browser's read time when the clock started.
+    #[cfg(target_arch = "wasm32")]
+    reads0: Duration,
+}
+
+impl GameClock {
+    fn new() -> GameClock {
+        GameClock {
+            start: Instant::now(),
+            held: Rc::new(Cell::new(Duration::ZERO)),
+            last: Rc::new(Cell::new(0)),
+            #[cfg(target_arch = "wasm32")]
+            reads0: crate::web::read_time(),
+        }
+    }
+
+    /// The time held so far.
+    fn held(&self) -> Duration {
+        #[cfg(target_arch = "wasm32")]
+        return self.held.get() + crate::web::read_time().saturating_sub(self.reads0);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.held.get()
+    }
+
+    /// Whole microseconds of game time (the original's clock counts whole
+    /// microseconds, @ 0x004faf40).
+    fn us(&self) -> u64 {
+        let t = self.start.elapsed().saturating_sub(self.held());
+        let us = u64::try_from(t.as_micros())
+            .unwrap_or(u64::MAX)
+            .max(self.last.get());
+        self.last.set(us);
+        us
+    }
+
+    /// `d` of wall time not counted.
+    #[cfg(target_arch = "wasm32")]
+    fn hold(&self, d: Duration) {
+        self.held.set(self.held.get() + d);
+    }
+}
 
 struct Viewer {
     game: Rc<RefCell<Game>>,
@@ -109,8 +183,12 @@ struct Viewer {
     saves: GameSaves,
     /// Where `options.xml` is read and written (none when the saves stay
     /// in memory).
+    #[cfg(not(target_arch = "wasm32"))]
     options_path: Option<std::path::PathBuf>,
-    start: Instant,
+    /// The page's part: the storage, the sound's start, the pace.
+    #[cfg(target_arch = "wasm32")]
+    web: web::WebPart,
+    clock: GameClock,
     window: Option<Rc<Window>>,
     /// The processor's picture in the window (with `--cpu`, or when the
     /// card's could not be made).
@@ -123,6 +201,8 @@ struct Viewer {
     /// The check mode's processor frame and when it last ran.
     check_buf: Vec<u32>,
     last_check: Option<Instant>,
+    /// The check mode's last comparison.
+    last_diff: Option<atlantis4_gl::check::Diff>,
     pointer: Option<(f64, f64)>,
     down: Option<(f64, f64)>,
     /// The press went to a GUI layer (the dialogs, the HUD, the inventory,
@@ -208,7 +288,7 @@ impl Viewer {
     /// The engine clock: whole microseconds, divided by 1000.0 as the
     /// original's animation clock is.
     fn now_ms(&self) -> f64 {
-        clock_us(self.start) as f64 / 1000.0
+        self.clock.us() as f64 / 1000.0
     }
 
     /// The frame animations, then the `OnAnimationFinished` callbacks of
@@ -280,7 +360,17 @@ impl Viewer {
 
     /// What the front end asked for, in order.
     fn front_actions(&mut self, el: &ActiveEventLoop) {
-        for a in self.front.take_actions() {
+        let actions = self.front.take_actions();
+        // A page is never closed by the game: the settings are kept as
+        // they change instead of at the end.
+        #[cfg(target_arch = "wasm32")]
+        if actions
+            .iter()
+            .any(|a| matches!(a, FrontAction::Settings | FrontAction::Volume(..)))
+        {
+            self.web.options_due = true;
+        }
+        for a in actions {
             log::info!("front end: {a:?}");
             match a {
                 FrontAction::Sound(p) => {
@@ -311,6 +401,9 @@ impl Viewer {
                 FrontAction::LeaveGame => self.leave_game(),
                 FrontAction::Quit => {
                     self.write_options();
+                    // The page again (a page cannot close itself).
+                    #[cfg(target_arch = "wasm32")]
+                    crate::a2_web::quit();
                     el.exit();
                 }
             }
@@ -338,6 +431,7 @@ impl Viewer {
     }
 
     /// `options.xml` written (0x005766b0, at the application's end).
+    #[cfg(not(target_arch = "wasm32"))]
     fn write_options(&self) {
         let Some(path) = &self.options_path else {
             return;
@@ -458,6 +552,7 @@ impl Viewer {
                 }
             );
             self.check_buf = buf;
+            self.last_diff = Some(d);
         }
         self.gl = Some(gl);
     }
@@ -558,6 +653,12 @@ impl Viewer {
 }
 
 impl ApplicationHandler for Viewer {
+    #[cfg(target_arch = "wasm32")]
+    fn resumed(&mut self, el: &ActiveEventLoop) {
+        self.resumed_web(el);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn resumed(&mut self, el: &ActiveEventLoop) {
         if self.window.is_some() {
             return;
@@ -616,7 +717,15 @@ impl ApplicationHandler for Viewer {
     /// Once per frame period (not after every input event): the game's
     /// update, then a redraw only when the picture changed. The movie and
     /// the animations pick their frame from the clock, so a late frame
-    /// skips pictures instead of slowing the game down.
+    /// skips pictures instead of slowing the game down. (In the browser
+    /// the redraws, one per screen refresh, run the updates due:
+    /// [`Viewer::redraw_web`].)
+    #[cfg(target_arch = "wasm32")]
+    fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        el.set_control_flow(ControlFlow::Wait);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
         let now = Instant::now();
         if now >= self.next_frame {
@@ -644,6 +753,12 @@ impl ApplicationHandler for Viewer {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        // The page's own events (the redraws, the keys, a hidden page) and
+        // the sound's start at the first click.
+        #[cfg(target_arch = "wasm32")]
+        if self.web_event(el, &event) {
+            return;
+        }
         match event {
             WindowEvent::CloseRequested => {
                 self.write_options();
@@ -656,6 +771,7 @@ impl ApplicationHandler for Viewer {
                 }
                 self.shown = None;
             }
+            #[cfg(not(target_arch = "wasm32"))]
             WindowEvent::RedrawRequested => self.draw(),
             WindowEvent::CursorLeft { .. } => self.pointer = None,
             WindowEvent::CursorMoved { position, .. } => {
@@ -735,80 +851,85 @@ impl Drop for Viewer {
     }
 }
 
-/// Whole microseconds since `start` (the original's clock counts whole
-/// microseconds, @ 0x004faf40).
-fn clock_us(start: Instant) -> u64 {
-    u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX)
-}
-
 /// The sound output: the 44,100 Hz stereo mix to the device, as is when
-/// the device runs at 44,100 Hz, else linearly resampled.
+/// the device runs at 44,100 Hz, else linearly resampled. (In the browser:
+/// silent while the page is hidden, the game held.)
 fn start_sound(core: atlantis4_engine::sound::Core) -> Option<cpal::Stream> {
     const RATE: u32 = atlantis4_engine::oalmix::RATE;
     // Resampler state: source frames not yet used, position in them.
     let mut src: Vec<i16> = Vec::new();
     let mut pos = 0f64;
-    crate::audio_out::start_with_rate(
-        move |out, rate, channels| {
-            let channels = channels.max(1);
-            let frames = out.len() / channels;
-            let mut core = core.lock().unwrap_or_else(|e| e.into_inner());
-            let put = |o: &mut [f32], l: f32, r: f32| {
-                if channels == 1 {
-                    o[0] = (l + r) / 2.0;
-                } else {
-                    o[0] = l;
-                    o[1] = r;
-                    o[2..].fill(0.0);
-                }
-            };
-            if rate == RATE {
-                let mut buf = vec![0i16; 2 * frames];
-                core.pull(&mut buf);
-                for (o, s) in out.chunks_exact_mut(channels).zip(buf.as_chunks::<2>().0) {
-                    put(o, f32::from(s[0]) / 32768.0, f32::from(s[1]) / 32768.0);
-                }
-                return;
+    let fill = move |out: &mut [f32], rate: u32, channels: usize| {
+        let channels = channels.max(1);
+        #[cfg(target_arch = "wasm32")]
+        if crate::a2_web::page_hidden() {
+            out.fill(0.0);
+            return;
+        }
+        let frames = out.len() / channels;
+        let mut core = core.lock().unwrap_or_else(|e| e.into_inner());
+        let put = |o: &mut [f32], l: f32, r: f32| {
+            if channels == 1 {
+                o[0] = (l + r) / 2.0;
+            } else {
+                o[0] = l;
+                o[1] = r;
+                o[2..].fill(0.0);
             }
-            let step = f64::from(RATE) / f64::from(rate);
-            for o in out.chunks_exact_mut(channels) {
-                let i = pos as usize;
-                while src.len() < 2 * (i + 2) {
-                    let mut more = vec![0i16; 2 * 256];
-                    core.pull(&mut more);
-                    src.extend(more);
-                }
-                let f = (pos - i as f64) as f32;
-                let at = |k: usize| f32::from(src[k]) / 32768.0;
-                let l = at(2 * i) * (1.0 - f) + at(2 * i + 2) * f;
-                let r = at(2 * i + 1) * (1.0 - f) + at(2 * i + 3) * f;
-                put(o, l, r);
-                pos += step;
+        };
+        if rate == RATE {
+            let mut buf = vec![0i16; 2 * frames];
+            core.pull(&mut buf);
+            for (o, s) in out.chunks_exact_mut(channels).zip(buf.as_chunks::<2>().0) {
+                put(o, f32::from(s[0]) / 32768.0, f32::from(s[1]) / 32768.0);
             }
-            let used = pos as usize;
-            src.drain(..2 * used.min(src.len() / 2));
-            pos -= used as f64;
-        },
-        RATE,
-    )
+            return;
+        }
+        let step = f64::from(RATE) / f64::from(rate);
+        for o in out.chunks_exact_mut(channels) {
+            let i = pos as usize;
+            while src.len() < 2 * (i + 2) {
+                let mut more = vec![0i16; 2 * 256];
+                core.pull(&mut more);
+                src.extend(more);
+            }
+            let f = (pos - i as f64) as f32;
+            let at = |k: usize| f32::from(src[k]) / 32768.0;
+            let l = at(2 * i) * (1.0 - f) + at(2 * i + 2) * f;
+            let r = at(2 * i + 1) * (1.0 - f) + at(2 * i + 3) * f;
+            put(o, l, r);
+            pos += step;
+        }
+        let used = pos as usize;
+        src.drain(..2 * used.min(src.len() / 2));
+        pos -= used as f64;
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    let stream = crate::audio_out::start_with_rate(fill, RATE);
+    #[cfg(target_arch = "wasm32")]
+    let stream = crate::audio_out::start_with_rate_buffer(fill, RATE, web::OUTPUT_FRAMES);
+    stream
 }
 
 /// Atlantis Evolution's folder in the per-user data folder: its
 /// `Documents/` stands for the player's documents, so the backup folder
 /// (the saves and `options.xml`) is `Documents/Atlantis Evolution/`.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn data_dir() -> std::path::PathBuf {
     crate::desktop::data_dir().join("atlantis4")
 }
 
 /// Opens the viewer on the game at `dir`, starting as `start` says,
 /// drawing as `render` says.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_view(dir: &Path, start_at: Start, render: Render) -> Result<(), String> {
     let (files, build) = A4Files::open_dir(dir).map_err(|e| e.to_string())?;
     log::info!("Atlantis Evolution {}", build.id);
-    let start = Instant::now();
+    let clock = GameClock::new();
     let mut g = Game::new(files, HEIGHT);
     // `play()` reads the clock at the call (a movie started by a script).
-    g.clock_us = Some(Box::new(move || clock_us(start)));
+    let c = clock.clone();
+    g.clock_us = Some(Box::new(move || c.us()));
     // `FinishGame` runs the front end's planks.
     g.app_planks = true;
     let game = Rc::new(RefCell::new(g));
@@ -862,7 +983,7 @@ pub fn run_view(dir: &Path, start_at: Start, render: Render) -> Result<(), Strin
         front,
         saves,
         options_path,
-        start,
+        clock,
         window: None,
         surface: None,
         gl: None,
@@ -870,6 +991,7 @@ pub fn run_view(dir: &Path, start_at: Start, render: Render) -> Result<(), Strin
         cpu_cache: CpuCache::default(),
         check_buf: Vec::new(),
         last_check: None,
+        last_diff: None,
         pointer: None,
         down: None,
         gui_down: false,

@@ -18,7 +18,7 @@ pub fn start_with<F>(fill: F) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
 {
-    start_config(fill, None)
+    start_config(fill, None, None)
 }
 
 /// The same, asking the device for `rate` when it offers it (in any of
@@ -31,10 +31,22 @@ pub fn start_with_rate<F>(fill: F, rate: u32) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
 {
-    start_config(fill, Some(rate))
+    start_config(fill, Some(rate), None)
 }
 
-fn start_config<F>(mut fill: F, want: Option<u32>) -> Option<cpal::Stream>
+/// The same, with output buffers of `frames` frames (the browser's: a
+/// buffer is filled when the one before it starts playing, so the page's
+/// thread may be busy that long without a gap in the sound; cpal's
+/// default is 2,048 frames, 46 ms at 44,100 Hz).
+#[cfg(all(target_arch = "wasm32", feature = "atlantis4"))]
+pub fn start_with_rate_buffer<F>(fill: F, rate: u32, frames: u32) -> Option<cpal::Stream>
+where
+    F: FnMut(&mut [f32], u32, usize) + Send + 'static,
+{
+    start_config(fill, Some(rate), Some(frames))
+}
+
+fn start_config<F>(mut fill: F, want: Option<u32>, frames: Option<u32>) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
 {
@@ -60,12 +72,20 @@ where
         .unwrap_or(default);
     let rate = config.sample_rate().0;
     let channels = usize::from(config.channels());
+    let mut stream_config: cpal::StreamConfig = config.clone().into();
+    if let Some(n) = frames {
+        stream_config.buffer_size = cpal::BufferSize::Fixed(n);
+    }
     let stream = match config.sample_format() {
         cpal::SampleFormat::F32 => device.build_output_stream(
-            &config.into(),
-            move |out: &mut [f32], _| {
+            &stream_config,
+            move |out: &mut [f32], info: &cpal::OutputCallbackInfo| {
                 #[cfg(not(target_arch = "wasm32"))]
                 crate::watchdog::audio_beat();
+                #[cfg(target_arch = "wasm32")]
+                note_underrun(info);
+                #[cfg(not(target_arch = "wasm32"))]
+                let _ = info;
                 fill(out, rate, channels)
             },
             |e| log::warn!("audio stream: {e}"),
@@ -74,10 +94,14 @@ where
         cpal::SampleFormat::I16 => {
             let mut buf = Vec::new();
             device.build_output_stream(
-                &config.into(),
-                move |out: &mut [i16], _| {
+                &stream_config,
+                move |out: &mut [i16], info: &cpal::OutputCallbackInfo| {
                     #[cfg(not(target_arch = "wasm32"))]
                     crate::watchdog::audio_beat();
+                    #[cfg(target_arch = "wasm32")]
+                    note_underrun(info);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let _ = info;
                     buf.resize(out.len(), 0.0);
                     fill(&mut buf, rate, channels);
                     for (o, s) in out.iter_mut().zip(&buf) {
@@ -101,4 +125,27 @@ where
         .ok()?;
     log::info!("audio output: {rate} Hz, {channels} channels");
     Some(stream)
+}
+
+/// The browser's output buffers that were due before they were filled
+/// (the page's thread busy longer than the sound scheduled ahead): each is
+/// a gap or a click in the sound. A testing aid of the end-to-end runs.
+#[cfg(target_arch = "wasm32")]
+static UNDERRUNS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+
+/// cpal's WebAudio output schedules each buffer at the end of the last;
+/// one whose start is already past when it is filled came too late.
+#[cfg(target_arch = "wasm32")]
+fn note_underrun(info: &cpal::OutputCallbackInfo) {
+    let t = info.timestamp();
+    if t.playback.duration_since(&t.callback).is_none() {
+        UNDERRUNS.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// The count of late output buffers since the page opened.
+#[cfg(target_arch = "wasm32")]
+#[cfg_attr(not(feature = "atlantis4"), allow(dead_code))]
+pub fn underruns() -> u32 {
+    UNDERRUNS.load(std::sync::atomic::Ordering::Relaxed)
 }

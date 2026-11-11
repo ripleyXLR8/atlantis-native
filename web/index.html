@@ -347,7 +347,8 @@
     affiliated with them.</span>
 </footer>
 <script type="module">
-  import init, { start, version, atlantis2_state, atlantis2_test, atlantis3_state, atlantis3_test } from "./pkg/atlantis_app.js";
+  import init, * as atl from "./pkg/atlantis_app.js";
+  const { start, version, atlantis2_state, atlantis2_test, atlantis3_state, atlantis3_test } = atl;
   const status = document.getElementById("status");
   status.textContent = "Loading the engine…";
   await init();
@@ -355,6 +356,10 @@
   // Atlantis II's and III's state and testing aids, for the end-to-end runs.
   window.atlantis2 = { state: () => JSON.parse(atlantis2_state() || "null"), test: atlantis2_test };
   window.atlantis3 = { state: () => JSON.parse(atlantis3_state() || "null"), test: atlantis3_test };
+  // Atlantis Evolution's, in the development builds that have it.
+  if (atl.atlantis4_state) {
+    window.atlantis4 = { state: () => JSON.parse(atl.atlantis4_state() || "null"), test: atl.atlantis4_test };
+  }
   // The engine's own version and commit (as in the F10 menu).
   document.getElementById("version").textContent = version();
   // Opens the game of the picked files; for Cryo's DVD, `language` is the
@@ -368,7 +373,7 @@
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
     try {
       const started = await start(files, language, game, paths);
-      document.body.classList.add(started === "atlantis2" ? "game-a2" : started === "atlantis3" ? "game-a3" : "game-a1");
+      document.body.classList.add({ atlantis2: "game-a2", atlantis3: "game-a3", atlantis4: "game-a4" }[started] || "game-a1");
       document.body.classList.remove("landing");
       // Atlantis II or III quit from its menu: the page again.
       window.atlantisQuit = () => location.reload();
