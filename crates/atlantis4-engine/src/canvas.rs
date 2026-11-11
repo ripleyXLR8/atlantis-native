@@ -9,7 +9,8 @@
 //!   MD5s of `tests/frames.rs`);
 //! - a graphics card's renderer (`atlantis4-gl`), which gives the same
 //!   primitives to OpenGL / WebGL 2 with the original's GL state
-//!   (`atlantis4-re` `subsystems/gl-pipeline.md`).
+//!   (`TeOpenGLTexture`'s parameters, the one `glBlendFunc`, the
+//!   material modes).
 //!
 //! The engine's `draw_on` functions call these in the original's draw
 //! order; nothing in them depends on which canvas draws.
