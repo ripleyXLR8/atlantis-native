@@ -1,0 +1,2876 @@
+# Scripted mixer cases: AL operations and the hash of each mix call as given by a reference model of wrap_oal.dll 2.2.0.5 "Generic Software" equal to the DLL run in an emulator. Numbers only.
+case 0
+src 0
+buf 0 2 44100 499 imp 474753181
+gain 0 0x3d97333c
+src 1
+buf 1 2 22050 174 imp 1556150080
+buf 1 2 22050 149 imp 840118660
+gain 1 0x3e4bf6bf
+src 2
+buf 2 1 44100 680 imp 373884080
+buf 2 1 44100 142 imp 1825384905
+play 0
+play 2
+mix 477 9ba33e668bf69985
+mix 171 101bb8aeab946925
+stop 0
+play 1
+mix 196 55843d8706191e54
+case 1
+src 0
+buf 0 2 32000 171 imp 1930702547
+gain 0 0x3f721e54
+src 1
+buf 1 2 44100 419 rand 1430007378
+buf 1 2 44100 586 square 32
+gain 1 0x3eb06915
+src 2
+buf 2 2 11025 255 rand 1066546915
+buf 2 2 11025 384 tri 18
+gain 2 0x3e55a69b
+play 1
+mix 524 df5a7bf84003c30b
+play 0
+play 2
+mix 561 5f29667717acd985
+gain 2 0x3f202828
+mix 359 016559f4345df5ac
+case 2
+src 0
+buf 0 1 32000 310 rand 793727588
+buf 0 1 32000 502 square 34
+buf 0 1 32000 287 rand 1945048524
+gain 0 0x3e3a09c6
+play 0
+mix 286 915b7afc54ff3d5d
+mix 110 85a46687657950c2
+mix 514 83479999f6baad6e
+mix 404 0277237a7ab77c7a
+mix 279 aa563ddd06b7434b
+case 3
+src 0
+buf 0 2 32000 571 square 14
+gain 0 0x3f652754
+src 1
+buf 1 2 48000 219 square 27
+gain 1 0x3f794af3
+play 1
+mix 659 508886d11b983524
+mix 538 c41c8b20857c1383
+case 4
+src 0
+buf 0 2 32000 291 square 2
+buf 0 2 32000 640 rand 983675924
+gain 0 0x3dabf505
+play 0
+mix 226 ff5feccbb6261784
+mix 664 99520110df33e755
+mix 325 a9c00ea5e217bbc2
+stop 0
+mix 378 ce74475c230513d2
+case 5
+src 0
+buf 0 2 48000 400 square 33
+buf 0 2 48000 199 tri 1
+buf 0 2 48000 416 imp 1891013703
+src 1
+buf 1 1 44100 281 rand 1014144478
+buf 1 1 44100 285 imp 1294135167
+buf 1 1 44100 71 imp 105067580
+gain 1 0x3ebab472
+src 2
+buf 2 1 48000 183 square 8
+buf 2 1 48000 359 tri 15
+gain 2 0x3e4f5df8
+play 0
+play 1
+play 2
+mix 400 a38dd8828d096cb3
+mix 49 f6b89d4912492fa8
+mix 376 1fb8f9feb13cc856
+case 6
+src 0
+buf 0 1 11025 433 rand 1986653680
+buf 0 1 11025 480 imp 1432595086
+buf 0 1 11025 548 rand 389045538
+gain 0 0x3f6aa9b4
+src 1
+buf 1 1 44100 674 imp 826883697
+buf 1 1 44100 294 square 22
+buf 1 1 44100 277 square 12
+gain 1 0x3ee23e32
+play 1
+mix 614 6ebfa1f36e13ceda
+mix 567 6a8a15a13e8e6975
+mix 243 8b5027d11d90d73a
+play 0
+mix 676 5a35d72a1f77d5ed
+case 7
+src 0
+buf 0 1 44100 533 tri 36
+gain 0 0x3ed2d5a9
+mix 193 b8bc0aca0b59082d
+play 0
+mix 617 f2a7faf264bf7361
+mix 403 518b7b737f21597a
+mix 681 f700c777fe87a98a
+mix 611 383c38a6c1bf303c
+gain 0 0x3f78dc4b
+mix 55 ac9ab7fef49ac432
+case 8
+src 0
+buf 0 2 44100 616 rand 820562014
+buf 0 2 44100 296 imp 21035368
+buf 0 2 44100 118 rand 1925008727
+gain 0 0x3efc276e
+src 1
+buf 1 2 48000 539 square 37
+gain 1 0x3e018082
+src 2
+buf 2 2 11025 505 tri 3
+buf 2 2 11025 338 tri 25
+buf 2 2 11025 471 rand 1424693995
+gain 2 0x3f479701
+play 0
+play 1
+play 2
+mix 527 6ddd6f052fa1ed49
+gain 2 0x3d1b5ef6
+mix 651 35c8405df4b66d6a
+mix 409 5a631ead37790167
+gain 0 0x3d8e0871
+mix 432 355dcbec0eef5d48
+gain 2 0x3f5403a4
+mix 561 4e766afd2f4540f4
+case 9
+src 0
+buf 0 1 22050 405 square 15
+buf 0 1 22050 651 tri 9
+buf 0 1 22050 91 tri 19
+gain 0 0x3f392237
+src 1
+buf 1 2 44100 166 tri 2
+play 1
+mix 548 ba88607afd7cf417
+mix 395 1777e4f7955cb590
+case 10
+src 0
+buf 0 2 11025 349 square 25
+buf 0 2 11025 231 imp 877703079
+buf 0 2 11025 423 tri 25
+gain 0 0x3db15c04
+src 1
+buf 1 1 48000 249 tri 20
+buf 1 1 48000 511 rand 1537645927
+gain 1 0x3eb5e440
+play 0
+play 1
+mix 453 b03493f39c5f960f
+mix 619 4ce9cc9c173581bb
+stop 0
+gain 1 0x3e27a02b
+mix 46 d81bfb50e59a9abb
+mix 463 6640cf8812e66080
+mix 418 256984cb62bc8799
+case 11
+src 0
+buf 0 1 48000 30 tri 36
+buf 0 1 48000 530 square 1
+gain 0 0x3e298ca3
+src 1
+buf 1 1 44100 358 tri 20
+gain 1 0x3f5c1384
+mix 68 e4d879a3407de578
+play 0
+play 1
+mix 116 96272c736d4e8b09
+stop 0
+gain 1 0x3eb43b9f
+mix 691 72869677f4b0f0c0
+gain 1 0x3f26a5f0
+mix 181 5ff7c2a57c1de314
+mix 344 49a28074f77667d0
+case 12
+src 0
+buf 0 2 11025 433 rand 594042347
+buf 0 2 11025 671 square 26
+src 1
+buf 1 1 44100 462 rand 1941052448
+gain 1 0x3f3c270f
+play 0
+play 1
+mix 571 105eeaee034e2aa7
+mix 611 c038faf11ad1d850
+mix 177 63bc5efdedb7642e
+case 13
+src 0
+buf 0 2 48000 155 tri 8
+buf 0 2 48000 253 rand 1732322166
+buf 0 2 48000 170 square 38
+gain 0 0x3d2fefcd
+src 1
+buf 1 1 44100 533 square 22
+buf 1 1 44100 207 rand 163520459
+buf 1 1 44100 469 square 39
+gain 1 0x3f36cab9
+play 0
+mix 573 c68c0048050bfe10
+play 1
+mix 268 27c2e27770f92b65
+gain 1 0x3e46202e
+mix 568 1cd77759f97303a3
+mix 558 96cdf85c5930b837
+stop 1
+mix 32 38723a2e5e8a17aa
+case 14
+src 0
+buf 0 1 44100 254 tri 15
+buf 0 1 44100 335 square 1
+gain 0 0x3f5e3a26
+mix 1 df3f619804a92fdb
+play 0
+mix 330 3a48130137b65f6e
+mix 143 014f670391839bb9
+gain 0 0x3ef2c0a9
+mix 380 ee9912fca4279d94
+case 15
+src 0
+buf 0 1 48000 60 rand 1610749677
+play 0
+mix 116 2f48b4c3c21ec247
+mix 504 d263c7c60b6f9806
+mix 339 216d4302eb1c96fd
+case 16
+src 0
+buf 0 2 48000 343 square 17
+buf 0 2 48000 174 rand 1948621741
+buf 0 2 48000 504 imp 971478099
+src 1
+buf 1 1 44100 67 rand 599105127
+buf 1 1 44100 209 rand 2092073507
+gain 1 0x3f30557e
+mix 301 3b17f8b83bec3e72
+play 0
+mix 452 7f8b73cb5f12060c
+case 17
+src 0
+buf 0 2 22050 157 imp 1390964738
+gain 0 0x3d1eeb24
+src 1
+buf 1 1 48000 596 imp 203366695
+gain 1 0x3d48f384
+play 1
+mix 424 b2aea16fce9e3693
+gain 1 0x3e4b1c9a
+mix 276 9688ec46af8fa56e
+mix 392 7fbcfcd86bdfa943
+case 18
+src 0
+buf 0 2 44100 466 imp 827692653
+gain 0 0x3ee97be1
+src 1
+buf 1 1 44100 587 imp 1886588325
+buf 1 1 44100 657 square 20
+buf 1 1 44100 587 imp 1677302701
+src 2
+buf 2 1 11025 146 tri 23
+buf 2 1 11025 668 square 21
+gain 2 0x3e18b16d
+play 0
+play 1
+play 2
+mix 401 f98d8f751baf35d8
+mix 343 936a87231cb0e696
+case 19
+src 0
+buf 0 1 48000 480 tri 22
+buf 0 1 48000 272 imp 196352365
+gain 0 0x3f0228c5
+mix 160 9e132485d5107211
+mix 525 8dd6c05a3a7cd764
+case 20
+src 0
+buf 0 1 32000 30 tri 39
+gain 0 0x3f04118b
+mix 438 d9bf817f2b942e96
+play 0
+mix 405 b4a45706b7f85535
+case 21
+src 0
+buf 0 1 44100 144 square 27
+src 1
+buf 1 2 44100 668 rand 1428404760
+buf 1 2 44100 648 tri 11
+buf 1 2 44100 526 square 35
+src 2
+buf 2 1 48000 35 rand 699561039
+buf 2 1 48000 44 imp 836606641
+buf 2 1 48000 518 rand 2002197637
+gain 2 0x3f5c148d
+play 2
+mix 567 893e07f135e8f50e
+play 0
+play 1
+mix 449 02024496102497de
+case 22
+src 0
+buf 0 2 48000 493 imp 358381296
+buf 0 2 48000 92 imp 843498093
+buf 0 2 48000 379 square 2
+gain 0 0x3afcd141
+src 1
+buf 1 2 22050 117 imp 143868926
+src 2
+buf 2 2 32000 647 square 10
+gain 2 0x3f2ce6cb
+play 1
+mix 434 582171027800c090
+mix 322 2ef0b8632395250d
+play 0
+play 2
+mix 198 3245a470b86f12e6
+mix 389 032512fe386072d3
+case 23
+src 0
+buf 0 2 32000 148 imp 719921946
+buf 0 2 32000 176 tri 1
+buf 0 2 32000 658 tri 35
+gain 0 0x3f695f46
+src 1
+buf 1 2 48000 671 imp 1651875457
+buf 1 2 48000 607 rand 951833597
+gain 1 0x3ee41d6c
+src 2
+buf 2 1 32000 597 square 5
+play 0
+play 2
+mix 611 1541ab2fa613b1d4
+play 1
+mix 470 99e4f649fc229ec2
+case 24
+src 0
+buf 0 1 44100 116 tri 7
+gain 0 0x3f6aca3e
+src 1
+buf 1 1 32000 556 square 39
+gain 1 0x3e2dc267
+play 0
+mix 10 2c34ce1df23b838c
+mix 72 aea760af24cb6aeb
+gain 0 0x3f2c7349
+play 1
+mix 592 f9e31e2eec288a39
+gain 1 0x3f428eac
+mix 290 df09ea500ab0c0cb
+case 25
+src 0
+buf 0 1 48000 140 imp 258134327
+buf 0 1 48000 359 square 12
+gain 0 0x3f3ea059
+mix 383 87fe673f134473ec
+play 0
+mix 6 9d908ecfb6b256de
+gain 0 0x3ed276f3
+mix 29 5b517952cbe9c4c1
+case 26
+src 0
+buf 0 2 44100 305 rand 1216901282
+gain 0 0x3f4bf020
+play 0
+mix 393 7b08abf29d349309
+gain 0 0x3f47e92b
+mix 410 b8883734e15688eb
+mix 135 f7bce5f450d01d8d
+mix 361 90ebb694c6e15523
+mix 89 0b449271fd114470
+mix 370 8ee724d497565f18
+case 27
+src 0
+buf 0 2 48000 247 imp 2108333966
+gain 0 0x3f10f619
+src 1
+buf 1 2 22050 448 tri 24
+gain 1 0x3daab96b
+play 0
+play 1
+mix 669 304dcc13ade5af2c
+mix 322 8c692da41cad01db
+case 28
+src 0
+buf 0 1 11025 330 tri 1
+buf 0 1 11025 131 rand 1390214496
+gain 0 0x3ef97703
+src 1
+buf 1 2 32000 620 square 16
+buf 1 2 32000 38 imp 1338003004
+gain 1 0x3f4f6a70
+src 2
+buf 2 1 44100 667 rand 1277612337
+buf 2 1 44100 494 rand 545378211
+gain 2 0x3de6506b
+mix 614 e66f98a7fe250db7
+play 0
+play 1
+mix 386 5b91e8a2d4849dcf
+mix 359 6b51d894cba9fc52
+mix 103 2ffc962e1ba4f9de
+case 29
+src 0
+buf 0 1 48000 168 rand 716147231
+buf 0 1 48000 162 tri 36
+gain 0 0x3f590530
+play 0
+mix 485 cf6c641e3db8c558
+mix 436 2df7244b4c2c1072
+mix 256 5f70bf18a0860070
+mix 216 0ed9e26c3f1435e4
+case 30
+src 0
+buf 0 2 22050 45 rand 149195256
+gain 0 0x3f6ac18f
+src 1
+buf 1 2 44100 247 square 25
+buf 1 2 44100 528 tri 32
+gain 1 0x3ea1fe90
+src 2
+buf 2 1 44100 525 tri 10
+buf 2 1 44100 415 rand 1433321345
+buf 2 1 44100 139 tri 2
+gain 2 0x3dd19e68
+play 0
+play 1
+play 2
+mix 146 e576d53fd97bc771
+stop 1
+gain 2 0x3f23d757
+mix 57 0bd8e21e9da491ba
+stop 2
+mix 46 d81bfb50e59a9abb
+gain 0 0x3f489792
+mix 114 b960fb5cb94682df
+mix 486 46be13d2dc57d15a
+mix 10 2c34ce1df23b838c
+case 31
+src 0
+buf 0 1 44100 659 tri 7
+buf 0 1 44100 648 imp 1877663849
+buf 0 1 44100 666 rand 1972281395
+src 1
+buf 1 1 22050 497 imp 258776073
+buf 1 1 22050 668 imp 200780767
+buf 1 1 22050 678 tri 16
+gain 1 0x3db170ce
+play 1
+mix 189 dfae75e86c3e349d
+mix 61 de280daacab6cf7d
+case 32
+src 0
+buf 0 1 11025 227 rand 319796292
+buf 0 1 11025 516 tri 24
+buf 0 1 11025 672 imp 723006150
+gain 0 0x3e311227
+src 1
+buf 1 1 44100 135 rand 1116764835
+buf 1 1 44100 440 square 14
+buf 1 1 44100 314 square 6
+gain 1 0x3f1ace78
+src 2
+buf 2 1 44100 39 square 27
+buf 2 1 44100 39 rand 740494763
+buf 2 1 44100 637 rand 1252491984
+play 0
+play 1
+mix 177 5ea7b1a8f57a3ca3
+gain 1 0x3f1d7355
+play 2
+mix 659 72857b6b047538fd
+stop 1
+mix 463 2617082b7e2aaeed
+play 0
+mix 191 255def3b572d57e1
+gain 2 0x3f754b39
+mix 542 51874f9161afa911
+gain 0 0x3f4e3c76
+mix 429 084b8f64a75a0061
+case 33
+src 0
+buf 0 1 48000 604 imp 212457636
+buf 0 1 48000 430 tri 2
+play 0
+mix 535 62eca7eff9635f01
+stop 0
+mix 144 1a0295f4bf5986c5
+mix 267 dbd2f3608ae97523
+case 34
+src 0
+buf 0 1 44100 167 tri 17
+gain 0 0x3f266f48
+src 1
+buf 1 2 22050 375 rand 457091489
+gain 1 0x3df9324d
+play 1
+mix 560 93b0d9639410e284
+play 0
+mix 457 d49e41a3e55e7144
+mix 396 c87499548f9efbd9
+gain 0 0x3f46ec6a
+play 1
+mix 506 4d975ea0ff1a6af3
+stop 0
+mix 8 ccfb953e2bd7c7a7
+mix 684 a9f224cd491c2728
+case 35
+src 0
+buf 0 2 11025 174 imp 1585990455
+buf 0 2 11025 691 rand 1976574052
+buf 0 2 11025 203 rand 2084366991
+gain 0 0x3f6c61f9
+src 1
+buf 1 2 32000 360 square 6
+gain 1 0x3f37ac7d
+src 2
+buf 2 2 11025 671 tri 31
+buf 2 2 11025 523 rand 1819631400
+gain 2 0x3d62b5ef
+play 1
+mix 364 d7eb6f88ba3cdcc8
+play 2
+mix 4 cfef4669a7e8af39
+play 0
+gain 2 0x3cd9c35f
+mix 472 a9cbc372e3522c5d
+case 36
+src 0
+buf 0 2 48000 124 tri 27
+buf 0 2 48000 615 imp 1328222071
+buf 0 2 48000 91 square 25
+gain 0 0x3e51faec
+src 1
+buf 1 2 44100 192 rand 1318353983
+gain 1 0x3f535ec4
+src 2
+buf 2 1 22050 401 rand 1484013674
+buf 2 1 22050 643 imp 298198825
+gain 2 0x3f7d6b8c
+play 1
+mix 238 e1a0eb550dbd07bb
+mix 267 dbd2f3608ae97523
+play 0
+play 2
+mix 452 75318d9dcfd01a1d
+gain 1 0x3f10b2f5
+mix 526 aaf8e9a540ab689a
+mix 465 5b30d76f6613b7c6
+case 37
+src 0
+buf 0 1 44100 436 imp 1056243477
+buf 0 1 44100 251 rand 79350349
+buf 0 1 44100 280 tri 15
+src 1
+buf 1 1 44100 258 rand 1879046540
+gain 1 0x3dbd2696
+play 0
+play 1
+mix 359 98880adaa38c9808
+gain 1 0x3f0b4b39
+mix 362 4afdb5bc9aaefeab
+mix 596 551d33131573a800
+play 1
+mix 253 ec4419177fd066d3
+case 38
+src 0
+buf 0 2 44100 565 tri 30
+buf 0 2 44100 515 tri 40
+gain 0 0x3f2728b0
+mix 677 89aa50627dbc5ef2
+mix 142 5203ba4e767d42f2
+mix 224 d54f02b97ed5bc2a
+case 39
+src 0
+buf 0 1 11025 460 tri 27
+gain 0 0x3ba94d60
+play 0
+mix 364 ef95bd8fc4a356ab
+mix 78 6cc145359c1da973
+mix 38 633cad874c6c0154
+case 40
+src 0
+buf 0 2 44100 416 rand 36676749
+play 0
+mix 266 1f926812704af745
+mix 432 b9e4fb3eddae23f7
+mix 421 cb28bb6971da208b
+mix 368 9232cc04ab27b5a9
+mix 582 36a6e54200c16cf7
+mix 342 66690b98205b2d30
+case 41
+src 0
+buf 0 2 44100 665 tri 26
+buf 0 2 44100 173 rand 125508003
+play 0
+mix 521 75cd2385d737d09b
+mix 56 fe10d102e88745b6
+mix 90 7dcb13a813515e2c
+mix 7 679e70ff5f4c9143
+case 42
+src 0
+buf 0 1 22050 561 square 27
+buf 0 1 22050 301 imp 1206816699
+gain 0 0x3eb5720a
+play 0
+mix 464 40dff925632b5fca
+mix 276 19d8ff477724fdf5
+mix 354 81eb4f10d1d51e0a
+mix 257 728e9a3401367336
+case 43
+src 0
+buf 0 1 44100 698 imp 1515852556
+buf 0 1 44100 579 imp 215320408
+mix 204 0645a4a67dcec462
+play 0
+mix 404 5744271a6e9fcdf4
+mix 509 9c0bb3a2f7d0cd05
+mix 40 b393978842a0fa3d
+mix 225 fa807c957eafe34b
+mix 692 ec5e098511f8ba7b
+case 44
+src 0
+buf 0 2 11025 508 imp 1439656369
+buf 0 2 11025 204 imp 1656662948
+src 1
+buf 1 2 32000 674 imp 1507621599
+buf 1 2 32000 298 imp 152258474
+buf 1 2 32000 566 rand 619747127
+gain 1 0x3dae3498
+src 2
+buf 2 2 48000 195 tri 2
+gain 2 0x3f695539
+play 0
+play 1
+play 2
+mix 263 2d6fdad2e75e2e44
+gain 0 0x3f11f1a7
+gain 1 0x3f31eec6
+gain 2 0x3eb1519d
+mix 432 b5522438a965889c
+play 0
+mix 171 101bb8aeab946925
+mix 577 a42a1835f8363eb2
+mix 302 452d321e3f87e51e
+mix 560 59f541ac7a35f3c8
+case 45
+src 0
+buf 0 2 44100 318 imp 768174143
+gain 0 0x3f5d359f
+src 1
+buf 1 2 22050 142 square 16
+buf 1 2 22050 412 tri 1
+buf 1 2 22050 503 imp 695471070
+gain 1 0x3f74cede
+src 2
+buf 2 1 32000 82 tri 5
+buf 2 1 32000 371 imp 2114996564
+buf 2 1 32000 679 square 4
+gain 2 0x3e7dfd08
+play 1
+mix 570 436179508a831e42
+play 0
+play 2
+mix 11 687e7fae95ac4cc8
+play 1
+stop 2
+mix 440 cde948c661ffa3d0
+case 46
+src 0
+buf 0 1 11025 483 imp 1592000865
+play 0
+mix 608 e7f429a02c39b64a
+gain 0 0x3ed20cab
+mix 208 e0084b66cb4a03e2
+mix 306 e28b98a94e007734
+case 47
+src 0
+buf 0 2 44100 674 rand 1355911525
+buf 0 2 44100 682 square 7
+gain 0 0x3f710028
+play 0
+mix 312 e04dcc65c95b5fec
+mix 88 768193420ea7b2dd
+mix 247 972b934026195380
+case 48
+src 0
+buf 0 2 11025 405 rand 678604769
+gain 0 0x3e1999eb
+src 1
+buf 1 2 22050 300 rand 475606195
+buf 1 2 22050 474 square 25
+gain 1 0x3daab87c
+mix 363 6013c9170030c639
+mix 553 c7a7cd10197d47fc
+play 1
+mix 632 4846ebbb37b0e378
+case 49
+src 0
+buf 0 2 44100 242 imp 1981301883
+buf 0 2 44100 662 tri 38
+buf 0 2 44100 318 square 14
+gain 0 0x3e8d1c9d
+play 0
+mix 19 f2c0d5456a983ecd
+mix 356 ef6240a0b991439c
+play 0
+mix 78 6287e17fe5efcb19
+mix 456 397eacf392c3132f
+mix 465 1f55a9b0c85043f1
+case 50
+src 0
+buf 0 2 44100 40 square 21
+gain 0 0x3d9de373
+mix 147 c7606d438ecce7ea
+play 0
+mix 579 5d4f36049ba0b717
+mix 443 f0649d9873a92635
+mix 261 86d911c492b42593
+case 51
+src 0
+buf 0 2 44100 41 rand 1207154849
+buf 0 2 44100 652 rand 1415307410
+buf 0 2 44100 468 square 26
+gain 0 0x3f391ced
+src 1
+buf 1 2 22050 216 rand 222265628
+src 2
+buf 2 2 48000 668 tri 21
+buf 2 2 48000 89 imp 1117996855
+buf 2 2 48000 328 square 24
+gain 2 0x3e10269e
+play 0
+play 1
+play 2
+mix 587 ad794a59590ab160
+mix 635 cf6f7197f9bcc119
+gain 1 0x3f52658c
+mix 554 4e7a8c59942ff527
+mix 598 69cd851db6574982
+play 1
+gain 2 0x3f39119b
+mix 215 fb3f3f8cc3711118
+mix 475 c035e1785ddf0dbf
+case 52
+src 0
+buf 0 2 48000 346 tri 20
+buf 0 2 48000 109 imp 1721970031
+gain 0 0x3f09a9aa
+play 0
+mix 245 f4f4f38f49a389ee
+mix 353 35cb9a29866d6130
+case 53
+src 0
+buf 0 2 11025 120 square 23
+buf 0 2 11025 166 square 18
+gain 0 0x3f5ca660
+mix 199 ff8a7cfd199be01b
+play 0
+mix 536 cdf4a6d5e0ebc4e5
+gain 0 0x3ed83872
+mix 417 68085f6439ee476a
+case 54
+src 0
+buf 0 2 32000 316 square 23
+buf 0 2 32000 114 tri 17
+gain 0 0x3f671aaa
+src 1
+buf 1 2 44100 89 square 39
+buf 1 2 44100 442 tri 35
+gain 1 0x3e118fb8
+src 2
+buf 2 2 11025 264 tri 16
+buf 2 2 11025 66 square 1
+buf 2 2 11025 44 imp 2045728399
+gain 2 0x3dedfb5e
+play 0
+play 2
+mix 490 7167d85530e6b5f6
+play 1
+mix 646 760114f4fe1ac12a
+mix 623 870fbd7927328c4d
+mix 227 41ced6daa116dc5d
+stop 0
+gain 2 0x3ce305e6
+mix 119 d51c15401c9d321e
+case 55
+src 0
+buf 0 1 11025 47 tri 32
+buf 0 1 11025 255 tri 23
+buf 0 1 11025 320 rand 815192972
+gain 0 0x3ddeb61c
+play 0
+mix 560 24bd47c4836b144d
+mix 81 eb90710e4a34dabf
+mix 563 70a29b2a875e6a0b
+play 0
+mix 464 462762ce3b7b534a
+case 56
+src 0
+buf 0 2 44100 566 imp 1672830395
+gain 0 0x3e534213
+play 0
+mix 195 679879a045a4fc04
+mix 6 9d908ecfb6b256de
+gain 0 0x3e2a7764
+mix 469 df2a3b9e89755139
+case 57
+src 0
+buf 0 1 32000 65 square 9
+buf 0 1 32000 148 square 5
+buf 0 1 32000 533 square 1
+gain 0 0x3f2e1cdc
+play 0
+mix 97 31535ce6e4bd2e48
+mix 326 abaa9874cd5fe6cc
+case 58
+src 0
+buf 0 1 11025 188 square 33
+gain 0 0x3e1facee
+src 1
+buf 1 2 11025 154 rand 1345895997
+buf 1 2 11025 308 rand 2126187774
+gain 1 0x3f7ed463
+src 2
+buf 2 2 44100 439 square 24
+play 2
+mix 684 34ffc704f9285767
+play 0
+mix 396 41410104047ef4b9
+mix 60 efe9dae9194027a3
+play 1
+gain 2 0x3f2f5980
+mix 579 74e82e82c35af6f1
+stop 2
+mix 414 49d124c4e4f8b892
+mix 538 a7d887cb1a27d373
+case 59
+src 0
+buf 0 1 44100 58 rand 492165908
+buf 0 1 44100 125 square 26
+buf 0 1 44100 347 imp 542140910
+mix 547 3fcad821a9664c6e
+mix 127 64d6c19683061d28
+play 0
+mix 378 a9fbe2d9ab95e6b6
+mix 25 cd00e292c5970d3c
+play 0
+mix 283 647c30c23fd44a7f
+mix 529 dbbf2ffb62d63e74
+case 60
+src 0
+buf 0 2 11025 357 tri 37
+buf 0 2 11025 571 imp 712702174
+play 0
+mix 569 9bd43b6a035aa7ba
+mix 288 b636680b60624808
+case 61
+src 0
+buf 0 2 11025 679 rand 833575336
+buf 0 2 11025 673 tri 29
+gain 0 0x3d8dedcb
+play 0
+mix 556 ab305b8d1896097d
+gain 0 0x3ee9c26e
+mix 67 b0abaf1195925055
+play 0
+mix 420 2ca38e05d5a59823
+case 62
+src 0
+buf 0 2 11025 339 tri 12
+play 0
+mix 173 ebbbf92422480666
+gain 0 0x3f4b64ec
+mix 190 4668ce99ae261511
+mix 612 5250e5e49005dd2c
+mix 131 2fe4ad1ac4f86ade
+mix 502 2474c6d835bb6e1c
+stop 0
+mix 68 e4d879a3407de578
+case 63
+src 0
+buf 0 1 22050 467 rand 1047241680
+buf 0 1 22050 612 tri 6
+gain 0 0x3ec7ff3a
+play 0
+mix 306 9530e9240f63d72c
+play 0
+mix 201 5aabf53eeb7966cf
+mix 77 dfcbf4c8267afa89
+case 64
+src 0
+buf 0 1 48000 415 tri 34
+src 1
+buf 1 2 44100 98 square 7
+buf 1 2 44100 32 square 24
+buf 1 2 44100 182 imp 1347867962
+gain 1 0x3efa2e08
+src 2
+buf 2 1 48000 552 tri 31
+buf 2 1 48000 54 rand 326960405
+buf 2 1 48000 480 imp 803172681
+play 0
+play 2
+mix 351 a3fc387758de49a5
+gain 2 0x3e99ca40
+mix 668 3fe8e4466365f441
+play 1
+mix 31 7b8ec8dd836b564f
+case 65
+src 0
+buf 0 2 48000 572 imp 1918288402
+play 0
+mix 517 97e47759ac15763e
+mix 228 d2710a3a6574fc3d
+mix 157 0a9fbf1caede33b5
+stop 0
+mix 365 2c8ba18d1cf6ab4c
+case 66
+src 0
+buf 0 1 32000 410 tri 14
+play 0
+mix 311 b9d435e664f5e3f8
+mix 639 5eefef682cc6618d
+gain 0 0x3ea8c09c
+mix 548 c3f98bcd6e42258b
+gain 0 0x3f0f75c3
+mix 392 7fbcfcd86bdfa943
+case 67
+src 0
+buf 0 2 44100 340 imp 1671020542
+buf 0 2 44100 389 square 31
+buf 0 2 44100 358 imp 1070905465
+play 0
+mix 241 85f4302ee3408083
+mix 314 30dd7f700d0310f0
+case 68
+src 0
+buf 0 1 44100 561 rand 208790906
+buf 0 1 44100 50 tri 4
+buf 0 1 44100 30 tri 27
+gain 0 0x3e85f181
+src 1
+buf 1 1 44100 690 tri 19
+play 0
+play 1
+mix 647 b951395d1d9e7608
+mix 633 bc40823d73582980
+case 69
+src 0
+buf 0 1 48000 459 rand 241483860
+gain 0 0x3f469ade
+src 1
+buf 1 1 44100 297 tri 18
+buf 1 1 44100 35 tri 30
+gain 1 0x3e15833a
+src 2
+buf 2 2 11025 317 imp 1538294263
+buf 2 2 11025 639 tri 28
+gain 2 0x3f619406
+play 1
+mix 93 0e1ecf29589676f3
+play 0
+gain 1 0x3d4b0947
+mix 227 054752f83df07f09
+play 2
+mix 665 346c3f4ff8addcde
+gain 2 0x3e8e0abe
+mix 179 238754df583de70c
+case 70
+src 0
+buf 0 2 44100 620 tri 33
+buf 0 2 44100 583 imp 1921790420
+gain 0 0x3f156cbf
+src 1
+buf 1 1 44100 62 rand 1389165965
+buf 1 1 44100 249 rand 1054667032
+gain 1 0x3e2c5e2e
+src 2
+buf 2 2 44100 611 rand 1207929456
+buf 2 2 44100 211 rand 2134120632
+gain 2 0x3e45a2a7
+play 0
+play 1
+mix 521 40863bd9b6c5681a
+play 2
+mix 585 4e8951375dcaf735
+play 1
+mix 699 7c7a7780759e3ef8
+play 1
+mix 578 c1ee14ac53600b60
+case 71
+src 0
+buf 0 1 44100 528 square 17
+buf 0 1 44100 683 square 3
+buf 0 1 44100 638 rand 1834930049
+gain 0 0x3f0bbb2f
+src 1
+buf 1 1 22050 440 square 35
+gain 1 0x3e57234e
+src 2
+buf 2 2 22050 598 imp 741009520
+buf 2 2 22050 435 square 31
+play 0
+play 2
+mix 138 c99bbc2815a1a156
+play 0
+play 1
+mix 112 ef56a9153f8d380d
+gain 0 0x3eeb1e31
+mix 107 68cdd3e659d997ff
+gain 1 0x3f47d9dc
+mix 397 df52c53b60bcdaef
+stop 1
+mix 150 019eed0a9d85ca10
+gain 2 0x3dff2a6d
+mix 161 b4fd4a0f677c3f1f
+case 72
+src 0
+buf 0 2 32000 490 imp 511401290
+gain 0 0x3ec6e9ec
+src 1
+buf 1 2 32000 625 imp 261747328
+buf 1 2 32000 653 tri 14
+buf 1 2 32000 397 tri 10
+gain 1 0x3ef3bd19
+play 0
+play 1
+mix 202 ec1969a215e6959a
+mix 81 7119f314d3837dac
+mix 531 2c48c186dace7828
+gain 1 0x3f493695
+mix 214 162e43904d31d391
+stop 1
+mix 319 07a692cc9bc920ef
+case 73
+src 0
+buf 0 1 48000 55 imp 404749755
+buf 0 1 48000 600 imp 344418867
+buf 0 1 48000 364 rand 139188602
+play 0
+mix 663 463b5ac25bf484b0
+mix 246 ef8dfd8970cf3adb
+mix 170 fd20f4f45f2c9b3c
+case 74
+src 0
+buf 0 2 11025 669 rand 1752105468
+buf 0 2 11025 292 tri 15
+gain 0 0x3dd1f7d9
+play 0
+mix 608 9ac6af10c3f45a10
+mix 305 ce68c17954f4d370
+mix 697 1f3ff478b24d2de3
+mix 233 f2da067e8c445d1f
+mix 393 e5e23eeff316f00d
+mix 372 f0f78e0037fc6c40
+case 75
+src 0
+buf 0 2 44100 284 imp 1460073698
+play 0
+mix 205 5095f28cf758d91f
+mix 55 ac9ab7fef49ac432
+mix 546 adcf79dba3e6d9ac
+case 76
+src 0
+buf 0 1 11025 691 tri 26
+buf 0 1 11025 417 rand 960819445
+buf 0 1 11025 422 rand 1525556167
+gain 0 0x3e80f76e
+src 1
+buf 1 1 11025 669 rand 1364629036
+buf 1 1 11025 196 square 31
+buf 1 1 11025 310 rand 1731197923
+src 2
+buf 2 1 44100 147 square 18
+buf 2 1 44100 461 tri 13
+play 1
+play 2
+mix 226 95a2df1f737d5ae6
+mix 244 1e5a6828bb682a50
+mix 406 de861dd7e64de6fc
+play 0
+mix 81 c1afcd1c89c45f84
+mix 476 47e0ada265f14ed5
+mix 567 bb9fc22c44bfe3dd
+case 77
+src 0
+buf 0 1 44100 370 tri 5
+buf 0 1 44100 118 square 9
+gain 0 0x3f756c8b
+mix 700 cd99e0d7b38a7236
+mix 100 7a12e561363385e9
+play 0
+mix 60 eb4b4c5b3b601019
+play 0
+mix 449 60e05e90696e635b
+mix 653 63cef4f0cbff8759
+mix 449 13087d2b2afe5b8c
+case 78
+src 0
+buf 0 2 22050 614 square 40
+buf 0 2 22050 301 rand 1806016596
+buf 0 2 22050 123 rand 1030954520
+src 1
+buf 1 1 22050 625 square 18
+gain 1 0x3f5d2739
+src 2
+buf 2 1 22050 44 imp 1674241471
+gain 2 0x3e6e0ff0
+play 0
+play 2
+mix 308 17dfa687279576e4
+play 1
+mix 224 0d4a6cb16fc284c2
+gain 1 0x3f56e79b
+mix 186 b40988df2a3caf5d
+case 79
+src 0
+buf 0 1 44100 488 square 8
+buf 0 1 44100 491 tri 31
+gain 0 0x3f7dfc65
+src 1
+buf 1 2 32000 572 rand 287681084
+src 2
+buf 2 2 22050 250 imp 2078181541
+buf 2 2 22050 679 imp 273347268
+gain 2 0x3f3575f8
+play 2
+mix 496 ac17d2aa2c6229df
+play 0
+mix 567 68a48fb5bd6ebdc8
+gain 0 0x3ecf2ba5
+play 1
+mix 309 1bf2ad1c2e385cb6
+case 80
+src 0
+buf 0 1 48000 495 imp 1243604581
+gain 0 0x3ea01809
+src 1
+buf 1 2 32000 690 rand 575914522
+buf 1 2 32000 200 imp 926401337
+play 1
+mix 388 e5d10704f92829b3
+play 0
+mix 376 ab69288a6a21db5b
+gain 1 0x3f56e262
+mix 158 c76919f95e6d2d0e
+case 81
+src 0
+buf 0 1 32000 590 imp 1516869508
+src 1
+buf 1 1 44100 82 tri 8
+buf 1 1 44100 140 imp 335489987
+src 2
+buf 2 2 44100 418 imp 2096492404
+play 0
+mix 678 2ed95f966f2933bc
+play 2
+mix 466 a6f6e59f67758723
+play 1
+mix 208 898b3d5bd78ace0b
+mix 276 9688ec46af8fa56e
+gain 2 0x3ea63faf
+mix 233 cb973b51d6e0730a
+gain 2 0x3f7cff85
+mix 663 6749d730b3a80055
+case 82
+src 0
+buf 0 1 48000 260 rand 1219154659
+buf 0 1 48000 633 imp 1901592509
+src 1
+buf 1 1 44100 254 square 6
+gain 1 0x3e9856bb
+src 2
+buf 2 2 44100 226 tri 26
+gain 2 0x3e0f0f58
+play 0
+play 1
+mix 183 c074db608963ec25
+play 2
+mix 358 b304cf6ad0846c95
+gain 0 0x3f0ff12e
+mix 98 28cec695ef11a231
+gain 1 0x3f63e005
+gain 2 0x3f43b069
+mix 168 f792b7f860bb94e5
+mix 209 875fd088c3e4fc6a
+play 0
+play 1
+mix 137 0281884fa6ae2e40
+case 83
+src 0
+buf 0 1 48000 166 square 35
+gain 0 0x3e89049e
+src 1
+buf 1 1 48000 346 rand 910109406
+buf 1 1 48000 319 square 18
+buf 1 1 48000 585 square 24
+gain 1 0x3f59266a
+src 2
+buf 2 1 32000 72 rand 1147417229
+buf 2 1 32000 399 rand 803257021
+buf 2 1 32000 286 tri 36
+gain 2 0x3f39643a
+play 0
+play 1
+play 2
+mix 693 88ae3256fceb73cd
+mix 698 43d8f6a923641287
+mix 333 0452e4aa5ec32970
+gain 0 0x3f636f2a
+mix 616 96497e49c11ebeb0
+play 0
+gain 1 0x3f226e6b
+mix 274 dc44c79a40379bbf
+case 84
+src 0
+buf 0 1 22050 71 tri 21
+buf 0 1 22050 337 imp 581940448
+buf 0 1 22050 203 square 25
+mix 235 ed4d01b36d154179
+mix 502 e991c0a37471f8f9
+case 85
+src 0
+buf 0 2 32000 572 square 23
+gain 0 0x3e93c1e6
+play 0
+mix 160 41face5428b91dfe
+mix 108 42a1ee1a44ed4632
+mix 252 4995f6dcf0e46355
+mix 398 c63ff065481b931d
+case 86
+src 0
+buf 0 2 44100 65 imp 1260908974
+gain 0 0x3f711be0
+play 0
+mix 298 f177abacc31e165b
+mix 463 6640cf8812e66080
+gain 0 0x3df04ba5
+mix 483 4dc46146ff5aa9b4
+mix 261 86d911c492b42593
+mix 594 d438c0a8d50f8aea
+case 87
+src 0
+buf 0 1 44100 448 square 17
+src 1
+buf 1 1 48000 395 imp 1011946425
+src 2
+buf 2 2 48000 98 square 19
+gain 2 0x3ef22e33
+mix 531 8b0e3adfed8461a5
+play 0
+play 1
+play 2
+mix 515 05ff81dd8ead9501
+gain 0 0x3eef083f
+gain 1 0x3f5799ec
+play 2
+mix 209 3787672201fdd01e
+gain 1 0x3f4abf87
+mix 607 b7e0f6018f9bb536
+mix 306 e28b98a94e007734
+gain 2 0x3f32ab18
+mix 196 0c37ddc45244523c
+case 88
+src 0
+buf 0 2 48000 606 square 11
+gain 0 0x3f09ff94
+play 0
+mix 317 e5ee44b6795e6d91
+mix 149 e148d282e8c86b18
+mix 379 1e8764ed5b3511ab
+gain 0 0x3f082f27
+mix 247 ed02a689d8616afc
+case 89
+src 0
+buf 0 1 32000 96 imp 2140129149
+buf 0 1 32000 573 imp 1186292419
+buf 0 1 32000 586 tri 17
+gain 0 0x3ef3b78f
+play 0
+mix 390 73e0a3d00e74a24b
+play 0
+mix 4 374708fff7719dd5
+gain 0 0x3efa3bc0
+mix 244 b2acbe0719b54c79
+gain 0 0x3f0ec623
+mix 574 ec77be8b9fc4d7e5
+mix 290 86002a795c997fc8
+mix 112 a124dba5d40971f4
+case 90
+src 0
+buf 0 2 44100 600 square 21
+gain 0 0x3d827360
+src 1
+buf 1 2 44100 507 rand 1167452842
+src 2
+buf 2 2 44100 675 square 35
+buf 2 2 44100 43 square 26
+buf 2 2 44100 118 rand 843911968
+gain 2 0x3f580fc2
+play 1
+mix 443 577a6966ddb8856b
+play 0
+mix 658 602aaf2c6103c01a
+stop 0
+play 2
+mix 399 4600374cd2e069cc
+gain 0 0x3f27cf4e
+mix 329 d083aa86eab31a70
+mix 280 5113313dd9d22fe1
+case 91
+src 0
+buf 0 2 44100 452 square 5
+play 0
+mix 576 ed2c99d8e9453a3c
+gain 0 0x3d1d036a
+mix 90 d3df611a0ed2e328
+case 92
+src 0
+buf 0 1 32000 274 imp 512551797
+src 1
+buf 1 1 44100 581 tri 22
+buf 1 1 44100 506 rand 14409725
+buf 1 1 44100 385 rand 503819568
+src 2
+buf 2 2 44100 442 square 15
+buf 2 2 44100 153 rand 235437002
+gain 2 0x3f7527bf
+play 0
+play 1
+play 2
+mix 148 124d7418f3695d2e
+play 2
+mix 615 14eede8bd87766de
+case 93
+src 0
+buf 0 1 32000 202 tri 6
+gain 0 0x3f256323
+src 1
+buf 1 2 32000 328 rand 1605296658
+buf 1 2 32000 126 tri 32
+buf 1 2 32000 343 rand 1600376034
+gain 1 0x3f0a5622
+play 0
+mix 203 ebf051497329eb52
+mix 569 845da1077a7d1b69
+case 94
+src 0
+buf 0 2 11025 372 square 3
+buf 0 2 11025 455 imp 1041801390
+buf 0 2 11025 355 square 1
+gain 0 0x3e852da1
+src 1
+buf 1 2 44100 265 square 19
+buf 1 2 44100 326 tri 37
+src 2
+buf 2 2 44100 219 square 12
+buf 2 2 44100 141 imp 79242076
+buf 2 2 44100 422 tri 26
+play 0
+play 1
+play 2
+mix 563 9afa4ce70e340830
+gain 1 0x3ded38dd
+stop 2
+mix 639 0eb44d46be58d764
+mix 46 c9f489f407e2213e
+mix 273 e9ebf4b42a8c43ec
+mix 25 cd00e292c5970d3c
+case 95
+src 0
+buf 0 1 48000 304 square 18
+buf 0 1 48000 170 imp 79274416
+gain 0 0x3f2c5261
+mix 611 383c38a6c1bf303c
+play 0
+mix 625 3ddb15dbe03aa56e
+gain 0 0x3e58e3ac
+mix 460 e830a58c5fb341b0
+case 96
+src 0
+buf 0 2 44100 638 imp 1042848547
+gain 0 0x3e990ed1
+mix 48 5d89f056865052bc
+mix 97 8de76ee7eb6b32c3
+mix 476 38bec17977e7afa4
+play 0
+mix 348 3a10bab135c8ec1f
+case 97
+src 0
+buf 0 2 44100 91 tri 26
+gain 0 0x3f0a88bc
+src 1
+buf 1 1 48000 606 imp 1918995344
+play 0
+play 1
+mix 378 3f7661313896d32a
+mix 226 c51f9562db759920
+mix 65 9c0095c04ef53d9d
+mix 653 7c7b284a35861366
+mix 653 7c7b284a35861366
+case 98
+src 0
+buf 0 2 11025 102 rand 1901747564
+buf 0 2 11025 281 tri 22
+buf 0 2 11025 449 tri 9
+gain 0 0x3f2a2d23
+play 0
+mix 397 bffb6e7084513836
+mix 63 6d8c651de2dd294c
+mix 649 f335fdb6f516edad
+mix 657 5cbf67a39e3fd95c
+case 99
+src 0
+buf 0 1 44100 474 square 35
+gain 0 0x3e25cf9e
+src 1
+buf 1 2 11025 594 tri 5
+buf 1 2 11025 438 imp 1896588116
+buf 1 2 11025 532 imp 1349388815
+gain 1 0x3f497a76
+mix 246 77f3ea088c1912c7
+play 1
+mix 519 2f881274f9fb5d32
+play 0
+mix 504 5d0922e0d505448f
+stop 1
+mix 454 1b07002f38c232f0
+case 100
+src 0
+buf 0 2 44100 682 imp 444073430
+gain 0 0x3f759aee
+play 0
+mix 439 c0601bc1bac97e69
+mix 54 a5645e7a3fa0866c
+case 101
+src 0
+buf 0 1 11025 283 square 14
+gain 0 0x3f6555d4
+src 1
+buf 1 2 44100 506 rand 1366428417
+buf 1 2 44100 233 rand 1200600176
+buf 1 2 44100 254 square 21
+gain 1 0x3f7c8db3
+play 1
+mix 283 013c31bfbe84efb7
+play 0
+mix 145 847fe156aa72660f
+mix 566 a994f718c23c4ff3
+mix 486 6a5d4ce16d63e6e2
+gain 1 0x3f36d0e5
+mix 55 ac9ab7fef49ac432
+mix 487 06b84a8fc71fac51
+case 102
+src 0
+buf 0 2 48000 137 tri 21
+buf 0 2 48000 82 square 25
+gain 0 0x3e4cd436
+mix 243 96c5023576733f88
+mix 220 c23a5cc2d7277749
+play 0
+mix 285 657473630fdc194b
+mix 589 a16b1eecc0aa9b4b
+mix 140 738c079dff6c9b77
+case 103
+src 0
+buf 0 2 22050 91 rand 1027419612
+buf 0 2 22050 617 tri 7
+play 0
+mix 232 8696303646cbe809
+mix 691 a1eb9a77ba6cf30d
+gain 0 0x3eaa1141
+mix 313 1a3f5affadce9638
+case 104
+src 0
+buf 0 1 44100 336 tri 33
+buf 0 1 44100 563 tri 17
+src 1
+buf 1 2 11025 513 imp 603238682
+gain 1 0x3f46713e
+src 2
+buf 2 1 44100 301 tri 18
+gain 2 0x3edc7235
+play 0
+play 1
+play 2
+mix 258 780bd820c4634680
+gain 1 0x3e82c07f
+gain 2 0x3ecdb2d0
+mix 70 d22cce18f631b47a
+gain 1 0x3eb2075e
+mix 84 151a0e2cd0adbd2f
+gain 1 0x3ef28f64
+gain 2 0x3f593a50
+mix 124 29ac5b64d79b8020
+mix 630 ad199b9a09e52a80
+case 105
+src 0
+buf 0 2 48000 559 tri 40
+src 1
+buf 1 1 22050 360 square 19
+gain 1 0x3e647ab8
+play 0
+mix 415 08097cf52b0acf88
+gain 0 0x3e512461
+mix 175 a8e903fb937c7ac4
+gain 0 0x3f554adf
+mix 261 86d911c492b42593
+case 106
+src 0
+buf 0 2 11025 464 imp 484276726
+gain 0 0x3e3a34e2
+src 1
+buf 1 2 44100 584 square 25
+buf 1 2 44100 61 square 23
+buf 1 2 44100 200 tri 35
+gain 1 0x3f760a4f
+src 2
+buf 2 2 44100 32 tri 10
+buf 2 2 44100 69 tri 24
+play 2
+mix 285 e2ddaea035e32a4f
+play 0
+mix 258 934ee56ad6539fb9
+play 1
+mix 91 52e7bf69f5d98899
+case 107
+src 0
+buf 0 1 44100 398 tri 5
+gain 0 0x3d4f84da
+src 1
+buf 1 1 22050 187 imp 1482707206
+buf 1 1 22050 329 rand 176512474
+buf 1 1 22050 491 tri 33
+gain 1 0x3f675abd
+mix 281 fbda37b52c495cca
+play 0
+mix 329 839fb7f77313be89
+mix 562 52c2f719776b618c
+play 1
+mix 62 b3ab6982980fddf4
+gain 0 0x3ee85d2a
+stop 1
+mix 163 ff851fd853ed0307
+gain 1 0x3e07fd73
+mix 320 bfe492baf731a0db
+case 108
+src 0
+buf 0 2 44100 398 square 33
+gain 0 0x3da87919
+src 1
+buf 1 1 11025 383 tri 36
+buf 1 1 11025 363 tri 2
+gain 1 0x3f28a245
+play 0
+play 1
+mix 471 2db553a1f68a99ad
+mix 198 a8f5400d648231d6
+play 0
+mix 216 d3d21474a42354fa
+mix 328 95fd8b5ecb67f079
+case 109
+src 0
+buf 0 2 22050 576 imp 920448777
+buf 0 2 22050 384 tri 3
+buf 0 2 22050 387 tri 15
+gain 0 0x3f267337
+play 0
+mix 613 32cccfa7d82021b9
+mix 660 677a4427c31d3d8c
+mix 92 8c7916bca62945fb
+mix 252 6907ad212c435002
+mix 334 53799ade05ffeb86
+play 0
+mix 366 ad0bf5709cffb3ac
+case 110
+src 0
+buf 0 2 48000 549 square 36
+buf 0 2 48000 360 tri 17
+gain 0 0x3e1679af
+src 1
+buf 1 2 32000 530 square 27
+buf 1 2 32000 489 rand 119490516
+gain 1 0x3f4327a6
+src 2
+buf 2 2 32000 375 rand 284026503
+buf 2 2 32000 588 rand 141544063
+play 1
+play 2
+mix 117 8a861f4048d84d3f
+gain 1 0x3ebe6816
+stop 2
+mix 583 763e8c2241621b8a
+mix 386 23f924e43421c41b
+case 111
+src 0
+buf 0 1 48000 522 square 13
+buf 0 1 48000 115 imp 277737379
+buf 0 1 48000 627 tri 40
+gain 0 0x3e243967
+play 0
+mix 515 8d53244dc628b09b
+mix 682 6d0616db4e98473a
+mix 334 e6c5b2ff5b38460f
+stop 0
+mix 700 cd99e0d7b38a7236
+mix 343 5077d5c90844b45e
+case 112
+src 0
+buf 0 2 48000 152 square 8
+buf 0 2 48000 259 rand 848643343
+src 1
+buf 1 2 11025 134 imp 70744669
+gain 1 0x3b3ff86b
+src 2
+buf 2 2 48000 388 imp 967017804
+play 0
+play 2
+mix 6 9d908ecfb6b256de
+play 1
+stop 2
+mix 352 1ca47447130eff79
+mix 96 8bf4a3be39d01922
+case 113
+src 0
+buf 0 2 44100 60 rand 1475710671
+buf 0 2 44100 258 square 21
+buf 0 2 44100 362 square 38
+gain 0 0x3f5e691d
+play 0
+mix 559 d83cd0b15d246adb
+mix 212 983cf19a9b29999c
+gain 0 0x3ed0c45b
+mix 504 d263c7c60b6f9806
+mix 699 1fd73e5fe3f36a31
+mix 170 3893c122a235d76a
+case 114
+src 0
+buf 0 1 44100 684 tri 32
+buf 0 1 44100 226 square 8
+buf 0 1 44100 335 imp 272678341
+gain 0 0x3f1b6dcd
+play 0
+mix 215 54949c150cfcc2de
+stop 0
+mix 123 aaf4a48db8af6b0c
+gain 0 0x3f471c47
+mix 392 7fbcfcd86bdfa943
+mix 595 5bf1b132b2a7bcef
+gain 0 0x3f44578a
+mix 535 62eca7eff9635f01
+mix 256 5f70bf18a0860070
+case 115
+src 0
+buf 0 2 44100 290 rand 533587650
+gain 0 0x3ef186c3
+mix 499 18a14bb49e74d5ef
+mix 12 17b0761f87b081d5
+mix 582 36a6e54200c16cf7
+play 0
+mix 280 68539a7d4fba1021
+mix 651 adfeb11b3d73ff84
+mix 665 35e7b2d6e8cb98cb
+case 116
+src 0
+buf 0 2 44100 496 tri 9
+gain 0 0x3f732a62
+play 0
+mix 320 7d5cfe7893a1f779
+mix 337 524863c46b6ae491
+mix 671 c926a8a73a8ad475
+gain 0 0x3f2ebf2d
+mix 488 77917b9816677102
+mix 308 0abe90866c4fbc89
+case 117
+src 0
+buf 0 2 48000 190 tri 27
+gain 0 0x3f1ab729
+mix 194 508f5ba745944e98
+play 0
+mix 449 0ea7f8f1c6d7473c
+mix 670 81b8d80236765ec9
+mix 110 360d579dbd14759b
+mix 210 16d0edc8b7ad7705
+case 118
+src 0
+buf 0 1 32000 37 tri 39
+play 0
+mix 331 72afd4cb840e583e
+mix 602 5d81987966a0197c
+play 0
+mix 420 6d0fe92e78f70fde
+mix 229 fcefeed6eb97cee9
+mix 397 318e9e1df845c413
+case 119
+src 0
+buf 0 2 44100 71 rand 251640542
+gain 0 0x3d0c1174
+play 0
+mix 1 df3f619804a92fdb
+mix 485 2cec0abfea28de58
+mix 458 97ae2e60f46fd4ea
+mix 531 8b0e3adfed8461a5
+mix 351 6d2daae4540f6324
+case 120
+src 0
+buf 0 1 32000 328 square 29
+buf 0 1 32000 96 rand 273295291
+buf 0 1 32000 553 tri 39
+play 0
+mix 675 55f892ecb15fd806
+mix 228 72de58049f7571ee
+mix 245 e051450f34ea549d
+mix 661 a5974d909bbde94f
+mix 463 6640cf8812e66080
+case 121
+src 0
+buf 0 1 48000 511 tri 39
+buf 0 1 48000 136 imp 1217375718
+src 1
+buf 1 2 11025 396 rand 1050276412
+buf 1 2 11025 102 tri 35
+gain 1 0x3d6df4cd
+play 0
+mix 165 87dfe814696dd075
+play 1
+mix 410 99b3d785be3f577e
+play 1
+mix 171 14c0c53d21d856b9
+stop 1
+mix 533 85a96a80013e9f6c
+case 122
+src 0
+buf 0 1 44100 392 square 9
+buf 0 1 44100 524 imp 595431517
+mix 405 2342951c074ccb18
+play 0
+mix 435 cee4df84200bcb25
+case 123
+src 0
+buf 0 2 44100 497 imp 1990122879
+buf 0 2 44100 120 rand 1891416956
+gain 0 0x3eb0a5da
+src 1
+buf 1 1 48000 570 square 4
+buf 1 1 48000 127 imp 1531270463
+buf 1 1 48000 61 tri 36
+gain 1 0x3f2e5be1
+mix 94 70d6aad73b9cfd0f
+play 0
+mix 356 1c37d7fe4949ff06
+mix 222 7b3e34727298d645
+stop 0
+mix 379 d95f3eacd05c1ca0
+case 124
+src 0
+buf 0 1 32000 279 square 7
+gain 0 0x3ed2e865
+src 1
+buf 1 1 22050 348 square 14
+play 0
+mix 371 9c8bcfbc49b72077
+play 1
+mix 8 a81306e3421b294b
+mix 342 23422d31b5563023
+gain 0 0x3d28894a
+play 1
+mix 106 cd821241e70b10fb
+mix 145 4d98c6651312c44f
+case 125
+src 0
+buf 0 1 44100 597 imp 1458249473
+mix 456 d68334e72457a9ee
+play 0
+mix 113 89f3bda768dd2240
+mix 531 0b3ccab99c7bbda7
+case 126
+src 0
+buf 0 2 22050 266 square 18
+buf 0 2 22050 216 tri 3
+buf 0 2 22050 504 square 39
+gain 0 0x3e59afe8
+src 1
+buf 1 1 32000 148 imp 1832932667
+buf 1 1 32000 315 square 38
+buf 1 1 32000 550 imp 1676489872
+gain 1 0x3f6fe583
+src 2
+buf 2 2 22050 172 square 35
+buf 2 2 22050 180 tri 40
+buf 2 2 22050 245 rand 2143299177
+play 0
+play 2
+mix 603 4153246f59900fd6
+play 1
+mix 563 dd016b1c41c4b587
+case 127
+src 0
+buf 0 2 22050 581 tri 7
+buf 0 2 22050 575 tri 17
+gain 0 0x3e726908
+src 1
+buf 1 1 22050 306 imp 1288308806
+gain 1 0x3f4be141
+mix 322 2ef0b8632395250d
+play 0
+mix 18 834a709ba2534ebe
+mix 619 46e19eb2807d2c35
+mix 3 d360325bca90c92b
+gain 0 0x3e17abe5
+play 1
+mix 220 b80615cefe5b6f77
+mix 237 a18f1f200332583b
+case 128
+src 0
+buf 0 2 44100 258 rand 1257308760
+buf 0 2 44100 187 imp 479021459
+mix 210 16d0edc8b7ad7705
+mix 291 5a07076eb82fb03d
+play 0
+mix 111 938395d61eb3147a
+mix 573 487ca7bf533b2967
+gain 0 0x3f35b5d9
+mix 473 014126b21efbcb90
+case 129
+src 0
+buf 0 2 44100 86 tri 36
+buf 0 2 44100 363 tri 4
+gain 0 0x3f6799bc
+src 1
+buf 1 1 44100 111 tri 20
+buf 1 1 44100 599 square 27
+gain 1 0x3e95decf
+play 0
+play 1
+mix 107 fda0c4e4c1f5e6be
+stop 0
+mix 255 2a0444559f4a96e1
+case 130
+src 0
+buf 0 2 44100 596 imp 1168314394
+mix 618 b95aed42bafae906
+play 0
+mix 366 78c4454eeb9ed3f2
+case 131
+src 0
+buf 0 1 48000 477 rand 573585006
+gain 0 0x3f71905b
+play 0
+mix 140 dcf7467b581972ab
+mix 699 9734634c1757ee50
+case 132
+src 0
+buf 0 1 44100 50 imp 558307175
+buf 0 1 44100 139 rand 1994257287
+buf 0 1 44100 598 tri 29
+gain 0 0x3d9b40e1
+src 1
+buf 1 1 48000 370 imp 1603338193
+buf 1 1 48000 674 imp 1597988750
+buf 1 1 48000 372 tri 14
+gain 1 0x3eaca710
+play 0
+play 1
+mix 120 d3700bc0bf07aa39
+mix 19 6f14f2d01b0d76a3
+mix 314 eba0b8de5284d8e4
+gain 1 0x3ef7d2da
+mix 654 71efde12d5130ab8
+mix 450 01782fddfb41f891
+gain 0 0x3f23e2e3
+mix 520 74ad040475ba3d4a
+case 133
+src 0
+buf 0 2 44100 80 square 3
+buf 0 2 44100 191 square 25
+gain 0 0x3e3539e6
+src 1
+buf 1 2 44100 598 imp 481559775
+buf 1 2 44100 141 tri 8
+buf 1 2 44100 616 rand 1865520537
+gain 1 0x3e93d31d
+src 2
+buf 2 2 44100 175 tri 27
+buf 2 2 44100 564 imp 701545731
+gain 2 0x3eab96a0
+play 0
+mix 466 8aae37c86a0069b8
+mix 477 1d8d6f33bb76764c
+play 1
+mix 307 9df18e83bfce0d61
+case 134
+src 0
+buf 0 1 44100 150 square 10
+buf 0 1 44100 636 tri 23
+gain 0 0x3dba9a02
+src 1
+buf 1 2 44100 687 rand 998487635
+buf 1 2 44100 543 tri 27
+buf 1 2 44100 156 imp 1086105429
+gain 1 0x3f21ed53
+mix 144 1a0295f4bf5986c5
+play 0
+play 1
+mix 446 0e8a4e7ca7eaa61b
+case 135
+src 0
+buf 0 2 44100 132 rand 768050258
+src 1
+buf 1 1 22050 604 square 15
+gain 1 0x3f073543
+play 1
+mix 487 df7fa1be30822bf6
+play 0
+mix 665 164945dae5f41840
+case 136
+src 0
+buf 0 2 22050 579 imp 846950709
+buf 0 2 22050 679 rand 1843985902
+gain 0 0x3e53c296
+src 1
+buf 1 2 11025 233 imp 1277739143
+gain 1 0x3f18cb42
+src 2
+buf 2 1 44100 450 imp 112368175
+buf 2 1 44100 352 tri 18
+mix 441 f9a8c9b949a6f1bb
+play 0
+mix 690 bae555aea679ad7e
+case 137
+src 0
+buf 0 1 44100 685 tri 13
+buf 0 1 44100 121 rand 782973903
+gain 0 0x3ebc818a
+mix 532 8378cf66af72b7b2
+mix 388 07cb830e7cb76dc7
+play 0
+mix 217 e5f07e99bc4d4eda
+case 138
+src 0
+buf 0 1 44100 458 square 10
+gain 0 0x3f197586
+src 1
+buf 1 2 48000 439 imp 1831920517
+buf 1 2 48000 620 imp 662053346
+src 2
+buf 2 2 48000 548 tri 34
+buf 2 2 48000 658 square 39
+gain 2 0x3f2cf836
+play 1
+play 2
+mix 620 3260e4b14e40e980
+play 0
+mix 260 ff975fa9cd7aaa8a
+case 139
+src 0
+buf 0 1 48000 386 square 3
+buf 0 1 48000 289 rand 1492539447
+buf 0 1 48000 55 square 39
+gain 0 0x3f7ef5e5
+src 1
+buf 1 2 48000 393 tri 20
+buf 1 2 48000 197 imp 972897413
+buf 1 2 48000 40 rand 483469405
+gain 1 0x3f776353
+play 1
+mix 319 88b2fedfd2a3c2aa
+play 0
+mix 299 5c61c760d3f4337d
+play 0
+gain 1 0x3f1bf800
+mix 259 de7f4be379b4f0d5
+mix 322 dff2fabc1129dca7
+mix 104 ffcc5e1c113be1cb
+gain 0 0x3e7f999f
+play 1
+mix 503 667fcc648a526b55
+case 140
+src 0
+buf 0 2 32000 486 square 27
+gain 0 0x3f4d321f
+play 0
+mix 234 e97e6f7ddca4c0cd
+stop 0
+mix 516 1d830c8af4ff60b1
+mix 357 508ead55e0354ff7
+mix 397 318e9e1df845c413
+case 141
+src 0
+buf 0 2 44100 448 square 31
+gain 0 0x3f5e3b40
+src 1
+buf 1 1 32000 531 tri 8
+gain 1 0x3f7c4a65
+mix 607 b7e0f6018f9bb536
+play 0
+mix 168 d3eb9f31e8d4d9f6
+play 1
+mix 280 b4a2ec67fdd89801
+mix 185 886baf4459d52b99
+mix 456 cd50122fd4696e16
+gain 1 0x3f158878
+mix 268 482500ac4ba894ac
+case 142
+src 0
+buf 0 1 48000 152 tri 38
+buf 0 1 48000 597 square 28
+buf 0 1 48000 593 square 10
+gain 0 0x3f65948f
+src 1
+buf 1 1 22050 210 imp 969200971
+play 0
+play 1
+mix 403 835c1fa2b5329471
+mix 463 cc596f64389b1b76
+play 0
+gain 1 0x3e8b4775
+mix 544 8927e486399ebfe7
+gain 1 0x3f0a5253
+mix 619 0441a442d522e370
+gain 0 0x3f0f24f3
+gain 1 0x3f01b9a4
+mix 618 6d8e77a12c065c2d
+case 143
+src 0
+buf 0 1 32000 121 rand 414125271
+gain 0 0x3f61951a
+src 1
+buf 1 2 44100 392 rand 770882006
+play 0
+mix 367 b5d3bfd04f5f9d9d
+mix 489 2f21312ae4024029
+mix 495 6fcac8badcc4ec50
+case 144
+src 0
+buf 0 2 48000 367 tri 19
+gain 0 0x3f55e018
+mix 451 baa234c528afba1c
+mix 37 3b18c58c739716e7
+play 0
+mix 40 2b0d69f40ce58ed8
+mix 136 2b024db345023e36
+mix 671 ba0739b20f5a300c
+case 145
+src 0
+buf 0 2 44100 388 rand 1660622505
+gain 0 0x3f63d0bf
+src 1
+buf 1 1 44100 511 square 39
+gain 1 0x3e5c858b
+src 2
+buf 2 1 44100 49 rand 1200803931
+buf 2 1 44100 513 square 33
+buf 2 1 44100 611 tri 24
+gain 2 0x3e40796d
+play 0
+play 1
+mix 329 7359a7182bee075d
+mix 435 7d6386392b074419
+play 2
+mix 611 c3d18a82e2a9c0e1
+play 0
+play 1
+mix 138 57f71525e60b04aa
+stop 2
+mix 381 13354aa4fcd33986
+mix 467 807d80fa301446b3
+case 146
+src 0
+buf 0 2 11025 484 square 35
+buf 0 2 11025 140 imp 1721193847
+buf 0 2 11025 195 square 29
+src 1
+buf 1 1 44100 76 square 21
+buf 1 1 44100 582 tri 36
+gain 1 0x3eab6dfa
+play 0
+play 1
+mix 319 99c90e4d4832a0c3
+gain 1 0x3ee790cb
+mix 281 b7383488779e3db7
+case 147
+src 0
+buf 0 1 32000 593 rand 1896109092
+buf 0 1 32000 390 imp 62524525
+gain 0 0x3de77a92
+src 1
+buf 1 1 44100 170 square 19
+play 0
+mix 222 7f731d8d96e58291
+play 1
+mix 302 51c822d4a266e991
+stop 1
+mix 193 580b8f6db7b2fcf0
+mix 571 c01e48b8db2f87aa
+stop 1
+mix 616 96497e49c11ebeb0
+case 148
+src 0
+buf 0 2 44100 74 imp 1338148574
+gain 0 0x3f77835a
+src 1
+buf 1 1 44100 549 imp 1220263889
+buf 1 1 44100 444 tri 33
+buf 1 1 44100 423 square 39
+src 2
+buf 2 1 11025 98 tri 5
+buf 2 1 11025 533 imp 852181100
+buf 2 1 11025 656 tri 19
+play 0
+play 2
+mix 613 a0559e75cd138e32
+play 1
+mix 377 1e65b5486df03b81
+mix 208 f3f7d4e57a3f7037
+stop 2
+mix 517 abcd53d840ad8569
+case 149
+src 0
+buf 0 1 11025 205 rand 468501754
+buf 0 1 11025 38 tri 28
+gain 0 0x3e892986
+mix 268 482500ac4ba894ac
+play 0
+mix 303 183862017e214d53
+mix 43 92b3fdab088c2c89
+case 150
+src 0
+buf 0 1 48000 77 imp 1533972138
+buf 0 1 48000 409 imp 794177710
+buf 0 1 48000 480 rand 151311894
+gain 0 0x3f00c7ac
+src 1
+buf 1 2 32000 616 tri 10
+buf 1 2 32000 376 rand 305020011
+play 0
+play 1
+mix 373 bf4b4a20973c414b
+mix 545 3ec9cb79e3a75bc9
+case 151
+src 0
+buf 0 2 44100 619 tri 36
+buf 0 2 44100 133 tri 10
+gain 0 0x3e8abcb1
+src 1
+buf 1 1 32000 150 square 29
+buf 1 1 32000 530 square 22
+gain 1 0x3e26c7a0
+play 1
+mix 207 aca978d0644d965b
+play 0
+mix 81 94a542b18589afaa
+case 152
+src 0
+buf 0 2 48000 398 square 26
+buf 0 2 48000 54 rand 266076651
+buf 0 2 48000 39 square 37
+gain 0 0x3e7eac10
+src 1
+buf 1 2 32000 488 square 14
+buf 1 2 32000 548 square 28
+buf 1 2 32000 284 tri 38
+gain 1 0x3f5aa5f0
+play 1
+mix 283 79cee53698052a3a
+play 0
+gain 1 0x3f34b75a
+mix 113 fef82293983db0ab
+mix 368 bc3a4fea5295bd9c
+gain 0 0x3bb9f622
+mix 53 bb4c2922f6fad08f
+gain 1 0x3e06d241
+mix 238 fc3a0a57c91ce82d
+case 153
+src 0
+buf 0 2 44100 395 imp 911568122
+buf 0 2 44100 525 rand 1950986223
+play 0
+mix 8 66687aadf862bd77
+play 0
+mix 43 58f218aeb259309e
+mix 367 90a307109585019d
+mix 507 748cb4901d9d2d30
+mix 613 e564e392cceccecf
+case 154
+src 0
+buf 0 2 44100 143 tri 23
+gain 0 0x3eccb3be
+play 0
+mix 139 ab8165b02b0eeb6d
+gain 0 0x3e81e604
+mix 109 3f9091a44a2f387c
+case 155
+src 0
+buf 0 1 11025 478 tri 37
+gain 0 0x3f1762ab
+src 1
+buf 1 1 11025 272 tri 27
+gain 1 0x3f23b93b
+play 0
+mix 677 3ca572a937b7ba9e
+play 1
+mix 439 2c9807a539db5794
+gain 0 0x3f30cdb7
+mix 554 f81ecd4c4e2adef2
+case 156
+src 0
+buf 0 1 44100 93 imp 2061317227
+gain 0 0x3e06107d
+src 1
+buf 1 1 44100 238 imp 2072459783
+gain 1 0x3ef812e0
+src 2
+buf 2 1 22050 192 imp 1776520016
+buf 2 1 22050 94 tri 2
+gain 2 0x3f56e4b8
+play 0
+play 1
+mix 260 0459560a6d1c301c
+play 2
+mix 255 694bb3ac82aba71f
+case 157
+src 0
+buf 0 2 32000 298 square 12
+buf 0 2 32000 238 rand 397676402
+gain 0 0x3f6a3148
+mix 70 1f6c9de2e555d5d5
+play 0
+mix 133 2727da34c973b167
+case 158
+src 0
+buf 0 2 44100 34 tri 16
+gain 0 0x3ed0d19a
+src 1
+buf 1 2 48000 595 square 27
+buf 1 2 48000 363 square 24
+buf 1 2 48000 528 square 40
+gain 1 0x3f51c5c4
+src 2
+buf 2 1 44100 503 tri 25
+buf 2 1 44100 362 tri 36
+buf 2 1 44100 458 imp 1494116520
+gain 2 0x3e597aea
+play 0
+play 1
+play 2
+mix 154 071784d7a040d482
+gain 2 0x3eb2b9ff
+mix 211 62b4a3b639878ec7
+play 1
+mix 338 8ce0590e102c3440
+stop 1
+mix 452 56882337e245d313
+gain 0 0x3edb938b
+play 2
+mix 424 db3598feade8ec9d
+mix 19 7fba8b4f9d939f8b
+case 159
+src 0
+buf 0 2 44100 188 square 16
+buf 0 2 44100 129 tri 4
+gain 0 0x3f201de7
+play 0
+mix 568 92d400fdcdf144b0
+mix 575 dec9d7d549b235f1
+stop 0
+mix 479 013165a33af15ff1
+case 160
+src 0
+buf 0 2 48000 55 tri 17
+buf 0 2 48000 154 square 32
+buf 0 2 48000 470 rand 790442737
+gain 0 0x3ef88e56
+src 1
+buf 1 2 22050 100 square 14
+buf 1 2 22050 450 tri 7
+gain 1 0x3f208d49
+src 2
+buf 2 1 44100 469 tri 37
+buf 2 1 44100 374 tri 13
+buf 2 1 44100 69 rand 506248443
+play 1
+play 2
+mix 367 16d215b782ef1d1c
+play 0
+stop 1
+mix 150 5d34b5926684eac5
+gain 2 0x3c2fd657
+mix 685 881f337541158e7a
+play 2
+mix 423 601f22129eb32aee
+case 161
+src 0
+buf 0 1 44100 628 rand 1726723312
+buf 0 1 44100 62 tri 1
+src 1
+buf 1 2 32000 460 rand 1801652480
+buf 1 2 32000 700 imp 1765199241
+gain 1 0x3f0ae28b
+src 2
+buf 2 2 22050 301 imp 368515444
+buf 2 2 22050 156 square 37
+buf 2 2 22050 239 imp 239588835
+gain 2 0x3f74b743
+play 0
+play 1
+mix 395 bbd7de2adc1e4937
+gain 1 0x3f753d8f
+mix 258 bd65a94b93d8a35f
+play 2
+mix 144 b19ee7b9f2494390
+gain 2 0x3f04b86b
+mix 488 f2d39f96b633dbc0
+case 162
+src 0
+buf 0 2 44100 137 square 20
+buf 0 2 44100 560 imp 482133384
+buf 0 2 44100 571 square 23
+gain 0 0x3f15d201
+play 0
+mix 229 56792522b16fb1c1
+mix 343 e1a74f49e6c7faf1
+case 163
+src 0
+buf 0 2 22050 508 rand 1953083938
+buf 0 2 22050 337 square 22
+buf 0 2 22050 576 square 38
+gain 0 0x3f580eea
+play 0
+mix 65 c78fec959ebc8682
+play 0
+mix 454 71cda415916a3092
+mix 171 ff2ed213c5b497cb
+mix 259 32921b864f2f9508
+mix 432 e623576cf65c0f3d
+case 164
+src 0
+buf 0 2 11025 486 rand 891489776
+buf 0 2 11025 200 imp 682142987
+buf 0 2 11025 233 tri 25
+gain 0 0x3d33a07d
+mix 515 27f4111912c59988
+mix 175 182a1c0c5b24b5c7
+mix 440 52e28210c0be3be4
+play 0
+mix 575 30f6497e9b50c679
+case 165
+src 0
+buf 0 2 22050 51 square 36
+buf 0 2 22050 457 square 34
+buf 0 2 22050 507 imp 140268362
+src 1
+buf 1 2 44100 49 tri 2
+buf 1 2 44100 540 square 25
+buf 1 2 44100 494 rand 1034319648
+src 2
+buf 2 2 32000 103 square 33
+buf 2 2 32000 182 tri 10
+buf 2 2 32000 646 imp 14281672
+gain 2 0x3ea1248c
+play 0
+play 1
+mix 168 314b6cbba382301e
+gain 1 0x3f0b67c2
+play 2
+mix 602 78aa2d2f0bd805cd
+mix 288 b3a0febe26dbd3b8
+mix 24 d7e8d80be20391e0
+mix 174 28b7759cbde79a3d
+case 166
+src 0
+buf 0 2 48000 652 tri 3
+buf 0 2 48000 164 imp 271794485
+buf 0 2 48000 191 square 10
+gain 0 0x3ed7b073
+src 1
+buf 1 2 44100 230 imp 986762952
+play 1
+mix 573 b106f1859b8d4526
+mix 532 8378cf66af72b7b2
+play 0
+mix 21 4fea5e6a3ec5f547
+case 167
+src 0
+buf 0 2 11025 492 square 13
+buf 0 2 11025 646 rand 863897611
+src 1
+buf 1 2 48000 305 tri 7
+buf 1 2 48000 539 rand 1289351103
+buf 1 2 48000 217 tri 36
+src 2
+buf 2 1 48000 48 imp 152575410
+gain 2 0x3f26d68e
+play 0
+play 1
+play 2
+mix 232 8f48020b2641fc44
+play 2
+mix 482 b3fb14826611a3f4
+mix 551 13b60e38d1ad3174
+mix 300 e98ad23f64f3a882
+gain 0 0x3e9252c0
+mix 308 059b8edf4adcab38
+gain 1 0x3f2bc9f0
+play 2
+mix 467 9cce0c716d1d5c45
+case 168
+src 0
+buf 0 2 22050 156 tri 24
+gain 0 0x3d7d5c4e
+mix 495 6fcac8badcc4ec50
+play 0
+mix 355 38b0135c6cc88bf1
+play 0
+mix 669 149690cd5f317375
+mix 644 c761e3be285d6d53
+mix 439 c0601bc1bac97e69
+stop 0
+mix 543 164d245d1382fc27
+case 169
+src 0
+buf 0 1 32000 38 square 22
+buf 0 1 32000 279 rand 526577927
+gain 0 0x3ec7b690
+play 0
+mix 658 b7950d1ea4bcef6b
+mix 38 85ada57e1f601e96
+case 170
+src 0
+buf 0 1 48000 293 rand 106696421
+buf 0 1 48000 39 rand 358175166
+play 0
+mix 40 aa86b7ab4fa50599
+gain 0 0x3f370074
+mix 460 1ea1f0915e4bf4e9
+mix 199 ff8a7cfd199be01b
+mix 248 5f51d9e57c051cc5
+mix 545 fb0009aaaaa8a6b2
+case 171
+src 0
+buf 0 1 48000 348 rand 1880792299
+buf 0 1 48000 589 square 7
+buf 0 1 48000 169 rand 631421163
+gain 0 0x3f22d8ca
+play 0
+mix 594 111695b8805f6742
+mix 389 f0dfa0c3a5ad0a8d
+mix 144 f6d7f3061c72d197
+mix 94 70d6aad73b9cfd0f
+mix 13 7955cb2de90dd9ef
+mix 268 482500ac4ba894ac
+case 172
+src 0
+buf 0 2 44100 491 rand 991819005
+buf 0 2 44100 539 square 38
+buf 0 2 44100 159 tri 35
+gain 0 0x3e535305
+src 1
+buf 1 1 32000 691 rand 1743715716
+gain 1 0x3f5d5945
+src 2
+buf 2 2 44100 82 tri 5
+gain 2 0x3d506d2e
+play 0
+play 1
+play 2
+mix 188 ac53cb2a248186ed
+gain 1 0x3ee416bb
+gain 2 0x3e86bdef
+mix 567 383f44d63b7c60cd
+gain 1 0x3f4d685b
+gain 2 0x3f462367
+mix 636 89972e6c9cc516b7
+mix 648 b2069f33fd956c79
+mix 691 0a49de4431dba492
+mix 533 85a96a80013e9f6c
+case 173
+src 0
+buf 0 2 44100 133 rand 1962621336
+buf 0 2 44100 586 imp 502505758
+buf 0 2 44100 470 square 18
+gain 0 0x3b42a93c
+mix 254 5817bc65840cf706
+play 0
+mix 401 db68ecf020197677
+mix 659 3e2fae00d6e2b2d3
+mix 616 2beea660b180a816
+gain 0 0x3f647be5
+mix 385 7e8f3ddcaf196e65
+case 174
+src 0
+buf 0 1 44100 516 square 18
+buf 0 1 44100 551 imp 688831898
+buf 0 1 44100 195 tri 17
+gain 0 0x3f1e1e3a
+play 0
+mix 517 2e605eae90ae5ef2
+mix 155 b5afda9531d50eca
+gain 0 0x3ed258e8
+mix 613 1399180dfd61ced6
+mix 522 d915342299b266cf
+mix 543 164d245d1382fc27
+mix 116 7c4c2b940c41426e
+case 175
+src 0
+buf 0 1 44100 599 square 34
+buf 0 1 44100 360 imp 1296133310
+buf 0 1 44100 69 tri 30
+gain 0 0x3e8f26c0
+mix 541 e42cdd1acce36fbe
+play 0
+mix 118 fbbb46425238e22b
+play 0
+mix 376 bd92873424fe7ca8
+mix 580 12625acfc52c5a5e
+gain 0 0x3f2e6a97
+mix 281 9107ba68e2548b01
+mix 261 86d911c492b42593
+case 176
+src 0
+buf 0 1 44100 477 rand 498594162
+gain 0 0x3ecec29a
+src 1
+buf 1 2 44100 521 square 21
+buf 1 2 44100 215 rand 506340924
+gain 1 0x3edd1b4a
+play 1
+mix 351 4197a8265cd740ed
+play 1
+mix 162 bfafe1028bcbb7f3
+case 177
+src 0
+buf 0 2 48000 97 tri 9
+gain 0 0x3f546632
+mix 598 69cd851db6574982
+play 0
+mix 141 eb54730f5c291a5e
+gain 0 0x3ebeb17e
+mix 409 810a994098cbf7fb
+play 0
+mix 174 093c925fa048f0e1
+mix 549 47585db1c41fc897
+case 178
+src 0
+buf 0 1 22050 168 rand 2005690391
+play 0
+mix 79 25a51593dfaad985
+mix 275 4504b43447e3f114
+mix 339 216d4302eb1c96fd
+mix 667 5ebd94628f435a5b
+case 179
+src 0
+buf 0 2 22050 285 tri 29
+gain 0 0x3cb578e1
+src 1
+buf 1 2 11025 113 tri 10
+buf 1 2 11025 89 rand 1278674541
+buf 1 2 11025 35 imp 1796346346
+gain 1 0x3ef2c4dd
+play 0
+play 1
+mix 248 0f4e8e42ca45d802
+play 1
+mix 384 32c8604dbc203d66
+gain 0 0x3eb920a0
+mix 625 202c945aecc8411d
+gain 1 0x3e94325e
+mix 600 a0ee989ed2a0a2e3
+case 180
+src 0
+buf 0 2 44100 675 square 17
+gain 0 0x3ead17dd
+src 1
+buf 1 2 48000 689 square 15
+gain 1 0x3f489c24
+src 2
+buf 2 2 44100 641 imp 1682334319
+gain 2 0x3f5c405f
+play 2
+mix 484 27b9b5c47a7ef184
+play 0
+gain 2 0x3f23fb4e
+mix 589 aa9fcdf737ab3e48
+gain 2 0x3f62b4c9
+mix 620 2d2e14cc85bccb24
+gain 2 0x3f13b5cf
+mix 28 b5fdab78d8947eac
+gain 2 0x3f34a6c5
+mix 313 c8480951197fbce4
+case 181
+src 0
+buf 0 1 44100 426 square 37
+gain 0 0x3f64590a
+play 0
+mix 135 b2da26e68c89da93
+mix 150 2dedda47972dd342
+mix 134 aa3b315841b6062c
+case 182
+src 0
+buf 0 2 44100 44 imp 1501298702
+buf 0 2 44100 551 imp 337432420
+gain 0 0x3eaa80fc
+play 0
+mix 513 9d6018ddacdd598e
+mix 74 250f52cb2d6f1966
+mix 559 ef27ae9ee0ded29e
+stop 0
+mix 459 2b1677a1e2e7af68
+gain 0 0x3e80b875
+mix 280 5cc201eb697e5702
+case 183
+src 0
+buf 0 1 32000 220 imp 1814329953
+buf 0 1 32000 38 rand 1051688384
+buf 0 1 32000 502 imp 1987856917
+src 1
+buf 1 1 44100 612 tri 1
+buf 1 1 44100 548 imp 329402247
+buf 1 1 44100 452 square 12
+gain 1 0x3eccb19a
+play 0
+mix 107 6fff5336ce5560a8
+play 1
+mix 6 9d908ecfb6b256de
+mix 547 e7fe3a764b4245e0
+mix 662 a4789885c8c5a1ca
+case 184
+src 0
+buf 0 2 44100 67 rand 2137580280
+buf 0 2 44100 61 square 25
+gain 0 0x3d4ffe19
+src 1
+buf 1 1 22050 439 tri 34
+buf 1 1 22050 660 tri 10
+buf 1 1 22050 316 tri 16
+src 2
+buf 2 1 44100 503 tri 36
+play 1
+play 2
+mix 101 01820c34cfb4f75b
+stop 2
+mix 430 94c5b046ce4f0b8d
+mix 610 76e97af696c6107b
+play 0
+mix 143 ea4fba73110d40bc
+play 0
+mix 643 b24f5ef616533b38
+case 185
+src 0
+buf 0 2 22050 248 rand 1355946277
+gain 0 0x3ee1e350
+src 1
+buf 1 1 22050 218 tri 28
+buf 1 1 22050 371 imp 233452356
+buf 1 1 22050 450 tri 38
+gain 1 0x3e73d0a2
+src 2
+buf 2 2 44100 683 square 2
+buf 2 2 44100 379 square 7
+gain 2 0x3f14ccb0
+play 0
+play 1
+play 2
+mix 461 c47aa979178bfec6
+gain 1 0x3e985dd8
+mix 601 6e433a706f8f0dcb
+mix 477 44b141d9fb4fe395
+case 186
+src 0
+buf 0 2 11025 287 imp 44764958
+buf 0 2 11025 85 tri 24
+buf 0 2 11025 447 tri 6
+gain 0 0x3ec38d0f
+play 0
+mix 246 77f3ea088c1912c7
+mix 390 0ae208d8333b8d56
+mix 373 91b3b1ff66bb41ea
+case 187
+src 0
+buf 0 2 44100 579 rand 430111672
+gain 0 0x3e81a3f7
+src 1
+buf 1 2 44100 115 square 4
+gain 1 0x3f2845a7
+src 2
+buf 2 1 11025 574 square 39
+buf 2 1 11025 470 square 10
+gain 2 0x3f7a4b51
+play 1
+play 2
+mix 668 337afc7a8d247672
+play 0
+mix 289 60b3fa477edbb834
+case 188
+src 0
+buf 0 1 44100 31 rand 1611161382
+buf 0 1 44100 542 rand 1946975442
+gain 0 0x3f7527f6
+src 1
+buf 1 1 44100 235 square 27
+gain 1 0x3eef527b
+play 1
+mix 645 d738738b9f2ed38e
+play 0
+mix 573 9a75fc6eef66115b
+gain 1 0x3f7a873f
+mix 395 1777e4f7955cb590
+mix 404 5a95c72bfe2ce9e1
+mix 349 d9f17d8e7c1ad649
+case 189
+src 0
+buf 0 2 11025 584 imp 347138133
+buf 0 2 11025 294 square 4
+gain 0 0x3f132fee
+src 1
+buf 1 1 44100 559 imp 1012495192
+buf 1 1 44100 277 tri 11
+gain 1 0x3f6048db
+src 2
+buf 2 2 44100 546 rand 719837847
+gain 2 0x3f1a4996
+play 0
+play 2
+mix 435 6d8b4a55430f588a
+play 1
+mix 113 b02b7ab954e2cac3
+case 190
+src 0
+buf 0 2 11025 518 imp 744359147
+buf 0 2 11025 698 tri 11
+buf 0 2 11025 190 imp 681421672
+gain 0 0x3d8408d0
+play 0
+mix 51 c0c74543cc9dcc7f
+mix 330 8544996d681dfec3
+mix 589 d9261a664fba07e4
+mix 453 939e0dd43a457dfa
+case 191
+src 0
+buf 0 2 11025 223 tri 4
+buf 0 2 11025 217 square 9
+buf 0 2 11025 277 imp 1935889856
+gain 0 0x3d7c5f48
+mix 493 b86ac75c1cd8e279
+mix 636 95b8830f2e3fdb69
+play 0
+mix 32 8d5fe2d4e023f3fc
+stop 0
+mix 553 c7a7cd10197d47fc
+mix 460 e830a58c5fb341b0
+mix 329 5bc633d52bc4345c
+case 192
+src 0
+buf 0 1 22050 672 imp 1620029749
+buf 0 1 22050 401 rand 182824361
+buf 0 1 22050 273 rand 1294562033
+src 1
+buf 1 2 44100 534 square 23
+buf 1 2 44100 274 rand 249719595
+buf 1 2 44100 358 square 4
+gain 1 0x3f51af1c
+play 0
+mix 89 0b449271fd114470
+play 1
+mix 610 972085243399a3ac
+mix 360 07e70bd466a2f7c8
+play 1
+mix 383 9478f98b08fa0a58
+mix 3 c82baa977d99a45a
+case 193
+src 0
+buf 0 2 44100 628 square 3
+buf 0 2 44100 299 imp 263774450
+gain 0 0x3d764d00
+mix 220 c23a5cc2d7277749
+mix 545 fb0009aaaaa8a6b2
+mix 455 81f00147304e0c79
+play 0
+mix 151 bbbb4fa9cf883f66
+mix 133 299bf7c4277adcc1
+stop 0
+mix 436 2df7244b4c2c1072
+case 194
+src 0
+buf 0 1 22050 543 square 27
+gain 0 0x3e4263a1
+mix 551 b0e21d402e6b2444
+mix 681 f700c777fe87a98a
+play 0
+mix 390 8208250720f67641
+mix 288 5b7b06d673d297b1
+mix 115 41f8c4636434f11b
+case 195
+src 0
+buf 0 1 48000 385 rand 828138339
+play 0
+mix 140 9b441cc81ac47a13
+mix 48 504e92723ef3f806
+case 196
+src 0
+buf 0 2 44100 61 square 5
+buf 0 2 44100 285 imp 1870038363
+buf 0 2 44100 584 tri 28
+mix 70 1f6c9de2e555d5d5
+mix 566 db62eb79fead0e2f
+play 0
+mix 516 7b9e4d7e782d8a7b
+play 0
+mix 645 13100898abc30b24
+mix 496 0649f4c65f24c119
+mix 679 e983d55d238d751e
+case 197
+src 0
+buf 0 2 44100 300 square 18
+buf 0 2 44100 263 square 28
+gain 0 0x3f78537a
+play 0
+mix 437 83c8962366b6a4be
+mix 125 ab932b9bf4191727
+mix 629 595d81e4f44024f5
+mix 378 ce74475c230513d2
+stop 0
+mix 433 f1755a6f03402bf6
+case 198
+src 0
+buf 0 1 44100 224 rand 38443659
+buf 0 1 44100 140 rand 818400058
+gain 0 0x3e15bf94
+src 1
+buf 1 2 32000 317 square 15
+buf 1 2 32000 379 square 4
+buf 1 2 32000 332 tri 25
+gain 1 0x3f50357c
+src 2
+buf 2 2 44100 191 square 27
+play 0
+play 1
+mix 404 e2f916b15f0a1d55
+mix 309 ee190e2313d4d6c9
+case 199
+src 0
+buf 0 2 44100 277 tri 1
+src 1
+buf 1 1 44100 558 imp 1269439112
+buf 1 1 44100 438 rand 2139574879
+buf 1 1 44100 364 imp 2081166826
+src 2
+buf 2 2 44100 320 imp 1526201193
+gain 2 0x3f769820
+play 1
+play 2
+mix 283 15c7111b8d756073
+play 0
+mix 51 a9a62ff74817798d
+play 2
+mix 620 df502b7c7532b3f0
+mix 491 c2c3808e45c96d34
+mix 411 a99f9d3d84efdecd
+gain 1 0x3f3023a8
+mix 190 4f30fcacbfd63bac
