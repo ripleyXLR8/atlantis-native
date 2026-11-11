@@ -55,6 +55,39 @@ use crate::warp::FACE_SIZE;
 pub const SCREEN_W: usize = 640;
 pub const SCREEN_H: usize = 480;
 
+/// How a point of a face maps to texels of the face's picture.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum FaceMap {
+    /// Atlantis II and III (and [`cube_point`]): the faces `ft`, `bk`,
+    /// `up`, `dn`, `lf`, `rt`, the texel `first + span·(s + 1)/2` of the
+    /// point's coordinate s ∈ [−1, 1] across the face ([`FaceMap::A2`]:
+    /// 1 + 510·t, the corners' texture coordinates 1/512 and 511/512,
+    /// `FUN_0045c790`).
+    Linear { first: f64, span: f64 },
+    /// Atlantis Evolution: the faces numbered as its exits' blocks (0 y =
+    /// +500, 1 y = −500, 2 z = −500, 3 z = +500, 4 x = −500, 5 x = +500,
+    /// each a frame `C + s·U + t·V`, s, t ∈ [0, 1]); 13 × 13 cells per face,
+    /// each 60 × 60 texels at (2, 2) of a 64 × 64 slot, laid out in a face
+    /// picture of [`A4_FACE`] texels (cell (i, j) at (64·i, 64·(12 − j)),
+    /// rows top-down); the point is the one a GL quad of the cell samples,
+    /// in GL's texel coordinates (texel centres at half a texel, as
+    /// [`FaceMap::Linear`]'s): `(64·i + 2 + 60·a, 64·(12 − j) + 2 + 60·(1 −
+    /// b))`, `a = 13 s − i`, `b = 13 t − j`.
+    A4Cells,
+}
+
+impl FaceMap {
+    /// Atlantis II and III's map.
+    pub const A2: FaceMap = FaceMap::Linear {
+        first: 1.0,
+        span: 510.0,
+    };
+}
+
+/// The side of an Atlantis Evolution face picture ([`FaceMap::A4Cells`]):
+/// 13 slots of 64 texels.
+pub const A4_FACE: usize = 13 * 64;
+
 /// The face whose plane a direction meets first, and the texel
 /// coordinates of that point: the face 0 `ft`, 1 `bk`, 2 `up`, 3 `dn`,
 /// 4 `lf`, 5 `rt`, and u, v in texels of the face (1 + 510·t, t = (s + 1)
@@ -63,6 +96,15 @@ pub const SCREEN_H: usize = 480;
 /// original samples the texel (⌊u⌋, ⌊v⌋). `None` for a direction that is
 /// not one (zero, not finite).
 pub fn cube_point(dir: [f64; 3]) -> Option<(usize, f64, f64)> {
+    cube_point_with(dir, FaceMap::A2)
+}
+
+/// [`cube_point`] with the faces and texels of `map`.
+pub fn cube_point_with(dir: [f64; 3], map: FaceMap) -> Option<(usize, f64, f64)> {
+    let (first, span) = match map {
+        FaceMap::Linear { first, span } => (first, span),
+        FaceMap::A4Cells => return a4_cell_point(dir),
+    };
     let [x, y, z] = dir;
     let (ax, ay, az) = (x.abs(), y.abs(), z.abs());
     let (face, u, v) = if az >= ax && az >= ay {
@@ -85,8 +127,44 @@ pub fn cube_point(dir: [f64; 3]) -> Option<(usize, f64, f64)> {
     if !(u.is_finite() && v.is_finite()) {
         return None;
     }
-    let texel = |s: f64| 1.0 + 510.0 * (s + 1.0) / 2.0;
+    let texel = |s: f64| first + span * (s + 1.0) / 2.0;
     Some((face, texel(u), texel(v)))
+}
+
+/// [`FaceMap::A4Cells`]'s face and texel point.
+fn a4_cell_point(dir: [f64; 3]) -> Option<(usize, f64, f64)> {
+    let [x, y, z] = dir;
+    let (ax, ay, az) = (x.abs(), y.abs(), z.abs());
+    // The face, and s, t from the frame C + s·U + t·V (U, V of length 1000).
+    let (face, s, t) = if ay >= ax && ay >= az {
+        if y > 0.0 {
+            (0, x / ay, z / ay)
+        } else {
+            (1, x / ay, -z / ay)
+        }
+    } else if az >= ax {
+        if z < 0.0 {
+            (2, x / az, y / az)
+        } else {
+            (3, -x / az, y / az)
+        }
+    } else if x < 0.0 {
+        (4, -z / ax, y / ax)
+    } else {
+        (5, z / ax, y / ax)
+    };
+    if !(s.is_finite() && t.is_finite()) {
+        return None;
+    }
+    let (s, t) = ((s + 1.0) / 2.0, (t + 1.0) / 2.0);
+    let ci = (s * 13.0).floor().clamp(0.0, 12.0);
+    let cj = (t * 13.0).floor().clamp(0.0, 12.0);
+    let (a, b) = (s * 13.0 - ci, t * 13.0 - cj);
+    Some((
+        face,
+        64.0 * ci + 2.0 + 60.0 * a,
+        64.0 * (12.0 - cj) + 2.0 + 60.0 * (1.0 - b),
+    ))
 }
 
 /// The original's projection for a picture `tile` / 16 times the 640x480
@@ -308,43 +386,123 @@ pub trait CubeRenderer {
 /// sprites in), in XRGB8888, sharpened and doubled as the options say
 /// (`atlantis_engine::upscale::PanoramaPrep`, the first game's, which
 /// computes again only the tiles a sprite's frame changed).
-#[derive(Default)]
 pub struct HdPanorama {
+    /// The side of a face, in texels: [`FACE_SIZE`] for Atlantis II and
+    /// III.
+    face: usize,
     atlas: Vec<u16>,
     prep: PanoramaPrep,
     double: bool,
+    /// The faces given as XRGB8888 ([`HdPanorama::update_xrgb`]): the
+    /// atlas as is, neither sharpened nor doubled.
+    xrgb: Vec<u32>,
+    xrgb_changed: bool,
+    map: FaceMap,
+}
+
+impl Default for HdPanorama {
+    fn default() -> HdPanorama {
+        HdPanorama::with_face(FACE_SIZE, FaceMap::A2)
+    }
 }
 
 impl HdPanorama {
+    /// Atlantis II and III's panorama: faces of [`FACE_SIZE`], [`FaceMap::A2`].
     pub fn new() -> HdPanorama {
         HdPanorama::default()
     }
 
+    /// A panorama of faces `face` texels square, sampled by `map`.
+    pub fn with_face(face: usize, map: FaceMap) -> HdPanorama {
+        HdPanorama {
+            face,
+            atlas: Vec::new(),
+            prep: PanoramaPrep::default(),
+            double: false,
+            xrgb: Vec::new(),
+            xrgb_changed: false,
+            map,
+        }
+    }
+
+    /// The side of a face, and of a face with its border ([`PAD`] each
+    /// side) in the atlas.
+    pub fn face_size(&self) -> (usize, usize) {
+        (self.face, self.face + 2 * PAD)
+    }
+
+    /// The face map.
+    pub fn face_map(&self) -> FaceMap {
+        self.map
+    }
+
     /// Brings the prepared faces up to date with `faces` (cube order,
-    /// 512 x 512 RGB565 each) and the options; the prepared tiles
-    /// computed again.
+    /// `face` x `face` RGB565 each, 512 for Atlantis II and III) and the
+    /// options; the prepared tiles computed again.
     pub fn update(&mut self, faces: &[Vec<u16>; 6], opts: &HdOptions) -> usize {
-        let fresh = self.atlas.len() != CELL * 6 * CELL;
-        self.atlas.resize(CELL * 6 * CELL, 0);
+        let (fs, cell) = self.face_size();
+        self.xrgb.clear();
+        let fresh = self.atlas.len() != cell * 6 * cell;
+        self.atlas.resize(cell * 6 * cell, 0);
         for (f, face) in faces.iter().enumerate() {
-            assert_eq!(face.len(), FACE_SIZE * FACE_SIZE);
-            for r in 0..CELL {
-                let sy = r.clamp(PAD, PAD + FACE_SIZE - 1) - PAD;
-                let src = &face[sy * FACE_SIZE..][..FACE_SIZE];
-                let dst = &mut self.atlas[(f * CELL + r) * CELL..][..CELL];
+            assert_eq!(face.len(), fs * fs);
+            for r in 0..cell {
+                let sy = r.clamp(PAD, PAD + fs - 1) - PAD;
+                let src = &face[sy * fs..][..fs];
+                let dst = &mut self.atlas[(f * cell + r) * cell..][..cell];
                 // (only the rows that changed: the faces change where a
                 // sprite moves)
-                if !fresh && same_pixels(&dst[PAD..PAD + FACE_SIZE], src) {
+                if !fresh && same_pixels(&dst[PAD..PAD + fs], src) {
                     continue;
                 }
                 dst[..PAD].fill(src[0]);
-                dst[PAD..PAD + FACE_SIZE].copy_from_slice(src);
-                dst[PAD + FACE_SIZE..].fill(src[FACE_SIZE - 1]);
+                dst[PAD..PAD + fs].copy_from_slice(src);
+                dst[PAD + fs..].fill(src[fs - 1]);
             }
         }
         self.double = opts.panorama == PanoFilter::Bicubic;
         self.prep
-            .update(&self.atlas, CELL, opts.sharpen, self.double)
+            .update(&self.atlas, cell, opts.sharpen, self.double)
+    }
+
+    /// Brings the atlas up to date with `faces` given as XRGB8888 (cube
+    /// order, `face` x `face` each): no sharpening, no doubling (the
+    /// original's own texels, for a renderer that filters as the original
+    /// does). Returns 1 when the atlas changed, else 0.
+    pub fn update_xrgb(&mut self, faces: &[Vec<u32>; 6]) -> usize {
+        let (fs, cell) = self.face_size();
+        self.atlas.clear();
+        self.double = false;
+        let fresh = self.xrgb.len() != cell * 6 * cell;
+        self.xrgb.resize(cell * 6 * cell, 0);
+        let mut changed = fresh;
+        for (f, face) in faces.iter().enumerate() {
+            assert_eq!(face.len(), fs * fs);
+            for r in 0..cell {
+                let sy = r.clamp(PAD, PAD + fs - 1) - PAD;
+                let src = &face[sy * fs..][..fs];
+                let dst = &mut self.xrgb[(f * cell + r) * cell..][..cell];
+                if !fresh && dst[PAD..PAD + fs] == *src {
+                    continue;
+                }
+                changed = true;
+                dst[..PAD].fill(src[0]);
+                dst[PAD..PAD + fs].copy_from_slice(src);
+                dst[PAD + fs..].fill(src[fs - 1]);
+            }
+        }
+        self.xrgb_changed |= changed;
+        usize::from(changed)
+    }
+
+    /// The prepared pixels: the XRGB atlas when the faces came as XRGB,
+    /// else the prepared RGB565 ones.
+    fn pixels(&self) -> &[u32] {
+        if self.xrgb.is_empty() {
+            self.prep.pixels()
+        } else {
+            &self.xrgb
+        }
     }
 
     /// Keeps the tiles computed again by [`HdPanorama::update`] for an
@@ -356,6 +514,10 @@ impl HdPanorama {
     /// The prepared atlas (XRGB8888), its size, its tiles' side, whether
     /// it is doubled.
     pub fn atlas(&self) -> (&[u32], (usize, usize), usize, bool) {
+        if !self.xrgb.is_empty() {
+            let cell = self.face_size().1;
+            return (&self.xrgb, (cell, 6 * cell), 64, false);
+        }
         (
             self.prep.pixels(),
             self.prep.size(),
@@ -364,8 +526,18 @@ impl HdPanorama {
         )
     }
 
-    /// The atlas's tiles computed again since the last call.
+    /// The atlas's tiles computed again since the last call (all of it
+    /// after an XRGB update that changed it).
     pub fn take_changes(&mut self) -> PanoChanges {
+        if !self.xrgb.is_empty() {
+            let all = std::mem::take(&mut self.xrgb_changed);
+            let _ = self.prep.take_changes();
+            return if all {
+                PanoChanges::All
+            } else {
+                PanoChanges::None
+            };
+        }
         self.prep.take_changes()
     }
 
@@ -373,19 +545,50 @@ impl HdPanorama {
     /// (XRGB8888): each pixel the prepared faces sampled bilinearly at its
     /// cube point (texel centres at half a texel, [`cube_point`]).
     pub fn render(&self, proj: &HdProjection, width: usize, height: usize, out: &mut [u32]) {
-        let px = self.prep.pixels();
-        let k = if self.double { 2.0 } else { 1.0 };
-        let pw = if self.double { 2 * CELL } else { CELL };
-        if px.len() < pw * pw * 6 {
+        let Some(sample) = self.sampler() else {
             out[..width * height].fill(0);
             return;
+        };
+        render_view(proj, width, height, out, sample);
+    }
+
+    /// The view `width` x `height` into `out` (XRGB8888, rows top-down)
+    /// where pixel (x, y) shows the cube point `point(x, y)` (face and
+    /// texel coordinates, as [`cube_point_with`] gives them), sampled
+    /// bilinearly as [`HdPanorama::render`] samples; 0 where there is
+    /// none.
+    pub fn render_points<P>(&self, width: usize, height: usize, out: &mut [u32], point: P)
+    where
+        P: Fn(usize, usize) -> Option<(usize, f64, f64)> + Sync,
+    {
+        let out = &mut out[..width * height];
+        let Some(sample) = self.sampler() else {
+            out.fill(0);
+            return;
+        };
+        for (y, line) in out.chunks_mut(width.max(1)).enumerate() {
+            for (x, px) in line.iter_mut().enumerate() {
+                *px = point(x, y).map_or(0, |(f, u, v)| sample(f, u, v));
+            }
+        }
+    }
+
+    /// The bilinear sample of the prepared atlas at a face's texel point
+    /// (texel centres at half a texel), or `None` when there is no atlas.
+    fn sampler(&self) -> Option<impl Fn(usize, f64, f64) -> u32 + Sync + '_> {
+        let px = self.pixels();
+        let cell = self.face_size().1;
+        let k = if self.double { 2.0 } else { 1.0 };
+        let pw = if self.double { 2 * cell } else { cell };
+        if px.len() < pw * pw * 6 {
+            return None;
         }
         // In 1/64 of a prepared pixel, from the first one's centre: the
         // texel coordinate c is k·(PAD + c) − 1/2 prepared pixels.
         let scale = 64.0 * k;
         let x0 = 64.0 * (k * PAD as f64 - 0.5);
-        let y0: [f64; 6] = std::array::from_fn(|f| 64.0 * (k * (f * CELL + PAD) as f64 - 0.5));
-        render_view(proj, width, height, out, |face, u, v| {
+        let y0: [f64; 6] = std::array::from_fn(|f| 64.0 * (k * (f * cell + PAD) as f64 - 0.5));
+        Some(move |face: usize, u: f64, v: f64| {
             let ax = (u * scale + x0) as usize;
             let ay = (v * scale + y0[face]) as usize;
             let o0 = (ay >> 6) * pw + (ax >> 6);
@@ -396,7 +599,7 @@ impl HdPanorama {
                 + spread(px[o1]) * ((64 - wx) * wy)
                 + spread(px[o1 + 1]) * (wx * wy);
             ((acc >> 12) & 0xff | (acc >> 25) & 0xff00 | (acc >> 38) & 0xff_0000) as u32
-        });
+        })
     }
 }
 
@@ -617,6 +820,60 @@ mod tests {
         assert_eq!(c([-1.0, -1.0, 1.0]), (0, 1.0, 1.0));
         assert_eq!(c([1.0, 1.0, 1.0]), (0, 511.0, 511.0));
         assert_eq!(cube_point([0.0; 3]), None);
+    }
+
+    #[test]
+    fn atlantis_evolution_cells() {
+        let c = |d| cube_point_with(d, FaceMap::A4Cells).unwrap();
+        // Each face's centre: the middle of cell (6, 6).
+        assert_eq!(c([0.0, 1.0, 0.0]), (0, 416.0, 416.0));
+        assert_eq!(c([0.0, -1.0, 0.0]), (1, 416.0, 416.0));
+        assert_eq!(c([0.0, 0.0, -1.0]), (2, 416.0, 416.0));
+        assert_eq!(c([0.0, 0.0, 1.0]), (3, 416.0, 416.0));
+        assert_eq!(c([-1.0, 0.0, 0.0]), (4, 416.0, 416.0));
+        assert_eq!(c([1.0, 0.0, 0.0]), (5, 416.0, 416.0));
+        // A quarter of face 2 from its bottom-left corner: a quarter into
+        // cell (3, 3), whose slot is the fourth of the tenth row.
+        assert_eq!(
+            c([-0.5, -0.5, -1.0]),
+            (2, 192.0 + 2.0 + 15.0, 576.0 + 2.0 + 45.0)
+        );
+        assert_eq!(cube_point_with([0.0; 3], FaceMap::A4Cells), None);
+        // The A2 map is cube_point's.
+        assert_eq!(
+            cube_point_with([0.3, -0.2, 1.0], FaceMap::A2),
+            cube_point([0.3, -0.2, 1.0])
+        );
+    }
+
+    #[test]
+    fn xrgb_faces_of_any_size_are_sampled_as_given() {
+        let mut p = HdPanorama::with_face(A4_FACE, FaceMap::A4Cells);
+        assert_eq!(p.face_size(), (A4_FACE, A4_FACE + 2 * PAD));
+        let faces: [Vec<u32>; 6] =
+            std::array::from_fn(|f| vec![0x0010_2030 * (f as u32 + 1); A4_FACE * A4_FACE]);
+        assert_eq!(p.update_xrgb(&faces), 1);
+        assert_eq!(p.take_changes(), PanoChanges::All);
+        assert_eq!(p.update_xrgb(&faces), 0);
+        assert_eq!(p.take_changes(), PanoChanges::None);
+        let (px, size, _, doubled) = p.atlas();
+        assert_eq!(px.len(), (A4_FACE + 8) * (A4_FACE + 8) * 6);
+        assert_eq!((size, doubled), ((A4_FACE + 8, 6 * (A4_FACE + 8)), false));
+        let mut out = vec![0u32; 6];
+        let dirs = [
+            [0.0, 1.0, 0.0],
+            [0.0, -1.0, 0.0],
+            [0.0, 0.0, -1.0],
+            [0.0, 0.0, 1.0],
+            [-1.0, 0.2, 0.0],
+            [1.0, 0.0, 0.3],
+        ];
+        p.render_points(6, 1, &mut out, |x, _| {
+            cube_point_with(dirs[x], FaceMap::A4Cells)
+        });
+        for (f, &o) in out.iter().enumerate() {
+            assert_eq!(o, 0x0010_2030 * (f as u32 + 1));
+        }
     }
 
     #[test]

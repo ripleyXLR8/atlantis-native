@@ -20,7 +20,7 @@
 //! [`HdPanorama::render`]: atlantis2_engine::hd::HdPanorama::render
 //! [`cube_point`]: atlantis2_engine::hd::cube_point
 
-use atlantis2_engine::hd::{CubeJob, CubeRenderer, DialogJob, PanoChanges, CELL, PAD};
+use atlantis2_engine::hd::{CubeJob, CubeRenderer, DialogJob, FaceMap, PanoChanges, CELL, PAD};
 use atlantis_engine::upscale::Axis;
 use web_sys::{WebGl2RenderingContext as Gl, WebGlProgram, WebGlTexture, WebGlUniformLocation};
 
@@ -36,6 +36,12 @@ uniform vec4 proj;        // fx, fy, cx, cy
 uniform float scale;      // tile / 16
 uniform float side;       // the widescreen columns on each side
 uniform int doubled;
+// The face map (`atlantis2_engine::hd::FaceMap::Linear`): texel first +
+// span·(s + 1)/2 of a face; and a face's side in the atlas with its border.
+uniform float tex_first;
+uniform float tex_span;
+uniform int PAD;
+uniform int CELL;
 out vec4 color;
 
 uvec3 texel(int c, int r) { return texelFetch(pano, ivec2(c, r), 0).rgb; }
@@ -62,8 +68,8 @@ void main() {
         color = vec4(0.0);
         return;
     }
-    float tu = 1.0 + 510.0 * (u + 1.0) / 2.0;
-    float tv = 1.0 + 510.0 * (v + 1.0) / 2.0;
+    float tu = tex_first + tex_span * (u + 1.0) / 2.0;
+    float tv = tex_first + tex_span * (v + 1.0) / 2.0;
     // In 64ths of a prepared pixel, from the first one's centre.
     float k = doubled != 0 ? 2.0 : 1.0;
     float x0 = 64.0 * (k * float(PAD) - 0.5);
@@ -222,16 +228,20 @@ fn release_units(gl: &Gl) {
 impl GlCube {
     pub fn new(gl: &Gl) -> Option<GlCube> {
         let gl = gl.clone();
-        let source = CUBE_FRAGMENT.replacen(
-            "out vec4 color;",
-            &format!("out vec4 color;\nconst int PAD = {PAD};\nconst int CELL = {CELL};"),
-            1,
-        );
-        let program = link_with(&gl, &source)?;
+        let program = link_with(&gl, CUBE_FRAGMENT)?;
         let loc =
             ["m", "proj", "scale", "side", "doubled"].map(|n| gl.get_uniform_location(&program, n));
         gl.use_program(Some(&program));
         gl.uniform1i(gl.get_uniform_location(&program, "pano").as_ref(), 0);
+        // Atlantis II and III's faces: FaceMap::A2, faces of FACE_SIZE.
+        let FaceMap::Linear { first, span } = FaceMap::A2 else {
+            return None;
+        };
+        let uniform = |n: &str| gl.get_uniform_location(&program, n);
+        gl.uniform1f(uniform("tex_first").as_ref(), first as f32);
+        gl.uniform1f(uniform("tex_span").as_ref(), span as f32);
+        gl.uniform1i(uniform("PAD").as_ref(), PAD as i32);
+        gl.uniform1i(uniform("CELL").as_ref(), CELL as i32);
         let max_texture = gl.get_parameter(Gl::MAX_TEXTURE_SIZE).ok()?.as_f64()? as usize;
         let texture = || -> Option<WebGlTexture> {
             let t = gl.create_texture()?;

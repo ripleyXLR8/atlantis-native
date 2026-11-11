@@ -1,0 +1,27 @@
+# GameWarp setYaw 0x00521e30 / setPitch 0x00521d70 with limits: each block `start yaw pitch yaw+ yaw- pitch+ pitch-`, then `op value -> yaw pitch yaw+ yaw- pitch+ pitch-` (fields +0x35e8..+0x35fc)
+# Numbers produced by the original Atlantis Evolution.exe (atlantis4-gog-en-2363910, MD5 f2de382af52f1d89e32ed7c286be8b4f): functions run unmodified under emulation: 0x00521e30, 0x00521d70
+# stubs: none; _CItan/_CIsin/_CIcos/_CIsqrt -> x87 fptan/fsin/fcos/fsqrt
+start 0 0 3.40282347e+38 3.40282347e+38 45 55
+yaw 10 -> 10 0 3.40282347e+38 3.40282347e+38 45 55
+yaw 370 -> 10 0 3.40282347e+38 3.40282347e+38 45 55
+yaw -725 -> -5 0 3.40282347e+38 3.40282347e+38 45 55
+pitch 30 -> -5 30 3.40282347e+38 3.40282347e+38 15 85
+pitch 60 -> -5 45 3.40282347e+38 3.40282347e+38 0 100
+pitch -80 -> -5 -55 3.40282347e+38 3.40282347e+38 100 0
+pitch 0 -> -5 0 3.40282347e+38 3.40282347e+38 45 55
+start 0 0 0 0 45 55
+yaw 30 -> 0 0 0 0 45 55
+yaw -30 -> 0 0 0 0 45 55
+start 100 0 360 360 45 55
+yaw 300 -> 300 0 160 560 45 55
+yaw 500 -> 100 0 0 720 45 55
+yaw -300 -> -300 0 400 320 45 55
+start 0 10 3.40282347e+38 3.40282347e+38 20 10
+pitch 40 -> 0 30 3.40282347e+38 3.40282347e+38 0 30
+pitch -40 -> 0 0 3.40282347e+38 3.40282347e+38 30 0
+pitch 5 -> 0 5 3.40282347e+38 3.40282347e+38 25 5
+start 0 0 30 20 45 55
+yaw 25 -> 25 0 5 45 45 55
+yaw 40 -> 30 0 0 50 45 55
+yaw -50 -> -20 0 50 0 45 55
+yaw -10 -> -10 0 40 10 45 55

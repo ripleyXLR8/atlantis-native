@@ -121,6 +121,20 @@ fn main() {
         .collect();
     let headless = args.iter().any(|a| a == "--headless");
     let log_file = init_log(headless);
+    // Atlantis Evolution's warp viewer (a development build's only).
+    #[cfg(feature = "atlantis4")]
+    if args.first().map(String::as_str) == Some("--atlantis4-view") {
+        let Some(dir) = args.get(1) else {
+            eprintln!("--atlantis4-view <game folder> [node]");
+            std::process::exit(2);
+        };
+        if let Err(e) = atlantis_app::a4::run_view(Path::new(dir), args.get(2).map(String::as_str))
+        {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+        return;
+    }
     // No terminal: the panics and the errors in message boxes.
     install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
     atlantis_app::watchdog::start();

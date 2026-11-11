@@ -15,8 +15,17 @@
 //! `2D/Menus/InGame/Marker_2.png` (object, file +0x1b1158), `Marker_4.png`
 //! (animation, +0x1b11c8) and `Marker_0.png` (exit, +0x1b124c), each with an
 //! `_over` twin; exits are named `Exit_%02d` (+0x1b11f0). Numbers are read
-//! here as `f64` then narrowed to `f32` (as C's `atof` into a `float`
-//! field would); how the original converts them is not read yet.
+//! as `f64` then narrowed to `f32`, as the original's `sscanf_s("%lf")`
+//! then float store (atlantis4-gog-en-2363910 @ 0x00406000, and inline
+//! @ 0x00570462).
+//!
+//! **A marker's `y` is negated in format 1.0 files** (`major == 1 && minor
+//! == 0`, which are also the values before any `FileFormatVersion`), for
+//! object (@ 0x0056fa37), animation (@ 0x0056fedc) and exit (@ 0x005704bc)
+//! markers; [`Scene::parse`] applies it, so the markers here are the
+//! points the engine uses. With the rule each of the 842 exit markers
+//! falls in one of its exit's own click blocks; without it, 37 of the 585
+//! exits of 1.0 files miss.
 
 use crate::xml::{self, Element, XmlError};
 
@@ -29,7 +38,7 @@ pub struct SceneObject {
     pub name: String,
     /// Every `marker` child, in file order (one in the data, except one
     /// animation with two, `Bateau_CA/0002`'s `mla2`; which one the
-    /// original shows is not read yet).
+    /// original shows is not read yet), `y` negated in format 1.0 files.
     pub markers: Vec<Point>,
 }
 
@@ -40,7 +49,7 @@ pub struct SceneAnimation {
     pub fps: f32,
     /// Every `marker` child, in file order (one in the data, except one
     /// animation with two, `Bateau_CA/0002`'s `mla2`; which one the
-    /// original shows is not read yet).
+    /// original shows is not read yet), `y` negated in format 1.0 files.
     pub markers: Vec<Point>,
 }
 
@@ -64,7 +73,7 @@ pub struct Exit {
     pub camera: Option<(f32, f32)>,
     /// Every `marker` child, in file order (one in the data, except one
     /// animation with two, `Bateau_CA/0002`'s `mla2`; which one the
-    /// original shows is not read yet).
+    /// original shows is not read yet), `y` negated in format 1.0 files.
     pub markers: Vec<Point>,
     pub blocks: Vec<Block>,
 }
@@ -116,28 +125,46 @@ fn text(el: &Element, a: &'static str) -> Result<String, SceneError> {
         .ok_or_else(|| SceneError::Attribute(el.name.clone(), a))
 }
 
-fn markers(el: &Element) -> Result<Vec<Point>, SceneError> {
+/// The `marker` children of `el`, `y` negated when `negate_y` (format
+/// 1.0).
+fn markers(el: &Element, negate_y: bool) -> Result<Vec<Point>, SceneError> {
     el.children_named("marker")
-        .map(|m| Ok([float(m, "x")?, float(m, "y")?, float(m, "z")?]))
+        .map(|m| {
+            let y = float(m, "y")?;
+            Ok([
+                float(m, "x")?,
+                if negate_y { -y } else { y },
+                float(m, "z")?,
+            ])
+        })
         .collect()
 }
+
+/// The format of a file without `FileFormatVersion` (the reader's
+/// defaults).
+pub const DEFAULT_VERSION: (u32, u32) = (1, 0);
 
 impl Scene {
     pub fn parse(data: &[u8]) -> Result<Scene, SceneError> {
         let mut scene = Scene::default();
+        // The format so far: the markers of the elements before
+        // `FileFormatVersion` follow the defaults.
+        let mut version = DEFAULT_VERSION;
         for el in xml::parse(data).map_err(SceneError::Xml)? {
+            let negate_y = version == (1, 0);
             match el.name.as_str() {
                 "FileFormatVersion" => {
-                    scene.version = Some((number(&el, "major")?, number(&el, "minor")?));
+                    version = (number(&el, "major")?, number(&el, "minor")?);
+                    scene.version = Some(version);
                 }
                 "object" => scene.objects.push(SceneObject {
                     name: text(&el, "name")?,
-                    markers: markers(&el)?,
+                    markers: markers(&el, negate_y)?,
                 }),
                 "animation" => scene.animations.push(SceneAnimation {
                     name: text(&el, "name")?,
                     fps: float(&el, "fps")?,
-                    markers: markers(&el)?,
+                    markers: markers(&el, negate_y)?,
                 }),
                 "exit" => {
                     let camera = el
@@ -158,7 +185,7 @@ impl Scene {
                         linked_warp: text(&el, "linkedWarp")?,
                         nb_warp_block: number(&el, "nbWarpBlock")?,
                         camera,
-                        markers: markers(&el)?,
+                        markers: markers(&el, negate_y)?,
                         blocks,
                     });
                 }
@@ -205,5 +232,21 @@ mod tests {
             }
         );
         assert!(s.unknown.is_empty());
+    }
+
+    #[test]
+    fn format_1_0_markers_have_y_negated() {
+        let m = br#"<object name="a"><marker x="1" y="2" z="3" /></object>"#;
+        // No version yet: the defaults, 1.0.
+        let mut x = m.to_vec();
+        x.extend(br#"<FileFormatVersion major="1" minor="1" />"#);
+        x.extend(m);
+        let s = Scene::parse(&x).unwrap();
+        assert_eq!(s.objects[0].markers, vec![[1.0, -2.0, 3.0]]);
+        assert_eq!(s.objects[1].markers, vec![[1.0, 2.0, 3.0]]);
+        let mut x = br#"<FileFormatVersion major="1" minor="0" />"#.to_vec();
+        x.extend(br#"<exit linkedWarp="Z\0002.wp" nbWarpBlock="16"><marker x="0" y="-5" z="9" /></exit>"#);
+        let s = Scene::parse(&x).unwrap();
+        assert_eq!(s.exits[0].markers, vec![[0.0, 5.0, 9.0]]);
     }
 }
