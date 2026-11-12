@@ -53,7 +53,8 @@ pub fn transition_paths(
         .collect()
 }
 
-/// The transition banks' folder (the static constructors' strings):
+/// The transition banks' folder (the builder @ 0x00417ac0, the seventh
+/// that tests WarpRes; the static constructors' strings):
 /// `spf\` (0x00755b68) + `SPF800\` (0x00755c70) when WarpRes
 /// (0x00789d34, the panorama faces' size) is 1024, else `SPF640\`
 /// (0x00755cd0). The screen size plays no part. The GOG install ships
@@ -63,6 +64,44 @@ pub fn spf_folder(warp_res: i32) -> &'static str {
         "spf/SPF800"
     } else {
         "spf/SPF640"
+    }
+}
+
+/// The other folders WarpRes chooses, each path builder testing
+/// 0x00789d34 = 1024 exactly (the static constructors' strings
+/// @ 0x004155f0..0x00415730): the cube `warp\` + `Warp1024\` or
+/// `Warp512\` (@ 0x00415a30, the view entry and its re-entry), the
+/// place animations `spw\` + `SPW1024\` or `SPW512\` (@ 0x004164c0), and
+/// `HNM800\` or `HNM640\` for the videos: the cinematics (`hnm\`
+/// @ 0x00416880, `loc\hnm\` @ 0x00416c60), the dialogs' body videos
+/// (`hnmdial\` @ 0x00417280) and the travel videos (`hnmtraj\`
+/// @ 0x00417670). GOG.com ships only the 512 and 640 folders, so with
+/// WarpRes 1024 the original finds none of these files: the cube's debug
+/// colours, no place animation, no film, no body video, no travel video.
+pub fn warp_folder(warp_res: i32) -> &'static str {
+    if warp_res == 1024 {
+        "Warp1024"
+    } else {
+        "Warp512"
+    }
+}
+
+/// The place animations' folder under `spw\` ([`warp_folder`]).
+pub fn spw_folder(warp_res: i32) -> &'static str {
+    if warp_res == 1024 {
+        "SPW1024"
+    } else {
+        "spw512"
+    }
+}
+
+/// The videos' folder under `hnm\`, `loc\hnm\`, `hnmdial\` and
+/// `hnmtraj\` ([`warp_folder`]).
+pub fn hnm_folder(warp_res: i32) -> &'static str {
+    if warp_res == 1024 {
+        "HNM800"
+    } else {
+        "HNM640"
     }
 }
 

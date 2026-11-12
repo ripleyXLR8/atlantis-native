@@ -65,6 +65,9 @@ pub struct Dialogs {
     cameras: HashMap<(String, i32), Option<Vec<[f32; 4]>>>,
     /// The world's folder (`hoggar`, ...).
     pub world: String,
+    /// The body videos' folder under `hnmdial\`: `HNM640`, `HNM800` with
+    /// WarpRes 1024 (@ 0x00417280, [`crate::travel::hnm_folder`]).
+    pub hnm: &'static str,
 }
 
 /// The placeholder text of an entry `Dial.txt` does not fill
@@ -75,6 +78,17 @@ impl Dialogs {
     /// The load of world folder `world` (`hoggar`, `ldm`, ...): the
     /// stands and cameras picked with `rand`.
     pub fn load(files: &A3Files, world: &str, text_language: &str, rand: &mut Rand) -> Dialogs {
+        Dialogs::load_in(files, "HNM640", world, text_language, rand)
+    }
+
+    /// [`Dialogs::load`] with the body videos under `hnmdial\<hnm>\`.
+    pub fn load_in(
+        files: &A3Files,
+        hnm: &'static str,
+        world: &str,
+        text_language: &str,
+        rand: &mut Rand,
+    ) -> Dialogs {
         let read = |p: &str| files.read(p.trim_start_matches("Datas/"));
         let persos = read(atlantis3_data::dialog::INFO_PATH)
             .and_then(|d| parse_info(&d).ok())
@@ -91,6 +105,7 @@ impl Dialogs {
             load_draws: Vec::new(),
             cameras: HashMap::new(),
             world: world.to_string(),
+            hnm,
         };
         let exists = |p: String| files.size(&p).is_some();
         for c in com {
@@ -109,15 +124,14 @@ impl Dialogs {
                     draws.push(Draw { value: v, n: dbs });
                     stand = v % dbs + 1;
                 } else {
-                    let vids = count(&|n| format!("hnmdial/HNM640/{world}/{mesh}s{n}c1.hnm"));
+                    let vids = count(&|n| format!("hnmdial/{hnm}/{world}/{mesh}s{n}c1.hnm"));
                     if vids > 0 {
                         let v = rand.rand();
                         draws.push(Draw { value: v, n: vids });
                         stand = v % vids + 1;
                         if camera == 0 {
-                            let cams = count(&|n| {
-                                format!("hnmdial/HNM640/{world}/{mesh}s{stand}c{n}.hnm")
-                            });
+                            let cams =
+                                count(&|n| format!("hnmdial/{hnm}/{world}/{mesh}s{stand}c{n}.hnm"));
                             if cams > 0 {
                                 let v = rand.rand();
                                 draws.push(Draw { value: v, n: cams });
@@ -250,8 +264,8 @@ impl Dialogs {
     pub fn video_path(&self, e: &Entry) -> String {
         let mesh = self.perso(&e.speaker).map_or("", |p| p.mesh.as_str());
         format!(
-            "hnmdial/HNM640/{}/{mesh}s{}c{}.hnm",
-            self.world, e.stand, e.camera
+            "hnmdial/{}/{}/{mesh}s{}c{}.hnm",
+            self.hnm, self.world, e.stand, e.camera
         )
     }
 
@@ -416,10 +430,12 @@ pub struct Running {
     pub voice_start: f64,
     /// The loop mode to go back to (@ 0x0074f34c).
     pub back: crate::game::Mode,
-    /// The dialog surface (640 x 480; the screen's size for a voice-over),
+    /// The dialog surface (the warp view, 640 x 480 with WarpRes 512; the
+    /// screen's size for a voice-over),
     /// in the display's format.
     pub surface: Surface,
 }
 
-/// The dialog surface's size (@ 0x00714f1c, @ 0x00714f20, WarpRes 512).
+/// The dialog surface's size with WarpRes 512 (@ 0x00714f1c, @ 0x00714f20;
+/// the game takes the warp view, `Startup::warp_view`).
 pub const SURFACE: (usize, usize) = (640, 480);

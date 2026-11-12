@@ -20,6 +20,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use atlantis3_data::A3Files;
+use atlantis3_engine::fixes::SETTINGS_FILE;
 use atlantis3_engine::px::Surface;
 use atlantis3_engine::{Game, Mode};
 use atlantis_data::FileSource;
@@ -96,11 +97,22 @@ pub fn start(install: Arc<dyn FileSource>, store: Rc<dyn SaveStore>) -> Result<(
     let label = files
         .edition_label()
         .map_err(|e| JsValue::from(format!("Atlantis III: {e}")))?;
-    let mut game = Game::new(files).map_err(|e| JsValue::from(format!("Atlantis III: {e}")))?;
+    // The bug fixes (`settings.ini` in the same storage, written with
+    // the defaults when there is none; the web page has no `--original`).
+    let fixes = match store.read(SETTINGS_FILE) {
+        Some(d) => atlantis3_engine::Fixes::parse(&String::from_utf8_lossy(&d)),
+        None => {
+            let f = atlantis3_engine::Fixes::default();
+            store.write(SETTINGS_FILE, f.to_text().as_bytes());
+            f
+        }
+    };
+    let mut game =
+        Game::with_fixes(files, fixes).map_err(|e| JsValue::from(format!("Atlantis III: {e}")))?;
     game.unix_time = || (js_sys::Date::now() / 1000.0) as i64;
     let mut kept = 0;
     for name in store.list() {
-        if name == CFG_KEY {
+        if name == CFG_KEY || name == SETTINGS_FILE {
             continue;
         }
         if let Some(d) = store.read(&name) {

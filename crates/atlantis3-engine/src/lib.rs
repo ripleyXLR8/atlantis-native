@@ -9,7 +9,8 @@
 //!
 //! - [`startup`]: `Atlantis3.cfg`, the install's language and the screen;
 //! - [`cinema`]: the cinematics and the intro, sound included;
-//! - [`audio`]: the port's mix of the sound outputs.
+//! - [`audio`]: the port's mix of the sound outputs;
+//! - [`fixes`]: the port's bug fixes (`settings.ini`, off with `--original`).
 
 #![forbid(unsafe_code)]
 
@@ -17,6 +18,7 @@ pub mod audio;
 pub mod caption;
 pub mod cinema;
 pub mod dialog;
+pub mod fixes;
 pub mod game;
 pub mod inventory;
 pub mod licorne;
@@ -32,6 +34,7 @@ pub mod travel;
 pub mod wam_setup;
 
 pub use cinema::{Cinema, CinemaError};
+pub use fixes::Fixes;
 #[doc(hidden)]
 pub use game::star_room_tables;
 pub use game::{cross_colour, cursor_range, BoardInput, Game, GameError, Mode};

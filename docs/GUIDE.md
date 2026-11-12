@@ -770,9 +770,26 @@ depth change applies when the menu is left, as in the original: the
 window takes the new size (in full screen the picture is scaled to the
 screen).
 
+The texture size 1024 makes the game look for its 1024-pixel panoramas
+and place animations and its 800-pixel videos, as the original does;
+GOG.com's release has none of them, and on GOG.com the original's
+options page leaves the texture button off and sets 512 itself.
+
+**Bug fix.** GOG.com's Spanish installation ships an `Atlantis3.cfg`
+that asks for 1024: in the original, until the player first opens the
+options page, the panoramas show plain colours and the place
+animations, cinematics (but the intro), dialog films and travel videos
+are missing. Atlantis Native applies the options page's own rule at
+start-up instead, so the Spanish edition plays as the others
+(`fix_warpres_cd`, on; it also uses 512 whenever the installation has
+no `Datas\warp\Warp1024` folder). `--original` turns it off, for that
+run only, and so does `fix_warpres_cd = off` in `settings.ini` (in the
+same `atlantis3` folder as the saves); the game then does what the
+original does, the reset at the options page included.
+
 The saves (`save/game<player>_<number>.sav` with their thumbnails, as the
-original names them) and `Atlantis3.cfg` (the options) are kept in the
-`atlantis3` folder of the per-user data folder (see
+original names them), `Atlantis3.cfg` (the options) and `settings.ini`
+(Atlantis Native's bug fixes) are kept in the `atlantis3` folder of the per-user data folder (see
 [Players, checkpoints and settings](#players-checkpoints-and-settings)),
 never in the game's folder: until the options page writes the player's
 own, the installation's `Datas\Atlantis3.cfg` is read. The screenshots
@@ -837,7 +854,8 @@ the player screen.
 `atlantis-native --original /path/to/game` plays the original game, bug for
 bug (see [Enhancements](TECHNICAL.md#enhancements)); with Atlantis II too
 (its music tracks then lose their last ~5.8 s when another follows, as
-in the original).
+in the original) and Atlantis III (GOG.com's Spanish edition then starts
+with the texture size its `Atlantis3.cfg` asks for, 1024).
 
 `atlantis-native --hd /path/to/game` starts in the [HD mode](TECHNICAL.md#hd-mode),
 whatever `settings.ini` says.

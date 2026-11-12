@@ -136,9 +136,18 @@ pub struct Config {
     /// of the difference of the clock @ 0x004e7b20, in seconds). Default 0.
     pub time: [i32; 5],
     /// `WarpRes` (DAT_00789d34): the size of the panorama cube faces,
-    /// 512 or 1024 (@ 0x0043f420); 1024 also makes the warp view 800 x 600
-    /// instead of 640 x 480 ([`Config::warp_view`]). Default 512.
+    /// 512 or 1024 (@ 0x0043f420); the reader also makes the warp view
+    /// 800 x 600 with 1024 instead of 640 x 480 ([`Config::view`]).
+    /// Default 512.
     pub warp_res: i32,
+    /// The warp view (DAT_00714f1c, DAT_00714f20), the 3D dialogs' stretch
+    /// surface (@ 0x0040cfe0): set from `WarpRes` by the reader right after
+    /// the defaults (@ 0x00406f4c) and again after the file (@ 0x00407c9f),
+    /// 800 x 600 for 1024, else 640 x 480; later only by the options'
+    /// texture button (@ 0x0045591d..0x0045595c). The options page's
+    /// `Version = CD` branch sets `WarpRes` to 512 and leaves the view
+    /// alone (@ 0x00456041). Default 640 x 480.
+    pub view: (i32, i32),
     /// `Smooth` (DAT_00755914, passed to @ 0x0040f120): smoothing of the
     /// stretched picture. Default true.
     pub smooth: bool,
@@ -187,6 +196,7 @@ impl Default for Config {
             install: b"NORM".to_vec(),
             time: [0; 5],
             warp_res: 512,
+            view: (640, 480),
             smooth: true,
             cursor: true,
             invert_mouse_y: false,
@@ -208,7 +218,17 @@ impl Config {
     pub fn parse(data: &[u8]) -> Config {
         let mut c = Config::default();
         c.apply(data);
+        c.view = Config::view_of(c.warp_res);
         c
+    }
+
+    /// The warp view the reader gives `warp_res` (@ 0x00407c9f..0x00407cc5).
+    pub fn view_of(warp_res: i32) -> (i32, i32) {
+        if warp_res == 1024 {
+            (800, 600)
+        } else {
+            (640, 480)
+        }
     }
 
     /// Reads the lines of `data` over the current values.
@@ -299,15 +319,9 @@ impl Config {
         self.subtitle_on = true;
     }
 
-    /// The size of the warp view (DAT_00714f1c, DAT_00714f20 @ 0x00406f4c
-    /// and 0x00407c9f, used @ 0x0040d0a3): 800 x 600 with 1024-pixel faces,
-    /// else 640 x 480.
+    /// The size of the warp view ([`Config::view`], used @ 0x0040d0a3).
     pub fn warp_view(&self) -> (i32, i32) {
-        if self.warp_res == 1024 {
-            (800, 600)
-        } else {
-            (640, 480)
-        }
+        self.view
     }
 
     /// The file the writer (@ 0x00408f80) makes from these options, CR LF
@@ -453,6 +467,7 @@ SFXVolume = 120\r\nMusicVolume = -4\r\nCursor = maybe\r\nTime 1 2 3\r\nUnknown =
             sous_titre: b"gbr".to_vec(),
             subtitle_on: false,
             warp_res: 1024,
+            view: (800, 600),
             smooth: false,
             cursor: false,
             invert_mouse_y: true,
@@ -472,5 +487,15 @@ SFXVolume = 120\r\nMusicVolume = -4\r\nCursor = maybe\r\nTime 1 2 3\r\nUnknown =
         let back = Config::parse(&bytes);
         assert_eq!(back, c);
         assert_eq!(back.warp_view(), (800, 600));
+    }
+
+    /// GOG.com's Spanish file (37 bytes, tabs and no last end of line):
+    /// WarpRes 1024 and the 800 x 600 view, as the reader leaves them.
+    #[test]
+    fn spanish_gog_warp_res() {
+        let c = Config::parse(b"WarpRes\t\t=\t1024\r\nPixelFormat\t=\t32bits");
+        assert_eq!((c.warp_res, c.warp_view()), (1024, (800, 600)));
+        assert_eq!(c.pixel_format.bits(), 32);
+        assert!(c.warnings.is_empty());
     }
 }

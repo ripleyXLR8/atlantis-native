@@ -72,7 +72,7 @@
 //! (every game: what the library's "Find installations" adds) and ends.
 //!
 //! `--original` (before the game directory) turns every enhancement off,
-//! in both games: the original game, bug for bug. `--new-game` skips the start-up videos
+//! in every game (Atlantis III's bug fixes too): the original game, bug for bug. `--new-game` skips the start-up videos
 //! and the player screen.
 //!
 //! `--puzzle <n> [--object <id>]` (a testing aid) plays StartPuzzle `n` at
@@ -427,13 +427,14 @@ fn main() {
                 frames,
                 screenshot.as_deref(),
                 no_intro,
+                original,
             ) {
                 eprintln!("{e}");
                 std::process::exit(1);
             }
             return;
         }
-        let run = atlantis_app::a3::open(Path::new(&dir))
+        let run = atlantis_app::a3::open(Path::new(&dir), original)
             .and_then(|(game, _)| atlantis_app::a3::run_window(game, fullscreen, no_intro));
         if let Err(e) = run {
             error_box(&e);
@@ -684,7 +685,7 @@ fn main() {
             })
         } else if let Some(dir) = atlantis3 {
             atlantis_app::watchdog::leave();
-            atlantis_app::a3::open(&dir).and_then(|(game, _)| {
+            atlantis_app::a3::open(&dir, original).and_then(|(game, _)| {
                 atlantis_app::a3::run_window_on(&mut el, game, fullscreen, a2_grace.replace(false))
             })
         } else {

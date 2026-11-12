@@ -793,7 +793,7 @@ mod tests {
         );
         assert!(!app.session().unwrap().wants_own_mode());
         // What the program then runs: Atlantis III's mode, from this folder.
-        let (game, label) = crate::a3::open_in(&a3, &d.join("atlantis3")).unwrap();
+        let (game, label) = crate::a3::open_in(&a3, &d.join("atlantis3"), false).unwrap();
         assert_eq!(label, "Atlantis III, GOG.com, French");
         drop(game);
     }

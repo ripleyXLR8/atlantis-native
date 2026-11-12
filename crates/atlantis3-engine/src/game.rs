@@ -175,6 +175,8 @@ struct Place {
 pub struct Game {
     files: A3Files,
     pub startup: Startup,
+    /// The port's bug fixes the game started with ([`crate::Fixes`]).
+    pub fixes: crate::Fixes,
     width: usize,
     height: usize,
     /// The screen, in the display's format (`PixelFormat`).
@@ -374,9 +376,16 @@ pub struct Game {
 impl Game {
     /// The game of the install `files`: its settings and the start-up's
     /// script part (chapter 0's boot state, the funeral chamber). Nothing
-    /// is shown before [`Game::start_intro`] or [`Game::new_game`].
+    /// is shown before [`Game::start_intro`] or [`Game::new_game`]. Every
+    /// bug fix on.
     pub fn new(files: A3Files) -> Result<Game, GameError> {
-        let startup = Startup::read(&files);
+        Game::with_fixes(files, crate::Fixes::default())
+    }
+
+    /// [`Game::new`] with the bug fixes `fixes` (`--original`:
+    /// [`crate::Fixes::original`]).
+    pub fn with_fixes(files: A3Files, fixes: crate::Fixes) -> Result<Game, GameError> {
+        let startup = Startup::read_with(&files, fixes);
         let (width, height) = startup.screen();
         let defnames = files
             .read("scenar/defnames.con")
@@ -389,6 +398,7 @@ impl Game {
             smooth: startup.config.smooth,
         });
         let startup_smooth = startup.config.smooth;
+        let dialog_size = startup.warp_view();
         // The display in the format of `PixelFormat` (@ 0x004074d0).
         let depth = if startup.config.pixel_format.bits() > 16 {
             Depth::Xrgb8888
@@ -408,6 +418,7 @@ impl Game {
         let mut game = Game {
             files,
             startup,
+            fixes,
             width,
             height,
             screen: Surface::new(depth, width * height),
@@ -467,7 +478,7 @@ impl Game {
             dialogs: None,
             running: None,
             dialog_renderer: {
-                let (w, h) = crate::dialog::SURFACE;
+                let (w, h) = dialog_size;
                 let mut r = Renderer::new(Variant::PII, Fpu::Double, w, h);
                 r.a3 = Some(A3Raster {
                     smooth: startup_smooth,
@@ -2246,7 +2257,8 @@ impl Game {
             _ => Vec::new(),
         };
         if let (Some(d), false) = (dest, self.double_click) {
-            let path = format!("hnmtraj/HNM640/{folder}/{}", d.video);
+            let hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
+            let path = format!("hnmtraj/{hnm}/{folder}/{}", d.video);
             // The sprites are there before the video starts, so that its
             // first frame has them.
             if self.files.size(&path).is_some() {
@@ -2287,13 +2299,17 @@ impl Game {
         let name = view.name.clone();
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
-        let path = format!("warp/Warp512/{folder}/{name}");
+        let warp = crate::travel::warp_folder(self.startup.config.warp_res);
+        let path = format!("warp/{warp}/{folder}/{name}");
         if self.place.cube != path {
             let depth = self.depth();
             match self.files.read(&path).map(|d| faces_of(&d, depth)) {
                 Some(Ok(faces)) => self.place.faces = faces,
                 Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
+                None => {
+                    let dir = format!("warp/{warp}/{folder}");
+                    self.place.faces = missing_cube(&self.files, &dir, &name, depth);
+                }
             }
             self.place.cube = path.clone();
         }
@@ -2326,12 +2342,16 @@ impl Game {
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         if let Some(name) = self.place.wam.view(id).map(|v| v.name.clone()) {
-            let path = format!("warp/Warp512/{folder}/{name}");
+            let warp = crate::travel::warp_folder(self.startup.config.warp_res);
+            let path = format!("warp/{warp}/{folder}/{name}");
             let depth = self.depth();
             match self.files.read(&path).map(|d| faces_of(&d, depth)) {
                 Some(Ok(faces)) => self.place.faces = faces,
                 Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => self.place.faces = missing_cube(&self.files, folder, &name, depth),
+                None => {
+                    let dir = format!("warp/{warp}/{folder}");
+                    self.place.faces = missing_cube(&self.files, &dir, &name, depth);
+                }
             }
             self.place.cube = path;
         }
@@ -2360,6 +2380,7 @@ impl Game {
         // values first: tests replaying the original's run).
         let (queue, rand) = (&mut self.rand_queue, &mut self.rand);
         let depth = self.screen.depth();
+        let spw = crate::travel::spw_folder(self.startup.config.warp_res);
         self.slots = Slots::load_depth(
             &self.files,
             &mut self.spw_cache,
@@ -2375,6 +2396,7 @@ impl Game {
                     .map(|r| r.shown)
             },
             depth,
+            spw,
         );
     }
 
@@ -2654,8 +2676,10 @@ impl Game {
         } else {
             &mut self.rand
         };
-        self.dialogs = Some(crate::dialog::Dialogs::load(
+        let hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
+        self.dialogs = Some(crate::dialog::Dialogs::load_in(
             &self.files,
+            hnm,
             folder,
             &lang,
             rand,
@@ -2678,6 +2702,8 @@ impl Game {
             self.load_dialogs(w);
         }
         let mut dialogs = self.dialogs.take().unwrap();
+        // The body videos' folder as WarpRes is now (@ 0x00417280).
+        dialogs.hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
         let mut stub = Rand::new(0);
         let rand = if self.stub_rand {
             &mut stub
@@ -2689,13 +2715,20 @@ impl Game {
             log::warn!("CDialogue::Open() : le dialogue {n} n'existe pas");
         }
         self.dialogs = Some(dialogs);
-        // The dialog's body surface: 640 × 480 for a 3D dialog, the
-        // screen's size for a voice-over (@ 0x0040cfe0: `new
+        // The dialog's body surface: the warp view for a 3D dialog (640 ×
+        // 480 with WarpRes 512, 800 × 600 when the start-up's WarpRes was
+        // 1024), the screen's size for a voice-over (@ 0x0040cfe0: `new
         // CDialogue(w, h, voixoff)`).
         let (sw, sh) = if voixoff {
             (self.width, self.height)
         } else {
-            crate::dialog::SURFACE
+            let view = self.startup.warp_view();
+            if view != self.dialog_size() {
+                self.dialog_renderer.resize(view.0, view.1);
+                // The heads are made for the surface's size.
+                self.heads.clear();
+            }
+            view
         };
         self.running = Some(crate::dialog::Running {
             dialog: n,
@@ -2861,7 +2894,7 @@ impl Game {
             self.draw_warp_only();
             r.surface.copy_from(&self.screen);
         } else {
-            let (sw, sh) = crate::dialog::SURFACE;
+            let (sw, sh) = self.dialog_size();
             // Viewport(640, 480) (@ 0x0043f760): centre and projection.
             let fov = self.camera_fov;
             (self.camera.cx, self.camera.cy) = ((sw / 2) as f32, (sh / 2) as f32);
@@ -3055,7 +3088,7 @@ impl Game {
             let src = r.surface.clone();
             self.screen.copy_from(&src);
         } else {
-            let (sw, sh) = crate::dialog::SURFACE;
+            let (sw, sh) = self.dialog_size();
             let (w, h) = (self.width, self.height);
             // The body surface into the destination, then the head over it
             // with a Z buffer cleared to 0 (@ 0x00467c70), then the stretch.
@@ -3102,6 +3135,12 @@ impl Game {
         self.flip_texts();
     }
 
+    /// The 3D dialogs' surface size (the warp view, [`Startup::warp_view`],
+    /// taken at each dialog's open).
+    fn dialog_size(&self) -> (usize, usize) {
+        (self.dialog_renderer.width(), self.dialog_renderer.height())
+    }
+
     /// The current speaker's head (`AddStand` @ 0x004782c0), loaded at its
     /// first use: `mesh\<mesh>s<stand>.db`, `map\Stand<stand>\<mesh>.tga`
     /// and its eye maps.
@@ -3115,7 +3154,7 @@ impl Game {
                     .read(&format!("map/Stand{stand}/{n}.tga"))
                     .and_then(|d| atlantis2_data::tga::Tga::parse(&d).ok())
             };
-            let (sw, sh) = crate::dialog::SURFACE;
+            let (sw, sh) = self.dialog_size();
             let head = files
                 .read(&format!("mesh/{mesh}s{stand}.db"))
                 .and_then(|d| atlantis3_data::db::parse(&d).ok())
@@ -3188,6 +3227,7 @@ impl Game {
             r.lipsync.as_mut().and_then(|l| l.eval(t))
         });
         let humeur = self.startup.config.humeur;
+        let (sw, sh) = self.dialog_size();
         let Some(h) = self.head(&e.speaker, e.stand) else {
             return;
         };
@@ -3201,7 +3241,6 @@ impl Game {
         };
         let factors = weights.map_or([0.0; 9], |w| crate::lipsync::lerp_factors(fpu, &w));
         h.mouth_a3(mood, weights.as_ref(), &factors);
-        let (sw, sh) = crate::dialog::SURFACE;
         let mut z = vec![0u32; sw * sh];
         let cam = e.camera.max(1) as usize;
         match dest {
@@ -3636,7 +3675,7 @@ pub fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
 /// game: chapter 0's boot state (`CFuner.wam` view 4 with world 1, at
 /// start-up) asks for `warp\Warp512\hoggar\cf0004.hnm`, which is in
 /// `ldm\`; the boot state is never drawn.
-fn missing_cube(files: &A3Files, folder: &str, name: &str, depth: Depth) -> Faces {
+fn missing_cube(files: &A3Files, dir: &str, name: &str, depth: Depth) -> Faces {
     const DEBUG: [u32; 6] = [
         0xff00_0080,
         0xff80_0000,
@@ -3648,16 +3687,12 @@ fn missing_cube(files: &A3Files, folder: &str, name: &str, depth: Depth) -> Face
     let stem = name.split_once('.').map_or(name, |(s, _)| s);
     let cut = stem.len().min(2);
     for side in ["ft", "bk", "up", "dn", "rt", "lf"] {
-        let tga = format!(
-            "warp/Warp512/{folder}/{}{side}{}.tga",
-            &stem[..cut],
-            &stem[cut..]
-        );
+        let tga = format!("{dir}/{}{side}{}.tga", &stem[..cut], &stem[cut..]);
         if files.size(&tga).is_some() {
             log::warn!("{tga}: the cube's TGA faces are not ported");
         }
     }
-    log::debug!("warp/Warp512/{folder}/{name}: not found (debug colours)");
+    log::debug!("{dir}/{name}: not found (debug colours)");
     match depth {
         Depth::Rgb565 => {
             Faces::Rgb565(DEBUG.map(|c| vec![<u16 as PagePixel>::from_argb(c); 512 * 512]))
@@ -3936,10 +3971,11 @@ impl Host for Game {
         // The cue file decides the folder (@ 0x00420f3c..0x00421089).
         let localised = self.files.size(&format!("hnm/{subtitles}")).is_some();
         let lang = self.startup.voice_language();
+        let hnm = crate::travel::hnm_folder(self.startup.config.warp_res);
         let path = if localised {
-            format!("loc/hnm/HNM640/{lang}/{folder}/{video}")
+            format!("loc/hnm/{hnm}/{lang}/{folder}/{video}")
         } else {
-            format!("hnm/HNM640/{folder}/{video}")
+            format!("hnm/{hnm}/{folder}/{video}")
         };
         let back = self.mode;
         let started = self.start_video(&path, fps.max(0) as u32, false, back, Vec::new());
