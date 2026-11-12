@@ -16,4 +16,5 @@ libm = "=0.2.16"
 
 [dev-dependencies]
 md-5 = "0.10"
+sha2 = "0.10"
 png = "0.18"

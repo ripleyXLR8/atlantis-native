@@ -45,6 +45,7 @@
 //!   renderer orders them is not read.
 
 pub mod anim;
+pub mod kernmap;
 pub mod text;
 
 use std::cell::RefCell;
