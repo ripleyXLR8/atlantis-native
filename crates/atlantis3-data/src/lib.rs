@@ -43,6 +43,7 @@ pub mod db;
 pub mod dialog;
 pub mod evolution2004;
 pub mod evolution2004_cfg;
+pub mod evolution2004_mls;
 pub mod exe;
 pub mod files;
 pub mod font_txt;
