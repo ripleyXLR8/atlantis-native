@@ -4111,6 +4111,17 @@ impl Host for Game {
 
     /// `MONDE=n` (@ 0x0044bb30): the dialogs freed and loaded again for
     /// the world (`Dial_Free`, `Dial_Init`).
+    /// The 2004 program's `CHANGECD=n`: the disc folder switched. The
+    /// disc's banks (FUN_00452310: `sujNN.spr`, `inventNN.spr`,
+    /// `suiveurs.spr`) are not ported yet.
+    fn change_cd_2004(&mut self, n: i32) {
+        log::info!("Menu_TestChangeCD : {n}");
+        match u32::try_from(n) {
+            Ok(n) => self.files.set_disc(n),
+            Err(_) => log::warn!("CHANGECD={n}: no such disc"),
+        }
+    }
+
     fn set_monde(&mut self, monde: i32) -> bool {
         // Kept here too: the script is out of `self` while it runs.
         self.world = monde;

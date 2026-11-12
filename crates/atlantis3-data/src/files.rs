@@ -20,9 +20,9 @@ pub const DATAS: &str = "Datas";
 #[derive(Clone)]
 pub struct A3Files {
     src: Arc<dyn FileSource>,
-    /// *Atlantis Evolution*'s 2004 program's data
-    /// ([`crate::evolution2004::Evolution2004Source`]).
-    evolution_2004: bool,
+    /// *Atlantis Evolution*'s 2004 program's data: the source that routes
+    /// the names to the discs.
+    evolution_2004: Option<Arc<crate::evolution2004::Evolution2004Source>>,
 }
 
 /// Why a folder is not a playable install.
@@ -60,21 +60,30 @@ impl A3Files {
     pub fn new(src: Arc<dyn FileSource>) -> A3Files {
         A3Files {
             src,
-            evolution_2004: false,
+            evolution_2004: None,
         }
     }
 
     /// *Atlantis Evolution*'s 2004 data, read through `src`.
     pub fn evolution_2004(src: Arc<crate::evolution2004::Evolution2004Source>) -> A3Files {
         A3Files {
-            src,
-            evolution_2004: true,
+            src: src.clone(),
+            evolution_2004: Some(src),
         }
     }
 
     /// Whether the data are *Atlantis Evolution*'s 2004 program's.
     pub fn is_evolution_2004(&self) -> bool {
-        self.evolution_2004
+        self.evolution_2004.is_some()
+    }
+
+    /// The 2004 program's current disc (`cd<n>\`, 0x0070d1a0) := `n`
+    /// (`Menu_TestChangeCD` @ 0x0045d580, an `FLA` install); nothing for
+    /// *Atlantis III*.
+    pub fn set_disc(&self, n: u32) {
+        if let Some(e) = &self.evolution_2004 {
+            e.set_disc(n);
+        }
     }
 
     /// The install at `dir`, with its executable identified.

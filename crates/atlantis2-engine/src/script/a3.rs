@@ -564,7 +564,12 @@ impl Script {
             host.set_monde(value);
             return Some(next);
         }
-        // `CHANGECD` and every other key: the default store.
+        if self.evolution_2004 && key == self.keys.changecd {
+            host.change_cd_2004(value);
+        }
+        // `CHANGECD` and every other key: the default store [the 2004
+        // branch (@ 0x00450908..0x0045093a) stores nothing itself; the
+        // store is kept: UNKNOWN whether the variable is read].
         self.vars[key] = value;
         Some(next)
     }

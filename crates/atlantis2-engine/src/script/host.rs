@@ -287,6 +287,12 @@ pub trait Host {
         true
     }
 
+    /// *Atlantis Evolution*'s 2004 `CHANGECD=n` (@ 0x0045091a):
+    /// `Menu_TestChangeCD(n)` (@ 0x0045d580, the current disc folder
+    /// `cd<n>\` on an `FLA` install), then the disc's sprite banks
+    /// (FUN_00452310).
+    fn change_cd_2004(&mut self, n: i32) {}
+
     /// The bag bar after an object was put in: `visible` is the count of
     /// the current world's entries (@ 0x00475870, kept @ 0x00671ee8), then
     /// @ 0x004757b0 until it returns 0: the bar scrolls to its end.
