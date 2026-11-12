@@ -45,7 +45,7 @@ been checked mostly by automated replays against the original's code and
 by the developer's own play, not yet by many players: reports are
 welcome.
 
-*Atlantis Evolution* (2004) is new: GOG.com's edition, in its five
+*Atlantis Evolution* (2004) is new in 0.7.0: GOG.com's edition, in its five
 languages, from the splash screens and the main menu through the whole
 story to the end, with its dialogs, inventory, documents, saves and
 puzzles, its videos and sounds decoded as the original decodes them. Its
@@ -131,7 +131,7 @@ contains none of them.</sub>
   with the original's own menus and options (640 x 480, 800 x 600 or
   1024 x 768, 16 or 32 bits), its saves kept apart from the game's
   folder, F12 screenshots; on the desktop and in the browser.
-- 🌊 **Atlantis Evolution** (new): GOG.com's edition in English, French,
+- 🌊 **Atlantis Evolution** (new in 0.7.0): GOG.com's edition in English, French,
   German, Italian and Spanish, its interface laid out on any window size
   as the original lays it out, full screen or windowed; on the desktop
   and in the browser.
