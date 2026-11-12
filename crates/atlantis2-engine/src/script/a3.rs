@@ -159,6 +159,34 @@ impl Script {
         self.run_init(host)
     }
 
+    /// *Atlantis Evolution*'s 2004 new game (start page
+    /// atlantis4-cd-en-3022848 @ 0x00457ae0..0x00457b5c): the bag
+    /// (0x006fcc1c, 0x400 entries of 12 bytes), the 300 variables
+    /// (0x0070d4f8) and the 0x800 flags (0x0070dbdc) cleared,
+    /// `LIMITEANGLEWARPY` = 50, `LIMITEANGLEWARPX` = −1, `CHAPTER` = 0, the
+    /// chapter number (0x0070fbf8) 0, then (FUN_004a2640) chapter 0 loaded
+    /// ("Fichier scenar non trouve") and its `/INIT` run ("PB avec la zone
+    /// INIT du Fichier scenar"). Not ported: the dword 0x006ffc18 := 0 and
+    /// FUN_00456ad0, called before the load [UNKNOWN: not read yet].
+    pub fn new_game_2004(&mut self, host: &mut dyn Host) -> bool {
+        self.bag.clear();
+        self.vars.iter_mut().for_each(|v| *v = 0);
+        self.flags.iter_mut().for_each(|f| *f = 0);
+        let k = self.keys.clone();
+        self.vars[k.limiteanglewarpy] = 50;
+        self.vars[k.limiteanglewarpx] = -1;
+        self.vars[k.chapter] = 0;
+        self.chapter = 0;
+        if !self.load_chapter(host, 0) {
+            self.fail("Fichier scenar non trouve".into());
+            return false;
+        }
+        if !self.run_init(host) {
+            log::error!("PB avec la zone INIT du Fichier scenar");
+        }
+        self.fatal.is_none()
+    }
+
     /// The menu's new game for an empty player slot (@ 0x00452b98): the
     /// flags cleared (@ 0x00451190, `GAMEOVER` = 0 with them), the bag
     /// emptied (@ 0x0042a020), `RunOneCommand("(chapter=600)")`, then the

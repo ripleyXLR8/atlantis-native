@@ -972,14 +972,19 @@ impl Game {
         self.mode = Mode::Idle;
     }
 
-    /// The start page's new game for an empty player slot (@ 0x00452b98):
+    /// The start page's new game for an empty player slot (@ 0x00452b98;
+    /// the 2004 program's: [`atlantis2_engine::script::Script::new_game_2004`]):
     /// the flags and the bag cleared, `(chapter=600)`, then the warp. The
     /// first warp frame's arrival scan plays chapter 1's three cinematics.
     pub fn new_game(&mut self) -> bool {
         self.video = None;
         self.audio.stop(CHANNEL_CINEMA);
         self.mode = Mode::Warp;
-        let ok = self.with_script(|s, h| s.new_game_a3(h));
+        let ok = if self.files.is_evolution_2004() {
+            self.with_script(|s, h| s.new_game_2004(h))
+        } else {
+            self.with_script(|s, h| s.new_game_a3(h))
+        };
         self.look_last = None;
         ok
     }
