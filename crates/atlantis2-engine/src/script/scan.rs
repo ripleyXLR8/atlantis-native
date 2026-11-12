@@ -231,7 +231,11 @@ impl Script {
             return true;
         }
         self.init_running = true;
-        let done = self.init_walk(host);
+        let done = if self.evolution_2004 {
+            self.init_walk_2004(host)
+        } else {
+            self.init_walk(host)
+        };
         self.init_running = false;
         done
     }
@@ -287,6 +291,121 @@ impl Script {
                 return false;
             }
             i2 = self.search_set_cool(host, q);
+        }
+    }
+
+    /// *Atlantis Evolution*'s 2004 `RunInit` (atlantis4-cd-en-3022848
+    /// @ 0x00451210, rewritten from *Atlantis III*'s @ 0x0044a6a0): from
+    /// the first `/INIT`, each `/set` line runs (SearchSetCool
+    /// @ 0x004519b0); a `/con(...)` (@ 0x00451790) true and followed by a
+    /// `/set` line runs the `/set` lines after it up to the next `/con` or
+    /// `/FININIT` (@ 0x00451140); false, or true without a `/set` after it,
+    /// the walk goes to the end of its line, then to the next `/con` or
+    /// `/FININIT`. A `/set(chapter=N)` restarts the walk on the new text's
+    /// `/INIT`; a waiting section stops it; it ends at a `/FININIT`.
+    fn init_walk_2004(&mut self, host: &mut dyn Host) -> bool {
+        let Some(init) = self.find_init() else {
+            self.fail("RunInit: no /INIT".into());
+            return false;
+        };
+        let mut p = init + 7;
+        loop {
+            let q = if self.chapter_reload {
+                self.chapter_reload = false;
+                let Some(init) = self.find_init() else {
+                    self.fail("RunInit: no /INIT".into());
+                    return false;
+                };
+                self.search_set_cool(host, init + 7)
+            } else {
+                let q = self.search_set_cool(host, p);
+                if self.resume_pending || self.travel_refused {
+                    return true;
+                }
+                q
+            };
+            if self.fatal.is_some() {
+                return false;
+            }
+            match self.init_con_2004(host, q) {
+                None => {
+                    // @ 0x004512b0..0x004512f0: past the line's CR, then
+                    // to the next `/con` or `/FININIT`.
+                    p = self.after_cr(S, q + 1);
+                    while p < self.len(S) && !self.at(S, p, b"/con") && !self.at(S, p, b"/FININIT")
+                    {
+                        p += 1;
+                    }
+                }
+                Some(r) if !self.init_skip => {
+                    let e = self.init_section_2004(host, r);
+                    if self.resume_pending || self.travel_refused {
+                        return true;
+                    }
+                    if self.fatal.is_some() {
+                        return false;
+                    }
+                    p = e + 1;
+                }
+                Some(r) => {
+                    self.init_skip = false;
+                    p = r;
+                }
+            }
+            if self.b(S, p) == b'#' {
+                p = self.after_cr(S, p);
+            }
+            if self.at(S, p, b"/FININIT") || (p > 0 && self.at(S, p - 1, b"/FININIT")) {
+                return true;
+            }
+            if p >= self.len(S) {
+                self.fail("RunInit: no /FININIT".into());
+                return false;
+            }
+        }
+    }
+
+    /// @ 0x00451790: a `/con` at `q` or `q + 1`. True and followed by a
+    /// `/set` line: that line (log `Condition verifiee INIT : %s`); false,
+    /// or true without a `/set`: `None`. No `/con`: `q + 1` (`q` at a
+    /// `/FININIT`).
+    fn init_con_2004(&mut self, host: &mut dyn Host, mut q: usize) -> Option<usize> {
+        if self.at(S, q + 1, b"/con") {
+            q += 1;
+        }
+        if self.at(S, q, b"/con") {
+            let r = self.eval_condition(host, q + 4)?;
+            log::debug!("Condition verifiee INIT : {}", self.line_text(S, q + 4));
+            return self.at(S, r + 2, b"/set").then_some(r + 2);
+        }
+        if !self.at(S, q, b"/FININIT") {
+            q += 1;
+        }
+        Some(q)
+    }
+
+    /// @ 0x00451140: the `/set` lines from `p` up to the next `/con` or
+    /// `/FININIT`; where the walk goes on.
+    fn init_section_2004(&mut self, host: &mut dyn Host, mut p: usize) -> usize {
+        loop {
+            if self.b(S, p) == 0 || p >= self.len(S) {
+                return self.len(S);
+            }
+            let r = self.search_set_cool(host, p);
+            let p2 = if r != 0 { r } else { p };
+            if self.resume_pending || self.travel_refused || self.fatal.is_some() {
+                return p2;
+            }
+            p = p2 + 1;
+            if self.at(S, p, b"/con") {
+                return p2;
+            }
+            if self.at(S, p2, b"/FININIT") {
+                return p2.saturating_sub(1);
+            }
+            if self.at(S, p, b"/FININIT") {
+                return p;
+            }
         }
     }
 

@@ -190,6 +190,9 @@ pub enum Dialect {
 pub struct Script {
     /// The game whose rules run.
     pub dialect: Dialect,
+    /// *Atlantis Evolution*'s 2004 program: *Atlantis III*'s rules with its
+    /// own `RunInit` ([`Script::run_init`]).
+    pub evolution_2004: bool,
     /// *Atlantis III*'s state ([`a3`]); unused by *Atlantis II*.
     pub a3: a3::A3State,
     pub names: DefNames,
@@ -354,6 +357,7 @@ impl Script {
             previous_chapter: 0,
             chapter_reload: false,
             init_running: false,
+            evolution_2004: false,
             init_skip: false,
             resume_pending: false,
             resume_at: 0,
@@ -775,5 +779,21 @@ mod tests {
         assert_eq!((s.var("TIME1"), s.seconds), (Some(1), 0.0));
         assert_eq!(s.degrees((-90f32).to_radians()), 270);
         assert_eq!(s.degrees(0.5f32.to_radians()), 0);
+    }
+
+    /// *Atlantis Evolution*'s 2004 `RunInit` (@ 0x00451210): a false `/con`
+    /// skips the `/set` lines up to the next `/con`, a true one runs them
+    /// (chapi001.con's block).
+    #[test]
+    fn init_2004_conditions() {
+        let mut s = script();
+        s.evolution_2004 = true;
+        s.set_chapter_text(
+            b"/INIT\r\n/set(flag1=1)\r\n/con(flag9=1)\r\n/set(flag2=1)\r\n/set(flag3=1)\r\n\
+              /con(flag9=0)\r\n/set(flag4=1)\r\n/set(flag5=1)\r\n/FININIT\r\n\r\n/001\r\n/set(flag6=1)\r\n",
+        );
+        assert!(s.run_init(&mut Nothing));
+        assert!(s.fatal.is_none());
+        assert_eq!(&s.flags[1..7], &[1, 0, 0, 1, 1, 0]);
     }
 }

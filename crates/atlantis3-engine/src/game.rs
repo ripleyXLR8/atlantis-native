@@ -391,7 +391,8 @@ impl Game {
             .read("scenar/defnames.con")
             .ok_or_else(|| GameError::Missing("scenar\\defnames.con".into()))?;
         let names = DefNames::parse(&defnames).map_err(|e| GameError::Script(e.to_string()))?;
-        let script = Script::new_a3(&defnames).map_err(GameError::Script)?;
+        let mut script = Script::new_a3(&defnames).map_err(GameError::Script)?;
+        script.evolution_2004 = files.is_evolution_2004();
         let fpu = Fpu::Double;
         let mut renderer = Renderer::new(Variant::PII, fpu, width, height);
         renderer.a3 = Some(A3Raster::new(startup.config.smooth));

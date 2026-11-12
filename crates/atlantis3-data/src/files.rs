@@ -20,6 +20,9 @@ pub const DATAS: &str = "Datas";
 #[derive(Clone)]
 pub struct A3Files {
     src: Arc<dyn FileSource>,
+    /// *Atlantis Evolution*'s 2004 program's data
+    /// ([`crate::evolution2004::Evolution2004Source`]).
+    evolution_2004: bool,
 }
 
 /// Why a folder is not a playable install.
@@ -55,7 +58,23 @@ pub fn holds_atlantis3(dir: &Path) -> bool {
 impl A3Files {
     /// An install read from `src`, unchecked.
     pub fn new(src: Arc<dyn FileSource>) -> A3Files {
-        A3Files { src }
+        A3Files {
+            src,
+            evolution_2004: false,
+        }
+    }
+
+    /// *Atlantis Evolution*'s 2004 data, read through `src`.
+    pub fn evolution_2004(src: Arc<crate::evolution2004::Evolution2004Source>) -> A3Files {
+        A3Files {
+            src,
+            evolution_2004: true,
+        }
+    }
+
+    /// Whether the data are *Atlantis Evolution*'s 2004 program's.
+    pub fn is_evolution_2004(&self) -> bool {
+        self.evolution_2004
     }
 
     /// The install at `dir`, with its executable identified.
