@@ -236,7 +236,14 @@ impl Slots {
     ) {
         let out = &mut self.slots;
         let depth = self.depth;
-        let path = format!("spw/{}/{world}/{name}", self.spw);
+        // The 2004 program: `spw\<name>` on the current disc (the view
+        // entry @ 0x0044307d..0x004430ab formats the name and passes it to
+        // the `spw` path builder FUN_00418070; no size or world folder).
+        let path = if files.is_evolution_2004() {
+            format!("spw/{name}")
+        } else {
+            format!("spw/{}/{world}/{name}", self.spw)
+        };
         let key = match depth {
             Depth::Rgb565 => path.clone(),
             Depth::Xrgb8888 => format!("{path}#x888"),
@@ -659,7 +666,7 @@ impl Slots {
     }
 
     /// The sprite pass (@ 0x00440bf0): every shown slot drawn into the
-    /// faces with `AFF_SPW`, in slot order: in mode 1 its frame, else
+    /// faces with `AFF_SPW` (each face's own size as the clip), in slot order: in mode 1 its frame, else
     /// each frame of its list in the list's order (@ 0x00439130); `tick`
     /// is the 15 Hz tick count (blinking slots are drawn on odd ticks).
     pub fn draw<P: Pixel>(&self, faces: &mut [Vec<P>; 6], tick: u32) {
@@ -669,13 +676,16 @@ impl Slots {
             }
             for frame in s.drawn_frames() {
                 for (face, px) in faces.iter_mut().enumerate() {
+                    // The face's surface: 512 x 512 (*Atlantis III*),
+                    // 768 x 768 (the 2004 program's `jp6` faces).
+                    let n = px.len().isqrt();
                     let mut t = Target {
                         pixels: px,
-                        pitch: 512,
+                        pitch: n,
                         ymin: 0,
-                        ymax: 512,
+                        ymax: n as i32,
                         xmin: 0,
-                        xmax: 512,
+                        xmax: n as i32,
                     };
                     s.bank.draw_face(&mut t, frame as usize, face);
                 }

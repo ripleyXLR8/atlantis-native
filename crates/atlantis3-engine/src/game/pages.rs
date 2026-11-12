@@ -426,12 +426,13 @@ impl Game {
             }
             _ => {}
         }
+        let n = crate::game::face_size(&self.files);
         self.place.faces = match depth {
             atlantis3_data::spr::Depth::Rgb565 => {
-                crate::px::Faces::Rgb565(std::array::from_fn(|_| vec![0; 512 * 512]))
+                crate::px::Faces::Rgb565(std::array::from_fn(|_| vec![0; n * n]))
             }
             atlantis3_data::spr::Depth::Xrgb8888 => {
-                crate::px::Faces::Xrgb8888(std::array::from_fn(|_| vec![0; 512 * 512]))
+                crate::px::Faces::Xrgb8888(std::array::from_fn(|_| vec![0; n * n]))
             }
         };
         self.place.cube.clear();
