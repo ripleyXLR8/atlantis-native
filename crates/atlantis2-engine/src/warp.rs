@@ -114,6 +114,25 @@ struct Edge {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct A3Raster {
     pub smooth: bool,
+    /// The faces' width and height in texels: 512 (*Atlantis III*), 768
+    /// (*Atlantis Evolution*'s 2004 program, its `jp6` panoramas). The
+    /// texture setter (`Game.exe` @ 0x004fc3a0, atlantis4-cd-en-3022848
+    /// @ 0x004c75a0, the same code) takes the scale (width · 2^21), the
+    /// pitch and the last row's index from the face's surface; the cube
+    /// is built for 512 in both (`PUSH 0x200` before the geometry
+    /// @ 0x004466d8 of the 2004 program), so its texture coordinates
+    /// 1/512 .. 511/512 map to texels 1.5 .. 766.5 of a 768 face.
+    pub face: usize,
+}
+
+impl A3Raster {
+    /// *Atlantis III*'s faces.
+    pub const fn new(smooth: bool) -> A3Raster {
+        A3Raster {
+            smooth,
+            face: FACE_SIZE,
+        }
+    }
 }
 
 /// A texel of the cube faces and a pixel of the screen the warp draws:
@@ -125,15 +144,15 @@ pub struct A3Raster {
 pub trait WarpTexel: Copy + Default + 'static {
     /// The bilinear pixel of the four texels at `i`, `i` + 1, `i` + 512,
     /// `i` + 513 weighted by the 6-bit fractions `fu`, `fv`.
-    fn bilinear(tex: &[Self], i: usize, fu: u32, fv: u32, oof: &mut u64) -> Self;
+    fn bilinear(tex: &[Self], pitch: usize, i: usize, fu: u32, fv: u32, oof: &mut u64) -> Self;
     /// `warpC` (*Atlantis II*): 16-bit only.
     fn polygon_c(r: &mut Renderer, poly: &mut [Vertex], tex: &[Self], out: &mut [Self]);
 }
 
 impl WarpTexel for u16 {
     #[inline(always)]
-    fn bilinear(tex: &[u16], i: usize, fu: u32, fv: u32, oof: &mut u64) -> u16 {
-        pii::bilinear565(tex, i, fu, fv, oof)
+    fn bilinear(tex: &[u16], pitch: usize, i: usize, fu: u32, fv: u32, oof: &mut u64) -> u16 {
+        pii::bilinear565(tex, pitch, i, fu, fv, oof)
     }
 
     fn polygon_c(r: &mut Renderer, poly: &mut [Vertex], tex: &[u16], out: &mut [u16]) {
@@ -150,18 +169,14 @@ impl WarpTexel for u32 {
     /// when the texel lies in the face's last row (`cmp ebx, [0x00794568]`
     /// = (512 − 1) · 512, `jae`): no read below the face.
     #[inline(always)]
-    fn bilinear(tex: &[u32], i: usize, fu: u32, fv: u32, oof: &mut u64) -> u32 {
+    fn bilinear(tex: &[u32], pitch: usize, i: usize, fu: u32, fv: u32, oof: &mut u64) -> u32 {
         let w = [
             (64 - fu) * (64 - fv),
             fu * (64 - fv),
             (64 - fu) * fv,
             fu * fv,
         ];
-        let below = if i >= (FACE_SIZE - 1) * FACE_SIZE {
-            0
-        } else {
-            FACE_SIZE
-        };
+        let below = if i >= (pitch - 1) * pitch { 0 } else { pitch };
         let t = [
             pii::at(tex, i, w[0], oof),
             pii::at(tex, i + 1, w[1], oof),
@@ -272,7 +287,8 @@ impl Renderer {
         out: &mut [P],
     ) {
         assert!(out.len() >= self.width * self.height);
-        assert!(faces.iter().all(|f| f.len() == FACE_SIZE * FACE_SIZE));
+        let face = self.a3.map_or(FACE_SIZE, |r| r.face);
+        assert!(faces.iter().all(|f| f.len() == face * face));
         assert!(
             self.variant != Variant::PII || self.width <= pii::MAX_WIDTH,
             "warpPII draws at most {} pixels across",

@@ -119,7 +119,7 @@ fn check(
             bad_m.push(key.clone());
         }
         let mut r = Renderer::new(Variant::PII, cam.fpu, 800, 600);
-        r.a3 = Some(A3Raster { smooth });
+        r.a3 = Some(A3Raster::new(smooth));
         let mut out = vec![0xf81fu16; 800 * 600];
         r.render(faces, &m, cam.projection(), &mut out);
         if md5_hex(&out) != row.md5 {

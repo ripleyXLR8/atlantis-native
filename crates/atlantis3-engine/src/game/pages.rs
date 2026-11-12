@@ -361,8 +361,8 @@ impl Game {
                 }
                 Event::Options => {
                     let c = &self.startup.config;
-                    self.renderer.a3 = Some(A3Raster { smooth: c.smooth });
-                    self.dialog_renderer.a3 = Some(A3Raster { smooth: c.smooth });
+                    self.renderer.a3 = Some(A3Raster::new(c.smooth));
+                    self.dialog_renderer.a3 = Some(A3Raster::new(c.smooth));
                     self.look.invert_y = c.invert_mouse_y;
                 }
                 // Done in the frame ([`Game::display_change`]).

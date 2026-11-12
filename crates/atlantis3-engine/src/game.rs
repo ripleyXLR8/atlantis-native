@@ -394,9 +394,7 @@ impl Game {
         let script = Script::new_a3(&defnames).map_err(GameError::Script)?;
         let fpu = Fpu::Double;
         let mut renderer = Renderer::new(Variant::PII, fpu, width, height);
-        renderer.a3 = Some(A3Raster {
-            smooth: startup.config.smooth,
-        });
+        renderer.a3 = Some(A3Raster::new(startup.config.smooth));
         let startup_smooth = startup.config.smooth;
         let dialog_size = startup.warp_view();
         // The display in the format of `PixelFormat` (@ 0x004074d0).
@@ -480,9 +478,7 @@ impl Game {
             dialog_renderer: {
                 let (w, h) = dialog_size;
                 let mut r = Renderer::new(Variant::PII, Fpu::Double, w, h);
-                r.a3 = Some(A3Raster {
-                    smooth: startup_smooth,
-                });
+                r.a3 = Some(A3Raster::new(startup_smooth));
                 r
             },
             dialog_tick: false,

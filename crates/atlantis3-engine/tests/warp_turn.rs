@@ -57,7 +57,7 @@ fn le32s(list: &str) -> Vec<u32> {
 /// reads the heap there, see `tests/warp.rs`).
 fn render(faces: &[Vec<u16>; 6], cam: &Camera) -> (String, bool, Fpu) {
     let mut r = Renderer::new(Variant::PII, cam.fpu, W as usize, H as usize);
-    r.a3 = Some(A3Raster { smooth: true });
+    r.a3 = Some(A3Raster::new(true));
     let mut out = vec![0u16; (W * H) as usize];
     r.render(faces, &cam.matrix(), cam.projection(), &mut out);
     (md5_hex(&out), r.out_of_face > 0, r.fpu)

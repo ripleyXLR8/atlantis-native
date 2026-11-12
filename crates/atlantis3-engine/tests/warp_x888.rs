@@ -109,7 +109,7 @@ fn check(text: &str, folder: &str, name: &str, files: &A3Files) -> (usize, Vec<S
             row.pitch
         );
         let mut r = Renderer::new(Variant::PII, cam.fpu, 800, 600);
-        r.a3 = Some(A3Raster { smooth: true });
+        r.a3 = Some(A3Raster::new(true));
         let mut out = vec![0x5af8_1f5au32; 800 * 600];
         r.render(&faces, &m, cam.projection(), &mut out);
         if md5_hex(&out) != row.md5 {

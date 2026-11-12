@@ -46,12 +46,15 @@ struct Rules {
     shift: u32,
     /// *Atlantis III*'s bilinear span (`warpBFPII` @ 0x0052f000).
     bilinear: bool,
+    /// The face's row length in texels.
+    pitch: usize,
 }
 
 const A2_RULES: Rules = Rules {
     tex_scale: TEX_SCALE,
     shift: TEXEL_SHIFT,
     bilinear: false,
+    pitch: PITCH,
 };
 
 impl Rules {
@@ -59,9 +62,10 @@ impl Rules {
         match a3 {
             None => A2_RULES,
             Some(r) => Rules {
-                tex_scale: 1_073_741_824.0,
+                tex_scale: r.face as f64 * 2_097_152.0,
                 shift: 6,
                 bilinear: r.smooth,
+                pitch: r.face,
             },
         }
     }
@@ -607,7 +611,7 @@ impl Renderer {
         if tail == 1 {
             // @ 0x0057e0c0: one pixel.
             out[base] = if rules.bilinear {
-                single_bilinear(tex, word(u0), word(v0), &mut self.out_of_face)
+                single_bilinear(tex, rules.pitch, word(u0), word(v0), &mut self.out_of_face)
             } else {
                 sample(&rules, tex, word(u0), word(v0), &mut self.out_of_face)
             };
@@ -694,18 +698,32 @@ fn sample<P: WarpTexel>(rules: &Rules, tex: &[P], u: u16, v: u16, oof: &mut u64)
     if rules.shift == TEXEL_SHIFT {
         return texel(tex, u, v);
     }
-    let i = usize::from(u >> 6) + usize::from(v >> 6) * PITCH;
+    let i = usize::from(u >> 6) + usize::from(v >> 6) * rules.pitch;
     if !rules.bilinear {
         return at(tex, i, 1, oof);
     }
-    P::bilinear(tex, i, u32::from(u & 63), u32::from(v & 63), oof)
+    P::bilinear(
+        tex,
+        rules.pitch,
+        i,
+        u32::from(u & 63),
+        u32::from(v & 63),
+        oof,
+    )
 }
 
 /// `warpBFPII`'s pixel (@ 0x0052f000): the four texels at `i`, `i` + 1,
 /// `i` + 512, `i` + 513 weighted by the 6-bit fractions, each colour
 /// summed and shifted right by 12.
 #[inline(always)]
-pub(super) fn bilinear565(tex: &[u16], i: usize, fu: u32, fv: u32, oof: &mut u64) -> u16 {
+pub(super) fn bilinear565(
+    tex: &[u16],
+    pitch: usize,
+    i: usize,
+    fu: u32,
+    fv: u32,
+    oof: &mut u64,
+) -> u16 {
     let w = [
         (64 - fu) * (64 - fv),
         fu * (64 - fv),
@@ -715,8 +733,8 @@ pub(super) fn bilinear565(tex: &[u16], i: usize, fu: u32, fv: u32, oof: &mut u64
     let t = [
         at(tex, i, w[0], oof),
         at(tex, i + 1, w[1], oof),
-        at(tex, i + PITCH, w[2], oof),
-        at(tex, i + PITCH + 1, w[3], oof),
+        at(tex, i + pitch, w[2], oof),
+        at(tex, i + pitch + 1, w[3], oof),
     ];
     let sum = |f: fn(u16) -> u32| -> u32 { (0..4).map(|k| w[k] * f(t[k])).sum::<u32>() >> 12 };
     let r = sum(|c| u32::from(c >> 11));
@@ -729,11 +747,12 @@ pub(super) fn bilinear565(tex: &[u16], i: usize, fu: u32, fv: u32, oof: &mut u64
 /// from the texel coordinates, not from the fractions (the code shifts
 /// before keeping the low six bits).
 #[inline(always)]
-fn single_bilinear<P: WarpTexel>(tex: &[P], u: u16, v: u16, oof: &mut u64) -> P {
+fn single_bilinear<P: WarpTexel>(tex: &[P], pitch: usize, u: u16, v: u16, oof: &mut u64) -> P {
     let (tu, tv) = (u32::from(u >> 6), u32::from(v >> 6));
     P::bilinear(
         tex,
-        (tu + tv * PITCH as u32) as usize,
+        pitch,
+        (tu + tv * pitch as u32) as usize,
         tu & 63,
         tv & 63,
         oof,
