@@ -1,0 +1,1442 @@
+//! *Atlantis Evolution* on the desktop and in the browser.
+//!
+//! The game library and `atlantis-native <game folder>` start it as the
+//! original does (`atlantis4_engine::menus`): the two splash screens (1.5 s each),
+//! then the main menu with its music; "new game" (which deletes
+//! `save.xml` and `0.xml`..`10.xml`), "continue" (`save.xml`) and a
+//! chapter of the load screen (`<N>.xml`) close the planks and start or
+//! load the game at their turn; the options' volumes, check boxes and
+//! credits work. The saves and `options.xml` live together in the
+//! player's data folder, `atlantis4/Documents/Atlantis Evolution/`, as
+//! the original's backup folder `<My Documents>/Atlantis Evolution/`
+//! holds both; `options.xml` is read at the start and written when the
+//! window closes or "quit" is clicked. In the game, the inventory menu's
+//! "menu" button writes `save.xml` and goes back to the main menu
+//! through the planks; `FinishGame` takes the same planks
+//! without that save, then the game is left (its autosave) and the main
+//! menu shows, without the credits.
+//!
+//! The window is the original's: the interface is laid out on the
+//! window's client area, whatever its size (the root layout is the client
+//! size in pixels, an orthographic projection centred on it, `TeMainWindow`
+//! 0x004ff990; the layouts keep their own proportions with their
+//! `LetterBox` and `PanScan` modes), so the window is resizable and the
+//! full screen is the screen's size, with no bars added. It opens at
+//! 1365 x 768 (smaller when the screen is), or full screen (the
+//! original's default: full screen at the desktop's size unless its
+//! `options.xml` asks for a window). The port's own: F11 and Alt+Enter
+//! switch the full screen. The port's settings are in `atlantis4/settings.ini`
+//! ([`A4Settings`]: the language, the renderer, the full screen).
+//!
+//! The language is the original's: `lang.ini`'s (GOG.com's installer
+//! writes the one chosen in its client), else `options.xml`'s
+//! `DebugLanguage`, checked against `Texts/<language>.xml` with the
+//! fallbacks `en fr de es it ru` (`atlantis4_data::A4Files::choose_language`).
+//! The original has no language menu; `settings.ini`'s `language` and
+//! `--lang <de|en|es|fr|it>` are Native's own choice over both.
+//!
+//! The development viewer, `atlantis-native --atlantis4-view <game
+//! folder>` (`--lang`, `--cpu`, `--gpu-check`, `--fullscreen`), has two
+//! shortcuts past the menus: `--node <node>` (or a bare
+//! `node`) starts a new game at `node`, `--save <file>` (or a bare name
+//! ending in `.xml`) loads that save of the backup folder; either game
+//! still goes back to the main menu.
+//! A new game boots the game's
+//! scripts (the `Texts` boot files, `3D/OnGameEnter.lua`,
+//! `Diary/Diary.lua`, `Inventory/InventoryScripts.lua`, then the node
+//! change to `firstWarpPath`, or to `node` when given) and shows the node
+//! in the window, drawn by the graphics card (`atlantis4_gl`) or the
+//! processor (`atlantis4_engine`): the background, the objects and animations the
+//! node's `OnWarpEnter` puts there, the markers and the game's cursor.
+//! Dragging with the left button turns the view (0.5° per pixel, the
+//! original's mouse look); a left click of less than 20 pixels calls the
+//! node's `OnWarpObjectHit` with what it hits, which leads through an exit
+//! with `ChangeWarp` as the original. `PlayMovie` plays its video full
+//! screen (the intro at a new game) over a black background: while it
+//! runs the view does not turn and clicks go to the movie's buttons (a
+//! click shows or hides the skip button at the top right, a click on it
+//! ends the movie), and its end calls `OnMovieFinished`. The sounds play
+//! as the original mixes them (`atlantis4_engine::sound`, `oalmix`): the
+//! music, the node's `PlaySound` sounds and ambiences, `OnSoundStopped`,
+//! the `AddToBag` notification, and a movie's sound file on the `video`
+//! channel from its start to its end or skip (the music cut meanwhile);
+//! the device is asked for 44,100 Hz, else the mix is resampled linearly
+//! to its rate (outside the exact part, like Windows' own audio engine
+//! after OpenAL). The dialogs run as the original's: `DrawText` lines in
+//! the bar that slides up from the bottom with their voice, the talking
+//! heads and backgrounds of a conversation (`InitDialog`), its topics
+//! (`PushAnswer`) stacked on the left, a click on a topic calling
+//! `OnAnswered`, a click on the bar skipping the line, `quit` closing the
+//! conversation; while they show, they take the clicks and the view does
+//! not turn. The HUD's inventory button (bottom right) opens the
+//! inventory menu: a click on an object selects it (shown in the HUD
+//! button) and a second within 300 ms closes the menu, as does the
+//! menu's quit button; the selected object is what the scripts'
+//! `Selected` sees when the warp is clicked. Objects can be dragged to an
+//! empty slot. `ShowDocument` shows its picture full screen (the first
+//! node's tutorials); a click turns to the next page 200 ms later, which
+//! closes it, a double click closes it at once. `LoadSprite` sprites and
+//! the `AddToBag` notification (its picture and the object's name) show;
+//! the inventory's box names the selected object. The layers draw in the
+//! original's order (the HUD, the inventory menu, the dialog, the
+//! answers, the notification, the cursor) and the clicks go to the top
+//! one: a dialog takes them over the HUD. The saves are written as the
+//! original's (`SaveGame`, the autosave at every node change) and read
+//! back through `Game::load`'s save branch.
+//!
+//! The same viewer runs in the browser ([`web`], `wasm32`): the game's
+//! files are the folder the player picked, read when the engine reads
+//! them; the frame is drawn by the graphics card through WebGL 2, by the
+//! processor on a 2D canvas without it; the redraws follow the screen's
+//! refresh while the game's updates keep the desktop's 60 a second; the
+//! saves and `options.xml` are kept in the page's storage; the sound
+//! starts at the first click or key; a hidden page holds the game.
+
+use std::cell::{Cell, RefCell};
+use std::num::NonZeroU32;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::Path;
+use std::rc::Rc;
+
+#[cfg(not(target_arch = "wasm32"))]
+use atlantis4_data::A4Files;
+use atlantis4_engine::canvas::{Canvas, CpuCache, CpuCanvas};
+use atlantis4_engine::dialog::Action;
+use atlantis4_engine::game_saves::GameSaves;
+use atlantis4_engine::menus::{Front, FrontAction};
+use atlantis4_engine::options::{self, Settings};
+use atlantis4_engine::pick::is_click;
+#[cfg(not(target_arch = "wasm32"))]
+use atlantis4_engine::saves::BackupFolder;
+use atlantis4_engine::saves::SaveStore;
+use atlantis4_engine::Game;
+#[cfg(not(target_arch = "wasm32"))]
+use atlantis4_script::{new_game, read_boot_vars, BootValue, EngineRef, ErrorMode};
+use atlantis4_script::{Options, Script, Value};
+use web_time::{Duration, Instant};
+use winit::application::ApplicationHandler;
+#[cfg(not(target_arch = "wasm32"))]
+use winit::dpi::PhysicalSize;
+use winit::event::{ElementState, MouseButton, WindowEvent};
+#[cfg(not(target_arch = "wasm32"))]
+use winit::event_loop::EventLoop;
+use winit::event_loop::{ActiveEventLoop, ControlFlow};
+#[cfg(not(target_arch = "wasm32"))]
+use winit::keyboard::{Key, NamedKey};
+#[cfg(not(target_arch = "wasm32"))]
+use winit::window::Fullscreen;
+use winit::window::{Window, WindowId};
+
+#[cfg(target_arch = "wasm32")]
+#[path = "a4_web.rs"]
+pub mod web;
+
+const WIDTH: u32 = 1365;
+const HEIGHT: u32 = 768;
+
+/// The time between two updates of the viewer (a 60 Hz display's): a
+/// frame is drawn only when its picture changed, so a 25 fps movie shows
+/// each of its pictures within one period of its time.
+const FRAME: Duration = Duration::from_micros(16_667);
+
+/// The game's clock: the time since the start less the time held. On the
+/// desktop nothing is held: it is the time since the start. In the
+/// browser, a hidden page or a redraw gap is held, and so is the time the
+/// browser takes to read the player's files (a synchronous read of a
+/// picked file, about 12 ms a MB, which the desktop's disk does in a
+/// fraction of that): a movie started after a 30 MB read then starts at
+/// the clock the frame's update reads, as on the desktop. The clock never
+/// goes back.
+#[derive(Clone)]
+struct GameClock {
+    start: Instant,
+    held: Rc<Cell<Duration>>,
+    last: Rc<Cell<u64>>,
+    /// The browser's read time when the clock started.
+    #[cfg(target_arch = "wasm32")]
+    reads0: Duration,
+}
+
+impl GameClock {
+    fn new() -> GameClock {
+        GameClock {
+            start: Instant::now(),
+            held: Rc::new(Cell::new(Duration::ZERO)),
+            last: Rc::new(Cell::new(0)),
+            #[cfg(target_arch = "wasm32")]
+            reads0: crate::web::read_time(),
+        }
+    }
+
+    /// The time held so far.
+    fn held(&self) -> Duration {
+        #[cfg(target_arch = "wasm32")]
+        return self.held.get() + crate::web::read_time().saturating_sub(self.reads0);
+        #[cfg(not(target_arch = "wasm32"))]
+        self.held.get()
+    }
+
+    /// Whole microseconds of game time (the original's clock counts whole
+    /// microseconds, @ 0x004faf40).
+    fn us(&self) -> u64 {
+        let t = self.start.elapsed().saturating_sub(self.held());
+        let us = u64::try_from(t.as_micros())
+            .unwrap_or(u64::MAX)
+            .max(self.last.get());
+        self.last.set(us);
+        us
+    }
+
+    /// `d` of wall time not counted.
+    #[cfg(target_arch = "wasm32")]
+    fn hold(&self, d: Duration) {
+        self.held.set(self.held.get() + d);
+    }
+}
+
+struct Viewer {
+    game: Rc<RefCell<Game>>,
+    /// The sound output, kept alive.
+    _audio: Option<cpal::Stream>,
+    /// The game's script state (none in the menus).
+    script: Option<Script>,
+    /// The front end (splashes, menus, the planks).
+    front: Front,
+    /// The game's backup folder as the menus see it.
+    saves: GameSaves,
+    /// Where `options.xml` is read and written (none when the saves stay
+    /// in memory).
+    #[cfg(not(target_arch = "wasm32"))]
+    options_path: Option<std::path::PathBuf>,
+    /// The desktop window's part: full screen, the keys, the game library.
+    #[cfg(not(target_arch = "wasm32"))]
+    desk: Desk,
+    /// The page's part: the storage, the sound's start, the pace.
+    #[cfg(target_arch = "wasm32")]
+    web: web::WebPart,
+    clock: GameClock,
+    window: Option<Rc<Window>>,
+    /// The processor's picture in the window (with `--cpu`, or when the
+    /// card's could not be made).
+    surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// The card's renderer on the window.
+    gl: Option<crate::a4_gl::GlView>,
+    render: Render,
+    /// The processor's renderer's state between frames.
+    cpu_cache: CpuCache,
+    /// The check mode's processor frame and when it last ran.
+    check_buf: Vec<u32>,
+    last_check: Option<Instant>,
+    /// The check mode's last comparison.
+    last_diff: Option<atlantis4_gl::check::Diff>,
+    pointer: Option<(f64, f64)>,
+    down: Option<(f64, f64)>,
+    /// The press went to a GUI layer (the dialogs, the HUD, the inventory,
+    /// a document).
+    gui_down: bool,
+    last: (f64, f64),
+    size: (u32, u32),
+    /// When the next frame is due (the game's update, then a draw if the
+    /// picture changed).
+    next_frame: Instant,
+    /// The [`Game::frame_key`] of the picture on screen.
+    shown: Option<u64>,
+    /// Frame time statistics, logged every few seconds.
+    stats: Stats,
+    /// The window closes.
+    quit: bool,
+}
+
+/// How the viewer draws.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Render {
+    /// The processor's renderer (`--cpu`) instead of the card's.
+    pub cpu: bool,
+    /// The check mode (`--gpu-check`): at most once a second, the frame
+    /// drawn by the card is drawn by the processor too and the two are
+    /// compared (logged: pixels that differ, the largest and the mean
+    /// channel difference, see `atlantis4_gl::check`).
+    pub check: bool,
+}
+
+/// Where the viewer starts.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Start {
+    /// The splashes, then the main menu (the original's start).
+    Menus,
+    /// A new game at this node (development).
+    Node(String),
+    /// This save of the backup folder (development).
+    Save(String),
+}
+
+/// Where the frame time goes: the game's update, the drawing, the copy to
+/// the window.
+#[derive(Default)]
+struct Stats {
+    frames: u32,
+    draws: u32,
+    tick: Duration,
+    draw: Duration,
+    present: Duration,
+    since: Option<Instant>,
+    /// "card" or "processor".
+    by: &'static str,
+}
+
+impl Stats {
+    fn log(&mut self) {
+        let now = Instant::now();
+        let since = *self.since.get_or_insert(now);
+        if now - since < Duration::from_secs(5) {
+            return;
+        }
+        let per = |d: Duration, n: u32| d.as_secs_f64() * 1e3 / f64::from(n.max(1));
+        log::info!(
+            "frames: {} updates ({:.2} ms each), {} drawn by the {} ({:.2} ms draw, {:.2} ms present) in {:.1} s",
+            self.frames,
+            per(self.tick, self.frames),
+            self.draws,
+            self.by,
+            per(self.draw, self.draws),
+            per(self.present, self.draws),
+            (now - since).as_secs_f64()
+        );
+        *self = Stats {
+            since: Some(now),
+            by: self.by,
+            ..Stats::default()
+        };
+    }
+}
+
+impl Viewer {
+    /// The engine clock: whole microseconds, divided by 1000.0 as the
+    /// original's animation clock is.
+    fn now_ms(&self) -> f64 {
+        self.clock.us() as f64 / 1000.0
+    }
+
+    /// The frame animations, then the `OnAnimationFinished` callbacks of
+    /// those that finished; the movie, then `OnMovieFinished` if it ended.
+    fn tick(&mut self, el: &ActiveEventLoop) {
+        let now = self.now_ms();
+        self.front.tick(now, &mut self.saves);
+        self.front_actions(el);
+        if self.script.is_none() {
+            // The menus: the sounds and the music still play.
+            self.game.borrow_mut().update(now);
+            return;
+        }
+        let finished = self.game.borrow_mut().update(now);
+        // `TeSoundManager::update` ran first in the frame: its signals'
+        // callbacks (`OnSoundStopped`) come before the animations'.
+        let sounds = self.game.borrow_mut().sound_callbacks();
+        for (name, args) in sounds {
+            self.callback(&name, &args);
+        }
+        for name in finished {
+            let arg = [Value::Str(name.into_bytes())];
+            self.callback("OnAnimationFinished", &arg);
+        }
+        let ended = self.game.borrow_mut().update_movie(now);
+        if let Some(name) = ended {
+            self.movie_finished(name);
+        }
+        // The dialog bar's end of line (`OnDialogClosed`,
+        // `OnDialogFinished`).
+        let dialogs = self.game.borrow_mut().dialog_callbacks();
+        for (name, args) in dialogs {
+            self.callback(&name, &args);
+        }
+        // The shown document's alarm and the notification's fades.
+        self.game.borrow_mut().update_gui(now);
+        self.gui_callbacks();
+        // `FinishGame` (0x0052bc30): the portrait planks, whose turn
+        // (`App+0xdb0`, `Game::onFinished` 0x00526910) leaves the game
+        // and enters the main menu; no save before, no credits.
+        if self.game.borrow_mut().take_finish() {
+            self.front.to_main_menu(now);
+        }
+        self.main_menu_button(now);
+    }
+
+    /// The inventory menu's "menu" button (0x0057cc50): `save.xml`, then
+    /// the portrait planks.
+    fn main_menu_button(&mut self, now: f64) {
+        if !self.game.borrow_mut().take_main_menu() {
+            return;
+        }
+        if let Some(script) = self.script.as_mut() {
+            if let Err(e) = self.saves.save(&self.game, script, "save.xml") {
+                log::error!("{e}");
+            }
+        }
+        self.front.to_main_menu(now);
+    }
+
+    /// Runs a script callback when a game is in play.
+    fn callback(&mut self, name: &str, args: &[Value]) {
+        if let Some(s) = self.script.as_mut() {
+            if let Err(e) = s.callback(name, args) {
+                log::error!("{e}");
+            }
+        }
+    }
+
+    /// What the front end asked for, in order.
+    fn front_actions(&mut self, el: &ActiveEventLoop) {
+        let actions = self.front.take_actions();
+        // A page is never closed by the game: the settings are kept as
+        // they change instead of at the end.
+        #[cfg(target_arch = "wasm32")]
+        if actions
+            .iter()
+            .any(|a| matches!(a, FrontAction::Settings | FrontAction::Volume(..)))
+        {
+            self.web.options_due = true;
+        }
+        for a in actions {
+            log::info!("front end: {a:?}");
+            match a {
+                FrontAction::Sound(p) => {
+                    let mut g = self.game.borrow_mut();
+                    let files = g.files.clone();
+                    g.sounds.play_free_sound(&files, &p, 1.0);
+                }
+                FrontAction::Music(p) => {
+                    let mut g = self.game.borrow_mut();
+                    let files = g.files.clone();
+                    let same = g.sounds.music.is_playing() && g.sounds.music.path() == p;
+                    if !same {
+                        g.sounds.play_music(&files, &p);
+                    }
+                }
+                FrontAction::Volume(ch, v) => {
+                    self.game.borrow_mut().sounds.set_channel_volume(&ch, v)
+                }
+                FrontAction::TestSound(ch, p) => {
+                    // `PG813A01.ogg` is in no install: silent.
+                    log::info!("test sound {p} on {ch}");
+                }
+                FrontAction::Settings => {
+                    let s = self.front.settings.clone();
+                    self.game.borrow_mut().apply_settings(&s);
+                }
+                FrontAction::StartGame(name) => self.start_game(&name),
+                FrontAction::LeaveGame => self.leave_game(),
+                FrontAction::Quit => {
+                    self.write_options();
+                    // The page again (a page cannot close itself).
+                    #[cfg(target_arch = "wasm32")]
+                    crate::a2_web::quit();
+                    el.exit();
+                }
+            }
+        }
+    }
+
+    /// `Game::leave` (0x00525f50: the autosave when a node is shown), the
+    /// script state dropped, then the main menu.
+    fn leave_game(&mut self) {
+        Game::leave(&self.game, self.script.as_ref());
+        self.script = None;
+        self.front.game_left(&self.saves);
+    }
+
+    /// `Game::enter` then `Game::load(name)` (0x00528c10, 0x00529e30): a
+    /// new game when the file is missing.
+    fn start_game(&mut self, name: &str) {
+        Game::leave(&self.game, self.script.take().as_ref());
+        let s = self.front.settings.clone();
+        self.game.borrow_mut().apply_settings(&s);
+        match self.saves.load(&self.game, name) {
+            Ok(script) => self.script = Some(script),
+            Err(e) => log::error!("{e}"),
+        }
+    }
+
+    /// `options.xml` written (0x005766b0, at the application's end).
+    #[cfg(not(target_arch = "wasm32"))]
+    fn write_options(&self) {
+        let Some(path) = &self.options_path else {
+            return;
+        };
+        let data = self.front.settings.write();
+        if let Some(d) = path.parent() {
+            let _ = std::fs::create_dir_all(d);
+        }
+        if let Err(e) = std::fs::write(path, data) {
+            log::warn!("{}: {e}", path.display());
+        }
+    }
+
+    /// The callbacks the screens raised (`OnDocumentClosed`, …).
+    fn gui_callbacks(&mut self) {
+        loop {
+            let cbs = self.game.borrow_mut().gui_callbacks();
+            if cbs.is_empty() {
+                break;
+            }
+            for (name, args) in cbs {
+                self.callback(&name, &args);
+            }
+        }
+    }
+
+    /// Runs what a click on the GUI led to, in order.
+    fn run_actions(&mut self, actions: Vec<Action>) {
+        for a in actions {
+            match a {
+                Action::Lua(name, args) => self.callback(&name, &args),
+                Action::HideAnswers => self.game.borrow_mut().dialogs.hide_answers(),
+            }
+        }
+    }
+
+    fn movie_finished(&mut self, name: String) {
+        let arg = [Value::Str(name.into_bytes())];
+        self.callback("OnMovieFinished", &arg);
+    }
+
+    fn in_movie(&self) -> bool {
+        self.game.borrow().movie.is_some()
+    }
+
+    /// The frame on `c`: the front end's layers over the game when it
+    /// shows, else the game, the cursor last.
+    fn paint(&mut self, c: &mut dyn Canvas) {
+        let (_, h) = c.size();
+        let mut g = self.game.borrow_mut();
+        g.height = h;
+        if self.front.active() || self.front.in_transition() {
+            if self.front.active() {
+                c.clear();
+            } else {
+                g.draw_on(c, None);
+            }
+            self.front.draw_on(c);
+            g.draw_cursor_on(c, self.pointer);
+        } else {
+            g.draw_on(c, self.pointer);
+        }
+    }
+
+    fn draw(&mut self) {
+        let key = self.frame_key();
+        let (w, h) = self.size;
+        if w == 0 || h == 0 {
+            return;
+        }
+        if self.gl.is_some() {
+            self.draw_gl(w, h);
+        } else {
+            self.draw_cpu(w, h);
+        }
+        self.shown = Some(key);
+    }
+
+    /// The frame drawn by the card; in the check mode, by the processor
+    /// too, and compared.
+    fn draw_gl(&mut self, w: u32, h: u32) {
+        let Some(mut gl) = self.gl.take() else { return };
+        let t0 = Instant::now();
+        {
+            let mut f = gl.renderer.begin(w, h);
+            self.paint(&mut f);
+            f.finish();
+        }
+        let t1 = Instant::now();
+        if let Some(win) = &self.window {
+            win.pre_present_notify();
+        }
+        if let Err(e) = gl.present(w, h) {
+            log::warn!("present: {e}");
+        }
+        self.stats.draws += 1;
+        self.stats.draw += t1 - t0;
+        self.stats.present += t1.elapsed();
+        let due = self
+            .last_check
+            .is_none_or(|t| t.elapsed() >= Duration::from_secs(1));
+        if self.render.check && due {
+            self.last_check = Some(Instant::now());
+            let card = gl.renderer.read_pixels();
+            let mut buf = std::mem::take(&mut self.check_buf);
+            buf.resize(w as usize * h as usize, 0);
+            let mut cache = std::mem::take(&mut self.cpu_cache);
+            let weights = self.game.borrow().weights;
+            self.paint(&mut CpuCanvas::new(&mut buf, w, h, &mut cache, weights));
+            self.cpu_cache = cache;
+            let d = atlantis4_gl::check::compare(&buf, &card, w as usize);
+            log::info!(
+                "GPU check {w}x{h}: {d}{}",
+                if d.within() {
+                    ""
+                } else {
+                    " (over the tolerance)"
+                }
+            );
+            self.check_buf = buf;
+            self.last_diff = Some(d);
+        }
+        self.gl = Some(gl);
+    }
+
+    /// The frame drawn by the processor into the window's buffer.
+    fn draw_cpu(&mut self, w: u32, h: u32) {
+        let (Some(nw), Some(nh)) = (NonZeroU32::new(w), NonZeroU32::new(h)) else {
+            return;
+        };
+        let Some(mut surface) = self.surface.take() else {
+            return;
+        };
+        if surface.resize(nw, nh).is_ok() {
+            if let Ok(mut buf) = surface.buffer_mut() {
+                let t0 = Instant::now();
+                let mut cache = std::mem::take(&mut self.cpu_cache);
+                let weights = self.game.borrow().weights;
+                self.paint(&mut CpuCanvas::new(&mut buf, w, h, &mut cache, weights));
+                self.cpu_cache = cache;
+                let t1 = Instant::now();
+                if let Some(win) = &self.window {
+                    win.pre_present_notify();
+                }
+                let _ = buf.present();
+                self.stats.draws += 1;
+                self.stats.draw += t1 - t0;
+                self.stats.present += t1.elapsed();
+            }
+        }
+        self.surface = Some(surface);
+    }
+
+    /// What the picture depends on: the game's, the front end's.
+    fn frame_key(&mut self) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let (w, h) = self.size;
+        let mut hs = std::collections::hash_map::DefaultHasher::new();
+        let menus = self.front.active();
+        menus.hash(&mut hs);
+        if menus {
+            self.pointer
+                .map(|(x, y)| (x.to_bits(), y.to_bits()))
+                .hash(&mut hs);
+        } else {
+            self.game
+                .borrow()
+                .frame_key(w, h, self.pointer)
+                .hash(&mut hs);
+        }
+        if menus || self.front.in_transition() {
+            self.front.key(&mut hs);
+        }
+        hs.finish()
+    }
+
+    fn release(&mut self) {
+        let Some(down) = self.down.take() else { return };
+        let Some(up) = self.pointer else { return };
+        if self.front.active() || self.front.in_transition() {
+            let (w, h) = self.size;
+            let now = self.now_ms();
+            self.front.release(w, h, up.0, up.1, now, &mut self.saves);
+            return;
+        }
+        let gui_down = std::mem::replace(&mut self.gui_down, false);
+        if gui_down || self.game.borrow().gui_shown() {
+            let (w, h) = self.size;
+            let actions = self.game.borrow_mut().gui_release(w, h, up.0, up.1);
+            if let Some(a) = actions {
+                self.run_actions(a);
+                self.gui_callbacks();
+                return;
+            }
+            if gui_down {
+                return;
+            }
+        }
+        if self.in_movie() {
+            let (w, h) = self.size;
+            let ended = self.game.borrow_mut().movie_release(w, h, up.0, up.1);
+            if let Some(name) = ended {
+                self.movie_finished(name);
+            }
+            return;
+        }
+        if !is_click((down.0 as f32, down.1 as f32), (up.0 as f32, up.1 as f32)) {
+            return;
+        }
+        let (w, h) = self.size;
+        let hit = self.game.borrow().click(w, h, up.0 as i32, up.1 as i32);
+        log::info!("click at {up:?}: {hit:?}");
+        if let Some(name) = hit {
+            // The warp's click callback (`+0xbc`): `OnWarpObjectHit(name)`.
+            let arg = [Value::Str(name.into_bytes())];
+            self.callback("OnWarpObjectHit", &arg);
+        }
+    }
+}
+
+impl ApplicationHandler for Viewer {
+    #[cfg(target_arch = "wasm32")]
+    fn resumed(&mut self, el: &ActiveEventLoop) {
+        self.resumed_web(el);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn resumed(&mut self, el: &ActiveEventLoop) {
+        if self.window.is_some() {
+            return;
+        }
+        // The original's window: its client area is the game's screen,
+        // whatever its size (the interface's root is the client size,
+        // `TeMainWindow` 0x004ff990); 1365 x 768 unless the screen is
+        // smaller, resizable; or the full screen.
+        let size = el
+            .primary_monitor()
+            .map(|m| m.size())
+            .map_or(PhysicalSize::new(WIDTH, HEIGHT), |m| {
+                window_size(m.width, m.height)
+            });
+        let attrs = Window::default_attributes()
+            .with_title("Atlantis Evolution - Atlantis Native")
+            .with_inner_size(size)
+            .with_resizable(true)
+            .with_fullscreen(self.desk.fullscreen.then_some(Fullscreen::Borderless(None)));
+        // The card's renderer unless `--cpu`; the processor's when the
+        // card's cannot be made.
+        let mut window = None;
+        if !self.render.cpu {
+            let (win, view) = crate::a4_gl::create(el, attrs.clone());
+            window = win;
+            match view {
+                Ok(v) => {
+                    log::info!("drawn by the graphics card: {}", v.renderer.info);
+                    self.gl = Some(v);
+                    self.stats.by = "card";
+                }
+                Err(e) => log::warn!("no OpenGL ({e}): drawn by the processor"),
+            }
+        }
+        let window = match window {
+            Some(w) => Rc::new(w),
+            None => match el.create_window(attrs) {
+                Ok(w) => Rc::new(w),
+                Err(e) => {
+                    log::error!("no window: {e}");
+                    el.exit();
+                    return;
+                }
+            },
+        };
+        if self.gl.is_none() {
+            self.stats.by = "processor";
+            match softbuffer::Context::new(window.clone())
+                .and_then(|c| softbuffer::Surface::new(&c, window.clone()))
+            {
+                Ok(s) => self.surface = Some(s),
+                Err(e) => {
+                    log::error!("no picture in the window: {e}");
+                    el.exit();
+                    return;
+                }
+            }
+        }
+        // The game draws its own cursor (`2D/arrow6.png`).
+        window.set_cursor_visible(false);
+        let s = window.inner_size();
+        self.size = (s.width, s.height);
+        self.window = Some(window);
+        self.next_frame = Instant::now();
+        el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
+    }
+
+    /// Once per frame period (not after every input event): the game's
+    /// update, then a redraw only when the picture changed. The movie and
+    /// the animations pick their frame from the clock, so a late frame
+    /// skips pictures instead of slowing the game down. (In the browser
+    /// the redraws, one per screen refresh, run the updates due:
+    /// [`Viewer::redraw_web`].)
+    #[cfg(target_arch = "wasm32")]
+    fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        el.set_control_flow(ControlFlow::Wait);
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        let now = Instant::now();
+        if now >= self.next_frame {
+            let t0 = Instant::now();
+            self.tick(el);
+            self.stats.frames += 1;
+            self.stats.tick += t0.elapsed();
+            self.next_frame += FRAME;
+            if self.next_frame <= now {
+                self.next_frame = now + FRAME;
+            }
+            let key = self.frame_key();
+            if self.shown != Some(key) {
+                if let Some(win) = &self.window {
+                    win.request_redraw();
+                }
+            }
+            self.stats.log();
+        }
+        if self.quit {
+            el.exit();
+            return;
+        }
+        el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
+    }
+
+    fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        // The page's own events (the redraws, the keys, a hidden page) and
+        // the sound's start at the first click.
+        #[cfg(target_arch = "wasm32")]
+        if self.web_event(el, &event) {
+            return;
+        }
+        match event {
+            WindowEvent::CloseRequested => {
+                self.write_options();
+                el.exit();
+            }
+            WindowEvent::Resized(s) => {
+                self.size = (s.width, s.height);
+                if let Some(gl) = &self.gl {
+                    gl.resize(s.width, s.height);
+                }
+                self.shown = None;
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            WindowEvent::RedrawRequested => self.draw(),
+            #[cfg(not(target_arch = "wasm32"))]
+            WindowEvent::ModifiersChanged(m) => {
+                self.desk.alt = m.state().alt_key();
+                // Shift in the first moments of an automatic start: the
+                // game library.
+                let early = self.desk.shift_until.is_some_and(|t| Instant::now() < t);
+                if early && m.state().shift_key() {
+                    log::info!("Atlantis Evolution stopped: the game library");
+                    self.desk.to_library = true;
+                    self.write_options();
+                    el.exit();
+                }
+            }
+            // The port's keys (the original reads none for the window):
+            // F11 and Alt+Enter switch the full screen.
+            #[cfg(not(target_arch = "wasm32"))]
+            WindowEvent::KeyboardInput { event, .. }
+                if event.state == ElementState::Pressed && !event.repeat =>
+            {
+                match event.logical_key {
+                    Key::Named(NamedKey::Enter) if self.desk.alt => self.toggle_fullscreen(),
+                    Key::Named(NamedKey::F11) => self.toggle_fullscreen(),
+                    _ => {}
+                }
+            }
+            WindowEvent::CursorLeft { .. } => self.pointer = None,
+            WindowEvent::CursorMoved { position, .. } => {
+                let p = (position.x, position.y);
+                self.pointer = Some(p);
+                if self.front.active() || self.front.in_transition() {
+                    let (w, h) = self.size;
+                    let now = self.now_ms();
+                    let held = self.down.is_some();
+                    self.front.hover(w, h, p.0, p.1, held, now);
+                    self.last = p;
+                    return;
+                }
+                {
+                    let (w, h) = self.size;
+                    self.game.borrow_mut().gui_hover(w, h, p.0, p.1);
+                }
+                if self.gui_down {
+                    // A press on the GUI does not turn the view; it may
+                    // drag an inventory object.
+                    if self.down.is_some() {
+                        self.game.borrow_mut().gui_drag(p.0, p.1);
+                    }
+                } else if self.in_movie() {
+                    // The view update (0x0052ab40) does not run during a
+                    // movie; a held press only changes the skip button's
+                    // picture.
+                    if self.down.is_some() {
+                        let (w, h) = self.size;
+                        self.game.borrow_mut().movie_drag(w, h, p.0, p.1);
+                    }
+                } else if self.down.is_some() && self.game.borrow().warp_takes_input() {
+                    // Input pixels, y up.
+                    let dx = p.0 - self.last.0;
+                    let dy_up = self.last.1 - p.1;
+                    let mut g = self.game.borrow_mut();
+                    let inverse = g.inverse_look;
+                    g.view.drag(dx as f32, dy_up as f32, inverse);
+                }
+                self.last = p;
+            }
+            WindowEvent::MouseInput {
+                state,
+                button: MouseButton::Left,
+                ..
+            } => match state {
+                ElementState::Pressed => {
+                    if let Some(p) = self.pointer {
+                        self.down = Some(p);
+                        self.last = p;
+                        let (w, h) = self.size;
+                        if self.front.active() || self.front.in_transition() {
+                            self.front.press(w, h, p.0, p.1);
+                            return;
+                        }
+                        // The GUI above the warp first (the dialogs, a
+                        // document, the inventory menu, the HUD); a movie's
+                        // buttons when none takes it.
+                        self.gui_down = self.game.borrow_mut().gui_press(w, h, p.0, p.1);
+                        if !self.gui_down && self.in_movie() {
+                            self.game.borrow_mut().movie_press(w, h, p.0, p.1);
+                        }
+                    }
+                }
+                ElementState::Released => self.release(),
+            },
+            _ => {}
+        }
+    }
+}
+
+impl Drop for Viewer {
+    /// The card's surface and context go before the window they draw on.
+    fn drop(&mut self) {
+        self.gl = None;
+        self.surface = None;
+    }
+}
+
+/// The sound's output: cpal's stream on the desktop, the page's own in
+/// the browser ([`crate::audio_out::web_out`]).
+#[cfg(not(target_arch = "wasm32"))]
+type SoundOut = cpal::Stream;
+#[cfg(target_arch = "wasm32")]
+type SoundOut = crate::audio_out::web_out::WebOutput;
+
+/// The sound output: the 44,100 Hz stereo mix to the device, as is when
+/// the device runs at 44,100 Hz, else linearly resampled. (In the browser:
+/// silent while the page is hidden, the game held.)
+fn start_sound(core: atlantis4_engine::sound::Core) -> Option<SoundOut> {
+    const RATE: u32 = atlantis4_engine::oalmix::RATE;
+    // Resampler state: source frames not yet used, position in them.
+    let mut src: Vec<i16> = Vec::new();
+    let mut pos = 0f64;
+    let fill = move |out: &mut [f32], rate: u32, channels: usize| {
+        let channels = channels.max(1);
+        #[cfg(target_arch = "wasm32")]
+        if crate::a2_web::page_hidden() {
+            out.fill(0.0);
+            return;
+        }
+        let frames = out.len() / channels;
+        let mut core = core.lock().unwrap_or_else(|e| e.into_inner());
+        let put = |o: &mut [f32], l: f32, r: f32| {
+            if channels == 1 {
+                o[0] = (l + r) / 2.0;
+            } else {
+                o[0] = l;
+                o[1] = r;
+                o[2..].fill(0.0);
+            }
+        };
+        if rate == RATE {
+            let mut buf = vec![0i16; 2 * frames];
+            core.pull(&mut buf);
+            for (o, s) in out.chunks_exact_mut(channels).zip(buf.as_chunks::<2>().0) {
+                put(o, f32::from(s[0]) / 32768.0, f32::from(s[1]) / 32768.0);
+            }
+            return;
+        }
+        let step = f64::from(RATE) / f64::from(rate);
+        for o in out.chunks_exact_mut(channels) {
+            let i = pos as usize;
+            while src.len() < 2 * (i + 2) {
+                let mut more = vec![0i16; 2 * 256];
+                core.pull(&mut more);
+                src.extend(more);
+            }
+            let f = (pos - i as f64) as f32;
+            let at = |k: usize| f32::from(src[k]) / 32768.0;
+            let l = at(2 * i) * (1.0 - f) + at(2 * i + 2) * f;
+            let r = at(2 * i + 1) * (1.0 - f) + at(2 * i + 3) * f;
+            put(o, l, r);
+            pos += step;
+        }
+        let used = pos as usize;
+        src.drain(..2 * used.min(src.len() / 2));
+        pos -= used as f64;
+    };
+    #[cfg(not(target_arch = "wasm32"))]
+    let stream = crate::audio_out::start_with_rate(fill, RATE);
+    #[cfg(target_arch = "wasm32")]
+    let stream = crate::audio_out::web_out::start(fill, RATE);
+    stream
+}
+
+/// The desktop window's part of the game.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Default)]
+struct Desk {
+    /// The window is full screen.
+    fullscreen: bool,
+    /// Alt is held (Alt+Enter).
+    alt: bool,
+    /// Until when Shift goes back to the game library (started from it
+    /// without its screen).
+    shift_until: Option<Instant>,
+    /// The window ended for the game library's screen.
+    to_library: bool,
+    /// `settings.ini`, when the game was started from it (the full screen
+    /// switch is kept there); none for the development viewer.
+    settings: Option<A4Settings>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Viewer {
+    /// F11 or Alt+Enter: the window or the full screen, kept in
+    /// `settings.ini` (as the first game's switch is).
+    fn toggle_fullscreen(&mut self) {
+        let full = !self.desk.fullscreen;
+        self.desk.fullscreen = full;
+        if let Some(w) = &self.window {
+            w.set_fullscreen(full.then_some(Fullscreen::Borderless(None)));
+        }
+        if let Some(s) = &mut self.desk.settings {
+            s.fullscreen = full;
+            save_settings(&settings_path(), s);
+        }
+    }
+}
+
+/// The window's first size: the original's 1365 x 768 when the screen
+/// (`screen_w` x `screen_h` pixels) holds it with room for the window's
+/// frame, else as large as 90 % of the screen allows, at the same
+/// proportions. The interface is laid out on whatever size the window
+/// has, as the original lays it out on its client area.
+#[cfg(not(target_arch = "wasm32"))]
+fn window_size(screen_w: u32, screen_h: u32) -> PhysicalSize<u32> {
+    let (mw, mh) = (screen_w * 9 / 10, screen_h * 9 / 10);
+    if screen_w == 0 || screen_h == 0 || (WIDTH <= mw && HEIGHT <= mh) {
+        return PhysicalSize::new(WIDTH, HEIGHT);
+    }
+    // The largest of the original's proportions within the room.
+    let w = mw.min(mh * WIDTH / HEIGHT).max(1);
+    PhysicalSize::new(w, (w * HEIGHT / WIDTH).max(1))
+}
+
+/// Atlantis Evolution's folder in the per-user data folder: its
+/// `Documents/` stands for the player's documents, so the backup folder
+/// (the saves and `options.xml`) is `Documents/Atlantis Evolution/`;
+/// `settings.ini` (the port's own settings) is beside it.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn data_dir() -> std::path::PathBuf {
+    crate::desktop::data_dir().join("atlantis4")
+}
+
+/// The name, for people, of a language of the game (its `lang.ini` tag).
+pub fn language_name(tag: &str) -> Option<&'static str> {
+    Some(match tag {
+        "de" => "German",
+        "en" => "English",
+        "es" => "Spanish",
+        "fr" => "French",
+        "it" => "Italian",
+        "ru" => "Russian",
+        _ => return None,
+    })
+}
+
+/// The edition of the installation in `dir`, for the game library: the
+/// build's name and the language its `lang.ini` gives, as the original
+/// chooses it ("Atlantis Evolution, GOG.com, French").
+#[cfg(not(target_arch = "wasm32"))]
+pub fn label(dir: &Path) -> Result<String, atlantis4_data::files::OpenError> {
+    let (files, build) = A4Files::open_dir(dir)?;
+    Ok(match language_name(&files.language()) {
+        Some(name) => format!("{}, {name}", build.label),
+        None => build.label.to_string(),
+    })
+}
+
+/// The name of the port's settings file, in [`data_dir`].
+pub const SETTINGS_FILE: &str = "settings.ini";
+
+/// The port's settings for Atlantis Evolution (`settings.ini`, the other
+/// games' pattern: `key = value` lines, `#` comments, unknown keys and bad
+/// values ignored with a warning). The original's own options (the
+/// volumes, the three check boxes) stay in its `options.xml`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct A4Settings {
+    /// The language (`language = de|en|es|fr|it`), over the install's
+    /// `lang.ini`; `auto` (none): `lang.ini`'s, as the original.
+    pub language: Option<String>,
+    /// The processor's renderer (`renderer = cpu`) instead of the
+    /// graphics card's (`gpu`).
+    pub cpu: bool,
+    /// Start in full screen (`fullscreen = on|off`; on: the original runs
+    /// full screen unless its `options.xml` asks for a window).
+    pub fullscreen: bool,
+}
+
+impl Default for A4Settings {
+    fn default() -> A4Settings {
+        A4Settings {
+            language: None,
+            cpu: false,
+            fullscreen: true,
+        }
+    }
+}
+
+impl A4Settings {
+    /// `key = value` lines; unknown keys and bad values keep the default.
+    pub fn parse(text: &str) -> A4Settings {
+        let mut s = A4Settings::default();
+        for line in text.lines() {
+            let line = line.trim();
+            if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+                continue;
+            }
+            let ok = match line.split_once('=') {
+                Some((k, v)) => {
+                    let v = v.trim().to_ascii_lowercase();
+                    match (k.trim().to_ascii_lowercase().as_str(), v.as_str()) {
+                        ("language", "auto" | "") => {
+                            s.language = None;
+                            true
+                        }
+                        ("language", l) if language_name(l).is_some() => {
+                            s.language = Some(l.to_string());
+                            true
+                        }
+                        ("renderer", "gpu") => {
+                            s.cpu = false;
+                            true
+                        }
+                        ("renderer", "cpu") => {
+                            s.cpu = true;
+                            true
+                        }
+                        ("fullscreen", "1" | "true" | "on" | "yes") => {
+                            s.fullscreen = true;
+                            true
+                        }
+                        ("fullscreen", "0" | "false" | "off" | "no") => {
+                            s.fullscreen = false;
+                            true
+                        }
+                        _ => false,
+                    }
+                }
+                None => false,
+            };
+            if !ok {
+                log::warn!("{SETTINGS_FILE}: '{line}' not understood");
+            }
+        }
+        s
+    }
+
+    pub fn to_text(&self) -> String {
+        format!(
+            "# Atlantis Native settings (Atlantis Evolution)\n\
+             # The original's own options (volumes, inverse look, compass,\n\
+             # permanent help) are kept in Documents/Atlantis Evolution/options.xml.\n\
+             # language: auto (the installation's lang.ini, as the original),\n\
+             # or de, en, es, fr, it\n\
+             language = {}\n\
+             # renderer: gpu (the graphics card, OpenGL 3.3 or ES 3.0) or cpu\n\
+             # (the processor, the reference)\n\
+             renderer = {}\n\
+             # Start in full screen (F11 or Alt+Enter switches it)\n\
+             fullscreen = {}\n",
+            self.language.as_deref().unwrap_or("auto"),
+            if self.cpu { "cpu" } else { "gpu" },
+            if self.fullscreen { "on" } else { "off" },
+        )
+    }
+}
+
+/// `settings.ini`'s place.
+#[cfg(not(target_arch = "wasm32"))]
+fn settings_path() -> std::path::PathBuf {
+    data_dir().join(SETTINGS_FILE)
+}
+
+/// `settings.ini` at `path`, written with the defaults when there is none
+/// (as the other games').
+#[cfg(not(target_arch = "wasm32"))]
+pub fn load_settings(path: &Path) -> A4Settings {
+    match std::fs::read(path) {
+        Ok(b) => A4Settings::parse(&String::from_utf8_lossy(&b)),
+        Err(_) => {
+            let s = A4Settings::default();
+            save_settings(path, &s);
+            s
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn save_settings(path: &Path, s: &A4Settings) {
+    if let Some(d) = path.parent() {
+        let _ = std::fs::create_dir_all(d);
+    }
+    if let Err(e) = std::fs::write(path, s.to_text()) {
+        log::warn!("{}: {e}", path.display());
+    }
+}
+
+/// The game at `dir` ready for its window: starting as `start` says,
+/// drawing as `render` says, in `language` when given (Native's choice),
+/// else in the install's (`lang.ini`, as the original), full screen as
+/// `fullscreen` says.
+#[cfg(not(target_arch = "wasm32"))]
+fn open_viewer(
+    dir: &Path,
+    start_at: Start,
+    render: Render,
+    language: Option<&str>,
+    fullscreen: bool,
+) -> Result<Viewer, String> {
+    let (files, build) =
+        A4Files::open_dir(dir).map_err(|e| crate::setup::explain_atlantis4(dir, &e))?;
+    log::info!(
+        "Atlantis Evolution {}, {}; saves and settings in {}",
+        build.id,
+        crate::version_string(),
+        data_dir().display()
+    );
+    let clock = GameClock::new();
+    let mut g = Game::new(files, HEIGHT);
+    // `play()` reads the clock at the call (a movie started by a script).
+    let c = clock.clone();
+    g.clock_us = Some(Box::new(move || c.us()));
+    // `FinishGame` runs the front end's planks.
+    g.app_planks = true;
+    let game = Rc::new(RefCell::new(g));
+    let engine: EngineRef = game.clone();
+    let options = Options {
+        errors: ErrorMode::Log,
+        ..Options::default()
+    };
+    let boot = read_boot_vars(&engine, options).map_err(|e| e.to_string())?;
+    let audio = start_sound(game.borrow().sounds.core());
+    game.borrow_mut().sounds.headless = audio.is_none();
+    // The backup folder (`TeGetBackupPath`: `backupPathTemplate`,
+    // `applicationTitle`) under Native's data folder: the saves and
+    // `Backup/options.xml` (0x00577530), read before anything plays.
+    game.borrow_mut().configure_saves(&boot, Some(&data_dir()));
+    let options_path = match &game.borrow().backup {
+        BackupFolder::Dir(d) => Some(d.join(options::FILE)),
+        BackupFolder::Memory(_) => None,
+    };
+    let settings = options_path
+        .as_ref()
+        .and_then(|p| std::fs::read(p).ok())
+        .map(|d| Settings::read(&d))
+        .unwrap_or_default();
+    game.borrow_mut().apply_settings(&settings);
+    if let Some(l) = language {
+        game.borrow_mut().set_language(Some(l));
+    }
+    log::info!("language {}", game.borrow().lang);
+    let version = match &boot.version_string {
+        Some(BootValue::Str(s)) => s.iter().map(|&c| char::from(c)).collect(),
+        _ => String::new(),
+    };
+    let files = game.borrow().files.clone();
+    let mut front = Front::new(&files, settings, version);
+    let mut saves = GameSaves {
+        game: game.clone(),
+        options,
+    };
+    let script = match start_at {
+        Start::Menus => {
+            front.start(0.0, &saves);
+            None
+        }
+        Start::Node(n) => {
+            game.borrow_mut().enter_game();
+            Some(new_game(&engine, options, n.as_bytes()).map_err(|e| e.to_string())?)
+        }
+        Start::Save(f) => Some(saves.load(&game, &f)?),
+    };
+    Ok(Viewer {
+        _audio: audio,
+        game,
+        script,
+        front,
+        saves,
+        options_path,
+        desk: Desk {
+            fullscreen,
+            ..Desk::default()
+        },
+        clock,
+        window: None,
+        surface: None,
+        gl: None,
+        render,
+        cpu_cache: CpuCache::default(),
+        check_buf: Vec::new(),
+        last_check: None,
+        last_diff: None,
+        pointer: None,
+        down: None,
+        gui_down: false,
+        last: (0.0, 0.0),
+        size: (WIDTH, HEIGHT),
+        next_frame: Instant::now(),
+        shown: None,
+        stats: Stats::default(),
+        quit: false,
+    })
+}
+
+/// The development viewer (`--atlantis4-view`): the game at `dir`,
+/// starting as `start` says, drawing as `render` says, in `language` when
+/// given (`--lang`), else in `settings.ini`'s or the install's; in a
+/// window unless `fullscreen`. `settings.ini` is neither used for the
+/// renderer nor written.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn run_view(
+    dir: &Path,
+    start_at: Start,
+    render: Render,
+    language: Option<&str>,
+    fullscreen: bool,
+) -> Result<(), String> {
+    let mut app = open_viewer(dir, start_at, render, language, fullscreen)?;
+    let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
+    el.run_app(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))
+}
+
+/// How long after an automatic start Shift still goes back to the game
+/// library (the other games' delay).
+#[cfg(not(target_arch = "wasm32"))]
+const SHIFT_GRACE: Duration = Duration::from_millis(2000);
+
+/// The game at `dir` as the program plays it (a folder on the command
+/// line, or the game library's choice, on its event loop `el`): the
+/// splashes and the main menu, as `settings.ini` says (the language, the
+/// renderer, the full screen; `fullscreen` forces the last); with
+/// `shift_grace` (the library's one game, started without its screen)
+/// Shift held in the first moments goes back to the library. Returns when
+/// the window closes.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn run_window_on(
+    el: &mut EventLoop<()>,
+    dir: &Path,
+    fullscreen: bool,
+    shift_grace: bool,
+) -> Result<crate::a2::Ended, String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    let path = settings_path();
+    let settings = load_settings(&path);
+    let render = Render {
+        cpu: settings.cpu,
+        check: false,
+    };
+    let mut app = open_viewer(
+        dir,
+        Start::Menus,
+        render,
+        settings.language.as_deref(),
+        fullscreen || settings.fullscreen,
+    )?;
+    app.desk.settings = Some(settings);
+    app.desk.shift_until = shift_grace.then(|| Instant::now() + SHIFT_GRACE);
+    el.run_app_on_demand(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))?;
+    Ok(if app.desk.to_library {
+        crate::a2::Ended::Library
+    } else {
+        crate::a2::Ended::Quit
+    })
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settings_ini_reads_and_writes_its_keys() {
+        let d = A4Settings::default();
+        assert_eq!(d.language, None);
+        assert!(!d.cpu && d.fullscreen);
+        assert_eq!(A4Settings::parse(&d.to_text()), d);
+        let s = A4Settings::parse("language = FR\nrenderer = cpu\nfullscreen = off\n");
+        assert_eq!(s.language.as_deref(), Some("fr"));
+        assert!(s.cpu && !s.fullscreen);
+        assert_eq!(A4Settings::parse(&s.to_text()), s);
+        assert!(s.to_text().contains("\nlanguage = fr\n"));
+        // Unknown values keep the default; `auto` is the install's.
+        let bad =
+            A4Settings::parse("language = xx\nrenderer = vulkan\nfullscreen = maybe\nother = 1");
+        assert_eq!(bad, A4Settings::default());
+        assert_eq!(
+            A4Settings::parse("language = de\nlanguage = auto").language,
+            None
+        );
+    }
+
+    #[test]
+    fn settings_ini_is_written_with_the_defaults() {
+        let d = std::env::temp_dir().join(format!("atlantis-a4-settings-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        let p = d.join(SETTINGS_FILE);
+        assert_eq!(load_settings(&p), A4Settings::default());
+        assert!(std::fs::read_to_string(&p)
+            .unwrap()
+            .contains("fullscreen = on"));
+        std::fs::write(&p, "renderer = cpu\n").unwrap();
+        assert!(load_settings(&p).cpu);
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// The first window: the original's size when the screen holds it,
+    /// else smaller at the same proportions.
+    #[test]
+    fn the_window_fits_the_screen() {
+        assert_eq!(window_size(1920, 1080), PhysicalSize::new(1365, 768));
+        assert_eq!(window_size(2560, 1440), PhysicalSize::new(1365, 768));
+        let s = window_size(1366, 768);
+        assert!(s.width <= 1229 && s.height <= 691, "{s:?}");
+        assert_eq!(s.width * 768 / 1365, s.height);
+        assert_eq!(window_size(0, 0), PhysicalSize::new(1365, 768));
+    }
+
+    #[test]
+    fn languages_have_names() {
+        for l in ["de", "en", "es", "fr", "it"] {
+            assert!(language_name(l).is_some());
+        }
+        assert_eq!(language_name("fr"), Some("French"));
+        assert_eq!(language_name("xx"), None);
+    }
+
+    /// GOG.com's folder: its edition and the language its `lang.ini`
+    /// gives, as the game library shows them.
+    #[test]
+    fn labels_gogs_installation() {
+        let Some(dir) = atlantis4_data::testing::install_dir() else {
+            return;
+        };
+        let (files, _) = A4Files::open_dir(&dir).unwrap();
+        let name = language_name(&files.language()).expect("one of the five languages");
+        assert_eq!(
+            label(&dir).unwrap(),
+            format!("Atlantis Evolution, GOG.com, {name}")
+        );
+    }
+}

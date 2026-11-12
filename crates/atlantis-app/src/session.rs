@@ -116,6 +116,8 @@ pub struct Session {
     atlantis2: Option<PathBuf>,
     /// The same for Atlantis III.
     atlantis3: Option<PathBuf>,
+    /// The same for Atlantis Evolution.
+    atlantis4: Option<PathBuf>,
 }
 
 impl Session {
@@ -142,6 +144,7 @@ impl Session {
             counts_play: true,
             atlantis2: None,
             atlantis3: None,
+            atlantis4: None,
         }
     }
 
@@ -165,10 +168,21 @@ impl Session {
         self.atlantis3.is_some()
     }
 
-    /// Whether Atlantis II or Atlantis III was chosen to play: the event
+    /// The folder of Atlantis Evolution chosen to play, if any (taken).
+    pub fn take_atlantis4(&mut self) -> Option<PathBuf> {
+        self.atlantis4.take()
+    }
+
+    /// Whether Atlantis Evolution was chosen to play: the event loop is to
+    /// end.
+    pub fn wants_atlantis4(&self) -> bool {
+        self.atlantis4.is_some()
+    }
+
+    /// Whether Atlantis II, III or Evolution was chosen to play: the event
     /// loop is to end, the program runs the game's own mode after it.
     pub fn wants_own_mode(&self) -> bool {
-        self.wants_atlantis2() || self.wants_atlantis3()
+        self.wants_atlantis2() || self.wants_atlantis3() || self.wants_atlantis4()
     }
 
     /// Adds `dirs` to the library (those not in it yet), saved.
@@ -335,15 +349,16 @@ impl App {
         }
     }
 
-    /// Plays what `opened` is: the first game at once, Atlantis II or III
-    /// once the event loop has ended ([`Session::take_atlantis2`],
-    /// [`Session::take_atlantis3`]); `folder` moves to the top of the
+    /// Plays what `opened` is: the first game at once, Atlantis II, III
+    /// or Evolution once the event loop has ended
+    /// ([`Session::take_atlantis2`], [`Session::take_atlantis3`],
+    /// [`Session::take_atlantis4`]); `folder` moves to the top of the
     /// library.
     pub fn play_opened(&mut self, opened: Opened, folder: &Path) {
-        let atlantis3 = opened.kind() == crate::setup::GameKind::Atlantis3;
+        let kind = opened.kind();
         match opened {
             Opened::LostTales(game, _) => self.play_game(*game, Some(folder)),
-            Opened::Atlantis2(label) | Opened::Atlantis3(label) => {
+            Opened::Atlantis2(label) | Opened::Atlantis3(label) | Opened::Atlantis4(label) => {
                 log::info!("game folder {} ({label})", folder.display());
                 self.stop_game();
                 let Some(session) = &mut self.session else {
@@ -351,11 +366,12 @@ impl App {
                 };
                 session.launcher = None;
                 session.played(folder);
-                if atlantis3 {
-                    session.atlantis3 = Some(folder.to_path_buf());
-                } else {
-                    session.atlantis2 = Some(folder.to_path_buf());
-                }
+                let slot = match kind {
+                    crate::setup::GameKind::Atlantis4 => &mut session.atlantis4,
+                    crate::setup::GameKind::Atlantis3 => &mut session.atlantis3,
+                    _ => &mut session.atlantis2,
+                };
+                *slot = Some(folder.to_path_buf());
                 // The window of this event loop closes; the game opens its
                 // own.
                 if let Some(w) = &self.window {
@@ -796,6 +812,54 @@ mod tests {
         let (game, label) = crate::a3::open_in(&a3, &d.join("atlantis3"), false).unwrap();
         assert_eq!(label, "Atlantis III, GOG.com, French");
         drop(game);
+    }
+
+    /// Atlantis Evolution in the game library: GOG.com's folder shown
+    /// with its name, edition and language, found by the search beside
+    /// the other games, chosen on the screen it is kept for the program
+    /// to run after the event loop (its own mode).
+    #[test]
+    fn the_library_plays_atlantis4() {
+        let Some(a4) = atlantis4_data::testing::install_dir() else {
+            return;
+        };
+        let own = own_data_dir("atlantis4");
+        let d = own.dir.clone();
+        let want = crate::a4::label(&a4).unwrap();
+        assert!(want.starts_with("Atlantis Evolution, GOG.com, "), "{want}");
+        // The search the first start and "Find installations" make.
+        let found = crate::desktop::first_of_each_game(std::slice::from_ref(&a4));
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].0, a4);
+        assert_eq!(found[0].1.kind(), crate::setup::GameKind::Atlantis4);
+        assert_eq!(found[0].1.label(), want);
+        let mut folders: Vec<PathBuf> = std::env::var_os("ATLANTIS3_DATA")
+            .map(PathBuf::from)
+            .into_iter()
+            .collect();
+        folders.push(a4.clone());
+        let text: String = folders
+            .iter()
+            .map(|f| format!("{}\n", f.display()))
+            .collect();
+        std::fs::write(d.join("games.txt"), &text).unwrap();
+        let mut app = app_with_library(&d);
+        app.show_launcher(None);
+        let l = app.session().unwrap().launcher().unwrap();
+        let labels: Vec<&str> = l.entries().iter().map(|e| e.label.as_str()).collect();
+        assert!(l.entries().iter().all(|e| e.found), "{labels:?}");
+        assert_eq!(labels.last(), Some(&want.as_str()));
+        let i = folders.len() - 1;
+        app.run_launcher_action(LauncherAction::Play(i));
+        let s = app.session().unwrap();
+        assert!(s.launcher().is_none());
+        assert!(s.wants_atlantis4() && s.wants_own_mode() && !s.wants_atlantis3());
+        assert_eq!(s.library().folders()[0], a4);
+        assert_eq!(
+            app.session_mut().unwrap().take_atlantis4(),
+            Some(a4.clone())
+        );
+        assert!(!app.session().unwrap().wants_own_mode());
     }
 
     /// Switching games drops the engine: nothing keeps its system alive.

@@ -35,6 +35,17 @@ mod a2_web;
 pub mod a3;
 #[cfg(target_arch = "wasm32")]
 mod a3_web;
+/// Atlantis Evolution, on the desktop and in the browser.
+pub mod a4;
+#[cfg(not(target_arch = "wasm32"))]
+mod a4_gl;
+#[cfg(target_arch = "wasm32")]
+#[path = "a4_gl_web.rs"]
+mod a4_gl;
+#[cfg(target_arch = "wasm32")]
+mod a4_prefetch;
+#[cfg(all(test, target_arch = "wasm32"))]
+mod a4_wasm_tests;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;

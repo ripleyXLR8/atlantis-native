@@ -1,0 +1,74 @@
+# a4_lua_save_globals.txt - the save's Lua globals writer, run unmodified
+# Producer: an emulator of the executable (Unicorn 2) run on
+#   atlantis4-gog-en-2363910 (MD5 f2de382af52f1d89e32ed7c286be8b4f).
+# Run unmodified: lua_newstate 0x004a4a50, luaL_openlibs 0x005821b0 (part B only),
+#   luaL_loadbuffer 0x004c3ce0, lua_pcall 0x004c50b0, TiXmlDocument ctor 0x00509740,
+#   TiXmlDeclaration("1.0","","") 0x005090b0, LinkEndChild 0x00509a90,
+#   TeLuaContext::save 0x004c1670, TiXmlDocument::Print (vtable+4, depth 0).
+# Stubs (Python): MSVCR100 allocator, _setjmp3 (returns 0), string and ctype
+#   functions, strtod, GetModuleFileNameA, fprintf/fputs/fputc (collect the
+#   bytes), _vsnprintf_s for %d / %f (C99 formatting; MSVCR100's %f is assumed
+#   equal for these finite values [INFERRED]).
+# The file on disk is written by fopen_s(..,"w") (text mode): every "\n"
+#   below is "\r\n" on disk [INFERRED]. No BOM. Bytes >= 0x80 are shown as \xNN
+#   (written raw). Element order = luaH_next order of this state's globals
+#   (exact for these runs; game saves are compared as sets).
+# Synthetic globals only (no game data).
+== chunk
+flagTrue = true
+flagFalse = false
+counter = 3
+negative = -2
+fraction = 0.1
+big = 123456789012
+tiny = 1e-7
+numericString = "42"
+plain = "abc"
+quote = 'say "hi"'
+apos = "it's"
+amp = "a&b<c>d"
+entity = "&#x41;"
+ctrl = "tab\tnl\n"
+high = "caf\233"
+empty = ""
+aTable = {}
+aFunction = function() end
+gone = 1
+gone = nil
+== A: lua_newstate only
+<?xml version="1.0" ?>
+<String name="numericString" value="42" />
+<String name="high" value="caf\xE9" />
+<Number name="big" value="123456789012.000000" />
+<Number name="fraction" value="0.100000" />
+<String name="quote" value='say &quot;hi&quot;' />
+<Number name="tiny" value="0.000000" />
+<Number name="counter" value="3.000000" />
+<Boolean name="flagFalse" value="0" />
+<Number name="negative" value="-2.000000" />
+<String name="ctrl" value="tab&#x09;nl&#x0A;" />
+<String name="empty" value="" />
+<String name="apos" value="it&apos;s" />
+<String name="plain" value="abc" />
+<String name="entity" value="&#x41;" />
+<Boolean name="flagTrue" value="1" />
+<String name="amp" value="a&amp;b&lt;c&gt;d" />
+== B: lua_newstate + luaL_openlibs
+<?xml version="1.0" ?>
+<Boolean name="flagTrue" value="1" />
+<String name="quote" value='say &quot;hi&quot;' />
+<String name="empty" value="" />
+<String name="high" value="caf\xE9" />
+<String name="entity" value="&#x41;" />
+<String name="amp" value="a&amp;b&lt;c&gt;d" />
+<String name="numericString" value="42" />
+<String name="apos" value="it&apos;s" />
+<Number name="big" value="123456789012.000000" />
+<Number name="counter" value="3.000000" />
+<Number name="negative" value="-2.000000" />
+<Number name="fraction" value="0.100000" />
+<Boolean name="flagFalse" value="0" />
+<Number name="tiny" value="0.000000" />
+<String name="ctrl" value="tab&#x09;nl&#x0A;" />
+<String name="_VERSION" value="Lua 5.1" />
+<String name="plain" value="abc" />

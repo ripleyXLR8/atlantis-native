@@ -13,6 +13,10 @@
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
 | `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe`, `Datas\`, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
 | `atlantis3-engine` | Atlantis III: the start-up's settings, the intro and the cinematics with their sound, the chapter scripts, the panorama (`warpBFPII`, 16 and 32 bits), the place animations and sprites, the cursor, the moves with their travel videos, the dialogs with their 3D heads, the inventory, the menus and the saves, every puzzle and map, the ending and the credits; see [Atlantis III](#atlantis-iii) |
+| `atlantis4-data` | Atlantis Evolution: detection of GOG.com's `Atlantis Evolution.exe`, the language (`lang.ini`), warp packages, scenes, pictures (an exact JPEG decoder), fonts, texts, the Vorbis sounds and Theora videos decoded as the original decodes them |
+| `atlantis4-script` | Atlantis Evolution: its Lua 5.1 scripts (vendored `rilua`) and the engine's bindings |
+| `atlantis4-engine` | Atlantis Evolution: the warp view, the GUI layouts, dialogs, inventory, documents, the menus and the saves, the OpenAL mix, the processor's renderer; see [Atlantis Evolution](#atlantis-evolution) |
+| `atlantis4-gl` | Atlantis Evolution's renderer on the graphics card (OpenGL 3.3, ES 3.0, WebGL 2) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit (Atlantis II's view in single precision), and presents it) |
 | `atlantis-sdl` | the first game's SDL2 front end (the first game only) for handhelds and PortMaster (the program `atlantis-native-sdl`, built with `--features sdl`): the gamepad as the mouse, the on-screen keyboard, SDL audio; see [The SDL2 front end](#the-sdl2-front-end-handhelds-and-portmaster) |
 
@@ -927,8 +931,11 @@ its single folder picked in the page.
 
 The library holds Atlantis II's and Atlantis III's folders beside the
 first game's (`games.txt` stays one folder per line; the game is told from the
-folder's files each time). `setup::kind_of` decides: Atlantis III
-first (see [Atlantis III](#atlantis-iii)), then Atlantis II when
+folder's files each time). `setup::kind_of` decides: Atlantis Evolution
+first (`Atlantis Evolution.exe` beside `3D/OnGameEnter.lua`, or that
+script and `Texts/` alone, refused then with what is missing; see
+[Atlantis Evolution](#atlantis-evolution)), then Atlantis III
+(see [Atlantis III](#atlantis-iii)), then Atlantis II when
 `atlantis2_data::files::holds_atlantis2` says so (`atlantis2.exe`, or
 `Game.exe` beside `wam` and `scenar`), else the first game when the
 folder holds `atlantis.exe` or CD images that are not all Atlantis
@@ -939,7 +946,8 @@ beside them). `setup::find_root` looks a few levels down for either game (or
 one of them), and never looks into the other game's folder, so neither
 detection takes the other game's folder; `setup::candidate_folders`
 reads the GOG.com product ids from the registry (both views; the first
-game's 1207658944, Atlantis II's 1207658951, Atlantis III's 1207658958)
+game's 1207658944, Atlantis II's 1207658951, Atlantis III's 1207658958,
+Atlantis Evolution's 1294416884)
 besides the usual folders.
 `desktop::open_any` opens either: the first game's `Game`, or Atlantis
 II's build (`A2Files::open_dir`, which needs its discs in the folder or
@@ -954,13 +962,14 @@ has the "Game library..." entry, and Shift in its first two seconds
 (the library's one game, started without the screen) does what it does
 for the first game; either one ends that run with `a2::Ended::Library`,
 and `main.rs` makes a new `App` showing the library's screen and runs
-the loop again. Atlantis III runs the same way (`a3.rs`, see
-[Atlantis III](#atlantis-iii)). The first start (`desktop::first_of_each_game`) looks
+the loop again. Atlantis III and Atlantis Evolution run the same way
+(`a3.rs`, `a4.rs`: `a4::run_window_on`; see [Atlantis III](#atlantis-iii)
+and [Atlantis Evolution](#atlantis-evolution)). The first start (`desktop::first_of_each_game`) looks
 in `setup::candidate_folders` only, as before, and opens folders until
 it has the first one of each game: one game found is offered as
 before, two or more are added to the library. A folder picked in the
 folder picker that holds two games or more (`setup::find_roots`) asks
-which of the first two. The web build finds any of the three games among
+which of the first two. The web build finds any of the four games among
 the picked files (see
 [Atlantis II in the browser](#atlantis-ii-in-the-browser)).
 
@@ -4276,6 +4285,113 @@ to change them.
   (@ 0x00452000, counting the time so far to the previous one), and each
   write adds the whole seconds played since the last. 0.6.0 wrote them
   back unchanged.
+
+## Atlantis Evolution
+
+*Atlantis Evolution* (2004) is known in one edition, GOG.com's, whose
+`Atlantis Evolution.exe` (2,363,910 bytes, MD5
+`f2de382af52f1d89e32ed7c286be8b4f`, a 2012 Tetraedge Engine program) is
+the reference of every address quoted in its crates. Nothing of Cryo's
+engine is in it, so it has an engine of its own, in four crates:
+`atlantis4-data` (the files: the executable's identification, the warp
+packages, scenes, pictures with an exact JPEG decoder, fonts, texts, the
+Vorbis sounds and Theora videos decoded to the original's samples and
+pixels), `atlantis4-script` (the game's Lua 5.1 scripts on a vendored
+Lua and the engine's bindings), `atlantis4-engine` (the warp view, the
+GUI layouts, dialogs, inventory, documents, menus, saves, the OpenAL
+mix, drawn by a processor renderer that is the reference) and
+`atlantis4-gl` (the same frames drawn by the graphics card, OpenGL 3.3,
+ES 3.0 or WebGL 2, checked against the processor's within a few levels).
+`atlantis-app/src/a4.rs` is its window, on the desktop and (with
+`a4_web.rs`) in the browser. It is part of every build; the cargo
+feature `atlantis4` that once enabled it is kept, empty. Its web build
+links with an 8 MiB WebAssembly stack (`atlantis-app/build.rs`): the
+scripts call the movie and sound decoders deep in their stack, whose
+frames are large, and the default 1 MiB overflows.
+
+**Detection and the library.** `setup::kind_of` takes a folder as
+Atlantis Evolution's when it holds `Atlantis Evolution.exe` beside
+`3D/OnGameEnter.lua` (`atlantis4_data::files::holds_atlantis4`), or that
+script and `Texts/` without the program (then refused, saying what is
+missing). `A4Files::build` identifies the program by size, PE timestamp
+and MD5; another program is refused with its size, timestamp and MD5
+(`setup::explain_atlantis4`). The library's label is the build's name
+and the language `lang.ini` gives (*Atlantis Evolution, GOG.com,
+French*, `a4::label`). Chosen in the library, the session keeps the
+folder (`Session::take_atlantis4`) and `main.rs` runs
+`a4::run_window_on` on the same event loop, as for Atlantis II and III,
+with Shift in the first two seconds going back to the library. A folder
+on the command line opens it directly; `--atlantis4-view` is the
+development viewer (the menus skipped with `--node` or `--save`).
+
+**The window.** The original lays its interface out on the window's
+client area, whatever its size: on a resize `TeMainWindow`
+(0x004ff990) sets the root layout's size to the client size in pixels
+and the 2D camera to an orthographic projection of that size, centred,
+y down (0x00510760); every `Percent` size is a fraction of the window,
+and the layouts that must keep a picture's proportions do it themselves
+(`LetterBox`, `PanScan`), while the warp's perspective takes the
+window's aspect. Without `DebugResolution` in its `options.xml` it runs
+full screen at the desktop's size. Native does the same rather than
+drawing 1365 x 768 and scaling it: the canvas, the GUI and the hit tests
+take the window's size in physical pixels, the pointer's position is in
+the same pixels, so the mouse maps one to one in a window of any size and
+in full screen; no bars are added. The window opens at 1365 x 768 (at
+most 90 % of the screen, at the same proportions), resizable, or full
+screen (borderless, the screen's size); F11 and Alt+Enter switch it (the
+port's keys). A test lays the main menu out at five window sizes and
+presses its buttons there (`atlantis4-engine/tests/menus.rs`).
+
+**Settings.** `atlantis4/settings.ini` in the per-user data folder
+(`a4::A4Settings`): `language` (`auto`: `lang.ini`'s), `renderer`
+(`gpu` or `cpu`; the processor's renderer is also the fallback when no
+context can be made) and `fullscreen` (`on` by default, as the
+original). The original's own options (volumes, inverse look, compass,
+permanent help) stay in its `options.xml`, beside the saves in
+`atlantis4/Documents/Atlantis Evolution/`.
+
+**PortMaster.** The SDL2 front end plays the first game only: Atlantis
+Evolution needs OpenGL 3.3 or ES 3.0 for its speed (the processor's
+renderer and the Theora videos are too slow on the handhelds' ARM
+cores), so a `gamedata` folder holding `Atlantis Evolution.exe` is
+refused with a message (`atlantis_sdl::other_game`, and the launcher
+script), as Atlantis II and III are not offered there.
+
+**Licences.** The Theora decoder (`theora-rs`, MPL-2.0, a port of
+libtheora's, BSD) and the Vorbis decoder (after libvorbis and libogg,
+BSD) carry their notices in `assets/licenses/`, which every desktop and
+web package holds.
+
+### Languages
+
+GOG.com sells *Atlantis Evolution* in five languages (German, English,
+Spanish, French, Italian) and ships them as one build: one data depot
+for all five, holding every language's texts, voices and pictures, and
+one `Atlantis Evolution.exe` (the same file in every language, so
+`atlantis4_data::exe` knows one build and the movie colour table is at
+the same place for all). The languages differ only by `lang.ini`
+(`[lang]` / `lang=en` as shipped), whose value GOG.com's installer sets
+to the language chosen in its client. The executable reads its language
+from that file alone: not from the registry, not from the system's
+locale (both functions are imported but never called). It then checks
+that `Texts/<language>.xml` exists and, if not, takes the first of `en
+fr de es it ru` that has one, so a missing or unknown value gives
+English. `options.xml`'s `DebugLanguage`, a development setting the
+game never writes on its own, overrides `lang.ini` before that check.
+The original has no language menu.
+
+`A4Files::choose_language` applies that rule and keeps the result as the
+language tag that every file lookup shares: the texts
+(`Texts/<language>.xml`), the voices (`Sounds/Dialogs/<language>/`), the
+movies' sound tracks (`Videos/<language>/`), the object and document
+names, and the localised pictures (`HD/<language>/` folders of the menus,
+the inventory menu, the objectives and the documents). A sound path that
+is not found in the language's folder falls back to `en/`, as in the
+original. Native adds its own choice over `lang.ini`: `--lang
+<de|en|es|fr|it>` on the desktop (`--atlantis4-view <folder> --lang fr`)
+and `?lang=fr` in the web page's address. `tests/languages.rs` boots
+each language present: the first node, the intro's sound file, a
+narration's text and voice, and the menu pictures.
 
 ## Tests
 

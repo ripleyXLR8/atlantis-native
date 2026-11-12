@@ -68,6 +68,17 @@
 //! game library finds and opens it too. The other games' options but
 //! `--original` and `--fullscreen` are refused in this mode.
 //!
+//! A folder holding Atlantis Evolution (GOG.com's, `Atlantis Evolution.exe`
+//! beside `3D\`) opens its own mode (`atlantis_app::a4`): the splashes,
+//! the main menu and the game as the original's, its saves and
+//! `options.xml` in `atlantis4/Documents/Atlantis Evolution/` of the
+//! per-user data folder, the port's `settings.ini` (the language, the
+//! renderer, the full screen) in `atlantis4/`. The game library finds and
+//! opens it too. The other games' options but `--fullscreen` are refused
+//! in this mode. `--atlantis4-view <folder> [--node <node> | --save
+//! <file>] [--lang <l>] [--cpu] [--gpu-check] [--fullscreen]` is its
+//! development viewer (the shortcuts past the menus).
+//!
 //! `atlantis-native --list-games` prints the games found on the computer
 //! (every game: what the library's "Find installations" adds) and ends.
 //!
@@ -121,6 +132,53 @@ fn main() {
         .collect();
     let headless = args.iter().any(|a| a == "--headless");
     let log_file = init_log(headless);
+    // Atlantis Evolution's development viewer.
+    if args.first().map(String::as_str) == Some("--atlantis4-view") {
+        // How it draws: the graphics card unless `--cpu`; `--gpu-check`
+        // compares the card's frames with the processor's (logged).
+        let render = atlantis_app::a4::Render {
+            cpu: args.iter().any(|a| a == "--cpu"),
+            check: args.iter().any(|a| a == "--gpu-check"),
+        };
+        let fullscreen = args.iter().any(|a| a == "--fullscreen");
+        args.retain(|a| a != "--cpu" && a != "--gpu-check" && a != "--fullscreen");
+        // Native's language choice over the install's `lang.ini`.
+        let language = args.iter().position(|a| a == "--lang").map(|i| {
+            args.remove(i);
+            if i < args.len() {
+                args.remove(i)
+            } else {
+                String::new()
+            }
+        });
+        let Some(dir) = args.get(1) else {
+            eprintln!(
+                "--atlantis4-view <game folder> [--node <node> | --save <file>] [--lang <de|en|es|fr|it>] [--cpu] [--gpu-check] [--fullscreen]"
+            );
+            std::process::exit(2);
+        };
+        // The development shortcuts past the menus: `--node <node>` (or a
+        // bare node) a new game there, `--save <file>` (or a bare name
+        // ending in `.xml`) that save of the backup folder.
+        let start = match (args.get(2).map(String::as_str), args.get(3)) {
+            (Some("--node"), Some(n)) => atlantis_app::a4::Start::Node(n.clone()),
+            (Some("--save"), Some(f)) => atlantis_app::a4::Start::Save(f.clone()),
+            (Some(a), _) if a.ends_with(".xml") => atlantis_app::a4::Start::Save(a.to_string()),
+            (Some(a), _) if !a.starts_with("--") => atlantis_app::a4::Start::Node(a.to_string()),
+            _ => atlantis_app::a4::Start::Menus,
+        };
+        if let Err(e) = atlantis_app::a4::run_view(
+            Path::new(dir),
+            start,
+            render,
+            language.as_deref(),
+            fullscreen,
+        ) {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+        return;
+    }
     // No terminal: the panics and the errors in message boxes.
     install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
     atlantis_app::watchdog::start();
@@ -394,6 +452,35 @@ fn main() {
         None => Start::Boot,
     };
 
+    // Atlantis Evolution: the other games' options refused (but
+    // `--fullscreen`).
+    let a4_dir = match args.as_slice() {
+        [d] if atlantis_app::setup::holds_atlantis4(Path::new(d)) => Some(d.clone()),
+        _ => None,
+    };
+    if let Some(dir) = a4_dir {
+        let mut not_a4: Vec<&str> = first_game_flags.clone();
+        not_a4.extend(a2_flags.iter().copied());
+        if force_wide {
+            not_a4.push("--widescreen");
+        } else if force_hd {
+            not_a4.push("--hd");
+        }
+        if original {
+            not_a4.push("--original");
+        }
+        refuse(&not_a4, "Atlantis Evolution's mode");
+        let run = EventLoop::new()
+            .map_err(|e| format!("No window can be opened: {e}"))
+            .and_then(|mut el| {
+                atlantis_app::a4::run_window_on(&mut el, Path::new(&dir), fullscreen, false)
+            });
+        if let Err(e) = run {
+            error_box(&e);
+            std::process::exit(1);
+        }
+        return;
+    }
     // Atlantis III: the other games' options refused (but its own:
     // `--no-intro`, and `--screenshot` with `--headless`).
     let a3_dir = match args.as_slice() {
@@ -637,7 +724,8 @@ fn main() {
                 }
             }
         }
-        // Atlantis II or III chosen: its own mode, after this event loop.
+        // Atlantis II, III or Evolution chosen: its own mode, after this
+        // event loop.
         !app.session().is_some_and(|s| s.wants_own_mode())
     };
     let windowed = if due || force_support {
@@ -646,7 +734,8 @@ fn main() {
     } else {
         begin(&mut app)
     };
-    // On demand: the event loop runs again for Atlantis II or III when it
+    // On demand: the event loop runs again for Atlantis II, III or
+    // Evolution when it
     // is chosen in the game library (a program has one event loop), and
     // for the library's screen when that game goes back to it.
     use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
@@ -662,6 +751,7 @@ fn main() {
         }
         let atlantis2 = app.session_mut().and_then(|s| s.take_atlantis2());
         let atlantis3 = app.session_mut().and_then(|s| s.take_atlantis3());
+        let atlantis4 = app.session_mut().and_then(|s| s.take_atlantis4());
         // The first game's window and sound end here.
         drop(app);
         let run = if let Some(dir) = atlantis2 {
@@ -683,6 +773,9 @@ fn main() {
                     a2_grace.replace(false),
                 )
             })
+        } else if let Some(dir) = atlantis4 {
+            atlantis_app::watchdog::leave();
+            atlantis_app::a4::run_window_on(&mut el, &dir, fullscreen, a2_grace.replace(false))
         } else if let Some(dir) = atlantis3 {
             atlantis_app::watchdog::leave();
             atlantis_app::a3::open(&dir, original).and_then(|(game, _)| {

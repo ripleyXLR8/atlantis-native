@@ -1,0 +1,19 @@
+[package]
+name = "atlantis4-data"
+description = "Atlantis Evolution data files: game detection, the file layer, warp packages, scenes, scripts, texts, fonts, pictures, sounds and videos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# Third-party decoders are pure Rust and build for wasm32-unknown-unknown
+# (the web build).
+[dependencies]
+atlantis-data = { path = "../atlantis-data" }
+encoding_rs = "0.8"
+libm = "=0.2.16"
+md-5 = "0.10"
+miniz_oxide = "0.8"
+png = "0.18"
+# A port of libtheora 1.2.0's decoder (MPL-2.0), pinned: its frames are
+# checked equal to libtheora's on every stream of the data.
+theora-rs = "=0.1.0"

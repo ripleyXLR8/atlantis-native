@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlantis Native</title>
-<meta name="description" content="Play Atlantis: The Lost Tales (Cryo, 1997), Atlantis II (Cryo, 1999) and Atlantis III (Cryo, 2001) in your browser with your own copy of the game.">
+<meta name="description" content="Play Atlantis: The Lost Tales (Cryo, 1997), Atlantis II (Cryo, 1999), Atlantis III (Cryo, 2001) and Atlantis Evolution (2004) in your browser with your own copy of the game.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Atlantis Native">
-<meta property="og:title" content="Atlantis Native: The Lost Tales, Atlantis II and Atlantis III in your browser">
-<meta property="og:description" content="Play Atlantis: The Lost Tales (Cryo, 1997), Atlantis II (Cryo, 1999) and Atlantis III (Cryo, 2001) in your browser with your own copy of the game.">
+<meta property="og:title" content="Atlantis Native: The Lost Tales, Atlantis II, Atlantis III and Atlantis Evolution in your browser">
+<meta property="og:description" content="Play Atlantis: The Lost Tales (Cryo, 1997), Atlantis II (Cryo, 1999), Atlantis III (Cryo, 2001) and Atlantis Evolution (2004) in your browser with your own copy of the game.">
 <meta property="og:url" content="https://ripleyxlr8.github.io/atlantis-native/">
 <meta property="og:image" content="https://ripleyxlr8.github.io/atlantis-native/emblem.png">
 <link rel="icon" href="favicon.png">
@@ -160,10 +160,11 @@
   /* The keys beside the frame while playing, when the game leaves them
      room (it sets body.show-keys: fit_canvas in lib.rs). */
   .keys { display: none; }
-  /* (each game's keys: body.game-a1, game-a2 or game-a3, set by the page) */
+  /* (each game's keys: body.game-a1, game-a2, game-a3 or game-a4, set by the page) */
   body.show-keys:not(.landing).game-a1 .keys.a1,
   body.show-keys:not(.landing).game-a2 .keys.a2,
-  body.show-keys:not(.landing).game-a3 .keys.a3 {
+  body.show-keys:not(.landing).game-a3 .keys.a3,
+  body.show-keys:not(.landing).game-a4 .keys.a4 {
     display: block; position: fixed; top: 50%; transform: translateY(-50%); z-index: 2;
     width: 168px; color: var(--muted); font-size: 13px; line-height: 1.35;
   }
@@ -268,20 +269,37 @@
     <dt><kbd>F11</kbd> or <kbd>Alt</kbd>+<kbd>Enter</kbd></dt><dd>full screen</dd>
   </dl>
 </aside>
+<aside class="keys left a4">
+  <h2 class="gold">Explore</h2>
+  <dl>
+    <dt><kbd>Drag</kbd> with the left button</dt><dd>look around</dd>
+    <dt><kbd>Left click</kbd></dt><dd>go, take, use, talk; a topic; the next line</dd>
+    <dt>The bag, bottom right</dt><dd>the inventory and the menu (save and quit)</dd>
+  </dl>
+</aside>
+<aside class="keys right a4">
+  <h2 class="gold">Menus</h2>
+  <dl>
+    <dt>The bag's menu button</dt><dd>saves and goes back to the main menu (the original has no Escape key)</dd>
+    <dt><kbd>F11</kbd> or <kbd>Alt</kbd>+<kbd>Enter</kbd></dt><dd>full screen</dd>
+  </dl>
+</aside>
 <main id="pick">
   <h1 class="logo">Atlantis</h1>
   <div class="tagline">
     <svg class="spear" viewBox="0 0 120 40"><use href="#spear"/></svg>
-    <span class="gold">The Lost Tales · Atlantis II · Atlantis III</span>
+    <span class="gold">The Lost Tales · Atlantis II · Atlantis III · Evolution</span>
     <svg class="spear right" viewBox="0 0 120 40"><use href="#spear"/></svg>
   </div>
   <div class="tablet">
     <p>Seth, the queen's new guard, arrives in Atlantis just as Queen Rhea
        disappears; two thousand years later, in Tibet, a new hero is
        called to save the world; in the Hoggar, an archaeologist opens the
-       way to other worlds. <em>Atlantis Native</em> is a new engine for
-       Cryo's adventures of 1997, 1999 and 2001: the three games whole,
-       faithful to the originals, playable here.</p>
+       way to other worlds; in 1904, a voyage at sea leads to a hidden
+       world. <em>Atlantis Native</em> is a new engine for
+       Cryo's adventures of 1997, 1999 and 2001 and for <i>Atlantis
+       Evolution</i> (2004): the four games whole, faithful to the
+       originals, playable here.</p>
     <p>It does not include the games themselves: their pictures, videos,
        voices and music belong to their publisher, so it plays them from
        <em>your own copy</em>. Choose the folder of your game:</p>
@@ -320,6 +338,17 @@
           Other editions are untested.</li>
     </ul>
     </section>
+    <section>
+    <h2 class="gold">Atlantis Evolution</h2>
+    <ul>
+      <li><em>GOG.com</em> (English, French, German, Italian, Spanish): the
+          folder where the game is installed (the one holding
+          <code>Atlantis Evolution.exe</code> and <code>3D</code>). The
+          language is the installation's; <code>?lang=fr</code> (or
+          <code>de</code>, <code>en</code>, <code>es</code>, <code>it</code>)
+          after the page's address chooses another.</li>
+    </ul>
+    </section>
     </div>
     <div class="choose">
       <label class="menu-item"><svg class="sun" viewBox="0 0 40 40"><use href="#sun"/></svg><span class="gold">Choose your game folder</span>
@@ -343,11 +372,12 @@
   </nav>
   <span class="cryo" id="version">Atlantis Native</span>
   <span class="legal">Free software under the GPL. <i>Atlantis: The Lost Tales</i>,
-    <i>Atlantis II</i> and <i>Atlantis III</i> © Microids (Cryo Interactive Entertainment); this project is not
+    <i>Atlantis II</i> and <i>Atlantis III</i> © Microids (Cryo Interactive Entertainment), <i>Atlantis Evolution</i> © Microids; this project is not
     affiliated with them.</span>
 </footer>
 <script type="module">
-  import init, { start, version, atlantis2_state, atlantis2_test, atlantis3_state, atlantis3_test } from "./pkg/atlantis_app.js";
+  import init, * as atl from "./pkg/atlantis_app.js";
+  const { start, version, atlantis2_state, atlantis2_test, atlantis3_state, atlantis3_test } = atl;
   const status = document.getElementById("status");
   status.textContent = "Loading the engine…";
   await init();
@@ -355,11 +385,16 @@
   // Atlantis II's and III's state and testing aids, for the end-to-end runs.
   window.atlantis2 = { state: () => JSON.parse(atlantis2_state() || "null"), test: atlantis2_test };
   window.atlantis3 = { state: () => JSON.parse(atlantis3_state() || "null"), test: atlantis3_test };
+  // Atlantis Evolution's.
+  window.atlantis4 = { state: () => JSON.parse(atl.atlantis4_state() || "null"), test: atl.atlantis4_test };
   // The engine's own version and commit (as in the F10 menu).
   document.getElementById("version").textContent = version();
   // Opens the game of the picked files; for Cryo's DVD, `language` is the
   // folder of the language the player chose (the engine lists them); for
   // a folder holding several games, `game` the one chosen.
+  // Atlantis Evolution's language when the page's address asks for one
+  // (`?lang=de|en|es|fr|it`): Native's choice over the install's lang.ini.
+  const a4lang = new URLSearchParams(location.search).get("lang") || undefined;
   const open = async (files, language, game, paths) => {
     const box = document.getElementById("err");
     box.textContent = "";
@@ -367,8 +402,8 @@
     // (the browser draws the message before the engine reads the files)
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
     try {
-      const started = await start(files, language, game, paths);
-      document.body.classList.add(started === "atlantis2" ? "game-a2" : started === "atlantis3" ? "game-a3" : "game-a1");
+      const started = await start(files, language, game, paths, a4lang);
+      document.body.classList.add({ atlantis2: "game-a2", atlantis3: "game-a3", atlantis4: "game-a4" }[started] || "game-a1");
       document.body.classList.remove("landing");
       // Atlantis II or III quit from its menu: the page again.
       window.atlantisQuit = () => location.reload();

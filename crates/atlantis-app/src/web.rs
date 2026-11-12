@@ -61,7 +61,7 @@ struct WebFiles {
     members: Mutex<Ranges>,
 }
 
-fn key(name: &str) -> String {
+pub(crate) fn key(name: &str) -> String {
     name.replace('\\', "/")
         .trim_matches('/')
         .to_ascii_lowercase()
@@ -319,6 +319,7 @@ pub async fn start(
     language: Option<String>,
     game: Option<String>,
     paths: Option<Vec<String>>,
+    a4_language: Option<String>,
 ) -> Result<JsValue, JsValue> {
     console_error_panic_hook::set_once();
     let _ = console_log::init_with_level(log::Level::Info);
@@ -340,6 +341,27 @@ pub async fn start(
     // player's choice.
     let paths: Vec<&str> = all.keys().map(String::as_str).collect();
     let picked = crate::web_layout::picked(&paths);
+    // Atlantis Evolution alone, or chosen among the games of the folder.
+    if let Some(install) = crate::web_layout::a4_install(&paths) {
+        use crate::web_layout::Picked;
+        let mut others: Vec<&str> = match &picked {
+            Picked::Both(_) => vec!["atlantis=Atlantis: The Lost Tales", "atlantis2=Atlantis II"],
+            Picked::Atlantis2(_) => vec!["atlantis2=Atlantis II"],
+            Picked::LostTales => vec!["atlantis=Atlantis: The Lost Tales"],
+            _ => Vec::new(),
+        };
+        if crate::web_layout::a3_install(&paths).is_some() {
+            others.push("atlantis3=Atlantis III");
+        }
+        if others.is_empty() || game.as_deref() == Some("atlantis4") {
+            drop(paths);
+            start_atlantis4(all, &install, a4_language.as_deref())?;
+            return Ok("atlantis4".into());
+        }
+        if game.is_none() {
+            return Err(format!("GAMES:{};atlantis4=Atlantis Evolution", others.join(";")).into());
+        }
+    }
     if let Some(install) = crate::web_layout::a3_install(&paths) {
         use crate::web_layout::Picked;
         let others: &[&str] = match &picked {
@@ -719,8 +741,35 @@ const READ_PART: u64 = 8 << 20;
 /// A read slower than this is logged.
 const SLOW_READ_MS: f64 = 50.0;
 
+thread_local! {
+    /// The time spent in synchronous reads of the picked files.
+    static READ_TIME: std::cell::Cell<web_time::Duration> =
+        const { std::cell::Cell::new(web_time::Duration::ZERO) };
+}
+
+/// The time the page has spent reading the picked files at once
+/// ([`read_picked`]): Atlantis Evolution's clock does not count it.
+pub(crate) fn read_time() -> web_time::Duration {
+    READ_TIME.with(std::cell::Cell::get)
+}
+
+/// Reads `len` bytes at `offset` of picked file `index` without blocking
+/// the page: the browser reads it in the background (Atlantis Evolution's
+/// read-ahead, [`crate::a4_prefetch`]).
+pub(crate) async fn read_picked_async(index: usize, offset: u64, len: u64) -> Option<Vec<u8>> {
+    let file = PICKED.with(|p| p.borrow().get(index).cloned())?;
+    fetch(&file, offset, len).await.ok()
+}
+
 /// Reads `len` bytes at `offset` of picked file `index`.
 fn read_picked_part(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
+    let t = web_time::Instant::now();
+    let data = read_picked_part_now(index, offset, len);
+    READ_TIME.with(|r| r.set(r.get() + t.elapsed()));
+    data
+}
+
+fn read_picked_part_now(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
     PICKED.with(|p| {
         let files = p.borrow();
         let f = files.get(index)?;
@@ -746,7 +795,7 @@ fn read_picked_part(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
 /// A folder of the picked files (Atlantis II's installed folder, a disc's
 /// copy): its files by their path below it (lower case), read at once
 /// when the engine reads them ([`read_picked`]).
-struct PickedDir {
+pub(crate) struct PickedDir {
     /// Lower-case path below the folder -> (index in [`PICKED`], size).
     files: HashMap<String, (usize, u64)>,
 }
@@ -760,6 +809,18 @@ impl PickedDir {
                 .filter_map(|(k, v)| k.strip_prefix(prefix).map(|r| (r.to_string(), *v)))
                 .collect(),
         }
+    }
+}
+
+impl PickedDir {
+    /// A file's index in [`PICKED`] and its size.
+    pub(crate) fn entry(&self, name: &str) -> Option<(usize, u64)> {
+        self.files.get(&key(name)).copied()
+    }
+
+    /// Every file: lower-case path, index in [`PICKED`] and size.
+    pub(crate) fn entries(&self) -> impl Iterator<Item = (&String, &(usize, u64))> {
+        self.files.iter()
     }
 }
 
@@ -831,6 +892,36 @@ fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsVa
         }
     };
     crate::a3_web::start(Arc::new(PickedDir::new(&index, install)), store)
+}
+
+/// Atlantis Evolution from its installed folder among the picked files
+/// ([`crate::a4::web`]), the saves in the browser's storage. The install
+/// (about 2 GB) stays in the player's files: each is read when the engine
+/// reads it, the part it reads.
+fn start_atlantis4(
+    all: HashMap<String, File>,
+    install: &str,
+    language: Option<&str>,
+) -> Result<(), JsValue> {
+    let index = keep_picked(all);
+    let dir = PickedDir::new(&index, install);
+    let bytes: u64 = dir.files.values().map(|&(_, s)| s).sum();
+    log::info!(
+        "Atlantis Evolution: {} files, {} MB, read when needed",
+        dir.files.len(),
+        bytes >> 20
+    );
+    let store: Rc<dyn SaveStore> = match WebStore::new("atlantis4") {
+        Some(s) => Rc::new(s),
+        None => {
+            log::warn!("no localStorage: the saves last as long as the page");
+            Rc::new(atlantis_engine::MemStore::new())
+        }
+    };
+    // Read ahead in the background, so that the engine's reads seldom
+    // wait for the browser.
+    let dir = crate::a4_prefetch::Prefetch::new(dir);
+    crate::a4::web::start(Arc::new(dir), store, language)
 }
 
 /// Atlantis II from the picked files: its installed folder and discs

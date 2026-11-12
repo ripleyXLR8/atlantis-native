@@ -27,6 +27,18 @@ web-time = "1"
 md-5 = "0.10"
 atlantis3-data = { path = "../atlantis3-data" }
 atlantis3-engine = { path = "../atlantis3-engine" }
+# Atlantis Evolution.
+atlantis4-data = { path = "../atlantis4-data" }
+atlantis4-engine = { path = "../atlantis4-engine" }
+atlantis4-script = { path = "../atlantis4-script" }
+# Its renderer on the graphics card (OpenGL 3.3 / ES 3.0 / WebGL 2).
+atlantis4-gl = { path = "../atlantis4-gl" }
+glow = "0.16"
+
+[features]
+# Atlantis Evolution is part of every build; the feature is kept, empty,
+# for the scripts and commands of its development builds.
+atlantis4 = []
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"
@@ -34,6 +46,9 @@ env_logger = "0.11"
 # portal (libdbus loaded at run time, zenity as the fallback): nothing to
 # link at build time.
 rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
+# The OpenGL context of Atlantis Evolution's window.
+glutin = "0.32"
+glutin-winit = "0.5"
 
 # The local time of the Atlantis II saves (`GetLocalTime` in the original).
 [target.'cfg(all(unix, not(target_arch = "wasm32")))'.dependencies]
@@ -53,7 +68,7 @@ cpal = { version = "0.15", features = ["wasm-bindgen"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 js-sys = "0.3"
-web-sys = { version = "0.3", features = ["File", "FileList", "Blob", "Window", "Storage", "HtmlCanvasElement", "WebGl2RenderingContext", "WebGlProgram", "WebGlShader", "WebGlTexture", "WebGlUniformLocation", "WebGlVertexArrayObject", "WebGlFramebuffer", "Document", "Element", "HtmlElement", "CssStyleDeclaration", "DomTokenList", "Response", "Location"] }
+web-sys = { version = "0.3", features = ["File", "FileList", "Blob", "Window", "Storage", "HtmlCanvasElement", "WebGl2RenderingContext", "WebGlProgram", "WebGlShader", "WebGlTexture", "WebGlUniformLocation", "WebGlVertexArrayObject", "WebGlFramebuffer", "Document", "Element", "HtmlElement", "CssStyleDeclaration", "DomTokenList", "Response", "Location", "AudioContext", "AudioContextOptions", "AudioBuffer", "AudioBufferSourceNode", "AudioDestinationNode", "AudioNode", "AudioScheduledSourceNode", "BaseAudioContext"] }
 console_error_panic_hook = "0.1"
 console_log = "1"
 

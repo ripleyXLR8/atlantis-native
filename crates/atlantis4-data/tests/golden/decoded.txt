@@ -1,0 +1,13 @@
+# Decoded-picture goldens of the GOG.com install of Atlantis Evolution:
+# hashes only. Each hash is the MD5 of the sorted lines
+# "<file>[:<package entry>]\t<width>x<height>\t<MD5 of the pixels>\n"
+# (pixels as decoded, rows top first, 8 bits per channel; PNG palettes
+# expanded to RGB, or RGBA with a tRNS chunk; TGA as RGBA).
+# Reference: Pillow 12.2 with its bundled libjpeg-turbo (JDCT_ISLOW, fancy
+# upsampling: the original's settings) and zlib.
+png 433 1d4ebbac73b10c648ea81fa23a3057fb
+tga 2 0c42742e2b0e25ae2abe85b156c4dece
+# libjpeg-turbo's pixels: the target of an exact JPEG decoder (not met by
+# the jpeg-decoder crate, see image.rs).
+jpeg-files 102 e8422ff280740019f497444e470d6336
+jpeg-packages 11834 b8369b7168b8ec54f91c951a98b0e553

@@ -300,6 +300,8 @@ pub enum Opened {
     Atlantis2(String),
     /// Atlantis III: its edition's name.
     Atlantis3(String),
+    /// Atlantis Evolution: its edition's name.
+    Atlantis4(String),
 }
 
 impl Opened {
@@ -308,6 +310,7 @@ impl Opened {
             Opened::LostTales(..) => GameKind::LostTales,
             Opened::Atlantis2(_) => GameKind::Atlantis2,
             Opened::Atlantis3(_) => GameKind::Atlantis3,
+            Opened::Atlantis4(_) => GameKind::Atlantis4,
         }
     }
 
@@ -317,19 +320,26 @@ impl Opened {
     pub fn label(&self) -> String {
         match self {
             Opened::LostTales(game, images) => edition_label(game, *images),
-            Opened::Atlantis2(label) | Opened::Atlantis3(label) => label.clone(),
+            Opened::Atlantis2(label) | Opened::Atlantis3(label) | Opened::Atlantis4(label) => {
+                label.clone()
+            }
         }
     }
 }
 
-/// The game in `dir`, any of them: Atlantis III or Atlantis II when the
-/// folder holds it ([`setup::kind_of`]), else the first game. Why it does
-/// not open otherwise, for the log ([`setup::explain`],
-/// [`setup::explain_atlantis2`] and [`setup::explain_atlantis3`] say it
+/// The game in `dir`, any of them: Atlantis Evolution, Atlantis III or
+/// Atlantis II when the folder holds it ([`setup::kind_of`]), else the
+/// first game. Why it does not open otherwise, for the log
+/// ([`setup::explain`], [`setup::explain_atlantis2`],
+/// [`setup::explain_atlantis3`] and [`setup::explain_atlantis4`] say it
 /// to the player).
 pub fn open_any(dir: &Path) -> Result<Opened, String> {
     let kind = setup::kind_of(dir);
-    if kind == Some(GameKind::Atlantis3) {
+    if kind == Some(GameKind::Atlantis4) {
+        crate::a4::label(dir)
+            .map(Opened::Atlantis4)
+            .map_err(|e| e.to_string())
+    } else if kind == Some(GameKind::Atlantis3) {
         crate::a3::label(dir)
             .map(Opened::Atlantis3)
             .map_err(|e| e.to_string())
@@ -358,7 +368,21 @@ pub fn edition_label(game: &Game, from_images: bool) -> String {
 /// it does not open.
 pub fn describe(dir: &Path) -> LauncherEntry {
     let kind = setup::kind_of(dir);
-    let (label, found) = if kind == Some(GameKind::Atlantis3) {
+    let (label, found) = if kind == Some(GameKind::Atlantis4) {
+        match crate::a4::label(dir) {
+            Ok(label) => (label, true),
+            Err(e) => {
+                log::info!("{}: {e}", dir.display());
+                let why = match e {
+                    atlantis4_data::files::OpenError::Exe(_) => {
+                        "Not found: an edition of Atlantis Evolution not supported yet"
+                    }
+                    _ => "Not found: this folder no longer holds the game",
+                };
+                (why.to_string(), false)
+            }
+        }
+    } else if kind == Some(GameKind::Atlantis3) {
         match crate::a3::label(dir) {
             Ok(label) => (label, true),
             Err(e) => {
@@ -650,7 +674,7 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
     loop {
         let dir = rfd::FileDialog::new()
             .set_title(
-                "Choose the folder of your game (the one with atlantis.exe, atlantis2.exe for Atlantis II, or Game.exe)",
+                "Choose the folder of your game (the one with atlantis.exe, atlantis2.exe for Atlantis II, Game.exe, or Atlantis Evolution.exe)",
             )
             .pick_folder()?;
         // Cryo's DVD (a copy of a side, the drive, the images of its
@@ -711,6 +735,24 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
                 }
             }
         };
+        if kind == GameKind::Atlantis4 {
+            match crate::a4::label(&root) {
+                Ok(label) => {
+                    log::info!("game folder {} ({label})", root.display());
+                    return Some(vec![(Opened::Atlantis4(label), root)]);
+                }
+                Err(e) => {
+                    log::warn!("{}: {e}", root.display());
+                    let text = setup::explain_atlantis4(&root, &e);
+                    match ask(&text, "Choose another folder", "Help", give_up) {
+                        Choice::First => {}
+                        Choice::Second => setup::open_url(setup::HELP_URL_A4),
+                        Choice::Third => return None,
+                    }
+                    continue;
+                }
+            }
+        }
         if kind == GameKind::Atlantis3 {
             match crate::a3::label(&root) {
                 Ok(label) => {
@@ -842,7 +884,7 @@ fn with_every_dvd_language(found: Vec<(PathBuf, Opened)>) -> Vec<(PathBuf, Opene
 /// offered, nor opened). The folders are opened until one of each game
 /// is found.
 pub fn first_of_each_game(candidates: &[PathBuf]) -> Vec<(PathBuf, Opened)> {
-    let mut found: [Option<(PathBuf, Opened)>; 3] = [None, None, None];
+    let mut found: [Option<(PathBuf, Opened)>; 4] = [None, None, None, None];
     'candidates: for c in candidates {
         for (root, kind) in setup::find_roots(c, 4) {
             let slot = &mut found[kind.index()];
@@ -1252,6 +1294,43 @@ mod tests {
             kinds,
             vec![(d.join("Games/Atlantis 3"), GameKind::Atlantis3)]
         );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// Atlantis Evolution: an unknown program refused in the library with
+    /// "not supported yet" (the folder's message gives its size and MD5);
+    /// GOG.com's folder described with its edition and language.
+    #[test]
+    fn describes_atlantis4() {
+        let d = tmp("a4");
+        let fake = d.join("Atlantis Evolution");
+        std::fs::create_dir_all(&fake).unwrap();
+        // A PE program of 80 bytes: `MZ`, `e_lfanew` 0x40, `PE\0\0`.
+        let mut exe = vec![0u8; 80];
+        exe[..2].copy_from_slice(b"MZ");
+        exe[0x3c] = 0x40;
+        exe[0x40..0x44].copy_from_slice(b"PE\0\0");
+        std::fs::write(fake.join("Atlantis Evolution.exe"), &exe).unwrap();
+        touch(&fake.join("3D/OnGameEnter.lua"));
+        touch(&fake.join("Texts/en.xml"));
+        assert_eq!(setup::kind_of(&fake), Some(GameKind::Atlantis4));
+        let e = describe(&fake);
+        assert!(
+            !e.found && e.label.contains("Atlantis Evolution not supported yet"),
+            "{}",
+            e.label
+        );
+        let why = open_any(&fake).err().unwrap();
+        assert!(why.contains("80 bytes") && why.contains("MD5"), "{why}");
+        let Some(gog) = atlantis4_data::testing::install_dir() else {
+            let _ = std::fs::remove_dir_all(&d);
+            return;
+        };
+        let e = describe(&gog);
+        assert!(e.found, "{}", e.label);
+        assert_eq!(e.label, crate::a4::label(&gog).unwrap());
+        assert!(e.label.starts_with("Atlantis Evolution, GOG.com, "));
+        assert!(matches!(open_any(&gog), Ok(Opened::Atlantis4(_))));
         let _ = std::fs::remove_dir_all(&d);
     }
 

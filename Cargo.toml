@@ -8,9 +8,17 @@ members = [
     "crates/atlantis2-engine",
     "crates/atlantis3-data",
     "crates/atlantis3-engine",
+    "crates/atlantis4-data",
+    "crates/atlantis4-engine",
+    "crates/atlantis4-script",
+    "crates/atlantis4-gl",
     "crates/atlantis-app",
     "crates/atlantis-sdl",
 ]
+
+# Vendored third-party code, built as a path dependency only (its own test
+# suite and dev-dependencies stay outside this workspace).
+exclude = ["vendor/rilua"]
 
 [workspace.package]
 version = "0.6.1"

@@ -1,0 +1,13 @@
+[package]
+name = "atlantis4-script"
+description = "Atlantis Evolution scripts: a Lua 5.1 state (vendored rilua), the engine's 54 tolua++ bindings and the boot and node-change sequences"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# rilua is pure Rust with no dependency and builds for wasm32-unknown-unknown.
+[dependencies]
+rilua = { path = "../../vendor/rilua" }
+
+[dev-dependencies]
+atlantis4-data = { path = "../atlantis4-data" }
