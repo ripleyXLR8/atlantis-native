@@ -1258,7 +1258,7 @@ impl Gui {
                         c.rotated(pic, rect, n.rotation, tint);
                     } else if let Some(pic) = pic {
                         let r = if n.size_percent {
-                            rect
+                            gl_rect(rect)
                         } else {
                             let c = crate::layout::pixel_snap(n.world);
                             crate::layout::window_rect(c, n.computed_size, width, height)
@@ -1268,6 +1268,9 @@ impl Gui {
                 }
             }
             Class::Text | Class::ExtendedText => {
+                if n.class == Class::ExtendedText {
+                    clip = Some(intersect(clip, scissor(rect, width, height)));
+                }
                 if let (Some(b), Some(font)) = (&n.block, &n.font) {
                     // The text's origin: the layout's top-left, floored,
                     // plus ½ where the window's size is odd
@@ -1281,11 +1284,7 @@ impl Gui {
                 }
             }
             Class::Clip => {
-                let c = pixel_span(rect, width, height);
-                clip = Some(match clip {
-                    Some(o) => (o.0.max(c.0), o.1.min(c.1), o.2.max(c.2), o.3.min(c.3)),
-                    None => c,
-                });
+                clip = Some(intersect(clip, scissor(rect, width, height)));
             }
             _ => {}
         }
@@ -1360,9 +1359,10 @@ fn scroll(n: &mut Node, now: f64) {
 
 /// A picture over `rect` turned by `degrees` about its centre (a rotation
 /// animation's layout): each pixel whose centre falls in the turned
-/// rectangle takes the picture's bilinear sample there. `[INFERRED]` the
-/// sense (a positive angle turns x toward y, clockwise on the y-down
-/// screen) and GL's sampling of a turned quad.
+/// rectangle takes the picture's bilinear sample there. A positive angle
+/// turns the picture **counter-clockwise on screen** (`[CONFIRMED-DYN]`,
+/// atlantis4-re experiment 2026-11-12-01, item 9: the planks' buckle
+/// for its 0 → 90° turn); GL's sampling of a turned quad `[INFERRED]`.
 pub fn draw_rotated(
     out: &mut [u32],
     width: u32,
@@ -1388,8 +1388,9 @@ pub fn draw_rotated(
     for j in j0..j1 {
         for i in i0..i1 {
             let (dx, dy) = (i as f64 + 0.5 - cx, j as f64 + 0.5 - cy);
-            // Back to the unturned rectangle.
-            let (u, v) = (c * dx + s * dy, -s * dx + c * dy);
+            // Back to the unturned rectangle: the screen point turned
+            // clockwise (y down) by the angle.
+            let (u, v) = (c * dx - s * dy, s * dx + c * dy);
             if u.abs() > hw || v.abs() > hh {
                 continue;
             }
@@ -1432,13 +1433,61 @@ fn rotation4(v: &GuiValue) -> [f32; 4] {
     out
 }
 
-/// The pixels whose centre is in `rect`: columns, rows.
-fn pixel_span(rect: Rect, width: u32, height: u32) -> Clip {
-    let i0 = (rect.left - 0.5).ceil().max(0.0) as i64;
-    let i1 = ((rect.left + rect.width - 0.5).ceil() as i64).min(i64::from(width));
-    let j0 = (rect.top - 0.5).ceil().max(0.0) as i64;
-    let j1 = ((rect.top + rect.height - 0.5).ceil() as i64).min(i64::from(height));
-    (i0, i1, j0, j1)
+/// The offset of the original's unsnapped GUI geometry from
+/// [`crate::layout::window_rect`]: half a pixel right and down
+/// (`[CONFIRMED-DYN]`, atlantis4-re experiment 2026-11-12-01: the 1.01
+/// full-window pictures' quad, items 23, and the text scissors, item 6,
+/// at 1365 × 768).
+pub const GL_OFFSET: f64 = 0.5;
+
+/// `rect` moved by [`GL_OFFSET`]: where the original draws a picture
+/// whose layout is not snapped to whole pixels (a `Percent` sprite).
+/// `[CONFIRMED-DYN]` for the 1.01 full-window pictures (menu, inventory,
+/// documents, conversation); `[INFERRED]` for the other `Percent`
+/// pictures, whose geometry goes the same way.
+pub fn gl_rect(rect: Rect) -> Rect {
+    Rect {
+        left: rect.left + GL_OFFSET,
+        top: rect.top + GL_OFFSET,
+        ..rect
+    }
+}
+
+/// The original's `glScissor(x, y, w, h)` (y from the bottom) for a
+/// clipping layout's `rect` in a window `height` pixels high: `x =
+/// trunc(left + ½)`, `y = trunc(H − top − height − ½)`, the size
+/// truncated, every conversion toward zero (`[CONFIRMED-DYN]`,
+/// atlantis4-re experiment 2026-11-12-01, item 6: the six topics'
+/// `glScissor(221, y, 389, 97)` and the dialog bar text's `(309, y, 747,
+/// 105)`, whose hidden position `y = −174` needs the truncation).
+pub fn gl_scissor(rect: Rect, height: u32) -> (i64, i64, i64, i64) {
+    (
+        (rect.left + GL_OFFSET).trunc() as i64,
+        (f64::from(height) - rect.top - rect.height - GL_OFFSET).trunc() as i64,
+        rect.width.trunc() as i64,
+        rect.height.trunc() as i64,
+    )
+}
+
+/// [`gl_scissor`] as columns and rows (y down) inside a `width` ×
+/// `height` window.
+pub fn scissor(rect: Rect, width: u32, height: u32) -> Clip {
+    let (x, y, w, h) = gl_scissor(rect, height);
+    let j1 = i64::from(height) - y;
+    (
+        x.max(0),
+        (x + w).min(i64::from(width)),
+        (j1 - h).max(0),
+        j1.min(i64::from(height)),
+    )
+}
+
+/// `c` inside `outer`, when there is one.
+fn intersect(outer: Option<Clip>, c: Clip) -> Clip {
+    match outer {
+        Some(o) => (o.0.max(c.0), o.1.min(c.1), o.2.max(c.2), o.3.min(c.3)),
+        None => c,
+    }
 }
 
 /// Two colours multiplied channel by channel, rounded (`× 255` is the
@@ -1582,6 +1631,78 @@ mod tests {
         let s = g.find("s").unwrap();
         g.update(s, (1365.0, 768.0), (0.0, 0.0), None);
         assert_eq!(g.node(s).computed_size, (1024.0, 768.0));
+    }
+
+    /// The topics' scissors of the original (experiment 2026-11-12-01,
+    /// item 6) from Native's layout rectangles of the six text boxes.
+    #[test]
+    fn the_scissors_are_the_originals_whole_pixels() {
+        let tops = [50.2, 166.44, 282.68, 398.92, 515.16, 631.4];
+        let ys = [620, 503, 387, 271, 155, 38];
+        let rows = [51, 168, 284, 400, 516, 633];
+        for k in 0..6 {
+            let r = Rect {
+                left: 221.1,
+                top: tops[k],
+                width: f64::from(389.16f32),
+                height: f64::from(97.2f32),
+            };
+            assert_eq!(gl_scissor(r, 768), (221, ys[k], 389, 97), "{k}");
+            assert_eq!(scissor(r, 1365, 768), (221, 610, rows[k], rows[k] + 97));
+        }
+        // Below the window: truncated toward zero (the bar's −174).
+        let r = Rect {
+            left: 309.0,
+            top: 836.64,
+            width: 747.0,
+            height: f64::from(105.3f32),
+        };
+        assert_eq!(gl_scissor(r, 768), (309, -174, 747, 105));
+    }
+
+    /// A positive angle turns the picture counter-clockwise on screen
+    /// (experiment 2026-11-12-01, item 9: the planks' buckle).
+    #[test]
+    fn a_positive_turn_is_counter_clockwise_on_screen() {
+        // Left half red, right half blue, 20 × 20 over a 40 × 40 window.
+        let mut rgba = Vec::new();
+        for _y in 0..20 {
+            for x in 0..20 {
+                rgba.extend(if x < 10 {
+                    [255, 0, 0, 255]
+                } else {
+                    [0, 0, 255, 255]
+                });
+            }
+        }
+        let pic = Picture {
+            width: 20,
+            height: 20,
+            rgba,
+        };
+        let rect = Rect {
+            left: 10.0,
+            top: 10.0,
+            width: 20.0,
+            height: 20.0,
+        };
+        let mut out = vec![0u32; 40 * 40];
+        draw_rotated(&mut out, 40, 40, &pic, rect, 90.0, [255; 4]);
+        // The right (blue) half is now the top half.
+        assert_eq!(out[13 * 40 + 20], 0x0000_00ff);
+        assert_eq!(out[26 * 40 + 20], 0x00ff_0000);
+    }
+
+    #[test]
+    fn percent_pictures_sit_half_a_pixel_right_and_down() {
+        // The 1.01 full-window picture at 1365 × 768: the original's quad
+        // is (−688.825, −387.34)–(689.825, 388.34) about the centre.
+        let r = crate::layout::window_rect((0.0, 0.0), (1378.65, 775.68), 1365, 768);
+        let g = gl_rect(r);
+        assert!((g.left - 682.5 + 688.825).abs() < 1e-4, "{}", g.left);
+        assert!((g.top - 384.0 + 387.34).abs() < 1e-4, "{}", g.top);
+        assert!((g.left + g.width - 682.5 - 689.825).abs() < 1e-4);
+        assert!((g.top + g.height - 384.0 - 388.34).abs() < 1e-4);
     }
 
     #[test]

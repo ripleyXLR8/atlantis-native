@@ -523,7 +523,8 @@ impl Game {
         if let Some((x, y)) = pointer {
             self.load_sprite(CURSOR_PATH);
             if let Some(Some(pic)) = self.sprites.get(CURSOR_PATH) {
-                let (l, t) = cursor_corner(pic, x, y);
+                let (w, h) = c.size();
+                let (l, t) = cursor_corner(pic, x, y, w, h);
                 c.sprite(pic, (0, 0, pic.width, pic.height), l, t);
             }
         }

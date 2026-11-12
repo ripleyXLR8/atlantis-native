@@ -14,7 +14,7 @@ use atlantis4_data::A4Files;
 use atlantis4_engine::dialog::Action;
 use atlantis4_engine::gui::anim::{curve, LinearAnim};
 use atlantis4_engine::gui::text::{self, Font, Frame};
-use atlantis4_engine::gui::{projection, Gui};
+use atlantis4_engine::gui::{gl_scissor, projection, Gui};
 use atlantis4_engine::Game;
 use atlantis4_script::{new_game, EngineRef, Options, Script, Value};
 
@@ -277,8 +277,19 @@ fn a_click_on_the_bar_skips_the_line() {
     let Some((game, mut script, clock)) = boot("3D/Centre17_C1/0001.wp") else {
         return;
     };
+    // The bar's text box clips to the original's scissor: hidden below
+    // the window, then up (experiment 2026-11-12-01, item 6).
+    let bar_scissor = |game: &Rc<RefCell<Game>>| {
+        let mut frame = vec![0u32; (W * H) as usize];
+        game.borrow_mut().draw(&mut frame, W, H, None);
+        let g = game.borrow();
+        let gui = g.dialogs.gui.as_ref().unwrap();
+        gl_scissor(gui.rect(gui.find("text").unwrap(), W, H), H)
+    };
+    assert_eq!(bar_scissor(&game), (309, -174, 747, 105));
     // Up after 500 ms; the bar is 830 wide at the bottom centre.
     run(&game, &mut script, &clock, T0 + 600_000);
+    assert_eq!(bar_scissor(&game), (309, 3, 747, 105));
     if let Some(dir) = std::env::var_os("A4_DUMP_DIALOG") {
         let mut frame = vec![0u32; (W * H) as usize];
         game.borrow_mut().draw(&mut frame, W, H, None);
@@ -314,6 +325,20 @@ fn a_conversation_offers_its_topics_and_a_click_answers() {
     if let Some(dir) = std::env::var_os("A4_DUMP_DIALOG") {
         dump(&frame, &std::path::Path::new(&dir).join("conversation.ppm"));
     }
+    // The topics' text boxes clip to the original's whole-pixel scissors
+    // (experiment 2026-11-12-01, item 6: `glScissor(221, y, 389, 97)`).
+    let scissors: Vec<_> = {
+        let g = game.borrow();
+        g.dialogs
+            .answers
+            .iter()
+            .map(|a| gl_scissor(a.gui.rect(a.gui.find("text").unwrap(), W, H), H))
+            .collect()
+    };
+    assert_eq!(
+        scissors,
+        [620, 503, 387, 271, 155, 38].map(|y| (221, y, 389, 97))
+    );
     // The six icons, 110 apart plus a 6.24 gap, centred on the window's
     // middle, x 0.1 of the window.
     let centres: Vec<(f32, f32)> = {

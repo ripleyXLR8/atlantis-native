@@ -22,15 +22,22 @@
 //!   shows), so
 //!   frame `k` is the `k`-th 48-pixel band from the top of the file
 //!   [INFERRED: PNGs uploaded as the JPEGs].
-//! - Placement each frame (`0x00569b60`): `p = project(point)`; if `p.z >
-//!   1` (behind the camera) the sprite goes to `(−w, −h)`; else its corner
-//!   is `(p.x − w/2, p.y − h/2)` (y from the bottom), so that the sprite,
-//!   at its own pixel size (the 480 × 320 interface scale cancels out), is
-//!   centred on the point.
+//! - Placement each frame (`0x00569b60`): `p = project(point)` (window
+//!   pixels, y up); if `p.z > 1` (behind the camera) the sprite goes to
+//!   `(−w, −h)`. Otherwise the sprite's centre in the 480 × 320 layer is
+//!   `floor(p.x·480/W + (w − w·480/W)/2)`, `floor(p.y·320/H + (h −
+//!   h·320/H)/2)` and its corner that centre less `(w·480/W, h·320/H)/2`,
+//!   the layer stretched to the window, so that the sprite keeps its own
+//!   pixel size `[CONFIRMED-DYN]` (atlantis4-re experiment 2026-11-12-01,
+//!   item 4: GL quads of 3 markers, 6 coordinates exact at 1365 × 768).
+//!   The sprite sits about `(w − w·480/W)/2` units (≈ 44 px at 1365)
+//!   right of and `(h − h·320/H)/2` (≈ 34 px at 768) above the point,
+//!   on whole layer units.
 //!
-//! Not settled: whether the position is snapped to whole pixels (the GUI's
-//! `Pixel` sprites are, `0x0054cde5`; drawn here at the exact position),
-//! and when the `_over` picture replaces the sprite (not shown here).
+//! Not settled: when the `_over` picture replaces the sprite (not shown
+//! here), and the draw order of two overlapping markers (the original
+//! draws each as two one-triangle draws interleaved with the next
+//! marker's; here each is one quad).
 
 use crate::camera::Camera;
 
@@ -93,16 +100,40 @@ impl Marker {
     }
 }
 
-/// `0x00569b60`: the bottom-left corner of a `w` × `h` sprite centred on
-/// the projection of `point` (pixels, y from the bottom), or `None` when
-/// the point is behind the camera (the original moves the sprite to `(−w,
-/// −h)`).
-pub fn place(cam: &Camera, point: [f32; 3], w: f32, h: f32) -> Option<(f32, f32)> {
+/// The 480 × 320 layer of the markers (`0x00569b60`).
+pub const LAYER: (f32, f32) = (480.0, 320.0);
+
+/// `0x00569b60`: the centre, in 480 × 320 layer units (y up), of a `w` ×
+/// `h` sprite for a point projected at `p` (window pixels, y up) in a
+/// `width` × `height` window (see the module notes).
+pub fn layer_centre(p: [f32; 2], w: f32, h: f32, width: u32, height: u32) -> (f32, f32) {
+    let sx = LAYER.0 / width as f32;
+    let sy = LAYER.1 / height as f32;
+    (
+        (p[0] * sx + (w - w * sx) / 2.0).floor(),
+        (p[1] * sy + (h - h * sy) / 2.0).floor(),
+    )
+}
+
+/// `0x00569b60`: the bottom-left corner of a `w` × `h` sprite for the
+/// marker at `point` in window pixels (y from the bottom): the layer
+/// centre of [`layer_centre`] stretched to the window, less half the
+/// sprite. `None` when the point is behind the camera (the original
+/// moves the sprite to `(−w, −h)`).
+pub fn place(cam: &Camera, point: [f32; 3], w: f32, h: f32) -> Option<(f64, f64)> {
     let p = cam.project(point);
     if p[2] > 1.0 {
         return None;
     }
-    Some((p[0] - w / 2.0, p[1] - h / 2.0))
+    let (cx, cy) = layer_centre([p[0], p[1]], w, h, cam.width, cam.height);
+    let (kx, ky) = (
+        f64::from(cam.width) / f64::from(LAYER.0),
+        f64::from(cam.height) / f64::from(LAYER.1),
+    );
+    Some((
+        f64::from(cx) * kx - f64::from(w) / 2.0,
+        f64::from(cy) * ky - f64::from(h) / 2.0,
+    ))
 }
 
 #[cfg(test)]
@@ -110,13 +141,28 @@ mod tests {
     use super::*;
     use crate::camera::FOV_HD;
 
+    /// The original's GL quads (experiment 2026-11-12-01, item 4): the
+    /// projected point and the quad's centre in 480 × 320 units.
     #[test]
-    fn a_marker_ahead_is_centred_and_one_behind_is_hidden() {
+    fn markers_are_placed_as_the_originals_quads() {
+        for (p, centre) in [
+            ([744.32, 159.14], (277.0, 80.0)),
+            ([1931.66, 458.23], (694.0, 204.0)),
+            ([162.87, 428.22], (72.0, 192.0)),
+        ] {
+            assert_eq!(layer_centre(p, 48.0, 48.0, 1365, 768), centre, "{p:?}");
+        }
+    }
+
+    #[test]
+    fn a_marker_ahead_is_placed_and_one_behind_is_hidden() {
         let cam = Camera::new(FOV_HD, 1365, 768, 0.0, 0.0);
-        assert_eq!(
-            place(&cam, [0.0, 0.0, -500.0], 48.0, 48.0),
-            Some((658.0, 360.0))
-        );
+        // Projected at (682, 384): centre floor(239.82 + 15.56) = 255,
+        // floor(160 + 14) = 174 units; corner 255·1365/480 − 24,
+        // 174·768/320 − 24 pixels.
+        let (x, y) = place(&cam, [0.0, 0.0, -500.0], 48.0, 48.0).unwrap();
+        assert!((x - (255.0 * 1365.0 / 480.0 - 24.0)).abs() < 1e-9, "{x}");
+        assert!((y - (174.0 * 2.4 - 24.0)).abs() < 1e-9, "{y}");
         assert_eq!(place(&cam, [0.0, 0.0, 500.0], 48.0, 48.0), None);
         assert_eq!(sprite_path(0, true), "2D/Menus/InGame/Marker_0_over.png");
     }

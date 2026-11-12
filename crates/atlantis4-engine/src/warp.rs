@@ -426,8 +426,8 @@ impl Warp {
                 continue;
             };
             let band = MarkerSprite::band(s.frame(now_ms));
-            let top = f64::from(cam.height) - f64::from(y_up) - f64::from(h);
-            c.sprite(pic, (0, band * h, w, h), f64::from(x), top);
+            let top = f64::from(cam.height) - y_up - f64::from(h);
+            c.sprite(pic, (0, band * h, w, h), x, top);
         }
     }
 }

@@ -2,7 +2,11 @@
 //! node with its animations and markers, as MD5s of the XRGB8888 words.
 //! The hashes were taken from the plain per-pixel code before the drawing
 //! was made faster (rows in parallel, the movie's rows and columns
-//! computed once): any change to a pixel shows here. The timing test
+//! computed once): any change to a pixel shows here.
+//! Re-pinned for the live check of 2026-11-12 (atlantis4-re experiment
+//! 2026-11-12-01): the cursor's corner truncated about the window's centre
+//! (every frame) and the markers placed as the original's quads (the
+//! node's frames). The timing test
 //! (`--ignored`) prints how long each part of a frame takes.
 //!
 //! These tests need `ATLANTIS4_DATA` (see `atlantis4_data::testing`) and
@@ -99,15 +103,15 @@ fn frames(dir: &std::path::Path, gui: bool) -> Vec<String> {
 }
 
 const FRAMES: [&str; 9] = [
-    "da9b9d4ba328fe4168416a42f330a43a",
-    "b18ddbd8e4c10c8dfce32fbb52ec413d",
-    "e1232bfb30a8764204cc2715111f5ec6",
-    "979ab99de75d6ba52d8e251c1bd11695",
-    "5ec63269b483d4e16b8b4cadf92296c5",
-    "f0b4f2f87b1c766dd8363b06defa3714",
-    "e321148a2e1afcb1e0dfd8147cc70a80",
-    "3a7f47d1224f1d11e43a97e3db8658ac",
-    "f3142f3814917bbaa81e6ecd6d2f0169",
+    "06262b1ff64427cb303d908f7cda937c",
+    "cbae9e96f23e2d433428350701f1181f",
+    "b6d7e4e8461204b6e7fbb5610632fd27",
+    "352eecf011f12a38843145b1c588a64d",
+    "9a7699ae51bc814062df91c9de58e935",
+    "955b52856fb166cb77975483f5ecd131",
+    "363369fca3c4a36e5d42ff061251ce44",
+    "bf3bca811cbe560279a604aa0bd6b436",
+    "255f8037214627a6c4fae4c21bd77158",
 ];
 
 /// [`FRAMES`] with the GUI layers: the intro's background covers the HUD;
@@ -116,21 +120,27 @@ const FRAMES: [&str; 9] = [
 /// frames (no dialog, notification or open inventory), so drawing the
 /// text layouts left them as they were.
 const FRAMES_GUI: [&str; 9] = [
-    "da9b9d4ba328fe4168416a42f330a43a",
-    "b18ddbd8e4c10c8dfce32fbb52ec413d",
-    "e1232bfb30a8764204cc2715111f5ec6",
-    "979ab99de75d6ba52d8e251c1bd11695",
-    "5ec63269b483d4e16b8b4cadf92296c5",
-    "3dc397ea2de73422ada7be1c9e192757",
-    "22d6839048df6ecbdc0403288e7049ac",
-    "1f376a7fccc9048dc8bbf18d107d14af",
-    "7fbb984d084eed57d6606e5288738832",
+    "06262b1ff64427cb303d908f7cda937c",
+    "cbae9e96f23e2d433428350701f1181f",
+    "b6d7e4e8461204b6e7fbb5610632fd27",
+    "352eecf011f12a38843145b1c588a64d",
+    "9a7699ae51bc814062df91c9de58e935",
+    "f43e1535fd3ae9a8fb4c1e785d2a51d7",
+    "7f14c8e07b57a1b4e40859df6bd54fa9",
+    "b361f7309a15a462792346bc6be7dcbc",
+    "a099347555dd97c0c80a58875df9dc18",
 ];
 
 #[test]
 fn the_frames_with_the_gui_are_the_plain_codes() {
     let Some(dir) = install() else { return };
-    assert_eq!(frames(&dir, true), FRAMES_GUI);
+    let got = frames(&dir, true);
+    if std::env::var_os("A4_PRINT_FRAMES").is_some() {
+        for h in &got {
+            println!("    \"{h}\",");
+        }
+    }
+    assert_eq!(got, FRAMES_GUI);
 }
 
 #[test]

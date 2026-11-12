@@ -104,13 +104,19 @@ pub fn draw(
 }
 
 /// The cursor's top-left corner in window pixels for a pointer at
-/// (`x`, `y`) (window pixels, y down): the anchor point on the pointer.
-/// How the pointer reaches the cursor layout's position, and whether that
-/// position is snapped, are not read (`[UNKNOWN]`).
-pub fn cursor_corner(pic: &Picture, x: f64, y: f64) -> (f64, f64) {
+/// (`x`, `y`) (the OS pointer in client pixels, y down) in a `width` ×
+/// `height` window: with the origin at the window's centre `c`, the
+/// corner is `trunc(pointer − c − anchor·size)`, truncated toward zero,
+/// the anchor offset a `float` (`[CONFIRMED-DYN]`, atlantis4-re
+/// experiment 2026-11-12-01, item 5: three pointers at 1365 × 768). With
+/// an odd width the corner lies on a half pixel.
+pub fn cursor_corner(pic: &Picture, x: f64, y: f64, width: u32, height: u32) -> (f64, f64) {
+    let (cx, cy) = (f64::from(width) / 2.0, f64::from(height) / 2.0);
+    let ax = CURSOR_ANCHOR.0 * pic.width as f32;
+    let ay = CURSOR_ANCHOR.1 * pic.height as f32;
     (
-        x - f64::from(CURSOR_ANCHOR.0) * f64::from(pic.width),
-        y - f64::from(CURSOR_ANCHOR.1) * f64::from(pic.height),
+        cx + (x - cx - f64::from(ax)).trunc(),
+        cy + (y - cy - f64::from(ay)).trunc(),
     )
 }
 
@@ -155,11 +161,20 @@ mod tests {
         assert_eq!(sample(&p, 0.0, 0.5), [255, 0, 0, 255]);
     }
 
+    /// The original's cursor quads (experiment 2026-11-12-01, item 5),
+    /// origin at the window's centre: pointer → corner.
     #[test]
-    fn the_cursor_point_is_30_and_10_percent_in() {
+    fn the_cursor_corner_is_the_originals() {
         let p = pic(38, 40, |_, _| [0; 4]);
-        let (l, t) = cursor_corner(&p, 100.0, 50.0);
-        assert!((l - (100.0 - 0.3f32 as f64 * 38.0)).abs() < 1e-9);
-        assert!((t - (50.0 - 0.1f32 as f64 * 40.0)).abs() < 1e-9);
+        let rel = |x, y| {
+            let (l, t) = cursor_corner(&p, x, y, 1365, 768);
+            (l - 682.5, t - 384.0)
+        };
+        assert_eq!(rel(100.0, 650.0), (-593.0, 262.0));
+        assert_eq!(rel(1310.0, 735.0), (616.0, 347.0));
+        // The third pointer's y was not recorded exactly (≈ 630).
+        assert_eq!(rel(400.0, 630.0).0, -293.0);
+        // An even width: whole pixels.
+        assert_eq!(cursor_corner(&p, 100.0, 50.0, 1366, 768), (89.0, 46.0));
     }
 }

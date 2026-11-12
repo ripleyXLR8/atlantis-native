@@ -977,12 +977,13 @@ impl Canvas for Frame<'_> {
         let a = f64::from(degrees).to_radians();
         let (s, c) = (a.sin(), a.cos());
         let (hw, hh) = (rect.width / 2.0, rect.height / 2.0);
-        // The unturned (u, v) to the window: dx = c·u − s·v, dy = s·u + c·v
-        // (the inverse of the processor's turn).
+        // The unturned (u, v) to the window, counter-clockwise on the
+        // y-down screen: dx = c·u + s·v, dy = −s·u + c·v (the inverse of
+        // the processor's turn).
         let at = |u: f64, v: f64| Vertex {
             p: [
-                (cx + c * u - s * v) as f32,
-                (cy + s * u + c * v) as f32,
+                (cx + c * u + s * v) as f32,
+                (cy - s * u + c * v) as f32,
                 0.0,
             ],
             uv: [
