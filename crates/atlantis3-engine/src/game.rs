@@ -3708,9 +3708,14 @@ pub(crate) fn face_size(files: &A3Files) -> usize {
 
 /// The six faces of a 2004 panorama (`jp6`,
 /// `atlantis3_data::evolution2004_jp6`) in the display's format `depth`:
-/// each face's JPEG decoded to r8g8b8, then x8r8g8b8 as it is, or RGB565
-/// by *Atlantis III*'s page conversion [UNKNOWN: the 2004 copy into a
-/// 16-bit face (@ 0x004b5120) is not read yet].
+/// each face's JPEG decoded to r8g8b8 (the loader @ 0x0042d8b0 decodes
+/// into a surface of format 0x94), then copied into the face in the
+/// display's format by @ 0x004b5120 → 0x004b5080 → 0x004b3bb0, the same
+/// instructions as *Atlantis III*'s surface copy (atlantis3-gog-fr-3473408
+/// @ 0x004ecc40 → 0x004ecba0 → 0x004eb6d0): x8r8g8b8 as it is, RGB565 with
+/// each channel truncated as its 32 → 16 path does ([`crate::menu`]'s
+/// conversion) [the 24-bit source branch of that copy is not checked
+/// separately].
 fn faces_of_jp6(data: &[u8], depth: Depth) -> Result<Faces, String> {
     use atlantis3_data::evolution2004_jp6::Jp6;
     let jp6 = Jp6::parse(data).map_err(|e| format!("{e:?}"))?;
