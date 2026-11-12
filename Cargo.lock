@@ -300,6 +300,7 @@ dependencies = [
  "atlantis2-data",
  "atlantis2-engine",
  "atlantis3-data",
+ "atlantis4-data",
  "libm",
  "log",
  "md-5",

@@ -240,6 +240,39 @@ impl Config {
     }
 }
 
+impl Config {
+    /// The options in *Atlantis III*'s [`crate::cfg::Config`], which the
+    /// engine reads. `GlobalVolume` and `MusicVolume1` are truncated to
+    /// integers [UNKNOWN: how the program uses its floats is not read
+    /// yet]; `Puzzles` has no place there.
+    pub fn to_a3(&self) -> crate::cfg::Config {
+        crate::cfg::Config {
+            resolution: self.resolution,
+            pixel_format: self.pixel_format,
+            full_screen: self.full_screen,
+            langue: self.langue.clone(),
+            sous_titre: self.sous_titre.clone(),
+            version: self.version.clone(),
+            install: self.install.clone(),
+            time: self.time,
+            warp_res: self.warp_res,
+            view: self.view,
+            smooth: self.smooth,
+            cursor: self.cursor,
+            invert_mouse_y: self.invert_mouse_y,
+            subtitle_on: self.subtitle_on,
+            global_volume: self.global_volume as i32,
+            sfx_volume: self.sfx_volume,
+            voices_volume: self.voices_volume,
+            music_volume: self.music_volume1 as i32,
+            log_file: self.log_file,
+            humeur: self.humeur,
+            super_cine: self.super_cine,
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -395,7 +395,11 @@ impl Game {
         script.evolution_2004 = files.is_evolution_2004();
         let fpu = Fpu::Double;
         let mut renderer = Renderer::new(Variant::PII, fpu, width, height);
-        renderer.a3 = Some(A3Raster::new(startup.config.smooth));
+        let face = face_size(&files);
+        renderer.a3 = Some(A3Raster {
+            smooth: startup.config.smooth,
+            face,
+        });
         let startup_smooth = startup.config.smooth;
         let dialog_size = startup.warp_view();
         // The display in the format of `PixelFormat` (@ 0x004074d0).
@@ -479,7 +483,10 @@ impl Game {
             dialog_renderer: {
                 let (w, h) = dialog_size;
                 let mut r = Renderer::new(Variant::PII, Fpu::Double, w, h);
-                r.a3 = Some(A3Raster::new(startup_smooth));
+                r.a3 = Some(A3Raster {
+                    smooth: startup_smooth,
+                    face,
+                });
                 r
             },
             dialog_tick: false,
@@ -576,6 +583,37 @@ impl Game {
     }
 
     /// The display's pixel format.
+    /// The panorama file of view `name`: *Atlantis III*'s
+    /// `warp\Warp<res>\<world>\<name>`; the 2004 program's
+    /// `warp\<name>` on the current disc (@ 0x00442d96..0x00442db4: the
+    /// view's name to the warp path builder FUN_00417670).
+    pub(crate) fn cube_path(&self, name: &str) -> String {
+        if self.files.is_evolution_2004() {
+            return format!("warp/{name}");
+        }
+        let folder = WORLDS.get(self.world as usize).copied().unwrap_or("");
+        let warp = crate::travel::warp_folder(self.startup.config.warp_res);
+        format!("warp/{warp}/{folder}/{name}")
+    }
+
+    /// The faces of view `name`'s panorama in the display's format; the
+    /// debug colours when the file is missing; `None` (logged) when it does
+    /// not decode.
+    pub(crate) fn read_cube(&self, name: &str) -> Option<Faces> {
+        let path = self.cube_path(name);
+        let depth = self.depth();
+        let Some(data) = self.files.read(&path) else {
+            let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
+            return Some(missing_cube(&self.files, dir, name, depth));
+        };
+        let faces = if self.files.is_evolution_2004() {
+            faces_of_jp6(&data, depth)
+        } else {
+            faces_of(&data, depth).map_err(|e| format!("{e:?}"))
+        };
+        faces.map_err(|e| log::error!("{path}: {e}")).ok()
+    }
+
     pub fn depth(&self) -> Depth {
         self.screen.depth()
     }
@@ -2294,19 +2332,10 @@ impl Game {
             return;
         };
         let name = view.name.clone();
-        let world = self.world;
-        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
-        let warp = crate::travel::warp_folder(self.startup.config.warp_res);
-        let path = format!("warp/{warp}/{folder}/{name}");
+        let path = self.cube_path(&name);
         if self.place.cube != path {
-            let depth = self.depth();
-            match self.files.read(&path).map(|d| faces_of(&d, depth)) {
-                Some(Ok(faces)) => self.place.faces = faces,
-                Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => {
-                    let dir = format!("warp/{warp}/{folder}");
-                    self.place.faces = missing_cube(&self.files, &dir, &name, depth);
-                }
+            if let Some(faces) = self.read_cube(&name) {
+                self.place.faces = faces;
             }
             self.place.cube = path.clone();
         }
@@ -2336,21 +2365,11 @@ impl Game {
         let Some(id) = self.place.view else {
             return;
         };
-        let world = self.world;
-        let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         if let Some(name) = self.place.wam.view(id).map(|v| v.name.clone()) {
-            let warp = crate::travel::warp_folder(self.startup.config.warp_res);
-            let path = format!("warp/{warp}/{folder}/{name}");
-            let depth = self.depth();
-            match self.files.read(&path).map(|d| faces_of(&d, depth)) {
-                Some(Ok(faces)) => self.place.faces = faces,
-                Some(Err(e)) => log::error!("{path}: {e:?}"),
-                None => {
-                    let dir = format!("warp/{warp}/{folder}");
-                    self.place.faces = missing_cube(&self.files, &dir, &name, depth);
-                }
+            if let Some(faces) = self.read_cube(&name) {
+                self.place.faces = faces;
             }
-            self.place.cube = path;
+            self.place.cube = self.cube_path(&name);
         }
         let (yaw, pitch) = self.escape_angles;
         let shown = match self.script.as_mut() {
@@ -3672,6 +3691,48 @@ pub fn dialog_fov(fpu: Fpu, deg: f32) -> f32 {
 /// game: chapter 0's boot state (`CFuner.wam` view 4 with world 1, at
 /// start-up) asks for `warp\Warp512\hoggar\cf0004.hnm`, which is in
 /// `ldm\`; the boot state is never drawn.
+/// The cube faces' size: 512 (*Atlantis III*), 768 (*Atlantis
+/// Evolution*'s 2004 program: every `warp\*.jp6` of its CD).
+pub(crate) fn face_size(files: &A3Files) -> usize {
+    if files.is_evolution_2004() {
+        768
+    } else {
+        atlantis2_engine::warp::FACE_SIZE
+    }
+}
+
+/// The six faces of a 2004 panorama (`jp6`,
+/// `atlantis3_data::evolution2004_jp6`) in the display's format `depth`:
+/// each face's JPEG decoded to r8g8b8, then x8r8g8b8 as it is, or RGB565
+/// by *Atlantis III*'s page conversion [UNKNOWN: the 2004 copy into a
+/// 16-bit face (@ 0x004b5120) is not read yet].
+fn faces_of_jp6(data: &[u8], depth: Depth) -> Result<Faces, String> {
+    use atlantis3_data::evolution2004_jp6::Jp6;
+    let jp6 = Jp6::parse(data).map_err(|e| format!("{e:?}"))?;
+    let mut rgb: [Vec<u32>; 6] = Default::default();
+    for (slot, face) in jp6.faces.iter().enumerate() {
+        let jpeg = face.jpeg().ok_or("a face without JPG")?;
+        let img = atlantis4_data::jpeg::decode(jpeg).map_err(|e| format!("{e:?}"))?;
+        let n = img.channels as usize;
+        if n < 3 || img.width != u32::from(jp6.width) || img.height != u32::from(jp6.height) {
+            return Err(format!("face {slot}: {}x{}x{n}", img.width, img.height));
+        }
+        rgb[slot] = img
+            .pixels
+            .chunks(n)
+            .map(|c| 0xff00_0000 | u32::from(c[0]) << 16 | u32::from(c[1]) << 8 | u32::from(c[2]))
+            .collect();
+    }
+    Ok(match depth {
+        Depth::Xrgb8888 => {
+            Faces::Xrgb8888(rgb.map(|f| f.into_iter().map(|c| c & 0x00ff_ffff).collect()))
+        }
+        Depth::Rgb565 => {
+            Faces::Rgb565(rgb.map(|f| f.into_iter().map(<u16 as PagePixel>::from_argb).collect()))
+        }
+    })
+}
+
 fn missing_cube(files: &A3Files, dir: &str, name: &str, depth: Depth) -> Faces {
     const DEBUG: [u32; 6] = [
         0xff00_0080,
@@ -3690,11 +3751,12 @@ fn missing_cube(files: &A3Files, dir: &str, name: &str, depth: Depth) -> Faces {
         }
     }
     log::debug!("{dir}/{name}: not found (debug colours)");
+    let n = face_size(files);
     match depth {
         Depth::Rgb565 => {
-            Faces::Rgb565(DEBUG.map(|c| vec![<u16 as PagePixel>::from_argb(c); 512 * 512]))
+            Faces::Rgb565(DEBUG.map(|c| vec![<u16 as PagePixel>::from_argb(c); n * n]))
         }
-        Depth::Xrgb8888 => Faces::Xrgb8888(DEBUG.map(|c| vec![c; 512 * 512])),
+        Depth::Xrgb8888 => Faces::Xrgb8888(DEBUG.map(|c| vec![c; n * n])),
     }
 }
 

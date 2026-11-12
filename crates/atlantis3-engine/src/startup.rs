@@ -39,21 +39,44 @@ impl Startup {
     /// [`Startup::read`] with the bug fixes `fixes` ([`Fixes::apply`],
     /// after the registry values).
     pub fn read_with(files: &A3Files, fixes: Fixes) -> Startup {
-        let mut config = match files.read("Atlantis3.cfg") {
-            Some(data) => Config::parse(&data),
-            None => {
-                log::warn!("Datas\\Atlantis3.cfg not found: the defaults");
-                Config::default()
+        let evolution = files.is_evolution_2004();
+        let mut config = if evolution {
+            // *Atlantis Evolution*'s 2004 program: `Datas\Atlantis4.cfg`
+            // over its own defaults (atlantis3_data::evolution2004_cfg).
+            use atlantis3_data::evolution2004_cfg as cfg4;
+            match files.read("Atlantis4.cfg") {
+                Some(data) => cfg4::Config::parse(&data).to_a3(),
+                None => {
+                    log::warn!("Datas\\Atlantis4.cfg not found: the defaults");
+                    cfg4::Config::default().to_a3()
+                }
+            }
+        } else {
+            match files.read("Atlantis3.cfg") {
+                Some(data) => Config::parse(&data),
+                None => {
+                    log::warn!("Datas\\Atlantis3.cfg not found: the defaults");
+                    Config::default()
+                }
             }
         };
-        let (language, install) = install_registry(files);
+        let (language, mut install) = install_registry(files);
+        if evolution {
+            // Its installer writes `Install = FLA` (MSI `Registry` table,
+            // atlantis4-re subsystems/cd2004-files.md).
+            install = b"FLA".to_vec();
+        }
         log::info!(
             "install: language {}, medium {}",
             String::from_utf8_lossy(&language),
             String::from_utf8_lossy(&install)
         );
         config.apply_install(&language, &install);
-        fixes.apply(&mut config, files);
+        // The fixes are *Atlantis III*'s (`fix_warpres_cd`: its GOG.com
+        // installs' 512 folders); the 2004 program's WarpRes is its file's.
+        if !evolution {
+            fixes.apply(&mut config, files);
+        }
         Startup {
             config,
             install_language: language,
