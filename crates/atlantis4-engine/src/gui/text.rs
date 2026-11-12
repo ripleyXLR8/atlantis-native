@@ -30,6 +30,11 @@
 //!   bottom; `GL_LINEAR` and `GL_BLEND`: the colour is the vertices', the
 //!   atlas gives the coverage.
 //!
+//! - **Kerning** (`TeFont2`'s `std::map`, [`super::kernmap`]): its
+//!   comparator is not a lexicographic order, so `find` returns a stored
+//!   pair for most byte pairs that are not in the file: nearly every pair
+//!   is kerned, mostly by −1.
+//!
 //! Every intermediate stored as a `float` is rounded to `f32` here at the
 //! same place; the sums between stores are done in `f64` (the x87 at 53
 //! bits).
@@ -40,6 +45,8 @@ use std::rc::Rc;
 use atlantis4_data::font::Font as TefFont;
 use atlantis4_data::image::decode_png;
 use atlantis4_data::A4Files;
+
+use super::kernmap::{KernMap, KernTable};
 
 /// `TeTextBase2`'s alignment (`+0x288`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -59,9 +66,10 @@ pub struct Font {
     pub descent: f32,
     pub line_height: f32,
     pub glyphs: Vec<atlantis4_data::font::Glyph>,
-    /// Kerning pairs `(c1, c2) → (dx, dy)` (the first of a repeated pair,
-    /// as a `std::map` insert keeps it).
-    kerning: HashMap<(u32, u32), (f32, f32)>,
+    /// The kerning `std::map` (see [`super::kernmap`]): filled with
+    /// `map[(c1, c2)] = (dx, dy)` in file order, so the last of a repeated
+    /// pair wins; looked up for every byte pair once, at load.
+    kerning: KernTable,
     pub atlas_width: u32,
     pub atlas_height: u32,
     /// The atlas's alpha, rows top-down.
@@ -79,12 +87,11 @@ impl Font {
             2 => img.pixels.iter().skip(1).step_by(2).copied().collect(),
             _ => vec![255; n],
         };
-        let mut kerning = HashMap::new();
-        for k in &f.kerning {
-            kerning
-                .entry((k.left, k.right))
-                .or_insert((k.offset[0], k.offset[1]));
-        }
+        let kerning = KernTable::new(KernMap::from_pairs(
+            f.kerning
+                .iter()
+                .map(|k| ((k.left, k.right), (k.offset[0], k.offset[1]))),
+        ));
         Some(Font {
             ascent: f.metrics[0],
             descent: f.metrics[1],
@@ -112,9 +119,11 @@ impl Font {
             .unwrap_or_default()
     }
 
-    /// The kerning of the pair (`a`, `b`), zero when absent.
+    /// The kerning of the pair (`a`, `b`) as the map's `find` gives it
+    /// (zero for `end()`): with its comparator most pairs not in the file
+    /// find a stored one.
     pub fn kern(&self, a: u32, b: u32) -> (f32, f32) {
-        self.kerning.get(&(a, b)).copied().unwrap_or((0.0, 0.0))
+        self.kerning.kern(a, b)
     }
 
     /// The atlas's coverage at (`x`, `y`), clamped to its edge.
@@ -697,9 +706,13 @@ mod tests {
     use super::*;
 
     /// A font of fixed-width glyphs: every glyph 8 wide, 10 high, advance
-    /// 10, bearing 1, top 10; ascent 10, descent 3, line 14; one kerning
-    /// pair (`A`, `V`) of −2.
+    /// 10, bearing 1, top 10; ascent 10, descent 3, line 14; no kerning.
     fn mono() -> Font {
+        mono_kerned(&[])
+    }
+
+    /// [`mono`] with these kerning pairs `(c1, c2, dx)`.
+    fn mono_kerned(pairs: &[(u8, u8, f32)]) -> Font {
         let g = atlantis4_data::font::Glyph {
             size: [8.0, 10.0],
             offset: [1.0, 10.0],
@@ -708,8 +721,11 @@ mod tests {
             atlas: [0.0, 0.0],
             code: 0,
         };
-        let mut kerning = HashMap::new();
-        kerning.insert((u32::from(b'A'), u32::from(b'V')), (-2.0, 0.0));
+        let kerning = KernTable::new(KernMap::from_pairs(
+            pairs
+                .iter()
+                .map(|&(a, b, dx)| ((u32::from(a), u32::from(b)), (dx, 0.0))),
+        ));
         Font {
             ascent: 10.0,
             descent: 3.0,
@@ -790,7 +806,8 @@ mod tests {
 
     #[test]
     fn quads_are_floored_and_kerned_from_the_line_start() {
-        let font = mono();
+        // One pair (`A`, `V`) of −2; (0, `A`) is "less" than it: not kerned.
+        let font = mono_kerned(&[(b'A', b'V', -2.0)]);
         let b = build(&font, parse_markup(b"AV"), frame(100));
         let q = line_quads(&font, &b, &b.lines[0]);
         assert_eq!((q[0].x0, q[0].y0, q[0].x1, q[0].y1), (1, 0, 9, 10));

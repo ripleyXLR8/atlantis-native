@@ -163,9 +163,11 @@ fn the_dialog_screen_lands_where_the_originals_code_puts_it() {
 
 #[test]
 fn glyph_quads_are_the_transcribed_ones() {
-    // The quads of the line drawer (@ 0x004a2020) for Arial 16, box 200:
-    // L = 103, block 103 × 20; left: `H` (1, 4)–(12, 16), `!` (100, 4)–
-    // (103, 16); centred: `H` (49, 4)–(60, 16).
+    // The quads of the line drawer (@ 0x004a2020) for Arial 16, box 200,
+    // with the font's kerning map as the original reads it (atlantis4-re
+    // `tools/gui/text_quads.py` on `kernmap.py`: 14 of the 16 keys,
+    // (0, `H`) among them, kerned by −1): L = 89, block 89 × 20; left: `H` (0, 4)–
+    // (11, 16), `!` (86, 4)–(89, 16); centred: `H` (55, 4)–(66, 16).
     let Some(files) = files() else { return };
     let font = Font::parse(&files.read("Common/Fonts/Arial_r_16.tef").unwrap()).unwrap();
     let frame = Frame {
@@ -176,18 +178,18 @@ fn glyph_quads_are_the_transcribed_ones() {
     let m = text::parse_markup(b"Hello, Atlantis!");
     let b = text::build(&font, m.clone(), frame);
     assert_eq!(b.lines.len(), 1);
-    assert_eq!(b.lines[0].width, 103.0);
-    assert_eq!((b.width, b.height), (103, 20));
+    assert_eq!(b.lines[0].width, 89.0);
+    assert_eq!((b.width, b.height), (89, 20));
     let q = text::line_quads(&font, &b, &b.lines[0]);
-    assert_eq!((q[0].x0, q[0].y0, q[0].x1, q[0].y1), (1, 4, 12, 16));
-    assert_eq!((q[1].x0, q[1].y0, q[1].x1, q[1].y1), (12, 7, 21, 16));
+    assert_eq!((q[0].x0, q[0].y0, q[0].x1, q[0].y1), (0, 4, 11, 16));
+    assert_eq!((q[1].x0, q[1].y0, q[1].x1, q[1].y1), (10, 7, 19, 16));
     let last = q.last().unwrap();
-    assert_eq!((last.x0, last.y0, last.x1, last.y1), (100, 4, 103, 16));
+    assert_eq!((last.x0, last.y0, last.x1, last.y1), (86, 4, 89, 16));
     let mut c = m;
     c.align = text::Align::Center;
     let b = text::build(&font, c, frame);
     let q = text::line_quads(&font, &b, &b.lines[0]);
-    assert_eq!((q[0].x0, q[0].x1), (49, 60));
+    assert_eq!((q[0].x0, q[0].x1), (55, 66));
 }
 
 const W: u32 = 1365;
