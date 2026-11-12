@@ -41,6 +41,7 @@ pub mod con;
 pub mod coord;
 pub mod db;
 pub mod dialog;
+pub mod evolution2004;
 pub mod exe;
 pub mod files;
 pub mod font_txt;
