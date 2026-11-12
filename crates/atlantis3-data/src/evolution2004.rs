@@ -134,9 +134,9 @@ pub enum Folder {
     MenuDesc,
     /// `menu\spr_` (FUN_00419240, FUN_00419510): the name follows directly.
     MenuSpr,
-    /// `loc\<language>\voix\` (FUN_00417b10, FUN_00417dc0).
+    /// `loc\voix\<language>\` (FUN_00417b10, FUN_00417dc0).
     Voices,
-    /// `loc\<language>\text\` (FUN_00419880, FUN_00419b30).
+    /// `loc\text\<language>\` (FUN_00419880, FUN_00419b30).
     Texts,
     // The per-disc folders.
     /// `warp\` (FUN_00417670).
@@ -147,7 +147,7 @@ pub enum Folder {
     Spw,
     /// `bink\` (FUN_004181e0, FUN_004185d0).
     Bink,
-    /// `loc\<language>\bink\` (FUN_00418350).
+    /// `loc\bink\<language>\` (FUN_00418350).
     LocalBink,
     /// `binktraj\` (FUN_00418740).
     BinkTraj,
@@ -196,9 +196,9 @@ impl Folder {
             Folder::Map => "map\\",
             Folder::Spf => "spf\\",
             Folder::Puzzles => "puzzles\\",
-            Folder::Voices => return format!("loc\\{language}\\voix\\"),
-            Folder::Texts => return format!("loc\\{language}\\text\\"),
-            Folder::LocalBink => return format!("loc\\{language}\\bink\\"),
+            Folder::Voices => return format!("loc\\voix\\{language}\\"),
+            Folder::Texts => return format!("loc\\text\\{language}\\"),
+            Folder::LocalBink => return format!("loc\\bink\\{language}\\"),
         };
         fixed.to_string()
     }
@@ -215,6 +215,112 @@ pub fn data_path(folder: Folder, name: &str, disc: u32, language: &str) -> Strin
         format!("cd{disc}\\")
     };
     format!("{root}Datas\\{}{name}", folder.text(language))
+}
+
+/// The folder a path under `Datas\` belongs to, by its first components
+/// (`loc\<voix|text|bink>\<language>\`); `None` for a file of `Datas\`
+/// itself or of a folder no path builder names.
+pub fn folder_of(rest: &str) -> Option<Folder> {
+    let parts: Vec<String> = rest
+        .split(['/', '\\'])
+        .filter(|p| !p.is_empty())
+        .map(|p| p.to_ascii_lowercase())
+        .collect();
+    let first = parts.first()?;
+    if parts.len() < 2 {
+        return None;
+    }
+    Some(match first.as_str() {
+        "wam" => Folder::Wam,
+        "sfx" => Folder::Sfx,
+        "scenar" => Folder::Scenar,
+        "spr" => Folder::Spr,
+        // `menu\desc\` and `menu\spr_<name>`: both on disc 0.
+        "menu" => Folder::MenuDesc,
+        "warp" => Folder::Warp,
+        "music" => Folder::Music,
+        "spw" => Folder::Spw,
+        "bink" => Folder::Bink,
+        "binktraj" => Folder::BinkTraj,
+        "binkdial" => Folder::BinkDial,
+        "map" => Folder::Map,
+        "spf" => Folder::Spf,
+        "puzzles" => Folder::Puzzles,
+        "loc" => match parts.get(1).map(String::as_str) {
+            Some("voix") => Folder::Voices,
+            Some("text") => Folder::Texts,
+            Some("bink") => Folder::LocalBink,
+            _ => return None,
+        },
+        _ => return None,
+    })
+}
+
+/// The install of the 2004 program seen as one game folder: a name under
+/// `Datas\` goes to `cd0\Datas\` or to the current disc's `cd<N>\Datas\`
+/// by its folder ([`folder_of`], [`Folder::on_disc0`]), a file of `Datas\`
+/// itself to the install's `datas\` (`Atlantis4.cfg`), any other name is
+/// unchanged. The current disc is `Menu_TestChangeCD`'s number: 1 at
+/// start-up for an `FLA` install (@ 0x004a1c24), then `CHANGECD=<n>` of the
+/// scripts (@ 0x0045091a) or a loaded game (@ 0x00461b06).
+pub struct Evolution2004Source {
+    src: std::sync::Arc<dyn atlantis_data::FileSource>,
+    disc: std::sync::atomic::AtomicU32,
+}
+
+impl Evolution2004Source {
+    pub fn new(src: std::sync::Arc<dyn atlantis_data::FileSource>) -> Evolution2004Source {
+        Evolution2004Source {
+            src,
+            disc: std::sync::atomic::AtomicU32::new(1),
+        }
+    }
+
+    /// The current disc.
+    pub fn disc(&self) -> u32 {
+        self.disc.load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    /// `Menu_TestChangeCD(n)` for an `FLA` install: the per-disc folders are
+    /// read from `cd<n>\` from now on.
+    pub fn set_disc(&self, n: u32) {
+        self.disc.store(n, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Where `name` is in the install.
+    pub fn map(&self, name: &str) -> String {
+        let n = name.replace('\\', "/");
+        let Some(rest) = n
+            .get(..6)
+            .filter(|d| d.eq_ignore_ascii_case("datas/"))
+            .map(|_| &n[6..])
+        else {
+            return n;
+        };
+        match folder_of(rest) {
+            Some(f) if f.on_disc0() => format!("cd0/datas/{rest}"),
+            Some(_) => format!("cd{}/datas/{rest}", self.disc()),
+            None => format!("datas/{rest}"),
+        }
+    }
+}
+
+impl atlantis_data::FileSource for Evolution2004Source {
+    fn size(&self, name: &str) -> Option<u64> {
+        self.src.size(&self.map(name))
+    }
+    fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
+        self.src.read_at(&self.map(name), offset, len)
+    }
+    fn has_dir(&self, name: &str) -> bool {
+        self.src.has_dir(&self.map(name))
+    }
+    fn read_beside(&self, name: &str) -> Option<Vec<u8>> {
+        self.src.read_beside(name)
+    }
+    fn list(&self, dir: &str) -> Vec<String> {
+        self.src.list(&self.map(dir))
+    }
 }
 
 /// Whether `dir` looks like the 2004 program's install: the program and
@@ -252,16 +358,41 @@ mod tests {
         );
         assert_eq!(
             data_path(Folder::LocalBink, "x.bik", 2, "gbr"),
-            "cd2\\Datas\\loc\\gbr\\bink\\x.bik"
+            "cd2\\Datas\\loc\\bink\\gbr\\x.bik"
         );
         assert_eq!(
             data_path(Folder::Voices, "a.ogg", 4, "gbr"),
-            "cd0\\Datas\\loc\\gbr\\voix\\a.ogg"
+            "cd0\\Datas\\loc\\voix\\gbr\\a.ogg"
         );
         assert_eq!(
             data_path(Folder::MenuSpr, "x.spr", 1, "gbr"),
             "cd0\\Datas\\menu\\spr_x.spr"
         );
+    }
+
+    #[test]
+    fn names_map_to_the_discs() {
+        let m = atlantis_data::files::MemFiles::default();
+        let src = Evolution2004Source::new(std::sync::Arc::new(m));
+        assert_eq!(
+            src.map("Datas/scenar/chapi038.con"),
+            "cd0/datas/scenar/chapi038.con"
+        );
+        assert_eq!(
+            src.map("Datas\\warp\\c20004.jp6"),
+            "cd1/datas/warp/c20004.jp6"
+        );
+        src.set_disc(3);
+        assert_eq!(
+            src.map("datas/loc/bink/gbr/x.bik"),
+            "cd3/datas/loc/bink/gbr/x.bik"
+        );
+        assert_eq!(
+            src.map("datas/loc/voix/gbr/a.ogg"),
+            "cd0/datas/loc/voix/gbr/a.ogg"
+        );
+        assert_eq!(src.map("Datas/Atlantis4.cfg"), "datas/Atlantis4.cfg");
+        assert_eq!(src.map("Atlantis Evolution.exe"), "Atlantis Evolution.exe");
     }
 
     /// The CD's install (`ATLANTIS4_CD`): the build is known, and every data
@@ -314,6 +445,39 @@ mod tests {
                 assert_eq!(f.on_disc0(), disc == 0, "cd{disc}: {n}");
             }
         }
+        // Every data file of the install, read through the source by its
+        // `Datas\` name with its disc current.
+        let src = Evolution2004Source::new(std::sync::Arc::new(atlantis_data::StdDir::new(&dir)));
+        let mut n = 0;
+        for disc in 0..=4u32 {
+            let datas = dir.join(format!("cd{disc}")).join("datas");
+            let mut stack = vec![datas.clone()];
+            while let Some(d) = stack.pop() {
+                for e in std::fs::read_dir(&d).unwrap().flatten() {
+                    let p = e.path();
+                    if p.is_dir() {
+                        stack.push(p);
+                        continue;
+                    }
+                    let rel = p
+                        .strip_prefix(&datas)
+                        .unwrap()
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    if disc > 0 {
+                        src.set_disc(disc);
+                    }
+                    let name = format!("Datas/{rel}");
+                    assert_eq!(
+                        atlantis_data::FileSource::size(&src, &name),
+                        Some(e.metadata().unwrap().len()),
+                        "{name} (disc {disc})"
+                    );
+                    n += 1;
+                }
+            }
+        }
+        assert_eq!(n, 7629 - 10, "data files");
         // `loc`: text and voices on disc 0, the localised videos elsewhere.
         assert!(dir.join("cd0/datas/loc/text/gbr").is_dir());
         assert!(dir.join("cd0/datas/loc/voix/gbr").is_dir());
