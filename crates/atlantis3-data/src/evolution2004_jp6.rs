@@ -85,6 +85,16 @@ fn u32_at(d: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_le_bytes(d.get(at..at + 4)?.try_into().ok()?))
 }
 
+/// The cube slot each face of [`Jp6::faces`] goes to: the `jp6` branch of
+/// the cube loader (@ 0x0042d8b0, called from @ 0x0042cbe0 when the warp
+/// file's extension is `jp6`) copies face i into the cube's i-th 0x80-byte
+/// face object, in the open's order; the slots are *Atlantis III*'s (its
+/// HNM frames `bk dn ft lf rt up` go to slots 1, 3, 0, 4, 5, 2,
+/// `atlantis2_engine::warp::FRAME_TO_FACE`): front, back, up, down, left,
+/// right. The CD's faces 2 are skies and 3 grounds [CONFIRMED-DATA: looked
+/// at].
+pub const SLOT_NAMES: [&str; 6] = ["ft", "bk", "up", "dn", "lf", "rt"];
+
 /// The order of the entries after the open's swaps.
 pub const FACE_ORDER: [usize; 6] = [2, 0, 5, 1, 3, 4];
 
