@@ -265,18 +265,13 @@ impl Game {
         }
         if self.click {
             // FUN_0043d080: the first enabled follower whose sprite is
-            // under the pointer.
+            // under the pointer ([`inv::follower_hit`]).
+            let list = &self.inv2004.followers;
             let name = self.inv2004.followers_bank.as_ref().and_then(|bank| {
-                self.inv2004
-                    .followers
-                    .iter()
-                    .zip(inv::follower_draws(&self.inv2004.followers))
-                    .find(|(f, (frame, x, y))| {
-                        f.enabled
-                            && usize::try_from(*frame)
-                                .is_ok_and(|i| bank.opaque_at(i, Some(*x), *y, px, py))
-                    })
-                    .map(|(f, _)| f.name.clone())
+                inv::follower_hit(list, |frame, x, y| {
+                    usize::try_from(frame).is_ok_and(|i| bank.opaque_at(i, Some(x), y, px, py))
+                })
+                .map(|k| list[k].name.clone())
             });
             if let Some(name) = name {
                 // @ 0x0042b69f..0x0042b700: its character, with subjects

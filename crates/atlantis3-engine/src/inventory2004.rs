@@ -291,9 +291,40 @@ pub fn follower_draws(list: &[Follower]) -> Vec<(i32, i32, i32)> {
         .collect()
 }
 
+/// The follower clicked (FUN_0043d080): the first enabled one whose
+/// sprite at its place (30 + 70 k, 30) is opaque under the pointer,
+/// tested with its frame +0x14 (parameter 1, @ 0x0043d0c4: the drawn
+/// +0x18 of an enabled follower is not the one tested). `opaque(frame, x,
+/// y)` is the sprite test at the pointer.
+pub fn follower_hit(list: &[Follower], opaque: impl Fn(i32, i32, i32) -> bool) -> Option<usize> {
+    list.iter()
+        .zip(follower_draws(list))
+        .position(|(f, (_, x, y))| f.enabled && opaque(f.frame_off, x, y))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// FUN_0043d080 tests an enabled follower with its parameter 1
+    /// frame (+0x14), though it is drawn with parameter 2 (+0x18).
+    #[test]
+    fn follower_hit_uses_the_first_frame() {
+        let f = |enabled| Follower {
+            name: "MIRANDA".into(),
+            frame_off: 1,
+            frame_on: 2,
+            enabled,
+        };
+        let list = [f(false), f(true)];
+        assert_eq!(follower_draws(&list)[1], (2, 100, 30));
+        // Only frame 1 is opaque at the pointer: the enabled follower 1.
+        assert_eq!(follower_hit(&list, |frame, _, _| frame == 1), Some(1));
+        assert_eq!(follower_hit(&list, |frame, _, _| frame == 2), None);
+        // Follower 0 (disabled) is never hit; 1 only at its own place.
+        assert_eq!(follower_hit(&list, |_, x, _| x == 30), None);
+        assert_eq!(follower_hit(&list, |_, x, _| x == 100), Some(1));
+    }
 
     fn e(id: i32) -> BagEntry {
         BagEntry {
