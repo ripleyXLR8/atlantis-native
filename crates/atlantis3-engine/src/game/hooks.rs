@@ -394,7 +394,18 @@ impl Game {
 
     /// The view entry's hook (@ 0x004c2010): `(LIMITEANGLEWARPY=70)` at
     /// every entry, then the place's.
+    ///
+    /// None of these place hooks (view entry, warp frame, zone click, main
+    /// loop, after a load) is in *Atlantis Evolution*'s 2004 program
+    /// (atlantis4-cd-en-3022848): its warp frame FUN_00443cc0 calls no
+    /// place hook (*Atlantis III*'s 0x004c27d0 has no counterpart), its
+    /// view entry FUN_00442c80 none either (`LIMITEANGLEWARPY` keeps the
+    /// new game's 50), and its zone hook FUN_004763e0 does nothing. They
+    /// are off for it ([`Game::a3_place_hooks`]).
     pub(super) fn view_hook(&mut self, s: &mut Script) {
+        if !self.a3_place_hooks() {
+            return;
+        }
         let mut h = Hx { g: self, s };
         h.run("(LIMITEANGLEWARPY=70)");
         let vue = h.vue();
@@ -414,8 +425,17 @@ impl Game {
         ldmorts::coffer_entry(&mut h);
     }
 
+    /// Whether *Atlantis III*'s place hooks run: not for the 2004
+    /// program ([`Game::view_hook`]).
+    pub(super) fn a3_place_hooks(&self) -> bool {
+        !self.files.is_evolution_2004()
+    }
+
     /// The warp frame's hook (@ 0x004c27d0), after `Interp_GereFrame`.
     pub(super) fn frame_hook(&mut self) {
+        if !self.a3_place_hooks() {
+            return;
+        }
         let Some(mut s) = self.script.take() else {
             return;
         };
@@ -429,6 +449,9 @@ impl Game {
     /// The zone click's hook (@ 0x004c32c0): the zone record kept for the
     /// next frame hook; the Hoggar's throws, the jewel case.
     pub(super) fn zone_hook(&mut self, kind: i32, value: i32, name: &str) {
+        if !self.a3_place_hooks() {
+            return;
+        }
         self.puzzles.zone = Some((kind, value, name.to_string()));
         let Some(mut s) = self.script.take() else {
             return;
@@ -579,6 +602,9 @@ impl Game {
     /// The main loop's per-frame hook (@ 0x004c1950, called from the main
     /// loop @ 0x004d5df9 in every mode): the Ankh coffer's lid.
     pub(super) fn main_loop_hook(&mut self) {
+        if !self.a3_place_hooks() {
+            return;
+        }
         let Some(mut s) = self.script.take() else {
             return;
         };
@@ -592,6 +618,9 @@ impl Game {
     /// After a load's one-shot bytes (@ 0x00459e70), the coffer's lid
     /// rebuilt (@ 0x004c1e20: 0x00785f2f := 0, then @ 0x004c1650).
     pub(super) fn after_load_hook(&mut self) {
+        if !self.a3_place_hooks() {
+            return;
+        }
         let Some(mut s) = self.script.take() else {
             return;
         };
@@ -604,6 +633,9 @@ impl Game {
 
     /// [`Game::after_load_hook`] while the script is out of the game.
     pub(super) fn after_load_hook_with(&mut self, s: &mut Script) {
+        if !self.a3_place_hooks() {
+            return;
+        }
         let mut h = Hx { g: self, s };
         ldmorts::coffer_entry(&mut h);
     }

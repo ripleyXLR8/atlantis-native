@@ -280,3 +280,20 @@ fn changecd_monde_playvoice() {
     let trace = g.trace.take().unwrap();
     assert!(trace.iter().any(|l| l == "voice 1 2 3 4 5"), "{trace:?}");
 }
+
+/// No *Atlantis III* place hook: the view entry leaves `LIMITEANGLEWARPY`
+/// at the new game's 50 (no `(LIMITEANGLEWARPY=70)`), `flag147` = 1 starts
+/// no Licorne screen (chapi030 sets it).
+#[test]
+fn no_atlantis3_place_hooks() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    assert_eq!(var(&g, "LIMITEANGLEWARPY"), 50);
+    g.run_command("(vue=2)");
+    assert_eq!(var(&g, "LIMITEANGLEWARPY"), 50);
+    g.run_command("(flag147=1)");
+    run(&mut g, &mut t, 0.2);
+    assert_eq!(g.puzzle_screen(), None);
+    assert_eq!(g.mode(), Mode::Warp);
+}
