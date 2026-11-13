@@ -539,3 +539,25 @@ fn changetypeobjet() {
     g.run_command("(changetypeobjet=MALLE_FERME,4)");
     assert!(clicks(&g).iter().all(|&c| c == 4), "{:?}", clicks(&g));
 }
+
+/// `VUEANGLES=n` (@ 0x0044e2e7): the view entered as `VUE=n` does, but
+/// FUN_00442c80's `turn` 0: the camera keeps its orientation instead of
+/// taking `ANGLEWARPX` / `ANGLEWARPY`.
+#[test]
+fn vueangles_keeps_the_camera() {
+    let Some((mut g, _)) = cabin() else {
+        return;
+    };
+    let before = g.camera().angles();
+    g.run_command("(anglewarpx=200)");
+    g.run_command("(vueangles=2)");
+    assert_eq!(g.place().1, Some(2));
+    let after = g.camera().angles();
+    assert!(
+        (after.0 - before.0).abs() < 0.02 && (after.1 - before.1).abs() < 0.02,
+        "{before:?} {after:?}"
+    );
+    g.run_command("(vue=1)");
+    let turned = g.camera().angles();
+    assert!((turned.0 - before.0).abs() > 0.1, "{before:?} {turned:?}");
+}

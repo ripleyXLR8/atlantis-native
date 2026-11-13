@@ -248,6 +248,8 @@ pub struct Game {
     film_cine_in: bool,
     film_cine_out: bool,
     film_skip_key: bool,
+    /// `VUEANGLES` entering its view: FUN_00442c80's `turn` 0.
+    view_no_turn_2004: bool,
     /// The 2004 program's dialog running (`AtlDial`, 0x006e6f5c), its
     /// data (read at the first `DIAL`) and the player perso (`PLAYERNAME`,
     /// 0x006e6f40).
@@ -524,6 +526,7 @@ impl Game {
             film_cine_in: false,
             film_cine_out: false,
             film_skip_key: false,
+            view_no_turn_2004: false,
             dialog2004: None,
             dialogs2004: None,
             player_2004: atlantis3_data::evolution2004_dialog::DEFAULT_PLAYER.to_string(),
@@ -2715,8 +2718,9 @@ impl Game {
         self.load_slots(id, shown);
         if self.files.is_evolution_2004() {
             // FUN_00442c80's camera code (`VUE`, the moves, `CHANGEWAM`:
-            // its second argument 1).
-            self.ship.enter(&mut self.camera, yaw, pitch, true);
+            // its second argument 1; `VUEANGLES`: 0).
+            let turn = !self.view_no_turn_2004;
+            self.ship.enter(&mut self.camera, yaw, pitch, turn);
         } else {
             self.camera.enter(yaw, pitch);
         }
@@ -4572,6 +4576,10 @@ impl Host for Game {
 
     fn disable_warp_2004(&mut self, disable: bool) {
         self.disable_warp_2004(disable);
+    }
+
+    fn view_turn_2004(&mut self, turn: bool) {
+        self.view_no_turn_2004 = !turn;
     }
 
     fn change_click_kind_2004(&mut self, id: i32, kind: i32, click: i32) {

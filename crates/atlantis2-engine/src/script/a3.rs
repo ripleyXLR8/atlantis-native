@@ -462,6 +462,15 @@ impl Script {
                 host.zone_by_name_2004(name, is(self, "ENABLEZONE"));
                 return Some(next);
             }
+            if is(self, "VUEANGLES") {
+                // @ 0x0044e2e7..0x0044e3f3: `VUE`'s code without its
+                // transition block (0x0070d082) and with the view entry's
+                // `turn` 0 (FUN_00442c80(view, 0) @ 0x0044e39f).
+                host.view_turn_2004(false);
+                self.set_vue(host, value);
+                host.view_turn_2004(true);
+                return Some(next);
+            }
             if is(self, "CHANGETYPEOBJET") {
                 // @ 0x0044db19..0x0044db50: the `#OBJETS#` id, `atoi`
                 // after the comma, FUN_00466690(id, 2, n).

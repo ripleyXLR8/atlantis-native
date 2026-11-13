@@ -346,6 +346,10 @@ pub trait Host {
     /// toggles every zone of that name in the place's views.
     fn zone_by_name_2004(&mut self, name: &str, on: bool) {}
 
+    /// The 2004 view entry's `turn` (FUN_00442c80's second argument): 0
+    /// while `VUEANGLES` enters its view, 1 otherwise.
+    fn view_turn_2004(&mut self, turn: bool) {}
+
     /// The 2004 `CHANGETYPEOBJET=NAME,n` (@ 0x0044db19): FUN_00466690
     /// gives every place-animation slot of (id, kind) and its WAM state
     /// record (`+0x18`) the click kind n.
