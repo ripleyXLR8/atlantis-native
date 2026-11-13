@@ -32,6 +32,7 @@
 #![forbid(unsafe_code)]
 
 pub mod atl;
+pub mod bink;
 pub mod cfg;
 pub mod cine_txt;
 // "con" is a reserved device name on Windows: the module's file has

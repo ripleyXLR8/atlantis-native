@@ -435,6 +435,12 @@ it off (see the [guide](docs/GUIDE.md#the-support-screen)).
 GNU General Public License, version 3 or later (see `LICENSE`). The code is
 derived from ScummVM's CryOmni3D engine, Copyright (C) the ScummVM team.
 
+The Bink video decoder (`crates/atlantis3-data/src/bink/`) is a port of
+ScummVM's (`video/bink_decoder.cpp`, with its tables, bit reader, Huffman
+decoder and YUV to RGB conversion), Copyright (C) the ScummVM team, under
+the GNU General Public License, version 3 or later; ScummVM's decoder is
+based on eos' and on FFmpeg's, by Kostya Shishkov.
+
 The program's icon (`assets/icon/`, drawn by `make_icon.py`) is the
 project's own, under the same licence.
 
