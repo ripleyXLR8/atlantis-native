@@ -346,3 +346,25 @@ fn numframevideo_at_the_film_start() {
     }
     assert_eq!(var(&g, "NUMFRAMEVIDEO"), 0);
 }
+
+/// A place sprite past pixel 511 of its 768-pixel face: the 2004 centre
+/// ray (FUN_0043b810) projects through face cameras of the cube's size
+/// (FUN_004c6d70(768): centre 384, viewport 0..767). `village.wam` view
+/// 9's `GAMEBOY` (`gbA1009009`, face 5, x 180..277, y 538..688) is
+/// clicked into the bag and the hand.
+#[test]
+fn a_sprite_low_on_a_768_face() {
+    let Some((mut g, mut t)) = cabin() else { return };
+    assert!(g.load_place("village.wam"));
+    g.enter_at(9, 0.0, 0.0);
+    g.run_command("(showobjet=GAMEBOY)");
+    t += 0.04;
+    g.step(t);
+    let gameboy = g.names().id(defnames::OBJETS, b"GAMEBOY").unwrap() as i32;
+    assert!(g.click_sprite(gameboy, 2), "the Gameboy under the centre");
+    t += 0.04;
+    g.step(t);
+    let bag: Vec<i32> = g.script().unwrap().bag.iter().map(|e| e.id).collect();
+    assert!(bag.contains(&gameboy), "{bag:?}");
+    assert_eq!(g.object_in_hand(), gameboy);
+}

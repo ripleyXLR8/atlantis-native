@@ -2272,8 +2272,7 @@ impl Game {
         // The sprite pass's hit test, against the frames just drawn
         // (0x0076e928 cleared @ 0x00440c07, set @ 0x00439a47 / 0x00439a5b).
         self.cursor_hit = self
-            .camera
-            .texel_a3(self.camera.cx, self.camera.cy)
+            .centre_texel(&self.camera)
             .and_then(|(f, u, v)| self.slots.hit(f, u, v))
             .map(|(k, kind)| (self.slots.slots[k].click, kind));
         // The animations' step, once per 15 Hz tick (@ 0x00439c90); the
@@ -3955,10 +3954,23 @@ impl Game {
         self.centre == Some(i)
     }
 
+    /// The face pixel under `c`'s screen centre: *Atlantis III*'s
+    /// (@ 0x0043a1a0, 512-pixel faces), or the 2004 program's
+    /// (atlantis4-cd-en-3022848 FUN_0043b810, its 768-pixel faces' cameras:
+    /// a pixel past 511 was out of every face, the sprites there could not
+    /// be clicked).
+    fn centre_texel(&self, c: &Camera) -> Option<(usize, i32, i32)> {
+        if self.files.is_evolution_2004() {
+            c.texel_face(c.cx, c.cy, face_size(&self.files) as u32)
+        } else {
+            c.texel_a3(c.cx, c.cy)
+        }
+    }
+
     /// The place sprite under the screen centre (the sprite pass's hit
     /// test @ 0x00439920): its entity id and click kind.
     pub fn sprite_under_centre(&self) -> Option<(i32, i32)> {
-        let (face, u, v) = self.camera.texel_a3(self.camera.cx, self.camera.cy)?;
+        let (face, u, v) = self.centre_texel(&self.camera)?;
         let (k, _) = self.slots.hit(face, u, v)?;
         let s = &self.slots.slots[k];
         Some((s.id, s.click))
@@ -3981,8 +3993,8 @@ impl Game {
                     atlantis2_engine::script::a3::deg_to_rad_a3(fpu, yaw),
                     atlantis2_engine::script::a3::deg_to_rad_a3(fpu, pitch),
                 );
-                let hit = c
-                    .texel_a3(c.cx, c.cy)
+                let hit = self
+                    .centre_texel(&c)
                     .and_then(|(f, u, v)| self.slots.hit(f, u, v))
                     .map(|(k, _)| &self.slots.slots[k])
                     .filter(|s| s.id == id && s.kind == kind);

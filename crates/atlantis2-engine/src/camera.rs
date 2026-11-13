@@ -657,6 +657,45 @@ impl Camera {
         None
     }
 
+    /// *Atlantis Evolution*'s 2004 centre ray to a face pixel
+    /// (atlantis4-cd-en-3022848 FUN_0043b810): [`Camera::texel_a3`]'s steps
+    /// with the face cameras of a cube of `size`-pixel faces as its
+    /// constructor FUN_004c6d70(size) sets them: centre size × 0.5
+    /// (FUN_004c6090), field of view 0x3fc9901c over size × size
+    /// (FUN_004c60b0; FUN_004c6120: focal = size / (2 tan(fov / 2))), and
+    /// the viewport 0 .. size − 1 that FUN_0043b810 tests the pixel
+    /// against (+0xd4..+0xe0, FUN_004c60f0). For 512 the focal is
+    /// *Atlantis III*'s 0x437efffd.
+    pub fn texel_face(&self, sx: f32, sy: f32, size: u32) -> Option<(usize, i32, i32)> {
+        let fpu = self.fpu;
+        let fov = f32::from_bits(0x3fc9_901c);
+        let t = libm::tan(fpu.mul(d(fov), 0.5));
+        let focal = fpu.f32(fpu.div(f64::from(size), fpu.add(t, t)));
+        let centre = fpu.f32(fpu.mul(f64::from(size), 0.5));
+        let last = size as i32 - 1;
+        let z = fpu.div(1.0, d(0.0001f32));
+        let v = [
+            fpu.f32(fpu.mul(fpu.mul(fpu.sub(d(sx), d(self.cx)), d(self.inv_fx)), z)),
+            fpu.f32(fpu.mul(fpu.mul(fpu.sub(d(sy), d(self.cy)), d(self.inv_fy)), z)),
+            fpu.f32(z),
+        ];
+        let w = rot_a3(fpu, self.q, v);
+        for (k, q) in FACE_QUATS.iter().enumerate() {
+            let p = rotb_a3(fpu, q.map(f32::from_bits), w);
+            if p[2].partial_cmp(&FACE_NEAR) != Some(std::cmp::Ordering::Greater) {
+                continue;
+            }
+            let r = fpu.div(1.0, d(p[2]));
+            let px = fpu.f32(fpu.add(fpu.mul(fpu.mul(d(p[0]), d(focal)), r), d(centre)));
+            let py = fpu.f32(fpu.add(fpu.mul(fpu.mul(d(focal), d(p[1])), r), d(centre)));
+            let (x, y) = (crate::fpu::ftol(d(px)), crate::fpu::ftol(d(py)));
+            if (0..=last).contains(&x) && (0..=last).contains(&y) {
+                return Some((k, x, y));
+            }
+        }
+        None
+    }
+
     /// FUN_0045adf0 → FUN_004581d0: the yaw and pitch (radians, floats) of
     /// the screen centre's direction: yaw = atan2(z, x), pitch = atan2(y,
     /// sqrt(z² + x²)).
@@ -755,6 +794,31 @@ mod tests {
             m,
             [0xbf800000, 0, 0xb43504f4, 0, 0x3f800000, 0, 0x343504f4, 0, 0xbf800000]
         );
+    }
+
+    /// The 2004 face cameras' focal (FUN_004c6120 with fov 0x3fc9901c):
+    /// 512 gives *Atlantis III*'s constant; 768 faces reach pixel 767,
+    /// where *Atlantis III*'s 0..511 cut them.
+    #[test]
+    fn texel_face_sizes() {
+        let fov = f32::from_bits(0x3fc9_901c);
+        let t = libm::tan(f64::from(fov) * 0.5);
+        assert_eq!(((512.0 / (t + t)) as f32).to_bits(), 0x437e_fffd);
+        let mut c = Camera::new(Fpu::Double, 640, 480);
+        assert_eq!(c.texel_face(c.cx, c.cy, 512), c.texel_a3(c.cx, c.cy));
+        // Some direction lands past 511 on a 768 face (every direction
+        // lands on some face).
+        let mut beyond = false;
+        for k in 0..72 {
+            c.yaw(0.0872);
+            if k % 6 == 0 {
+                c.pitch(0.05);
+            }
+            let (_, x, y) = c.texel_face(c.cx, c.cy, 768).expect("a face");
+            assert!((0..768).contains(&x) && (0..768).contains(&y));
+            beyond |= x > 600 || y > 600;
+        }
+        assert!(beyond);
     }
 
     #[test]
