@@ -601,3 +601,126 @@ fn sprpleinecran() {
     g.step(t);
     assert!(corner(&g) > 0);
 }
+
+/// A pixel of `bank`'s sprite `index` at its own place that none of
+/// `before` (tested first by the game) covers.
+fn spot(b: &atlantis3_data::spr::Bank, index: usize, before: &[usize]) -> (i32, i32) {
+    for y in (0..600).step_by(3) {
+        for x in (0..800).step_by(3) {
+            if b.opaque_at(index, None, 0, x, y)
+                && !before.iter().any(|&a| b.opaque_at(a, None, 0, x, y))
+            {
+                return (x, y);
+            }
+        }
+    }
+    panic!("no pixel of #{index}");
+}
+
+/// The Gameboy (`AtlCarte`, loop mode 10, FUN_00409970 / FUN_00409ed0 /
+/// FUN_00409a80): chapter 10's `village.wam` view 9 shows `gbA1009009`
+/// (`GAMEBOY`, click kind 1, which FUN_004441a0 puts in the bag and the
+/// hand). With `GAMEBOY` in the hand, the panorama's FUN_00476320
+/// (@ 0x00443db6) opens the Gameboy and empties the hand. Cosmo's button
+/// (#1) plays `clipcosmo.bik` and the light voice-over dialog 121, the
+/// clip freezing on frame 26 − 5; the exit button (#7) closes it back to
+/// the warp. Taken in the hand from the bag, it opens over the inventory
+/// (@ 0x00428ed1), and the right button goes back to the inventory.
+///
+/// The sprite lies at y 538..688 of its 768-pixel face (`gba1009009.SPW`
+/// frame 0, face 5), beyond the 512-pixel faces of *Atlantis III*'s centre
+/// ray ([`Game::click_sprite`]), so the test puts it in the bag and the
+/// hand as the kind-1 click does.
+#[test]
+fn the_gameboy() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    for c in [
+        "(changecd=1)",
+        "(changewam=village.wam)",
+        "(chapter=10)",
+        "(vue=9)",
+    ] {
+        g.run_command(c);
+    }
+    assert!(
+        run_until(&mut g, &mut t, 10.0, |g| g.mode() == Mode::Warp),
+        "the warp"
+    );
+    assert_eq!(g.place(), ("village.wam", Some(9)));
+    run(&mut g, &mut t, 0.5);
+    let gameboy = object(&g, "GAMEBOY");
+    let slot = g
+        .slots()
+        .slots
+        .iter()
+        .find(|s| s.name.eq_ignore_ascii_case("gbA1009009"))
+        .map(|s| (s.shown, s.kind, s.id, s.click));
+    assert_eq!(slot, Some((true, 2, gameboy, 1)));
+    g.run_command("(sacados=GAMEBOY)");
+    g.run_command("(objetenmain=GAMEBOY)");
+    assert_eq!(hand(&g), gameboy);
+    t += 0.04;
+    g.step(t);
+    assert_eq!(g.mode(), Mode::Carte2004);
+    assert!(g.carte_2004_open());
+    assert!(bag(&g).contains(&gameboy));
+    assert_eq!(hand(&g), 0, "FUN_00429a20");
+    run(&mut g, &mut t, 0.2);
+    write_ppm(&g, "gameboy.ppm");
+    let bank = g.carte_2004_bank().expect("gameboy.spr");
+
+    // Cosmo's button: the clip and the commentator's light voice-over.
+    let cosmo = spot(&bank, 1, &[]);
+    g.set_pointer(cosmo.0, cosmo.1);
+    g.click();
+    t += 0.04;
+    g.step(t);
+    assert_eq!(g.carte_2004_clip().map(|c| c.0), Some(1));
+    assert_eq!(g.dialog_2004(), Some((121, 1, true, true)));
+    assert!(
+        run_until(&mut g, &mut t, 5.0, |g| g
+            .carte_2004_clip()
+            .is_some_and(|c| c.2)),
+        "the clip did not end"
+    );
+    assert_eq!(g.carte_2004_clip(), Some((1, 21, true)));
+    assert_eq!(g.mode(), Mode::Carte2004);
+    g.set_pointer(400, 560);
+    t += 0.04;
+    g.step(t);
+    write_ppm(&g, "gameboy_cosmo.ppm");
+
+    // The exit button: the warp again, the hand empty, the dialog closed.
+    let exit = spot(&bank, 7, &[1, 3, 5, 9, 11]);
+    g.set_pointer(exit.0, exit.1);
+    g.click();
+    t += 0.04;
+    g.step(t);
+    assert_eq!(g.mode(), Mode::Warp);
+    assert!(!g.carte_2004_open());
+    assert_eq!(g.carte_2004_clip(), None);
+    assert_eq!(g.dialog_2004(), None);
+    assert_eq!(hand(&g), 0);
+    run(&mut g, &mut t, 0.2);
+
+    // From the bag: the Gameboy in the hand opens it over the inventory
+    // (@ 0x00428ed1); the right button closes it back to the inventory.
+    g.right_click();
+    run(&mut g, &mut t, 0.3);
+    assert_eq!(g.mode(), Mode::Inventory);
+    let slot = bag(&g).iter().position(|&id| id == gameboy).unwrap();
+    point_slot(&mut g, slot as i32);
+    g.click();
+    t += 0.04;
+    g.step(t);
+    assert_eq!(g.mode(), Mode::Carte2004);
+    assert_eq!(hand(&g), 0);
+    g.right_click();
+    t += 0.04;
+    g.step(t);
+    assert_eq!(g.mode(), Mode::Inventory);
+    assert!(g.inventory_open());
+    assert!(!g.carte_2004_open());
+}

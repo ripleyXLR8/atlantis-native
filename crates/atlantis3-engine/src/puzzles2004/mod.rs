@@ -38,9 +38,10 @@
 //! frame by mode (0x0d Bulle, 0x0f Pong, 0x10 Defender, 0x11 Frogger,
 //! 0x12 Tron, 0x13 Hanoi, 0x14 Catapulte, 0x15 Caisses), then the light
 //! dialog's pass (0x006e6f59 and `AtlDial_Continue` false →
-//! `AtlDial_Close`), then the map when the object in the hand is `GAMEBOY`
-//! (FUN_00409970, `AtlCarte`, mode 10, and FUN_00429a20) — the map is not
-//! ported (no 2004 script names `GAMEBOY` in a hand: [UNKNOWN] use).
+//! `AtlDial_Close`), then the Gameboy when the object in the hand is
+//! `GAMEBOY` (FUN_00409970, `AtlCarte`, mode 10, and FUN_00429a20 empties
+//! the hand; the player takes it in `village.wam` view 9 or from the bag):
+//! `crate::game`'s `carte2004` module.
 //! Escape does nothing in these modes (FUN_0042c560's table stops at
 //! mode 8, @ 0x0042c572).
 //!

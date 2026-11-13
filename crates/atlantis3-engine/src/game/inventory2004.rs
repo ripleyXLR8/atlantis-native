@@ -323,6 +323,8 @@ impl Game {
             if self.dialog2004.is_some() {
                 self.light_dialog_2004();
             }
+            // FUN_00476320's Gameboy test (@ 0x00428ed1).
+            self.carte_hand_2004();
             self.inventory.fade_step(self.now);
         } else if self.mode == Mode::Subjects {
             // A follower chosen: the subject menu's part of the same call

@@ -715,7 +715,7 @@ impl Game {
     /// music back to full in 1 s (FUN_00430bf0(1.0)), the dialog freed
     /// (its head closed), then `Interp_CloseInterrupt` (FUN_00452ef0(0)):
     /// the waiting section goes on.
-    fn close_dialog_2004(&mut self) {
+    pub(crate) fn close_dialog_2004(&mut self) {
         let Some(run) = self.dialog2004.take() else {
             return;
         };

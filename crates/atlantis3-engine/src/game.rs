@@ -37,6 +37,7 @@ use atlantis3_data::coord::Coord;
 use std::collections::{BTreeMap, HashMap};
 
 mod board;
+mod carte2004;
 mod credits;
 mod dialog2004;
 mod film;
@@ -122,6 +123,8 @@ pub enum Mode {
     /// The 2004 program's modes 13..21: a mini-game
     /// ([`crate::puzzles2004`]).
     Puzzle2004,
+    /// The 2004 program's mode 10: the Gameboy (`AtlCarte`, FUN_00409ed0).
+    Carte2004,
     /// Nothing to show (before the intro, after the game stopped).
     Idle,
 }
@@ -280,6 +283,8 @@ pub struct Game {
     puzzles_2004: [i32; 8],
     /// The 2004 program's mini-games ([`crate::puzzles2004`]).
     puzzles2004: puzzles2004::State,
+    /// The 2004 program's Gameboy (`AtlCarte`, mode 10).
+    carte2004: carte2004::State,
     /// The previous frame's duration (FUN_004a2630), seconds.
     frame_t: f32,
     /// The click flags (@ 0x007592b8, double click @ 0x007592bb) and the
@@ -551,6 +556,7 @@ impl Game {
             logos_2004: None,
             puzzles_2004: [0; 8],
             puzzles2004: Default::default(),
+            carte2004: Default::default(),
             frame_t: 0.0,
             click: false,
             double_click: false,
@@ -1143,7 +1149,7 @@ impl Game {
     /// turning, the turn speeds gain dx / 2000 and lose dy / 2000; the
     /// centre zone is picked again.
     pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
-        if self.mode == Mode::Puzzle2004 {
+        if matches!(self.mode, Mode::Puzzle2004 | Mode::Carte2004) {
             self.puzzle_pointer_2004(dx, dy);
             return;
         }
@@ -1721,6 +1727,7 @@ impl Game {
             Mode::Menu => self.menu_frame(),
             Mode::Screen => self.screen_frame(),
             Mode::Puzzle2004 => self.puzzle_frame_2004(),
+            Mode::Carte2004 => self.carte_frame_2004(),
             Mode::Idle => {}
         }
         if self.logos_2004.is_some() && !self.film_running_2004() {
@@ -2041,6 +2048,11 @@ impl Game {
             }
             let (yaw, pitch) = self.camera.angles();
             self.with_script(|s, h| s.gere_frame(h, yaw, pitch));
+            // The 2004 program's FUN_00476320 after `Interp_GereFrame`
+            // (@ 0x00443db6): the Gameboy in the hand opens it.
+            if self.files.is_evolution_2004() {
+                self.carte_hand_2004();
+            }
             // The places' frame hook (@ 0x004c27d0).
             self.frame_hook();
             // The click scan (@ 0x004405b0) whenever no menu is open: a

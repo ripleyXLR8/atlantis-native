@@ -665,6 +665,7 @@ impl Run {
             Mode::Subjects => 8,
             Mode::Screen => self.g.puzzle_screen().map_or(-1, |s| s.mode_number()),
             Mode::Puzzle2004 => self.g.puzzle_2004().map_or(-1, |p| p.mode() as i32),
+            Mode::Carte2004 => 10,
             Mode::Idle => 0,
         }
     }
