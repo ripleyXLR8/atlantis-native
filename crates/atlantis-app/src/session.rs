@@ -11,7 +11,6 @@ use std::path::{Path, PathBuf};
 
 use atlantis_data::Game;
 use atlantis_engine::persist::{Graphics, Settings};
-use atlantis_engine::subtitles::SubtitleFont;
 use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
 use atlantis_engine::Start;
 use web_time::{Duration, Instant};
@@ -21,6 +20,7 @@ use winit::keyboard::{Key, NamedKey};
 
 use crate::desktop::{self, Opened};
 use crate::launcher::{Launcher, LauncherAction, LauncherEntry, LauncherKey};
+use crate::launcher_art::Item;
 use crate::library::Library;
 use crate::support::PlayClock;
 use crate::{options_with_settings, start_game, App};
@@ -252,17 +252,22 @@ impl Session {
 }
 
 /// Draws the game library's screen in `frame` when it is shown; false
-/// when it is not.
+/// when it is not. With `items`, the screen's text and ornaments are left
+/// out of the frame and given there instead, for the window to draw at its
+/// own resolution.
 pub fn draw_launcher(
     session: Option<&Session>,
     frame: &mut Vec<u16>,
-    font: &mut Option<SubtitleFont>,
+    items: Option<&mut Vec<Item>>,
 ) -> bool {
     let Some(launcher) = session.and_then(|s| s.launcher.as_ref()) else {
         return false;
     };
     frame.resize(SCREEN_W * SCREEN_H, 0);
-    launcher.draw(frame, font.get_or_insert_with(SubtitleFont::new));
+    match items {
+        Some(items) => *items = launcher.draw_scene(frame),
+        None => launcher.draw(frame),
+    }
     true
 }
 
@@ -391,14 +396,8 @@ impl App {
         session.shift_until = None;
         session.launcher = None;
         session.refresh(0, &desktop::describe);
-        let message = message.unwrap_or_else(|| {
-            if session.library.is_empty() {
-                String::new()
-            } else {
-                "Choose the game to play".to_string()
-            }
-        });
-        session.message(message);
+        // (the screen's own line already says to choose a game)
+        session.message(message.unwrap_or_default());
         log::info!("game library: {} games", session.library.len());
     }
 
@@ -685,8 +684,7 @@ mod tests {
             .is_empty());
         assert_eq!(std::fs::read_to_string(d.join("games.txt")).unwrap(), "");
         let mut frame = Vec::new();
-        let mut font = None;
-        assert!(draw_launcher(app.session(), &mut frame, &mut font));
+        assert!(draw_launcher(app.session(), &mut frame, None));
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -719,8 +717,7 @@ mod tests {
                 return;
             };
             let mut frame = Vec::new();
-            let mut font = None;
-            assert!(draw_launcher(app.session(), &mut frame, &mut font));
+            assert!(draw_launcher(app.session(), &mut frame, None));
             let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
             std::fs::write(PathBuf::from(dir).join(name), png).unwrap();
         };
@@ -946,15 +943,14 @@ mod tests {
         app.show_launcher(None);
         if let Some(dir) = std::env::var_os("ATLANTIS_DVD_SHOTS") {
             let mut frame = Vec::new();
-            let mut font = None;
-            assert!(draw_launcher(app.session(), &mut frame, &mut font));
+            assert!(draw_launcher(app.session(), &mut frame, None));
             let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
             std::fs::write(PathBuf::from(&dir).join("library-dvd.png"), png).unwrap();
             // The end of the list: the Japanese version, the Perfect
             // Edition.
             let l = app.session_mut().unwrap().launcher.as_mut().unwrap();
             l.key(LauncherKey::End);
-            assert!(draw_launcher(app.session(), &mut frame, &mut font));
+            assert!(draw_launcher(app.session(), &mut frame, None));
             let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
             std::fs::write(PathBuf::from(dir).join("library-dvd-end.png"), png).unwrap();
             let l = app.session_mut().unwrap().launcher.as_mut().unwrap();

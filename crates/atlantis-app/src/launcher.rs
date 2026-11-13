@@ -1,14 +1,18 @@
 //! The game library's screen (desktop): the game folders of the library,
-//! each shown as its game and edition (the first game's or Atlantis II's)
-//! and its path, to choose the one to play;
-//! drawn in the window on the 640x480 screen, in the style of the options
-//! menu ([`atlantis_engine::options_menu`]). This module is the screen's
-//! state, input and drawing; the front end carries out its actions.
+//! each shown as its game and edition and its path, to choose the one to
+//! play; in the look of the web page ([`crate::launcher_art`]). It is laid
+//! out on the 640x480 screen: its background drawn in the 640x480 frame,
+//! its text and ornaments either drawn there too or handed to the front
+//! end to draw at the window's resolution, so that they stay smooth in a
+//! large window. This module is the screen's state, input and layout; the
+//! front end carries out its actions.
 
 use std::path::PathBuf;
 
-use atlantis_engine::subtitles::SubtitleFont;
-use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
+use atlantis_engine::warp::SCREEN_W;
+
+use crate::launcher_art::{self as art, Frame565, Item, Style};
+use crate::setup::GameKind;
 
 /// An entry of the list.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,6 +24,8 @@ pub struct LauncherEntry {
     pub label: String,
     /// The folder opens as the game.
     pub found: bool,
+    /// The game the folder holds (or held), when known: its badge.
+    pub kind: Option<GameKind>,
 }
 
 /// The keys the screen reads.
@@ -77,59 +83,72 @@ pub enum LauncherAction {
     Quit,
 }
 
-const BOX_X: i32 = 16;
-const BOX_Y: i32 = 12;
-const BOX_W: i32 = SCREEN_W as i32 - 2 * BOX_X;
-const BOX_H: i32 = SCREEN_H as i32 - 2 * BOX_Y;
-const LIST_X: i32 = BOX_X + 12;
-const LIST_Y: i32 = BOX_Y + 62;
-const LIST_W: i32 = BOX_W - 24;
-const ROW_H: i32 = 44;
+const LIST_X: i32 = 24;
+const LIST_Y: i32 = 116;
+const LIST_W: i32 = SCREEN_W as i32 - 2 * LIST_X;
+const ROW_H: i32 = 40;
 /// The rows shown at once.
 pub const VISIBLE: usize = 6;
 const LIST_H: i32 = VISIBLE as i32 * ROW_H;
-const BUTTON_Y: i32 = LIST_Y + LIST_H + 14;
+const BUTTON_Y: i32 = LIST_Y + LIST_H + 16;
 const BUTTON_H: i32 = 26;
-const BUTTON_GAP: i32 = 9;
-const MESSAGE_Y: i32 = BUTTON_Y + BUTTON_H + 14;
-const HELP_Y: i32 = BOX_Y + BOX_H - 26;
+const BUTTON_GAP: i32 = 4;
+/// A button's room for the sun on its left.
+const BUTTON_PAD: i32 = 22;
+const MESSAGE_Y: f32 = (BUTTON_Y + BUTTON_H + 22) as f32;
 /// The link to the project's Buy Me a Coffee page, above the help line.
-const SUPPORT_TEXT: &[u8] = b"Enjoying Atlantis Native? Buy me a coffee";
-const SUPPORT_Y: i32 = HELP_Y - 22;
-const SUPPORT_W: i32 = 320;
-const SUPPORT_X: i32 = BOX_X + (BOX_W - SUPPORT_W) / 2;
-const LINK: u16 = 0xfea0;
+const SUPPORT_TEXT: &str = "Enjoying Atlantis Native? Buy me a coffee";
+const SUPPORT_BASE: f32 = 447.0;
+const HELP_BASE: f32 = 469.0;
 /// Two clicks on a row this close (ms) play it.
 const DOUBLE_CLICK_MS: u64 = 500;
 
-const BG: u16 = 0x18e3;
-const SCREEN_BG: u16 = 0x0000;
-const LIST_BG: u16 = 0x1082;
-const BORDER: u16 = 0xbdf7;
-const HIGHLIGHT: u16 = 0x3a0c;
-const BUTTON_BG: u16 = 0x2945;
-const TEXT: u16 = 0xffff;
-const DIM: u16 = 0x9cf3;
-const GREYED: u16 = 0x632c;
-const SELECTED: u16 = 0xffe0;
-const MISSING: u16 = 0xfbef;
+const LOGO: Style = Style::logo(58.0);
+const TAGLINE: Style = Style::caps(13.0);
+const NAME: Style = Style::caps(11.5);
+const EDITION: Style = Style::body(13.5, art::TEXT);
+const PATH: Style = Style::body(12.0, art::MUTED);
+const TAG: Style = Style::italic(12.0, art::MUTED);
+const BUTTON: Style = Style {
+    tracking: 0.07,
+    ..Style::caps(11.5)
+};
+const BUTTON_OFF: Style = Style {
+    tracking: 0.07,
+    ..Style::caps_in(11.5, (70, 82, 110))
+};
+const MESSAGE: Style = Style::italic(13.5, art::MUTED);
+const SUPPORT: Style = Style::body(13.5, art::LINK);
+const HELP: Style = Style::body(11.5, art::MUTED);
+
+/// An entry's label as the game's name and the rest (the edition, or why
+/// the folder does not open): "Atlantis II, GOG.com, French" gives
+/// ("Atlantis II", "GOG.com, French").
+fn split_label(e: &LauncherEntry) -> (Option<&'static str>, &str) {
+    let Some(kind) = e.kind else {
+        return (None, &e.label);
+    };
+    let name = kind.name();
+    match e.label.strip_prefix(name) {
+        Some("") => (Some(name), ""),
+        Some(rest) if rest.starts_with(", ") => (Some(name), &rest[2..]),
+        _ if !e.found => (Some(name), &e.label),
+        _ => (None, &e.label),
+    }
+}
 
 impl Button {
+    /// The button's width: its longer label's and the sun's room.
     fn width(self) -> i32 {
-        match self {
-            Button::Play => 90,
-            Button::Add => 150,
-            Button::Find => 140,
-            Button::Remove => 90,
-            Button::Quit => 70,
-        }
+        let w = art::width(&BUTTON, self.label(false)).max(art::width(&BUTTON, self.label(true)));
+        w.ceil() as i32 + BUTTON_PAD + 4
     }
 
     fn label(self, missing: bool) -> &'static str {
         match self {
-            Button::Play if missing => "Locate...",
+            Button::Play if missing => "Locate\u{2026}",
             Button::Play => "Play",
-            Button::Add => "Add a game folder...",
+            Button::Add => "Add a game folder\u{2026}",
             Button::Find => "Find installations",
             Button::Remove => "Remove",
             Button::Quit => "Quit",
@@ -141,7 +160,7 @@ impl Button {
 fn button_rects() -> [(Button, i32, i32, i32, i32); 5] {
     let total: i32 =
         BUTTONS.iter().map(|b| b.width()).sum::<i32>() + BUTTON_GAP * (BUTTONS.len() as i32 - 1);
-    let mut x = BOX_X + (BOX_W - total) / 2;
+    let mut x = (SCREEN_W as i32 - total) / 2;
     BUTTONS.map(|b| {
         let r = (b, x, BUTTON_Y, b.width(), BUTTON_H);
         x += b.width() + BUTTON_GAP;
@@ -149,48 +168,10 @@ fn button_rects() -> [(Button, i32, i32, i32, i32); 5] {
     })
 }
 
-/// `text` as Windows-1252 bytes (the font's code page), '?' for what it
-/// cannot show.
-fn bytes(text: &str) -> Vec<u8> {
-    text.chars()
-        .map(|c| match c as u32 {
-            0x20..=0x7e | 0xa0..=0xff => c as u32 as u8,
-            0x2026 => 0x85,
-            _ => b'?',
-        })
-        .collect()
-}
-
-/// `text` cut on the right with "..." to fit `max_w` pixels (a label
-/// keeps its start, the game's name).
-fn fit_right(font: &SubtitleFont, text: &str, max_w: i32) -> Vec<u8> {
-    let mut b = bytes(text);
-    if font.width(&b) <= max_w {
-        return b;
-    }
-    let dots = font.width(b"...");
-    while !b.is_empty() && font.width(&b) + dots > max_w {
-        b.pop();
-    }
-    b.extend_from_slice(b"...");
-    b
-}
-
-/// `text` cut on the left with "..." to fit `max_w` pixels (a path keeps
-/// its end, the game's folder).
-fn fit_left(font: &SubtitleFont, text: &str, max_w: i32) -> Vec<u8> {
-    let b = bytes(text);
-    if font.width(&b) <= max_w {
-        return b;
-    }
-    let dots = font.width(b"...");
-    let mut start = 0;
-    while start < b.len() && font.width(&b[start..]) + dots > max_w {
-        start += 1;
-    }
-    let mut out = b"...".to_vec();
-    out.extend_from_slice(&b[start..]);
-    out
+/// The Buy Me a Coffee link's rectangle (x, y, w, h).
+fn support_rect() -> (i32, i32, i32, i32) {
+    let w = art::width(&SUPPORT, SUPPORT_TEXT).ceil() as i32;
+    ((SCREEN_W as i32 - w) / 2, SUPPORT_BASE as i32 - 14, w, 19)
 }
 
 /// The screen's state.
@@ -396,8 +377,8 @@ impl Launcher {
 
     /// Whether a screen point is on the Buy Me a Coffee link.
     fn on_support_link(x: i32, y: i32) -> bool {
-        (SUPPORT_X..SUPPORT_X + SUPPORT_W).contains(&x)
-            && (SUPPORT_Y - 2..SUPPORT_Y + 18).contains(&y)
+        let (sx, sy, sw, sh) = support_rect();
+        (sx..sx + sw).contains(&x) && (sy..sy + sh).contains(&y)
     }
 
     /// The mouse wheel: `rows` down (negative: up).
@@ -406,125 +387,180 @@ impl Launcher {
         self.scroll = (self.scroll as i64 + i64::from(rows)).clamp(0, max) as usize;
     }
 
-    /// Draws the screen on a 640x480 RGB565 frame.
-    pub fn draw(&self, screen: &mut [u16], font: &SubtitleFont) {
-        let fill = |screen: &mut [u16], x: i32, y: i32, w: i32, h: i32, c: u16| {
-            for yy in y.max(0)..(y + h).min(SCREEN_H as i32) {
-                for xx in x.max(0)..(x + w).min(SCREEN_W as i32) {
-                    screen[yy as usize * SCREEN_W + xx as usize] = c;
-                }
-            }
-        };
-        let text = |screen: &mut [u16], t: &[u8], x: i32, y: i32, max_w: i32, c: u16| {
-            font.draw(screen, SCREEN_W, SCREEN_H, t, x, y, max_w, c);
-        };
-        let centre = |t: &[u8]| BOX_X + (BOX_W - font.width(t)) / 2;
-        screen.fill(SCREEN_BG);
-        fill(screen, BOX_X - 1, BOX_Y - 1, BOX_W + 2, BOX_H + 2, BORDER);
-        fill(screen, BOX_X, BOX_Y, BOX_W, BOX_H, BG);
-        let t = b"Atlantis Native: game library";
-        text(screen, t, centre(t), BOX_Y + 12, BOX_W, TEXT);
-        let t = b"Choose the game to play (Atlantis: The Lost Tales or Atlantis II)";
-        text(screen, t, centre(t), BOX_Y + 34, BOX_W, DIM);
-        // The list.
-        fill(
-            screen,
-            LIST_X - 1,
-            LIST_Y - 1,
-            LIST_W + 2,
-            LIST_H + 2,
-            GREYED,
-        );
-        fill(screen, LIST_X, LIST_Y, LIST_W, LIST_H, LIST_BG);
-        if self.entries.is_empty() {
-            let t = b"No game in the list yet.";
-            text(screen, t, centre(t), LIST_Y + 100, BOX_W, TEXT);
-            let t = b"Add the folder of your game, or let Atlantis Native find it.";
-            text(screen, t, centre(t), LIST_Y + 122, BOX_W, DIM);
+    /// Draws the screen on a 640x480 RGB565 frame, its text and ornaments
+    /// included.
+    pub fn draw(&self, screen: &mut [u16]) {
+        for item in self.draw_scene(screen) {
+            art::draw(&mut Frame565(screen), &item);
         }
+    }
+
+    /// Draws the screen's background on a 640x480 RGB565 frame and gives
+    /// its text and ornaments, for the front end to draw over the frame
+    /// once it is scaled to the window ([`art::draw`] on an
+    /// [`art::Window`]).
+    pub fn draw_scene(&self, screen: &mut [u16]) -> Vec<Item> {
+        let mut items = Vec::new();
+        let cx = SCREEN_W as f32 / 2.0;
+        let centred = |style: &Style, t: &str, baseline: f32| {
+            Item::text(*style, t, cx - art::width(style, t) / 2.0, baseline)
+        };
+        screen.copy_from_slice(art::background());
+        // The logo, under it the tagline between two spears.
+        items.push(centred(&LOGO, "Atlantis", 62.0));
+        let t = "Choose a game";
+        let tw = art::width(&TAGLINE, t);
+        items.push(centred(&TAGLINE, t, 92.0));
+        let (sw, sy) = (60.0, 92.0 - art::cap_height(&TAGLINE) / 2.0 - 10.0);
+        items.push(Item::Spear {
+            x: cx - tw / 2.0 - 16.0 - sw,
+            y: sy,
+            w: sw,
+            flip: false,
+        });
+        items.push(Item::Spear {
+            x: cx + tw / 2.0 + 16.0,
+            y: sy,
+            w: sw,
+            flip: true,
+        });
+        // The tablet: the list on a dark veil between double gold rules.
+        let (tx, tw) = (LIST_X, LIST_W);
+        art::shade(screen, (tx, LIST_Y - 8, tw, LIST_H + 16), art::TABLET, 0.72);
+        for y in [
+            LIST_Y - 11,
+            LIST_Y - 9,
+            LIST_Y + LIST_H + 8,
+            LIST_Y + LIST_H + 10,
+        ] {
+            art::shade(screen, (tx, y, tw, 1), art::GOLD, 0.75);
+        }
+        if self.entries.is_empty() {
+            let mid = (LIST_Y + LIST_H / 2) as f32;
+            items.push(centred(&EDITION, "No game in the list yet.", mid - 6.0));
+            items.push(centred(
+                &MESSAGE,
+                "Add the folder of your game, or let Atlantis Native find it.",
+                mid + 16.0,
+            ));
+        }
+        let scrolls = self.entries.len() > VISIBLE;
+        let right = LIST_X + LIST_W - if scrolls { 18 } else { 12 };
+        let text_x = LIST_X + 40;
         let rows = self.entries.iter().enumerate().skip(self.scroll);
         for (i, e) in rows.take(VISIBLE) {
             let y = LIST_Y + (i - self.scroll) as i32 * ROW_H;
             let sel = i == self.selected;
             if sel {
-                fill(screen, LIST_X + 3, y + 2, LIST_W - 6, ROW_H - 4, HIGHLIGHT);
+                art::shade(
+                    screen,
+                    (LIST_X + 4, y + 1, LIST_W - 8, ROW_H - 2),
+                    (60, 100, 170),
+                    0.22,
+                );
+                items.push(Item::Sun {
+                    cx: (LIST_X + 20) as f32,
+                    cy: (y + ROW_H / 2) as f32,
+                    r: 9.0,
+                });
+            } else if i + 1 < self.scroll + VISIBLE
+                && i + 1 < self.entries.len()
+                && i + 1 != self.selected
+            {
+                art::shade(
+                    screen,
+                    (text_x, y + ROW_H - 1, right - text_x, 1),
+                    art::GOLD,
+                    0.16,
+                );
             }
-            let label_c = match (e.found, sel) {
-                (false, _) => MISSING,
-                (true, true) => SELECTED,
-                (true, false) => TEXT,
-            };
-            let w = LIST_W - 24;
-            let mut label = fit_right(font, &e.label, w);
+            // The game's name in the gold capitals, its edition beside it,
+            // the folder under them.
+            let line = (y + 17) as f32;
+            let mut w = (right - text_x) as f32;
             if i == 0 && e.found {
-                let tag = b"last played";
-                let tw = font.width(tag);
-                text(screen, tag, LIST_X + LIST_W - 12 - tw, y + 5, tw + 2, DIM);
-                label = fit_right(font, &e.label, w - tw - 12);
+                let tag = "last played";
+                let tgw = art::width(&TAG, tag);
+                items.push(Item::text(TAG, tag, right as f32 - tgw, line));
+                w -= tgw + 14.0;
             }
-            text(screen, &label, LIST_X + 12, y + 5, w, label_c);
-            let path = fit_left(font, &e.path.display().to_string(), w);
-            let path_c = if e.found { DIM } else { GREYED };
-            text(screen, &path, LIST_X + 12, y + 23, w, path_c);
+            let (name, rest) = split_label(e);
+            let rest_style = if e.found {
+                EDITION
+            } else {
+                Style::body(13.5, art::ERROR)
+            };
+            let mut x = text_x as f32;
+            if let Some(name) = name {
+                let style = if e.found {
+                    NAME
+                } else {
+                    Style::caps_in(11.5, art::MUTED)
+                };
+                let n = art::fit_right(&style, name, w);
+                let nw = art::width(&style, &n);
+                items.push(Item::text(style, &n, x, line));
+                x += nw + 12.0;
+                w -= nw + 12.0;
+            }
+            if !rest.is_empty() && w > 20.0 {
+                let r = art::fit_right(&rest_style, rest, w);
+                items.push(Item::text(rest_style, &r, x, line));
+            }
+            let path = art::fit_left(
+                &PATH,
+                &e.path.display().to_string(),
+                (right - text_x) as f32,
+            );
+            items.push(Item::text(PATH, &path, text_x as f32, (y + 34) as f32));
         }
-        // A scroll bar when the list is longer than the box.
+        // A scroll bar when the list is longer than the tablet.
         let n = self.entries.len();
-        if n > VISIBLE {
-            let bar_h = (LIST_H * VISIBLE as i32 / n as i32).max(12);
-            let bar_y = LIST_Y + (LIST_H - bar_h) * self.scroll as i32 / (n - VISIBLE) as i32;
-            fill(screen, LIST_X + LIST_W - 5, bar_y, 3, bar_h, DIM);
+        if scrolls {
+            let track = LIST_H - 8;
+            let bar_h = (track * VISIBLE as i32 / n as i32).max(16);
+            let bar_y = LIST_Y + 4 + (track - bar_h) * self.scroll as i32 / (n - VISIBLE) as i32;
+            let x = LIST_X + LIST_W - 9;
+            art::shade(screen, (x, LIST_Y + 4, 2, track), art::GOLD, 0.18);
+            art::shade(screen, (x, bar_y, 2, bar_h), art::GOLD, 0.7);
         }
-        // The buttons.
+        // The buttons: the gold capitals of the game's menus, the sun
+        // beside the one under the pointer.
         let missing = self.selected_missing();
         for (b, x, y, w, h) in button_rects() {
             let on = self.hover == Some(b) || self.focus == Some(b);
             let enabled = self.enabled(b);
-            fill(
-                screen,
-                x - 1,
-                y - 1,
-                w + 2,
-                h + 2,
-                if on && enabled { SELECTED } else { GREYED },
-            );
-            fill(
-                screen,
-                x,
-                y,
-                w,
-                h,
-                if on && enabled { HIGHLIGHT } else { BUTTON_BG },
-            );
-            let t = b.label(missing).as_bytes();
-            let c = match (enabled, on) {
-                (false, _) => GREYED,
-                (true, true) => SELECTED,
-                (true, false) => TEXT,
-            };
-            text(screen, t, x + (w - font.width(t)) / 2, y + 5, w, c);
+            let style = if enabled { BUTTON } else { BUTTON_OFF };
+            let base = (y + h / 2) as f32 + art::cap_height(&style) / 2.0;
+            // (the label centred in the button's room, the sun before it)
+            let label = b.label(missing);
+            let room = (w - BUTTON_PAD - 4) as f32;
+            let lx = (x + BUTTON_PAD) as f32 + (room - art::width(&style, label)) / 2.0;
+            items.push(Item::text(style, label, lx, base));
+            if on && enabled {
+                items.push(Item::Sun {
+                    cx: lx - 12.0,
+                    cy: (y + h / 2) as f32,
+                    r: 9.0,
+                });
+            }
         }
         if !self.message.is_empty() {
-            let m = bytes(&self.message);
-            text(
-                screen,
-                &m,
-                centre(&m).max(BOX_X + 8),
-                MESSAGE_Y,
-                BOX_W - 16,
-                TEXT,
-            );
+            let m = art::fit_right(&MESSAGE, &self.message, (SCREEN_W - 32) as f32);
+            items.push(centred(&MESSAGE, &m, MESSAGE_Y));
         }
-        let x = centre(SUPPORT_TEXT);
-        text(screen, SUPPORT_TEXT, x, SUPPORT_Y, BOX_W, LINK);
-        fill(screen, x, SUPPORT_Y + 15, font.width(SUPPORT_TEXT), 1, LINK);
-        let t = b"Arrows choose, Enter or double-click plays, Del removes, Esc quits";
-        text(screen, t, centre(t), HELP_Y, BOX_W, DIM);
+        items.push(centred(&SUPPORT, SUPPORT_TEXT, SUPPORT_BASE));
+        let t =
+            "Arrows choose \u{b7} Enter or double-click plays \u{b7} Del removes \u{b7} Esc quits";
+        items.push(centred(&HELP, t, HELP_BASE));
+        items
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use atlantis_engine::warp::SCREEN_H;
 
     fn entry(path: &str, found: bool) -> LauncherEntry {
         LauncherEntry {
@@ -535,6 +571,7 @@ mod tests {
                 "Not found".to_string()
             },
             found,
+            kind: Some(GameKind::LostTales),
         }
     }
 
@@ -643,10 +680,13 @@ mod tests {
         assert_eq!(l.focus(), Some(Button::Add));
         let (x, y) = button_centre(Button::Play);
         assert_eq!(l.click(x, y, 0), LauncherAction::None);
-        let font = SubtitleFont::new();
         let mut s = vec![0u16; SCREEN_W * SCREEN_H];
-        l.draw(&mut s, &font);
-        assert!(s.contains(&TEXT));
+        l.draw(&mut s);
+        assert_ne!(s, art::background());
+        let items = l.draw_scene(&mut s);
+        assert!(items
+            .iter()
+            .any(|i| matches!(i, Item::Text { text, .. } if text == "No game in the list yet.")));
     }
 
     #[test]
@@ -668,56 +708,107 @@ mod tests {
         assert_eq!((l.selected(), l.scroll), (0, 0));
     }
 
-    #[test]
-    fn draws_the_list_and_the_buttons() {
-        let font = SubtitleFont::new();
-        for b in BUTTONS {
-            for missing in [false, true] {
-                assert!(
-                    font.width(b.label(missing).as_bytes()) + 12 <= b.width(),
-                    "{b:?}"
-                );
-            }
-        }
-        let (_, last_x, _, last_w, _) = button_rects()[4];
-        assert!(button_rects()[0].1 >= BOX_X && last_x + last_w <= BOX_X + BOX_W);
-        assert!(HELP_Y > MESSAGE_Y + 18 && BOX_Y + BOX_H <= SCREEN_H as i32);
-        let mut l = three();
-        l.set_message("2 installations found");
-        let mut s = vec![0u16; SCREEN_W * SCREEN_H];
-        l.draw(&mut s, &font);
-        for c in [BG, HIGHLIGHT, SELECTED, MISSING, DIM, TEXT] {
-            assert!(s.contains(&c), "{c:04x}");
-        }
+    fn texts(items: &[Item]) -> Vec<&str> {
+        items
+            .iter()
+            .filter_map(|i| match i {
+                Item::Text { text, .. } => Some(text.as_str()),
+                _ => None,
+            })
+            .collect()
     }
 
     #[test]
-    fn long_paths_keep_their_end() {
-        let font = SubtitleFont::new();
-        let long = format!("/home/player/{}/Atlantis", "very-long-folder".repeat(20));
-        let b = fit_left(&font, &long, 300);
-        assert!(font.width(&b) <= 300);
-        assert!(b.starts_with(b"...") && b.ends_with(b"/Atlantis"));
-        assert_eq!(fit_left(&font, "/short", 300), b"/short");
-        // A label keeps its start, the game's name.
-        let label = "Atlantis: The Lost Tales, GOG.com, French (1999 build), from disc images";
-        let b = fit_right(&font, label, 250);
-        assert!(font.width(&b) <= 250);
-        assert!(b.starts_with(b"Atlantis: The") && b.ends_with(b"..."));
-        assert_eq!(fit_right(&font, "Atlantis II", 300), b"Atlantis II");
-        assert_eq!(bytes("Jeux\u{e9}\u{4e2d}"), b"Jeux\xe9?");
+    fn draws_the_list_and_the_buttons() {
+        // The buttons fit across the screen, the sun's room beside each.
+        let rects = button_rects();
+        assert!(rects[0].1 >= 4 && rects[4].1 + rects[4].3 <= SCREEN_W as i32 - 4);
+        for b in BUTTONS {
+            for missing in [false, true] {
+                let w = art::width(&BUTTON, b.label(missing)).ceil() as i32;
+                assert!(w + BUTTON_PAD <= b.width(), "{b:?}");
+            }
+        }
+        const { assert!(MESSAGE_Y + 14.0 < SUPPORT_BASE && SUPPORT_BASE + 18.0 < HELP_BASE) };
+        const { assert!(HELP_BASE + 6.0 < SCREEN_H as f32) };
+        let mut l = three();
+        l.set_message("2 installations found");
+        let mut bare = vec![0u16; SCREEN_W * SCREEN_H];
+        let items = l.draw_scene(&mut bare);
+        let t = texts(&items);
+        for want in [
+            "Atlantis",
+            "Choose a game",
+            "Not found",
+            "last played",
+            "2 installations found",
+        ] {
+            assert!(t.contains(&want), "{want}: {t:?}");
+        }
+        // The selected row (the first) and its sun; the spears.
+        let suns = items
+            .iter()
+            .filter(|i| matches!(i, Item::Sun { .. }))
+            .count();
+        assert_eq!(suns, 1);
+        assert_eq!(
+            items
+                .iter()
+                .filter(|i| matches!(i, Item::Spear { .. }))
+                .count(),
+            2
+        );
+        // Hovering a button shows a second sun.
+        let (x, y) = button_centre(Button::Find);
+        l.pointer(x, y);
+        let items = l.draw_scene(&mut bare);
+        assert_eq!(
+            items
+                .iter()
+                .filter(|i| matches!(i, Item::Sun { .. }))
+                .count(),
+            2
+        );
+        // Drawn whole on the frame: the text changes it.
+        let mut s = vec![0u16; SCREEN_W * SCREEN_H];
+        l.draw(&mut s);
+        assert_ne!(s, bare);
+    }
+
+    #[test]
+    fn labels_split_into_the_game_and_its_edition() {
+        let e = |label: &str, found: bool, kind| LauncherEntry {
+            path: PathBuf::from("/g"),
+            label: label.to_string(),
+            found,
+            kind,
+        };
+        let a2 = Some(GameKind::Atlantis2);
+        let a3 = Some(GameKind::Atlantis3);
+        assert_eq!(
+            split_label(&e("Atlantis II, GOG.com, French (patch 1.01)", true, a2)),
+            (Some("Atlantis II"), "GOG.com, French (patch 1.01)")
+        );
+        // "Atlantis II" is not the start of Atlantis III's name.
+        assert_eq!(
+            split_label(&e("Atlantis III, GOG.com, French", true, a3)),
+            (Some("Atlantis III"), "GOG.com, French")
+        );
+        assert_eq!(
+            split_label(&e("Not found: the folder was moved", false, a2)),
+            (Some("Atlantis II"), "Not found: the folder was moved")
+        );
+        assert_eq!(
+            split_label(&e("Not found: gone", false, None)),
+            (None, "Not found: gone")
+        );
     }
 
     #[test]
     fn the_support_link() {
         let mut l = Launcher::new(Vec::new());
-        assert_eq!(
-            l.click(SUPPORT_X + SUPPORT_W / 2, SUPPORT_Y + 6, 0),
-            LauncherAction::Support
-        );
-        assert_eq!(
-            l.click(SUPPORT_X - 5, SUPPORT_Y + 6, 0),
-            LauncherAction::None
-        );
+        let (x, y, w, h) = support_rect();
+        assert_eq!(l.click(x + w / 2, y + h / 2, 0), LauncherAction::Support);
+        assert_eq!(l.click(x - 5, y + h / 2, 0), LauncherAction::None);
     }
 }

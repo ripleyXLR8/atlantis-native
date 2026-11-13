@@ -161,7 +161,11 @@ last played selected. Each game is shown as its name and edition,
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
-German* or *Atlantis Evolution, GOG.com, English*, and its folder.
+German* or *Atlantis Evolution, GOG.com, English*, and its folder: the
+game's name in gold capitals, the edition beside it (why the folder does
+not open, in red, when it does not). The screen has the look of the web
+version's page, and its text and ornaments are drawn at the window's
+resolution, so they stay smooth in a large window or in full screen.
 
 | Action | Mouse | Keyboard |
 |---|---|---|

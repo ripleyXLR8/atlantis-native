@@ -58,6 +58,8 @@ pub mod guide;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod launcher;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod launcher_art;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod library;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod session;
@@ -255,6 +257,13 @@ pub struct App {
     menu_frame: Vec<u16>,
     /// The game library's screen (desktop).
     launcher_frame: Vec<u16>,
+    /// Its text and ornaments, drawn at the window's resolution, and the
+    /// window's last picture of the screen with what it was drawn from
+    /// (the items, the window's size), shown again while they hold.
+    #[cfg(not(target_arch = "wasm32"))]
+    launcher_text: Vec<launcher_art::Item>,
+    #[cfg(not(target_arch = "wasm32"))]
+    launcher_shown: (Vec<launcher_art::Item>, usize, usize, Vec<u32>),
     paused_at: Option<Instant>,
     graphics: Graphics,
     /// Where the graphics mode is saved (`settings.ini`).
@@ -389,6 +398,10 @@ impl App {
             menu_font: None,
             menu_frame: Vec::new(),
             launcher_frame: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            launcher_text: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            launcher_shown: (Vec::new(), 0, 0, Vec::new()),
             paused_at: None,
             graphics: Graphics::Original,
             saves: None,
@@ -1040,12 +1053,17 @@ impl App {
         };
         // The support screen or the game library's screen, drawn in
         // `launcher_frame`.
+        // The library's text is drawn after the frame is scaled to the
+        // window, sharp at its resolution (in the frame when the options
+        // menu is open over it).
+        #[cfg(not(target_arch = "wasm32"))]
+        self.launcher_text.clear();
         #[cfg(not(target_arch = "wasm32"))]
         let launcher = support::draw_support(self.support.as_ref(), &mut self.launcher_frame)
             || session::draw_launcher(
                 self.session.as_ref(),
                 &mut self.launcher_frame,
-                &mut self.menu_font,
+                (!self.menu.is_open()).then_some(&mut self.launcher_text),
             );
         #[cfg(target_arch = "wasm32")]
         let launcher = false;
@@ -1239,6 +1257,18 @@ impl App {
             );
             return;
         }
+        // The library's screen as last shown: shown again.
+        #[cfg(not(target_arch = "wasm32"))]
+        if launcher && !self.launcher_text.is_empty() {
+            let (items, w, h, px) = &self.launcher_shown;
+            if (*w, *h) == (sw, sh) && *items == self.launcher_text && px.len() == buf.len() {
+                buf.copy_from_slice(px);
+                if let Some(b) = soft_buf {
+                    b.present().unwrap();
+                }
+                return;
+            }
+        }
         // RGB565 -> XRGB8888 table and source column per window column,
         // built once (the per-pixel arithmetic was the cost in the browser).
         let lut = hd::rgb565_to_888();
@@ -1259,6 +1289,18 @@ impl App {
             for (d, &x) in buf[start..start + dw].iter_mut().zip(&self.col_map) {
                 *d = lut[usize::from(src_row[x])];
             }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if launcher && !self.launcher_text.is_empty() {
+            let mut win = launcher_art::Window {
+                px: &mut buf[..],
+                stride: sw,
+                rect: (ox, oy, dw, dh),
+            };
+            for item in &self.launcher_text {
+                launcher_art::draw(&mut win, item);
+            }
+            self.launcher_shown = (self.launcher_text.clone(), sw, sh, buf.to_vec());
         }
         if let Some(b) = soft_buf {
             b.present().unwrap();

@@ -438,6 +438,7 @@ pub fn describe(dir: &Path) -> LauncherEntry {
         path: dir.to_path_buf(),
         label,
         found,
+        kind: kind.or_else(|| dvd_language_of(dir).map(|_| GameKind::LostTales)),
     }
 }
 

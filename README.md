@@ -443,6 +443,13 @@ The subtitle font, Liberation Sans Regular
 Corporation, Copyright (c) 2012 Red Hat, Inc.), is licensed under the SIL
 Open Font License, version 1.1 (see `assets/fonts/LICENSE-LiberationSans`).
 
+The game library's font, P052 Roman and Italic
+(`assets/fonts/P052-Roman.otf`, `P052-Italic.otf`, URW's Palatino-style
+face from the urw-base35-fonts, Copyright 2015 URW Software, 2013, 2014
+(URW)++ Design & Development), is licensed under the GNU Affero General
+Public License, version 3, with a font exception (see
+`assets/fonts/LICENSE-P052`).
+
 The Chinese subtitle fonts, subsets of Noto Serif TC Regular and Noto
 Serif SC Regular (`assets/fonts/NotoSerifTC-Subset.otf`,
 `NotoSerifSC-Subset.otf`, from the notofonts/noto-cjk release
