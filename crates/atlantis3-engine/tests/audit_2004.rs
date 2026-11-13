@@ -351,10 +351,13 @@ fn numframevideo_at_the_film_start() {
 /// ray (FUN_0043b810) projects through face cameras of the cube's size
 /// (FUN_004c6d70(768): centre 384, viewport 0..767). `village.wam` view
 /// 9's `GAMEBOY` (`gbA1009009`, face 5, x 180..277, y 538..688) is
-/// clicked into the bag and the hand.
+/// clicked into the bag and the hand; in the hand it opens the Gameboy
+/// (FUN_00476320 → FUN_00409970), which empties the hand (FUN_00429a20).
 #[test]
 fn a_sprite_low_on_a_768_face() {
-    let Some((mut g, mut t)) = cabin() else { return };
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
     assert!(g.load_place("village.wam"));
     g.enter_at(9, 0.0, 0.0);
     g.run_command("(showobjet=GAMEBOY)");
@@ -366,5 +369,10 @@ fn a_sprite_low_on_a_768_face() {
     g.step(t);
     let bag: Vec<i32> = g.script().unwrap().bag.iter().map(|e| e.id).collect();
     assert!(bag.contains(&gameboy), "{bag:?}");
-    assert_eq!(g.object_in_hand(), gameboy);
+    assert_eq!(
+        g.mode(),
+        Mode::Carte2004,
+        "the Gameboy opened from the hand"
+    );
+    assert_eq!(g.object_in_hand(), 0);
 }
