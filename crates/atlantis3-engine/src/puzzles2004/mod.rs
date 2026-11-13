@@ -78,7 +78,9 @@
 
 pub mod catapulte;
 pub mod defender;
+pub mod frogger;
 pub mod hanoi;
+pub mod sim;
 pub mod tron;
 
 use std::sync::Arc;
@@ -301,6 +303,7 @@ pub fn init(id: PuzzleId, host: &mut dyn Host) -> Option<Box<dyn Puzzle>> {
     match id {
         PuzzleId::Catapulte => Some(Box::new(catapulte::Catapulte::init(host))),
         PuzzleId::Defender => Some(Box::new(defender::Defender::init(host))),
+        PuzzleId::Frogger => Some(Box::new(frogger::Frogger::init(host))),
         PuzzleId::Hanoi => Some(Box::new(hanoi::Hanoi::init(host))),
         PuzzleId::Tron => Some(Box::new(tron::Tron::init(host))),
         _ => None,
