@@ -297,3 +297,34 @@ fn no_atlantis3_place_hooks() {
     assert_eq!(g.puzzle_screen(), None);
     assert_eq!(g.mode(), Mode::Warp);
 }
+
+/// The light dialog's pass (FUN_00476320) is in the warp frame's branch
+/// of `Interp_GereFrame`, not while a turn runs (0x006e7c2c ≠ 0): a light
+/// dialog whose voice ended keeps its line until the turn ends.
+#[test]
+fn light_dialog_waits_for_the_turn() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    g.run_command("(dial=153,light)");
+    t += 0.04;
+    g.step(t);
+    let (n, line, _, light) = g.dialog_2004().expect("the light dialog");
+    assert!(light);
+    let (yaw, _) = g.angles_deg();
+    g.run_command(&format!("(anglewarpx={})", (yaw as i32 + 180) % 360));
+    g.run_command("(INITRECALAGE=1)");
+    assert!(g.turning());
+    // Every voice ended; the turn runs on (12 of its ticks a step at most).
+    t += 60.0;
+    g.step(t);
+    assert!(g.turning(), "the turn still runs");
+    assert_eq!(g.dialog_2004().map(|d| (d.0, d.1)), Some((n, line)));
+    while g.turning() {
+        t += 0.04;
+        g.step(t);
+    }
+    t += 0.04;
+    g.step(t);
+    assert_ne!(g.dialog_2004().map(|d| (d.0, d.1)), Some((n, line)));
+}

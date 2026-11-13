@@ -2014,10 +2014,6 @@ impl Game {
                 s.dialog_ended(h);
             });
         }
-        // The 2004 program's light dialog (FUN_00476320 @ 0x00443db6).
-        if self.dialog2004.is_some() {
-            self.light_dialog_2004();
-        }
         // 1. The step: 25 Hz ticks of the look or the turn, the centre pick.
         self.warp_step();
         // 2. The frame drawn; with the click flag set, the sprite pass
@@ -2046,6 +2042,13 @@ impl Game {
             }
             let (yaw, pitch) = self.camera.angles();
             self.with_script(|s, h| s.gere_frame(h, yaw, pitch));
+            // The 2004 program's light dialog (FUN_00476320 @ 0x00443db6):
+            // after `Interp_GereFrame` (FUN_004520c0), in the same branch
+            // of its warp frame FUN_00443cc0 (not turning, 0x006e7c2c = 0;
+            // 0x00719d91 = 0, @ 0x00443d8e..0x00443dd0).
+            if self.dialog2004.is_some() {
+                self.light_dialog_2004();
+            }
             // The places' frame hook (@ 0x004c27d0).
             self.frame_hook();
             // The click scan (@ 0x004405b0) whenever no menu is open: a
