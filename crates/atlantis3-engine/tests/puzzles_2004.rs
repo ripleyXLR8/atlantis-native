@@ -97,3 +97,149 @@ fn init_start_fin() {
     assert!(g.puzzle_2004_surface().is_none());
     assert_eq!(g.puzzles_2004_cfg(), [0, 1, 0, 0, 0, 0, 0, 0]);
 }
+
+/// A bank of `cd0\datas\spr` (the CD's names are of mixed case).
+fn bank(g: &Game, name: &str) -> Arc<atlantis3_data::spr::Bank> {
+    let dir =
+        std::path::PathBuf::from(std::env::var_os("ATLANTIS4_CD").unwrap()).join("cd0/datas/spr");
+    let f = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(name))
+        .unwrap_or_else(|| panic!("{name}"));
+    let d = std::fs::read(f.path()).unwrap();
+    Arc::new(atlantis3_data::spr::Bank::parse(&d, g.depth()).unwrap())
+}
+
+/// A pixel of `bank`'s sprite `index` (drawn at its own place) that none of
+/// `above` (tested first by the game) covers.
+fn spot(b: &atlantis3_data::spr::Bank, index: usize, above: &[usize]) -> (i32, i32) {
+    for y in (0..600).step_by(3) {
+        for x in (0..800).step_by(3) {
+            if b.opaque_at(index, None, 0, x, y)
+                && !above.iter().any(|&a| b.opaque_at(a, None, 0, x, y))
+            {
+                return (x, y);
+            }
+        }
+    }
+    panic!("no pixel of #{index}");
+}
+
+fn click_at(g: &mut Game, t: &mut f64, p: (i32, i32)) {
+    g.set_pointer(p.0, p.1);
+    g.click();
+    *t += 0.04;
+    g.step(*t);
+}
+
+/// `PUZ_CATAPULTE` from chapter 110's /030 (the console clicked): the game
+/// runs; the play button; shots aimed (by the game's own flight) at the
+/// right block until it breaks: `FLAG21` = 1, back on the console; the
+/// exit: `CATA_CLIC_EXIT` = 1, and the chapter's /042 runs `FINPUZZLE`,
+/// the film `CURTIS_DIEU` and chapter 11.
+#[test]
+fn catapulte_won_from_chapter_110() {
+    use atlantis3_engine::puzzles2004::catapulte::{self as cata, Ball, Catapulte, Field, State};
+    let Some((mut g, mut t)) = in_chapter(110) else {
+        return;
+    };
+    g.unix_time = || 1_100_000_000;
+    // The click scan of the console's object (`CtrlScenarIN` with
+    // `CLICOBJET` set).
+    let console = g
+        .names()
+        .id(atlantis2_data::defnames::OBJETS, b"CONSOLE_VILLAGE_FX")
+        .unwrap();
+    g.set_var("CLICOBJET", console as i32);
+    g.ctrl_scenar_in();
+    for _ in 0..3 {
+        t += 0.04;
+        g.step(t);
+    }
+    assert_eq!(g.mode(), Mode::Puzzle2004);
+    assert_eq!(g.puzzle_2004(), Some(PuzzleId::Catapulte));
+    assert_eq!(g.puzzles_2004_cfg()[1], 1);
+    let ecran = bank(&g, "Cata_Ecran1.spr");
+    let bloc = bank(&g, "Cata_bloc.spr");
+    let mur = bank(&g, "Cata_mur.spr");
+    if let Some(s) = g.puzzle_2004_surface() {
+        write_ppm("catapulte_console", s, 800, 600);
+    }
+    let play = spot(&ecran, 4, &[3]);
+    click_at(&mut g, &mut t, play);
+    let c = g.puzzle_2004_state::<Catapulte>().unwrap();
+    assert_eq!((c.state, c.screen), (State::Aim, 2));
+    let mut shots = 0;
+    while !g.puzzle_2004_state::<Catapulte>().unwrap().won {
+        shots += 1;
+        assert!(shots < 60, "not won in 60 shots");
+        // Wait for the player's turn.
+        while g.puzzle_2004_state::<Catapulte>().unwrap().state != State::Aim {
+            t += 0.04;
+            g.step(t);
+        }
+        t += 0.04;
+        g.step(t);
+        let c = g.puzzle_2004_state::<Catapulte>().unwrap();
+        let field = Field {
+            bloc: Some(&bloc),
+            mur: Some(&mur),
+            hits: c.hits,
+        };
+        let aim = (300..800)
+            .step_by(4)
+            .flat_map(|x| (0..600).step_by(4).map(move |y| (x, y)))
+            .find(|&p| {
+                let ball = Ball {
+                    pos: cata::PLAYER_START,
+                    vel: cata::aim_velocity(cata::PLAYER_START, (p.0 as f32, p.1 as f32)),
+                    acc: (0.0, 0.0),
+                    damp: 1.0,
+                };
+                // The frames last 0.04 s (the clock's steps, as f32).
+                matches!(
+                    cata::landing(ball, c.wind, &field, 0.04, 500),
+                    Some((_, Some(2)))
+                )
+            })
+            .expect("an aim at the right block");
+        if shots == 1 {
+            g.set_pointer(aim.0, aim.1);
+            t += 0.04;
+            g.step(t);
+            if let Some(s) = g.puzzle_2004_surface() {
+                write_ppm("catapulte_aim", s, 800, 600);
+            }
+        }
+        click_at(&mut g, &mut t, aim);
+        assert_eq!(
+            g.puzzle_2004_state::<Catapulte>().unwrap().state,
+            State::PlayerShot
+        );
+        while g.puzzle_2004_state::<Catapulte>().unwrap().state == State::PlayerShot {
+            t += 0.04;
+            g.step(t);
+        }
+    }
+    assert_eq!(g.script().unwrap().flags[21], 1);
+    // A second later, the console with the mark moved.
+    while g.puzzle_2004_state::<Catapulte>().unwrap().state != State::Console {
+        t += 0.04;
+        g.step(t);
+    }
+    assert_eq!(
+        g.puzzle_2004_state::<Catapulte>().unwrap().mark,
+        cata::MARK_AFTER
+    );
+    let exit = spot(&ecran, 3, &[]);
+    click_at(&mut g, &mut t, exit);
+    for _ in 0..3 {
+        t += 0.04;
+        g.step(t);
+    }
+    // /042: FINPUZZLE, the film, chapter 11.
+    assert_eq!(g.script().unwrap().var("CATA_CLIC_EXIT"), Some(2));
+    assert_ne!(g.mode(), Mode::Puzzle2004);
+    assert_eq!(g.puzzle_2004(), None);
+}

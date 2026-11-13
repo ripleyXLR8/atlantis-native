@@ -76,6 +76,8 @@
 //! game's init and driven through [`Host`] (the game's view of the
 //! engine). The engine's side is `game::puzzles2004`.
 
+pub mod catapulte;
+
 use std::sync::Arc;
 
 use atlantis3_data::spr::Bank;
@@ -219,6 +221,13 @@ pub trait Host {
         false
     }
     fn trace(&mut self, _line: String) {}
+    /// The display's size as FUN_00411a30 / FUN_00411a50 give it: the
+    /// stretch surface's while it is open, else the screen's (the inits'
+    /// FUN_0042e390 centres the pointer on it, before their start opens the
+    /// stretch surface).
+    fn display_size(&self) -> (i32, i32) {
+        (WIDTH as i32, HEIGHT as i32)
+    }
 }
 
 /// A running game.
@@ -237,8 +246,10 @@ pub trait Puzzle: std::any::Any {
 /// the start's common part ([`PuzzleId::mode`], [`PuzzleId::cfg_index`]).
 /// `None` for the games ported elsewhere or not yet.
 pub fn init(id: PuzzleId, host: &mut dyn Host) -> Option<Box<dyn Puzzle>> {
-    let _ = (id, host);
-    None
+    match id {
+        PuzzleId::Catapulte => Some(Box::new(catapulte::Catapulte::init(host))),
+        _ => None,
+    }
 }
 
 /// `AtlSpr_Aff(bank, frame, x, y, alpha)` (FUN_00436b70) into the stretch

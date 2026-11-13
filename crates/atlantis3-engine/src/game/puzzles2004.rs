@@ -330,6 +330,14 @@ impl Host for Cx<'_> {
         !self.g.puzzles2004.fin_in_frame
     }
 
+    fn display_size(&self) -> (i32, i32) {
+        if self.g.puzzles2004.surface.is_some() {
+            (pz::WIDTH as i32, pz::HEIGHT as i32)
+        } else {
+            (self.g.width as i32, self.g.height as i32)
+        }
+    }
+
     fn tracing(&self) -> bool {
         self.g.trace.is_some()
     }
