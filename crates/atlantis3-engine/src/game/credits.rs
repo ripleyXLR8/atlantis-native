@@ -418,8 +418,27 @@ impl Game {
     /// Escape on the credits (@ 0x00457360): the configuration written
     /// (kept in [`Credits::config`] for the program to store), then the
     /// program quits. False when the credits are not shown.
+    ///
+    /// *Atlantis Evolution*'s 2004 program (atlantis4-cd-en-3022848, the
+    /// Escape handler of loop mode 7 on page 9, @ 0x0042c929..0x0042c9a6):
+    /// with `CREDITS` = 1 (the credits of the game's end, `CREDITS=1`)
+    /// `CREDITS` := 0, the start page (page 0x00712800 := 0; the dword
+    /// 0x007129ac := 0 [UNKNOWN: its reader], the sub-state left) and
+    /// `Interp_CloseInterrupt(1)` (FUN_00452ef0): the section
+    /// that waited after `CREDITS=1` goes on, and nothing quits (false).
+    /// Only another value quits (FUN_0045c7d0: the page closed, the
+    /// configuration written, the program's exit).
     pub fn credits_escape(&mut self) -> bool {
         if self.mode != Mode::Menu || self.credits.is_none() {
+            return false;
+        }
+        if self.files.is_evolution_2004()
+            && self.script.as_ref().and_then(|s| s.var("CREDITS")) == Some(1)
+        {
+            self.set_var("CREDITS", 0);
+            self.credits = None;
+            self.menus.page = crate::menu::PAGE_START;
+            self.with_script(|s, h| s.close_interrupt(h));
             return false;
         }
         let cfg = self.cfg_text();

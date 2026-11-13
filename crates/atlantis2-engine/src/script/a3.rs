@@ -765,6 +765,17 @@ impl Script {
             // @ 0x00449cf0: 0x0077e500).
             return Some(self.len(src));
         }
+        if self.evolution_2004 && key == k.credits {
+            // atlantis4-cd-en-3022848 @ 0x004504d5..0x00450513: `CREDITS`
+            // := the value, loop mode 7 (FUN_004a2620(7)) and the credits
+            // page's start (FUN_0045cc20); then the section waits
+            // (0x0070fc04 := 1 unless 0x0070fc05, the resume position
+            // 0x006af4e0 after the line) until Escape on the credits page
+            // resumes it.
+            self.vars[key] = value;
+            host.credits();
+            return Some(self.wait(next));
+        }
         if key == k.objetenmain {
             if self.b(src, p + 1) == b'0' {
                 self.vars[key] = 0;

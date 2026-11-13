@@ -127,3 +127,29 @@ fn vue_sets_arriveevue_to_the_new_view() {
     assert_eq!(var(&g, "ARRIVEEVUE"), 2);
     assert_eq!(var(&g, "VUE"), 2);
 }
+
+/// `CREDITS=1` (@ 0x004504c4..0x00450513; chapi041 /005 after
+/// `cinema=FIN`): the credits page; Escape there with `CREDITS` = 1
+/// (@ 0x0042c94f..0x0042c9a1): `CREDITS` 0, the start page, the waiting
+/// section goes on; with another value Escape quits.
+#[test]
+fn credits_then_escape() {
+    let Some((mut g, _)) = cabin() else { return };
+    let text = b"/INIT\r\n/FININIT\r\n\r\n/001\r\n/con(flag5=0)\r\n/set(credits=1)\r\n\
+                 /set(flag5=1)\r\n/000\r\n";
+    assert!(g.script_mut().unwrap().set_chapter_text(text));
+    g.ctrl_scenar_in();
+    assert!(g.credits().is_some(), "the credits page");
+    assert_eq!(g.mode(), Mode::Menu);
+    assert_eq!(var(&g, "CREDITS"), 1);
+    assert_eq!(flag(&g, 5), 0, "the section waits");
+    assert!(!g.credits_escape(), "no quit");
+    assert!(g.credits().is_none());
+    assert_eq!(var(&g, "CREDITS"), 0);
+    assert_eq!(g.menu_page().map(|p| p.0), Some(0), "the start page");
+    assert_eq!(flag(&g, 5), 1, "the section went on");
+    // Another value: Escape quits.
+    g.run_command("(credits=2)");
+    assert!(g.credits().is_some());
+    assert!(g.credits_escape());
+}

@@ -4578,6 +4578,13 @@ impl Host for Game {
         self.start_credits();
     }
 
+    /// The 2004 program's `CREDITS=` (atlantis4-cd-en-3022848
+    /// @ 0x004504d5..0x004504e6): loop mode 7 and the credits page
+    /// (FUN_0045cc20, page 9 `i_credit`).
+    fn credits(&mut self) {
+        self.start_credits();
+    }
+
     fn dial_start_a3(&mut self, n: i32, voixoff: bool) -> DialStart {
         self.start_dialog(n, voixoff);
         DialStart::Started
