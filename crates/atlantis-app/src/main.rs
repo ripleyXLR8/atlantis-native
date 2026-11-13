@@ -179,6 +179,21 @@ fn main() {
         }
         return;
     }
+    // Atlantis Evolution's 2004 program, the port in progress.
+    if args.first().map(String::as_str) == Some("--evolution2004") {
+        let fullscreen = args.iter().any(|a| a == "--fullscreen");
+        args.retain(|a| a != "--fullscreen");
+        let Some(dir) = args.get(1) else {
+            eprintln!("--evolution2004 <install folder> [--fullscreen]");
+            std::process::exit(2);
+        };
+        install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
+        if let Err(e) = atlantis_app::a3::run_evolution_2004(Path::new(dir), fullscreen) {
+            error_box(&e);
+            std::process::exit(1);
+        }
+        return;
+    }
     // No terminal: the panics and the errors in message boxes.
     install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
     atlantis_app::watchdog::start();
