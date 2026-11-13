@@ -203,6 +203,13 @@ pub struct Game {
     angle_x_now: Option<f32>,
     place: Place,
     camera: Camera,
+    /// *Atlantis Evolution*'s 2004 ship node and `TANGAGEWARP` pitching
+    /// (only the 2004 program uses it).
+    ship: crate::tangage::Ship,
+    /// The previous frame's time: the 2004 pitching's step takes the
+    /// previous frame routine's duration (FUN_004a2630, the float
+    /// 0x00719d94 the frame routine @ 0x004a14d0..0x004a15ea measures).
+    ship_last: Option<f64>,
     look: Look,
     renderer: Renderer,
     zoom: Zoom,
@@ -457,6 +464,8 @@ impl Game {
             angle_x_now: None,
             place: Place::default(),
             camera: Camera::new(fpu, width as u32, height as u32),
+            ship: Default::default(),
+            ship_last: None,
             look,
             renderer,
             zoom: Zoom::default(),
@@ -718,6 +727,11 @@ impl Game {
 
     pub fn mode(&self) -> Mode {
         self.mode
+    }
+
+    /// The 2004 program's ship node and pitching (`TANGAGEWARP`).
+    pub fn ship(&self) -> &crate::tangage::Ship {
+        &self.ship
     }
 
     /// The place's file name and the current view.
@@ -1487,6 +1501,9 @@ impl Game {
 
     /// One displayed frame at the game's time `now` (seconds).
     pub fn step(&mut self, now: f64) {
+        // The previous frame's duration (the 2004 pitching's `t`).
+        let frame_t = self.ship_last.map_or(0.0, |t| now - t);
+        self.ship_last = Some(now);
         self.now = now;
         if let (Some(a), Some(s)) = (self.angle_x_now, self.script.as_mut()) {
             s.angle_x = a;
@@ -1508,7 +1525,13 @@ impl Game {
         }
         match self.mode {
             Mode::Intro | Mode::Video => self.video_step(),
-            Mode::Warp => self.warp_frame(),
+            Mode::Warp => {
+                self.warp_frame();
+                if self.files.is_evolution_2004() {
+                    // FUN_00445760 at the warp routine's end (@ 0x00444168).
+                    self.ship.step(&mut self.camera, frame_t as f32);
+                }
+            }
             Mode::Inventory | Mode::Subjects => self.overlay_frame(),
             Mode::Dialog => self.dialog_frame(),
             Mode::Menu => self.menu_frame(),
@@ -1903,12 +1926,23 @@ impl Game {
             self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
         }
         let (w, h) = (self.width as u32, self.height as u32);
+        // The 2004 program's turns inside the ship's node (FUN_00444920
+        // and the camera node's own frame), while it is the camera's.
+        let ship = self.files.is_evolution_2004() && self.ship.engaged();
         while self.look_acc >= 1.0 {
             self.look_acc -= 1.0;
             if let Some(turn) = self.moving.turn.as_mut() {
                 self.camera_fov = warp_fov(self.camera.fpu);
                 self.camera.set_fov(self.camera_fov, w, h);
-                let step = turn.step(&mut self.camera, &mut self.zoom, (w, h));
+                let step = if ship {
+                    let mut c = crate::tangage::ShipCamera {
+                        cam: &mut self.camera,
+                        ship: &mut self.ship,
+                    };
+                    turn.step(&mut c, &mut self.zoom, (w, h))
+                } else {
+                    turn.step(&mut self.camera, &mut self.zoom, (w, h))
+                };
                 if !step.going {
                     // @ 0x00431aee: the move pending, a target view or not
                     // (a re-alignment, a zone aim without one).
@@ -1921,6 +1955,13 @@ impl Game {
                 // under the camera lock; the speeds still decay and the
                 // limits are tested on the camera as it is.
                 self.look.frame_locked(&self.camera);
+                self.camera_fov = warp_fov(self.camera.fpu);
+                self.camera.set_fov(self.camera_fov, w, h);
+            } else if ship {
+                self.look.frame(&mut crate::tangage::ShipCamera {
+                    cam: &mut self.camera,
+                    ship: &mut self.ship,
+                });
                 self.camera_fov = warp_fov(self.camera.fpu);
                 self.camera.set_fov(self.camera_fov, w, h);
             } else {
@@ -2440,7 +2481,13 @@ impl Game {
         self.place.view = Some(id);
         self.place_sounds_enter(id);
         self.load_slots(id, shown);
-        self.camera.enter(yaw, pitch);
+        if self.files.is_evolution_2004() {
+            // FUN_00442c80's camera code (`VUE`, the moves, `CHANGEWAM`:
+            // its second argument 1).
+            self.ship.enter(&mut self.camera, yaw, pitch, true);
+        } else {
+            self.camera.enter(yaw, pitch);
+        }
         self.look.stop();
         self.moving.turn = None;
         self.look_last = None;
@@ -2477,6 +2524,10 @@ impl Game {
             None => Vec::new(),
         };
         self.load_slots(id, shown);
+        if self.files.is_evolution_2004() {
+            // The 2004 re-entry FUN_00443a10 @ 0x00443c57.
+            self.ship.reenter(&mut self.camera);
+        }
         if let Some(mut s) = self.script.take() {
             self.view_hook(&mut s);
             self.script = Some(s);
@@ -4028,14 +4079,33 @@ impl Host for Game {
         // @ 0x00440820 / @ 0x00440880 return at once under the camera lock
         // (0x0077b8ac).
         if !self.puzzles.cam_lock {
-            if yaw {
+            if yaw && self.files.is_evolution_2004() && self.ship.engaged() {
+                // The 2004 FUN_00444a40: relative to the ship while the
+                // pitching is on.
+                self.ship.set_yaw(&mut self.camera, angle);
+            } else if yaw {
                 self.camera.set_yaw(angle);
+            } else if self.files.is_evolution_2004() && self.ship.engaged() {
+                // FUN_00444b00 with the camera node under the ship.
+                self.ship.set_pitch(&mut self.camera, angle);
             } else {
                 self.camera.pitch_from_here(angle);
             }
         }
         self.look.stop();
         self.centre = self.pick_centre();
+    }
+
+    fn tangage_warp_2004(&mut self, v: i32, n: [i32; 6]) {
+        if v == 0 {
+            self.ship.stop();
+            return;
+        }
+        // @ 0x004503f3: (n1, n2, n3) as floats (FILD), normalised
+        // (FUN_004539b0), then FUN_00445450(axis, n4, n5, n6).
+        let fpu = self.camera.fpu;
+        let axis = crate::tangage::normalize_axis(fpu, [n[0] as f32, n[1] as f32, n[2] as f32]);
+        self.ship.set(fpu, axis, n[3], n[4], n[5]);
     }
 
     fn quick_save(&mut self, n: i32, script: &Script) {

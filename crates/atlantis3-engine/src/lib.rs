@@ -32,6 +32,7 @@ pub mod place_anim;
 pub mod px;
 pub mod startup;
 pub mod subjects;
+pub mod tangage;
 pub mod text;
 pub mod travel;
 pub mod wam_setup;
