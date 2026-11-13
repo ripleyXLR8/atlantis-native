@@ -32,6 +32,10 @@ fn in_chapter(chapter: i32) -> Option<(Game, f64)> {
     g.step(0.0);
     g.skip();
     g.step(0.01);
+    // Not an arrival: the cabin's `vue=1` left `ARRIVEEVUE` = 1, which
+    // chapter 31's /001 (`(flag148=0)&(arriveevue=1)`: Cosmo's greeting,
+    // a dialog) would take for the arrival at Cosmo's.
+    g.set_var("ARRIVEEVUE", 0);
     g.run_command(&format!("(chapter={chapter})"));
     g.step(0.02);
     Some((g, 0.02))
