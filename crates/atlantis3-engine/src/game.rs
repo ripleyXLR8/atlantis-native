@@ -26,6 +26,7 @@ use atlantis3_data::A3Files;
 use crate::audio::{csm_gain, Audio, CHANNEL_CINEMA, CHANNEL_MUSIC, CHANNEL_PLACE, CHANNEL_VOICE};
 use crate::cinema::Cinema;
 use crate::menu::PagePixel;
+use crate::music2004::{GameBackend, Music2004, OggSlots};
 use crate::place_anim::Slots;
 use crate::px::{Faces, Surface};
 use crate::startup::Startup;
@@ -242,6 +243,11 @@ pub struct Game {
     /// The music (`STARTMUSIK`): the file playing, to start it again after
     /// a cinematic (@ 0x00433d00).
     music: Option<String>,
+    /// *Atlantis Evolution*'s 2004 music ([`crate::music2004`]): its slots,
+    /// their streams, and the files they opened (for the log and tests).
+    pub music2004: Music2004,
+    music2004_streams: OggSlots,
+    pub music2004_opened: Vec<String>,
     /// The sounds decoded so far, by file.
     sounds: HashMap<String, Option<Decoded>>,
     /// The place's `Coord` file, the listener's position (@ 0x0074e898)
@@ -461,6 +467,9 @@ impl Game {
             cursor_hit: None,
             resume_next: false,
             music: None,
+            music2004: Music2004::default(),
+            music2004_streams: OggSlots::default(),
+            music2004_opened: Vec::new(),
             sounds: HashMap::new(),
             coord: Coord::default(),
             listener: [0.0; 3],
@@ -520,6 +529,18 @@ impl Game {
             story_sound_model: false,
             stub_rand: false,
         };
+        if game.files.is_evolution_2004() {
+            // The 2004 sound's start (@ 0x0042edf3): FUN_00430dd0(Global)
+            // then FUN_00430cb0(Music), from `Atlantis4.cfg`.
+            let (g, m) = (
+                game.startup.config.global_volume as f32,
+                game.startup.config.music_volume as f32,
+            );
+            game.with_music_2004(|mu, b| {
+                mu.set_global_volume(b, g);
+                mu.set_music_volume(b, m);
+            });
+        }
         // `AtlScarabee_MainInit` (@ 0x004d67b0).
         game.scarab_reload_banks();
         if !game.with_script(|s, h| s.boot_a3(h)) {
@@ -1444,7 +1465,9 @@ impl Game {
             self.angle_x_now = None;
         }
         // The 15 Hz tick (@ 0x0043e550): the scripts' clocks.
+        let mut ticked = false;
         while now - self.tick_last >= 1.0 / 15.0 {
+            ticked = true;
             let last = self.tick_last;
             self.tick_last += 1.0 / 15.0;
             let t = self.tick_last;
@@ -1467,6 +1490,42 @@ impl Game {
         // The main loop's per-frame place part, after the mode's frame
         // (@ 0x004d5df9 → 0x004c1950).
         self.main_loop_hook();
+        if self.files.is_evolution_2004() {
+            self.music_2004_frame(ticked);
+        }
+    }
+
+    /// Runs `f` with the 2004 music and its [`GameBackend`].
+    fn with_music_2004<R>(
+        &mut self,
+        f: impl FnOnce(&mut Music2004, &mut GameBackend<'_>) -> R,
+    ) -> R {
+        let mut b = GameBackend {
+            files: &self.files,
+            audio: &self.audio,
+            rand: &mut self.rand,
+            streams: &mut self.music2004_streams,
+            opened: Some(&mut self.music2004_opened),
+        };
+        f(&mut self.music2004, &mut b)
+    }
+
+    /// The 2004 music's part of the frame: the streams decoded ahead and
+    /// their `END_OF_SONG` passed to the sync callback (@ 0x004310e0, FMOD's
+    /// thread in the original); then, when a 15 Hz tick passed (the timer's
+    /// flag 0x0070c10d, one update however many ticks), the update the
+    /// frame routine calls after the mode's part (@ 0x004a15bc →
+    /// FUN_00430380).
+    fn music_2004_frame(&mut self, ticked: bool) {
+        let fired = self.music2004_streams.pump(&self.audio);
+        self.with_music_2004(|m, b| {
+            for ch in fired {
+                m.sync(b, ch, crate::music2004::Sync::EndOfSong);
+            }
+            if ticked {
+                m.tick(b);
+            }
+        });
     }
 
     // ---- videos -------------------------------------------------------
@@ -4124,6 +4183,18 @@ impl Host for Game {
     /// The 2004 program's `CHANGECD=n`: the disc folder switched. The
     /// disc's banks (FUN_00452310: `sujNN.spr`, `inventNN.spr`,
     /// `suiveurs.spr`) are not ported yet.
+    fn start_music_2004(&mut self, value: &str) {
+        self.with_music_2004(|m, b| m.start_musik_value(b, value));
+    }
+
+    fn stop_music_2004(&mut self, value: &str) {
+        self.with_music_2004(|m, b| m.stop_musik_value(b, value));
+    }
+
+    fn fade_music_2004(&mut self, value: &str) {
+        self.with_music_2004(|m, b| m.fade_musik_value(b, value));
+    }
+
     fn change_cd_2004(&mut self, n: i32) {
         log::info!("Menu_TestChangeCD : {n}");
         match u32::try_from(n) {

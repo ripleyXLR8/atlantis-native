@@ -405,12 +405,36 @@ impl Script {
             let t = self.line_text(src, p + 1);
             self.music = t.bytes().take(0xff).collect();
             let click = self.click;
-            host.start_music(&t);
+            if self.evolution_2004 {
+                // The 2004 branch (@ 0x0044edc0): the text copied to
+                // 0x0070daac too, the click byte 0x006e9fe8 kept around
+                // FUN_00452be0 (@ 0x0044efe5, @ 0x0044f00f).
+                host.start_music_2004(&t);
+            } else {
+                host.start_music(&t);
+            }
             self.click = click;
             return Some(next);
         }
         if key == k.stopmusik {
-            host.stop_music();
+            if self.evolution_2004 {
+                // @ 0x0044f068: the couche word, FUN_00452ec0(couche, 1).
+                let t = self.line_text(src, p + 1);
+                host.stop_music_2004(&t);
+            } else {
+                host.stop_music();
+            }
+            return Some(next);
+        }
+        if self.evolution_2004 && is(self, "FADEMUSIK") {
+            // @ 0x0044f298: the text copied to 0x0070daac as STARTMUSIK's,
+            // the click byte kept around FUN_00452e80 (@ 0x0044f4db,
+            // @ 0x0044f4e9).
+            let t = self.line_text(src, p + 1);
+            self.music = t.bytes().take(0xff).collect();
+            let click = self.click;
+            host.fade_music_2004(&t);
+            self.click = click;
             return Some(next);
         }
         if is(self, "INITRECALAGE") {

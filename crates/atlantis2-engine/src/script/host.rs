@@ -272,6 +272,16 @@ pub trait Host {
     /// `stopmusik` (@ 0x00477090): fade the music out.
     fn stop_music(&mut self) {}
 
+    /// *Atlantis Evolution*'s 2004 `STARTMUSIK` (atlantis4-cd-en-3022848
+    /// @ 0x0044edc0): `value` (the line's text) is `<couche>,<playlist>`.
+    fn start_music_2004(&mut self, value: &str) {}
+
+    /// The 2004 `STOPMUSIK` (@ 0x0044f068): `value` starts with the couche.
+    fn stop_music_2004(&mut self, value: &str) {}
+
+    /// The 2004 `FADEMUSIK` (@ 0x0044f298): `<couche>,<volume>,<ms>`.
+    fn fade_music_2004(&mut self, value: &str) {}
+
     /// The world's part of `Interp_SetMonde` (@ 0x00484df0): its object
     /// and subject sprite banks, its dialog texts, and its disc (1 → CD 1,
     /// 2 → CD 2, 3 → CD 3, 4 → CD 4, 6 → CD 4; 5, Tibet, keeps the disc in

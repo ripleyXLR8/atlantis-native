@@ -358,6 +358,16 @@ impl Game {
                     // sound starts.
                     let g = csm_gain(self.level(self.startup.config.music_volume));
                     self.audio.set_gain(CHANNEL_MUSIC, [g, g]);
+                    if self.files.is_evolution_2004() {
+                        // The 2004 options page's calls (@ 0x0045a457
+                        // FUN_00430cb0, @ 0x0045a4fc FUN_00430dd0).
+                        let c = &self.startup.config;
+                        let (m, g) = (c.music_volume as f32, c.global_volume as f32);
+                        self.with_music_2004(|mu, b| {
+                            mu.set_music_volume(b, m);
+                            mu.set_global_volume(b, g);
+                        });
+                    }
                 }
                 Event::Options => {
                     let c = &self.startup.config;

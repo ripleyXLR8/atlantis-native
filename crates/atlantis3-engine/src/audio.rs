@@ -26,8 +26,12 @@ pub const CHANNEL_VOICE: usize = 15;
 /// voices), [`OBJECT_CHANNELS`] of them.
 pub const CHANNEL_OBJECTS: usize = 16;
 pub const OBJECT_CHANNELS: usize = 6;
+/// The first channel of *Atlantis Evolution*'s 2004 music slots (FMOD
+/// channels 1..5, [`crate::music2004`]), [`crate::music2004::SLOTS`] of
+/// them.
+pub const CHANNEL_MUSIC_2004: usize = CHANNEL_OBJECTS + OBJECT_CHANNELS;
 /// How many channels the mix has.
-pub const CHANNELS: usize = CHANNEL_OBJECTS + OBJECT_CHANNELS;
+pub const CHANNELS: usize = CHANNEL_MUSIC_2004 + crate::music2004::SLOTS;
 
 #[derive(Clone, Debug, Default)]
 struct Channel {

@@ -25,6 +25,7 @@ pub mod licorne;
 pub mod lipsync;
 pub mod maps;
 pub mod menu;
+pub mod music2004;
 pub mod place_anim;
 pub mod px;
 pub mod startup;
