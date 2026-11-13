@@ -252,6 +252,10 @@ pub struct Game {
     film_cine_in: bool,
     film_cine_out: bool,
     film_skip_key: bool,
+    /// `AtlBink_Start` ran while the script was out of the game (a
+    /// `CINEMA=` without cine-in): its `NUMFRAMEVIDEO` := 0 is written
+    /// when the script is back ([`Game::with_script`]).
+    numframevideo_reset: bool,
     /// `VUEANGLES` entering its view: FUN_00442c80's `turn` 0.
     view_no_turn_2004: bool,
     /// The 2004 full-screen sprite (`SPRPLEINECRAN`, the bank name
@@ -537,6 +541,7 @@ impl Game {
             film_cine_in: false,
             film_cine_out: false,
             film_skip_key: false,
+            numframevideo_reset: false,
             view_no_turn_2004: false,
             spr_plein_ecran: None,
             dialog2004: None,
@@ -662,6 +667,9 @@ impl Game {
             s.angle_x = a;
         }
         let r = f(&mut s, self);
+        if std::mem::take(&mut self.numframevideo_reset) {
+            s.set_var("NUMFRAMEVIDEO", 0);
+        }
         if let Some(e) = &s.fatal {
             log::error!("script: {e}");
         }

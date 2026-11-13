@@ -1182,11 +1182,9 @@ impl Script {
     /// 0x0070fc04 := 1 when the call returned 1).
     fn cinema_2004(&mut self, host: &mut dyn Host, src: Src, p: usize, next: usize) -> usize {
         let line = self.line_text(src, p);
+        // `NUMFRAMEVIDEO` := 0 is `AtlBink_Start`'s (@ 0x004028cd..
+        // 0x004028e9), at the film's start (after its cine-in): the host's.
         let started = host.play_cinema_2004(line.as_bytes());
-        if started {
-            // `AtlBink_Start` @ 0x004028cd..0x004028e9: `NUMFRAMEVIDEO` := 0.
-            self.set_var("NUMFRAMEVIDEO", 0);
-        }
         self.double_click = false;
         self.click = false;
         self.click_aux = 0;

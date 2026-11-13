@@ -298,9 +298,17 @@ impl Game {
                 None => log::warn!("AtlBink_PlayMusic({path}) : Stream_Open() Not OK"),
             }
         }
+        // @ 0x004028cd..0x004028e9: `NUMFRAMEVIDEO` := 0 (ebp, 0 since
+        // @ 0x00401d58), at the film's start: after a cine-in, and for the
+        // travel films too. A `CINEMA=` without cine-in calls this from the
+        // script (out of the game then): written when it is back.
+        if self.script.is_some() {
+            self.set_var("NUMFRAMEVIDEO", 0);
+        } else {
+            self.numframevideo_reset = true;
+        }
         // @ 0x004028f0..0x00402902: the subtitle cleared, the clicks
-        // cleared (`NUMFRAMEVIDEO` := 0 by the script, which is the
-        // caller here: `Script::cinema_2004`).
+        // cleared.
         self.subtitle = None;
         self.click = false;
         self.double_click = false;

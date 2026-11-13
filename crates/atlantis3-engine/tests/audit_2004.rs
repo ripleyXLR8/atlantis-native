@@ -328,3 +328,21 @@ fn light_dialog_waits_for_the_turn() {
     g.step(t);
     assert_ne!(g.dialog_2004().map(|d| (d.0, d.1)), Some((n, line)));
 }
+
+/// `NUMFRAMEVIDEO` := 0 is `AtlBink_Start`'s (@ 0x004028cd..0x004028e9):
+/// at the film's start after the cine-in, not at the `CINEMA=` line.
+#[test]
+fn numframevideo_at_the_film_start() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    g.run_command("(cinema=INTRO)");
+    assert!(g.film_cine_2004().is_some(), "the cine-in");
+    g.set_var("NUMFRAMEVIDEO", 99);
+    while g.film_2004().is_none() {
+        t += 0.04;
+        g.step(t);
+        assert!(t < 5.0);
+    }
+    assert_eq!(var(&g, "NUMFRAMEVIDEO"), 0);
+}
