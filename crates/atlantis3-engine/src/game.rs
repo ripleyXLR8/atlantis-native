@@ -1699,8 +1699,13 @@ impl Game {
             let last = self.tick_last;
             self.tick_last += 1.0 / 15.0;
             let t = self.tick_last;
-            if let Some(s) = self.script.as_mut() {
-                s.tick(t, last);
+            let second = self.script.as_mut().is_some_and(|s| s.tick(t, last));
+            if second && self.files.is_evolution_2004() {
+                // The 2004 program's second (FUN_00451a20, @ 0x00441538):
+                // `RND` := rand() % 100, drawn before `RANDOM`, `TIME1` and
+                // `TIME2` are set (which draw nothing).
+                let r = self.script_rand() % 100;
+                self.set_var("RND", r);
             }
             self.ticks = self.ticks.wrapping_add(1);
             self.anim_tick = true;

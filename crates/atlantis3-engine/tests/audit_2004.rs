@@ -183,3 +183,16 @@ fn anglewarpy_above_500() {
     g.run_command("(anglewarpy=523)");
     assert_eq!(y(&g), minus23);
 }
+
+/// The second's tick (FUN_00451a20): `RND` := rand() % 100 (chapi011's
+/// `rnd>50`).
+#[test]
+fn rnd_every_second() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    g.set_var("RND", -1);
+    g.queue_rand(1234);
+    run(&mut g, &mut t, 1.2);
+    assert_eq!(var(&g, "RND"), 34);
+}

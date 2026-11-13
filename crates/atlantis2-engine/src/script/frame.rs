@@ -380,8 +380,10 @@ impl Script {
     /// scheduler time since this task's last run (`now - last`, seconds);
     /// over 10 s it is dropped, from 1 s one second is taken and `RANDOM` =
     /// the tick count & 0xff, `TIME1` and `TIME2` + 1. So the clocks count
-    /// seconds of real time, at most one per tick.
-    pub fn tick(&mut self, now: f64, last: f64) {
+    /// seconds of real time, at most one per tick. True when a second was
+    /// taken (the 2004 program's FUN_00451a20 also sets `RND` then, from
+    /// the host's `rand()`).
+    pub fn tick(&mut self, now: f64, last: f64) -> bool {
         let fpu = self.fpu;
         self.ticks = self.ticks.wrapping_add(1);
         self.tick_flags = [true; 4];
@@ -389,7 +391,7 @@ impl Script {
         self.seconds = fpu.f32(sum);
         if sum > 10.0 {
             self.seconds = 0.0;
-            return;
+            return false;
         }
         if f64::from(self.seconds) >= 1.0 {
             self.seconds = fpu.f32(fpu.sub(f64::from(self.seconds), 1.0));
@@ -397,7 +399,9 @@ impl Script {
             self.vars[k.random] = self.ticks & 0xff;
             self.vars[k.time1] = self.vars[k.time1].wrapping_add(1);
             self.vars[k.time2] = self.vars[k.time2].wrapping_add(1);
+            return true;
         }
+        false
     }
 
     /// The text of a variable's name, for messages.
