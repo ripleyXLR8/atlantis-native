@@ -453,3 +453,40 @@ fn disable_warp() {
         .iter()
         .all(|r| r.etat == 1 && r.vue == 1));
 }
+
+/// The 2004 `CREATESUJ` (FUN_0043e520: an entry enabled per subject the
+/// character lacks) and `ENABLESUJ` (FUN_0043e5e0: only an existing entry
+/// enabled, none added); `DISABLESUJ` as *Atlantis III*'s.
+#[test]
+fn createsuj_and_enablesuj() {
+    let Some((mut g, _)) = cabin() else {
+        return;
+    };
+    let miranda = g.names().id(defnames::PERSONNAGES, b"MIRANDA").unwrap() as i32;
+    let list = |g: &Game| -> Vec<(i32, u8)> {
+        g.script()
+            .unwrap()
+            .subjects
+            .list(miranda)
+            .iter()
+            .map(|s| (s.index, s.flag))
+            .collect()
+    };
+    let suj = |g: &Game, n: &str| g.names().id(defnames::SUJETS, n.as_bytes()).unwrap() as i32;
+    let before = list(&g).len();
+    g.run_command("(createsuj=MIRANDA,MONSTRE,SOURCE)");
+    let (monstre, source, cintre) = (suj(&g, "MONSTRE"), suj(&g, "SOURCE"), suj(&g, "CINTRE"));
+    let l = list(&g);
+    assert_eq!(l.len(), before + 2, "{l:?}");
+    assert_eq!(&l[before..], [(monstre, 1), (source, 1)]);
+    g.run_command("(createsuj=MIRANDA,MONSTRE)");
+    assert_eq!(list(&g).len(), before + 2);
+    g.run_command("(disablesuj=MIRANDA,MONSTRE)");
+    assert_eq!(list(&g)[before], (monstre, 0));
+    // Not there: nothing added.
+    g.run_command("(enablesuj=MIRANDA,CINTRE)");
+    assert_eq!(list(&g).len(), before + 2);
+    assert!(!list(&g).iter().any(|e| e.0 == cintre));
+    g.run_command("(enablesuj=MIRANDA,MONSTRE)");
+    assert_eq!(list(&g)[before], (monstre, 1));
+}

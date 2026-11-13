@@ -394,6 +394,11 @@ impl Script {
             self.subjects_command(src, p + 1, key);
             return Some(next);
         }
+        if self.evolution_2004 && is(self, "CREATESUJ") {
+            // @ 0x0044e4a0..0x0044e4b2: FUN_0043e520(the text after `=`).
+            self.subjects_command(src, p + 1, super::set::CREATESUJ_2004);
+            return Some(next);
+        }
         if key == k.clearsuj {
             let id = self.id(defnames::PERSONNAGES, src, p + 1);
             self.subjects.clear(id);

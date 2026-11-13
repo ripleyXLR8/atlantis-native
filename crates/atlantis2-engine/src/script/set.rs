@@ -22,6 +22,10 @@ use crate::camera::deg_to_rad;
 use atlantis2_data::con::atof;
 use atlantis2_data::defnames;
 
+/// [`Script::subjects_command`]'s key for the 2004 program's `CREATESUJ`
+/// (not a variable's index).
+pub(super) const CREATESUJ_2004: usize = usize::MAX;
+
 impl Script {
     /// `SetVariables` (@ 0x004818f0) on the line at `p` of a text.
     pub fn set_variables(&mut self, host: &mut dyn Host, src: Src, mut p: usize) -> Option<usize> {
@@ -621,6 +625,11 @@ impl Script {
     /// `ENABLESUJ` (@ 0x0047f920), `DISABLESUJ` (@ 0x0047f9f0), `KILLSUJ`
     /// (@ 0x0047fa70): `PERSO,SUJ1[,SUJ2...]`, subjects matched by their
     /// `#SUJETS#` parameter.
+    /// `ENABLESUJ`, `DISABLESUJ`, `KILLSUJ` (`key`, the variables' index)
+    /// and the 2004 program's `CREATESUJ` ([`CREATESUJ_2004`]): the
+    /// character's name, then each subject name after a comma up to the
+    /// `)` (the 2004 program's FUN_0043e520, FUN_0043e5e0, FUN_0043e660,
+    /// FUN_0043e6e0 walk the line the same way).
     pub(super) fn subjects_command(&mut self, src: Src, mut p: usize, key: usize) {
         let perso = self.id(defnames::PERSONNAGES, src, p);
         p = self.after_comma(src, p);
@@ -629,7 +638,15 @@ impl Script {
                 return;
             }
             let value = self.param(defnames::SUJETS, src, p);
-            if key == self.keys.enablesuj {
+            if self.evolution_2004 && key == CREATESUJ_2004 {
+                // FUN_0043e520: the index (FUN_00466f70(2, ..)) and an
+                // entry added when the value has none.
+                let index = self.id(defnames::SUJETS, src, p);
+                self.subjects.create(perso, value, index);
+            } else if self.evolution_2004 && key == self.keys.enablesuj {
+                // FUN_0043e5e0: only an existing entry is enabled.
+                self.subjects.enable_existing(perso, value);
+            } else if key == self.keys.enablesuj {
                 // The index is looked up only for a new entry.
                 let index = if self.subjects.list(perso).iter().any(|s| s.value == value) {
                     0
