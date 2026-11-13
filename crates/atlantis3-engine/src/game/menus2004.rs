@@ -84,6 +84,7 @@ impl Game {
     pub(super) fn new_game_at_2004(&mut self, chapter: i32) -> bool {
         self.video = None;
         self.film = None;
+        self.film_cine = None;
         self.mode = Mode::Warp;
         let ok = self.with_script(|s, h| {
             s.close_interrupt(h);
@@ -94,13 +95,12 @@ impl Game {
     }
 
     /// The 2004 loader (FUN_00460b50) on the save `text`: the script's part
-    /// ([`Script::load_2004`]); the hide and zone tables and `SprPleinEcran`
-    /// are read but not applied (the port keeps no such tables yet).
+    /// ([`Script::load_2004`]), then the hide table (applied to the view's
+    /// place animations) and the zone table (applied to the place's
+    /// zones), then `SprPleinEcran` (a name not empty
+    /// opened by FUN_00436790 @ 0x0046488c; the port opens `spr\` + its file part).
     pub(super) fn load_text_2004(&mut self, text: &[u8]) -> bool {
         let g = SaveGame2004::parse(text);
-        if !g.hide_table.is_empty() || !g.zone_table.is_empty() {
-            self.not_ported("the 2004 saves' NBSpwHideTable / NBZoneTable");
-        }
         let data = LoadData {
             current_cd: g.current_cd,
             wam: String::from_utf8_lossy(&g.wam).into_owned(),
@@ -127,6 +127,15 @@ impl Game {
         self.puzzles.after_load();
         let vars = g.vars.clone();
         let ok = self.with_script(|s, h| s.load_2004(h, &data, &vars));
+        if ok {
+            self.load_hide_table_2004(&g.hide_table);
+            self.load_zone_table_2004(&g.zone_table);
+            let spr = String::from_utf8_lossy(&g.spr_plein_ecran).into_owned();
+            let file = spr.rsplit(['\\', '/']).next().unwrap_or("").trim();
+            if !file.is_empty() {
+                atlantis2_engine::script::Host::spr_plein_ecran_2004(self, Some(file));
+            }
+        }
         self.after_load_hook();
         ok
     }
@@ -167,6 +176,7 @@ impl Game {
             .collect();
         let (yaw, pitch) = self.camera.angles();
         let q = angles_quaternion(yaw, pitch);
+        let (hide_table, zone_table) = self.save_tables_2004_of(s);
         let mut g = SaveGame2004 {
             current_cd: self.disc_2004.max(1),
             date_and_time: date_and_time_now(self.local_time()),
@@ -177,6 +187,15 @@ impl Game {
             vars: s.vars.iter().copied().take(300).collect(),
             objects: self.bag_names_2004(s),
             dialogs,
+            hide_table,
+            zone_table,
+            // The bank's name (0x0070c970): the path FUN_00418d50 built,
+            // `spr\<name>` here (the original's exact prefix [UNKNOWN]).
+            spr_plein_ecran: self
+                .spr_plein_ecran
+                .as_ref()
+                .map(|(n, _)| format!("spr\\{n}").into_bytes())
+                .unwrap_or_default(),
             quaternion: q.map(Some),
             ..Default::default()
         };

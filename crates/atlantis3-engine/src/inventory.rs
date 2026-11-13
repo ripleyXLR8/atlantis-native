@@ -349,11 +349,25 @@ pub fn label(
     w: i32,
     h: i32,
 ) -> (crate::text::Zone, crate::text::Zone, Vec<crate::text::Line>) {
+    label_aligned(font, text, pointer, w, h, 0)
+}
+
+/// [`label`] with the layouts' horizontal code `halign` (the 2004
+/// program's FUN_0042bed0 passes [`crate::text::HALIGN_2004`],
+/// @ 0x0042bf37 and its second layout).
+pub fn label_aligned(
+    font: &crate::text::GdiFont,
+    text: &[u8],
+    pointer: (i32, i32),
+    w: i32,
+    h: i32,
+    halign: i32,
+) -> (crate::text::Zone, crate::text::Zone, Vec<crate::text::Line>) {
     use crate::text::{layout, Zone};
     let (px, py) = pointer;
     let (x0, y0) = (px + 50, py - 20);
     let (x1, y1) = (x0 + 20 * text.len() as i32, y0 + 18);
-    let first = Zone::new(x0, w - x1, y0, h - y1, 0, 1);
+    let first = Zone::new(x0, w - x1, y0, h - y1, halign, 1);
     let lines = layout(font, text, w, h, first);
     let th = font.tm_height;
     let mut bx = (x0, y0, x0, y0);
@@ -369,7 +383,7 @@ pub fn label(
         bx.0 += w - bx.2;
         bx.2 = w;
     }
-    let second = Zone::new(bx.0, w - bx.0 - bx.2, bx.1, h - bx.3, 0, 1);
+    let second = Zone::new(bx.0, w - bx.0 - bx.2, bx.1, h - bx.3, halign, 1);
     let printed = layout(font, text, w, h, second);
     (first, second, printed)
 }

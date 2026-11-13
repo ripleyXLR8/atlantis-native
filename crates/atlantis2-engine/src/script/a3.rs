@@ -360,6 +360,24 @@ impl Script {
             host.turn_now(yaw, a);
             return Some(next);
         }
+        if self.evolution_2004
+            && (key == k.limiteanglewarpx
+                || is(self, "LIMITEANGLEWARPXMIN")
+                || is(self, "LIMITEANGLEWARPXMAX"))
+        {
+            // The 2004 program (@ 0x0044dd26..0x0044de2c), 999 → −1:
+            // `LIMITEANGLEWARPX=v` sets X := v, XMIN := −v, XMAX := v;
+            // `LIMITEANGLEWARPXMIN=v` / `..XMAX=v` set that bound and X := v.
+            let v = if value == 999 { -1 } else { value };
+            self.vars[key] = v;
+            if key == k.limiteanglewarpx {
+                self.set_var("LIMITEANGLEWARPXMIN", -v);
+                self.set_var("LIMITEANGLEWARPXMAX", v);
+            } else {
+                self.vars[k.limiteanglewarpx] = v;
+            }
+            return Some(next);
+        }
         if key == k.limiteanglewarpx || key == k.limiteanglewarpy {
             self.vars[key] = if value == 999 { -1 } else { value };
             return Some(next);
@@ -408,6 +426,11 @@ impl Script {
             self.subjects_command(src, p + 1, key);
             return Some(next);
         }
+        if self.evolution_2004 && is(self, "CREATESUJ") {
+            // @ 0x0044e4a0..0x0044e4b2: FUN_0043e520(the text after `=`).
+            self.subjects_command(src, p + 1, super::set::CREATESUJ_2004);
+            return Some(next);
+        }
         if key == k.clearsuj {
             let id = self.id(defnames::PERSONNAGES, src, p + 1);
             self.subjects.clear(id);
@@ -451,6 +474,39 @@ impl Script {
                 let t = self.line_text(src, p + 1);
                 let name = t.split(')').next().unwrap_or("");
                 host.zone_by_name_2004(name, is(self, "ENABLEZONE"));
+                return Some(next);
+            }
+            if is(self, "SPRPLEINECRAN") {
+                // @ 0x00450518..0x004507a6: `0` → the bank closed
+                // (FUN_00436970) and the name emptied; else the word
+                // between the `=` and the `)`: a bank open closed, then
+                // `spr\<word>` opened (FUN_00418d50, FUN_00436790).
+                let t = self.line_text(src, p + 1);
+                let name = t.split(')').next().unwrap_or("").trim().to_string();
+                host.spr_plein_ecran_2004((!name.starts_with('0')).then_some(name.as_str()));
+                return Some(next);
+            }
+            if is(self, "VUEANGLES") {
+                // @ 0x0044e2e7..0x0044e3f3: `VUE`'s code without its
+                // transition block (0x0070d082) and with the view entry's
+                // `turn` 0 (FUN_00442c80(view, 0) @ 0x0044e39f).
+                host.view_turn_2004(false);
+                self.set_vue(host, value);
+                host.view_turn_2004(true);
+                return Some(next);
+            }
+            if is(self, "CHANGETYPEOBJET") {
+                // @ 0x0044db19..0x0044db50: the `#OBJETS#` id, `atoi`
+                // after the comma, FUN_00466690(id, 2, n).
+                let id = self.id(defnames::OBJETS, src, p + 1);
+                let i = self.after_comma(src, p);
+                let n = self.atoi_at(src, i);
+                host.change_click_kind_2004(id, 2, n);
+                return Some(next);
+            }
+            if is(self, "DISABLEWARP") {
+                // @ 0x0044f76e..0x0044f789: FUN_00442030(value == 0).
+                host.disable_warp_2004(value != 0);
                 return Some(next);
             }
             if let Some(op) = op {
@@ -929,6 +985,8 @@ impl Script {
         if !self.run_init(host) {
             log::error!("SetVariables(): PB avec la zone INIT du Fichier scenar");
         }
+        // @ 0x00461d0b: the hide table cleared before the view.
+        self.shown.clear();
         self.run_command(host, format!("(Vue={})", d.vue).as_bytes());
         // @ 0x00461d27..0x00461ee7: the 300 variables, then the 0x800 flags.
         for (k, v) in self.vars.iter_mut().enumerate().take(300) {

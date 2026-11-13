@@ -245,6 +245,18 @@ pub struct Game {
     /// and the `#CINEMATIQUES#` names ([`film`]).
     film: Option<film::FilmPlaying>,
     film_sound: Option<crate::film2004::FilmSound>,
+    /// The cine-in or cine-out running (0x006e01f0 / 0x006e01f4), the
+    /// cine-in and cine-out wanted (0x006e01e8 / 0x006e01ec, set by every
+    /// `CINEMA=`) and Escape / Space in loop mode 5 (0x006e9e70).
+    film_cine: Option<film::Cine>,
+    film_cine_in: bool,
+    film_cine_out: bool,
+    film_skip_key: bool,
+    /// `VUEANGLES` entering its view: FUN_00442c80's `turn` 0.
+    view_no_turn_2004: bool,
+    /// The 2004 full-screen sprite (`SPRPLEINECRAN`, the bank name
+    /// 0x0070c970): its name and bank, drawn over every warp draw.
+    spr_plein_ecran: Option<(String, Bank)>,
     /// The 2004 program's dialog running (`AtlDial`, 0x006e6f5c), its
     /// data (read at the first `DIAL`) and the player perso (`PLAYERNAME`,
     /// 0x006e6f40).
@@ -521,6 +533,12 @@ impl Game {
             video: None,
             film: None,
             film_sound: None,
+            film_cine: None,
+            film_cine_in: false,
+            film_cine_out: false,
+            film_skip_key: false,
+            view_no_turn_2004: false,
+            spr_plein_ecran: None,
             dialog2004: None,
             dialogs2004: None,
             player_2004: atlantis3_data::evolution2004_dialog::DEFAULT_PLAYER.to_string(),
@@ -796,6 +814,12 @@ impl Game {
 
     pub fn camera(&self) -> &Camera {
         &self.camera
+    }
+
+    /// Tests: the 2004 full-screen sprite's name (`SPRPLEINECRAN`).
+    #[doc(hidden)]
+    pub fn spr_plein_ecran_2004(&self) -> Option<&str> {
+        self.spr_plein_ecran.as_ref().map(|(n, _)| n.as_str())
     }
 
     /// The camera's angles in degrees (yaw, pitch).
@@ -1087,6 +1111,7 @@ impl Game {
     pub fn new_game(&mut self) -> bool {
         self.video = None;
         self.film = None;
+        self.film_cine = None;
         self.film_sound = None;
         self.audio.stop(CHANNEL_CINEMA);
         self.mode = Mode::Warp;
@@ -1105,8 +1130,8 @@ impl Game {
         // The 2004 program's keyboard callback: Escape (scan code 1) or
         // Space (0x39) in loop mode 5 sets 0x006e9e70 (@ 0x0042c504..
         // 0x0042c51b), which the film's loop reads.
-        if let Some(f) = self.film.as_mut() {
-            f.skip_key = true;
+        if self.film_running_2004() {
+            self.film_skip_key = true;
             return;
         }
         if self.video.as_ref().is_some_and(|v| !v.travel) {
@@ -1456,7 +1481,17 @@ impl Game {
         else {
             return;
         };
-        let Some(key) = usize::try_from(e.id)
+        self.draw_object_label(e.id);
+    }
+
+    /// The hover label of object `id` (@ 0x0042a530; the 2004 program's
+    /// FUN_0042bed0, the same but for the layout's horizontal alignment 4,
+    /// which FUN_00420b00 turns into `DT_RIGHT | DT_RTLREADING` only for a
+    /// Hebrew or Arabic font (`tmCharSet` 0xb1 / 0xb2), left otherwise —
+    /// the CD's `font.txt` fonts are `ANSI_CHARSET`; white, as every
+    /// `AtlFont_Print` (FUN_004211d0 `SetTextColor(0xffffff)`)).
+    pub(crate) fn draw_object_label(&mut self, id: i32) {
+        let Some(key) = usize::try_from(id)
             .ok()
             .and_then(|i| self.names.name(atlantis2_data::defnames::OBJETS, i))
             .map(|n| String::from_utf8_lossy(n).into_owned())
@@ -1487,7 +1522,13 @@ impl Game {
         else {
             return;
         };
-        let (_, zone, _) = crate::inventory::label(font, &text, self.pointer, w as i32, h as i32);
+        let halign = if self.files.is_evolution_2004() {
+            crate::text::HALIGN_2004
+        } else {
+            0
+        };
+        let (_, zone, _) =
+            crate::inventory::label_aligned(font, &text, self.pointer, w as i32, h as i32, halign);
         if let Some(t) = self.texts.as_ref() {
             with_px!(&mut self.screen, s => t.print(
                 s,
@@ -1682,7 +1723,7 @@ impl Game {
             Mode::Puzzle2004 => self.puzzle_frame_2004(),
             Mode::Idle => {}
         }
-        if self.logos_2004.is_some() && self.film.is_none() {
+        if self.logos_2004.is_some() && !self.film_running_2004() {
             self.next_logo_2004();
         }
         // The main loop's per-frame place part, after the mode's frame
@@ -1787,8 +1828,8 @@ impl Game {
     }
 
     fn video_step(&mut self) {
-        if self.film.is_some() {
-            self.film_step();
+        if self.film_running_2004() {
+            self.film_pass_2004();
             return;
         }
         let Some(v) = self.video.as_mut() else {
@@ -2074,6 +2115,12 @@ impl Game {
         self.look_acc = fpu.f32(fpu.add(f64::from(self.look_acc), fpu.mul(dt, 25.0)));
         if let Some(s) = self.script.as_ref() {
             self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
+            if self.files.is_evolution_2004() {
+                self.look.limit_x_range = Some((
+                    s.var("LIMITEANGLEWARPXMIN").unwrap_or(0),
+                    s.var("LIMITEANGLEWARPXMAX").unwrap_or(0),
+                ));
+            }
             self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
         }
         let (w, h) = (self.width as u32, self.height as u32);
@@ -2195,6 +2242,17 @@ impl Game {
         }
         let sprites = self.slots.slots.iter().any(|s| s.shown);
         self.render_cube(&m, proj, sprites);
+        // The 2004 full-screen sprite (FUN_00444670 @ 0x00444772..
+        // 0x004447f0): with a bank name, its sprite 0 at its own position
+        // (x 0x80000000), alpha 1, over the view (a surface of the
+        // destination's size and format, @ 0x004446a7..0x004446bf).
+        if let Some((_, bank)) = &self.spr_plein_ecran {
+            let (w, h) = (self.width, self.height);
+            with_px!(&mut self.screen, s => {
+                let mut t = Target::screen(s.as_mut_slice(), w, h);
+                bank.draw(&mut t, None, 0, 0);
+            });
+        }
         // The sprite pass's hit test, against the frames just drawn
         // (0x0076e928 cleared @ 0x00440c07, set @ 0x00439a47 / 0x00439a5b).
         self.cursor_hit = self
@@ -2557,6 +2615,10 @@ impl Game {
                 .find_map(|v| v.destinations.iter().find(|d| d.target == next))
                 .cloned()
         });
+        if self.files.is_evolution_2004() {
+            self.move_film_2004(old, next);
+            return;
+        }
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         // The transition sprites (@ 0x00435a90): per `id_spf` of the
@@ -2567,23 +2629,7 @@ impl Game {
                 .sprites
                 .iter()
                 .filter_map(|name| {
-                    let hidden = self.script.as_ref().is_some_and(|s| {
-                        let id = self
-                            .names
-                            .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
-                            .map(|i| (i as i32, 1))
-                            .or_else(|_| {
-                                self.names
-                                    .id(atlantis2_data::defnames::OBJETS, name.as_bytes())
-                                    .map(|i| (i as i32, 2))
-                            });
-                        id.is_ok_and(|(id, kind)| {
-                            s.shown
-                                .iter()
-                                .any(|r| r.id == id && r.kind == kind && !r.shown)
-                        })
-                    });
-                    if hidden {
+                    if self.transition_hidden(name) {
                         return None;
                     }
                     let e = self
@@ -2614,6 +2660,55 @@ impl Game {
             if self.files.size(&path).is_some() {
                 self.start_video(&path, 15, true, Mode::Warp, spf);
             }
+        }
+    }
+
+    /// Whether the show table hides the transition sprite's entity `name`
+    /// (@ 0x0044b8b0; the 2004 program's FUN_004522b0): its
+    /// `#PERSONNAGES#` id (kind 1), else its `#OBJETS#` id (kind 2), with
+    /// a record not shown.
+    pub(crate) fn transition_hidden(&self, name: &str) -> bool {
+        self.script.as_ref().is_some_and(|s| {
+            let id = self
+                .names
+                .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
+                .map(|i| (i as i32, 1))
+                .or_else(|_| {
+                    self.names
+                        .id(atlantis2_data::defnames::OBJETS, name.as_bytes())
+                        .map(|i| (i as i32, 2))
+                });
+            id.is_ok_and(|(id, kind)| {
+                s.shown
+                    .iter()
+                    .any(|r| r.id == id && r.kind == kind && !r.shown)
+            })
+        })
+    }
+
+    /// The 2004 program's move film (`AtlWarp_continue` FUN_00443cc0
+    /// @ 0x00443fa0..0x004440bd): from a view, the transition sprites
+    /// (FUN_004359b0(old, new)); the move's film name (FUN_00469380(old,
+    /// new): the first view `old` of the WAM with a destination to `new`,
+    /// its `+0x10` text); no double click and `binktraj\<name>`
+    /// (FUN_00418740) existing → FUN_00402a70(film, "", 15, 1, 0): a
+    /// travel film, no cine-in. No WAM's move film is on the CD
+    /// (1,239 names; `binktraj\` holds the cintre's two `CINEMA` films and
+    /// the labyrinth's `la*.bik`) [CONFIRMED-DATA].
+    fn move_film_2004(&mut self, old: Option<u32>, next: u32) {
+        let Some(old) = old else {
+            return;
+        };
+        let Some(d) = crate::travel::destination(&self.place.wam, old, next).cloned() else {
+            return;
+        };
+        if self.double_click || d.video.is_empty() {
+            return;
+        }
+        let path = format!("binktraj/{}", d.video);
+        if self.files.size(&path).is_some() {
+            let spf = self.transition_banks_2004(old, next);
+            self.film_begin_2004(&path, "", 15, true, false, spf);
         }
     }
 
@@ -2660,8 +2755,9 @@ impl Game {
         self.load_slots(id, shown);
         if self.files.is_evolution_2004() {
             // FUN_00442c80's camera code (`VUE`, the moves, `CHANGEWAM`:
-            // its second argument 1).
-            self.ship.enter(&mut self.camera, yaw, pitch, true);
+            // its second argument 1; `VUEANGLES`: 0).
+            let turn = !self.view_no_turn_2004;
+            self.ship.enter(&mut self.camera, yaw, pitch, turn);
         } else {
             self.camera.enter(yaw, pitch);
         }
@@ -4204,6 +4300,9 @@ impl Host for Game {
                     faces: Default::default(),
                     cube: String::new(),
                 };
+                // The 2004 program's `CHANGEWAM` (FUN_00441a50 @ 0x00441bcd
+                // → FUN_00422920): the zone table cleared.
+                self.inv2004.zone_table.clear();
                 // The Land of the Dead's map banks (@ 0x004c372b), the
                 // jewel case's (@ 0x004c367e).
                 if name.eq_ignore_ascii_case("ldmorts.wam") {
@@ -4523,6 +4622,58 @@ impl Host for Game {
 
     fn zone_by_name_2004(&mut self, name: &str, on: bool) {
         self.zone_toggle_2004(name, on);
+    }
+
+    fn disable_warp_2004(&mut self, disable: bool) {
+        self.disable_warp_2004(disable);
+    }
+
+    fn spr_plein_ecran_2004(&mut self, name: Option<&str>) {
+        // A bank open is closed first (FUN_00436970 @ 0x00450617 /
+        // 0x00450750), then `spr\<name>` opened (FUN_00436790: a missing
+        // file logs `AtlSpr_OpenBank : le fichier .. n'existe pas` and
+        // leaves the name empty).
+        self.spr_plein_ecran = None;
+        let Some(name) = name else {
+            return;
+        };
+        let path = format!("spr/{name}");
+        match self
+            .files
+            .read(&path)
+            .and_then(|d| Bank::parse(&d, self.screen.depth()).ok())
+        {
+            Some(b) => self.spr_plein_ecran = Some((name.to_string(), b)),
+            None => log::warn!("AtlSpr_OpenBank : le fichier {path} n'existe pas"),
+        }
+    }
+
+    fn view_turn_2004(&mut self, turn: bool) {
+        self.view_no_turn_2004 = !turn;
+    }
+
+    fn change_click_kind_2004(&mut self, id: i32, kind: i32, click: i32) {
+        // FUN_00466690: each slot of (id, kind): its state record's +0x18
+        // (the WAM's, kept for the next view entries) and its own +0x18.
+        for k in 0..self.slots.slots.len() {
+            let s = &mut self.slots.slots[k];
+            if s.id != id || s.kind != kind {
+                continue;
+            }
+            s.click = click;
+            s.state.click = click;
+            let (e, r) = s.rec;
+            if let Some(w) = self
+                .place
+                .wam
+                .entities
+                .get_mut(e)
+                .and_then(|e| e.states.get_mut(r))
+                .and_then(|w| w.get_mut(6))
+            {
+                *w = click as u32;
+            }
+        }
     }
 
     fn stop_sound_2004(&mut self, name: &str) {

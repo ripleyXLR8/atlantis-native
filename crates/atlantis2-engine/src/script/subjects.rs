@@ -207,6 +207,27 @@ impl SubjectTable {
         self.set_i32(base, n + 1);
     }
 
+    /// *Atlantis Evolution*'s 2004 `CREATESUJ` of one subject
+    /// (atlantis4-cd-en-3022848 FUN_0043e520): nothing when an entry has
+    /// the value, else {value, index, 1} written after the count (no
+    /// limit) and the count one more.
+    pub fn create(&mut self, character: i32, value: i32, index: i32) {
+        if self.find(character, value).is_some() {
+            return;
+        }
+        self.enable(character, value, index);
+    }
+
+    /// The 2004 `ENABLESUJ` of one subject (FUN_0043e5e0): the first entry
+    /// with the value gets flag 1; none → nothing (no entry is added,
+    /// unlike *Atlantis III*'s).
+    pub fn enable_existing(&mut self, character: i32, value: i32) {
+        if let Some(i) = self.find(character, value) {
+            let at = Self::entry_at(character, i).unwrap() + 8;
+            self.bytes[at] = 1;
+        }
+    }
+
     /// `DISABLESUJ` of one subject (@ 0x0047f9f0): the first entry with the
     /// value gets flag 0.
     pub fn disable(&mut self, character: i32, value: i32) {

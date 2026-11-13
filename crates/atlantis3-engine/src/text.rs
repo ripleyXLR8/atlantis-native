@@ -173,7 +173,8 @@ impl FontId {
 
 /// A layout (`AtlFont_SetLayout` @ 0x0041e190): the margins and the
 /// alignments (horizontal 0 left, 1 right, 2 centre; vertical 0 top, 1
-/// bottom, 2 middle).
+/// bottom, 2 middle). *Atlantis Evolution*'s 2004 program has a fourth
+/// horizontal code, [`HALIGN_2004`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Zone {
     pub ml: i32,
@@ -183,6 +184,17 @@ pub struct Zone {
     pub halign: i32,
     pub valign: i32,
 }
+
+/// The 2004 program's horizontal code 4 (atlantis4-cd-en-3022848
+/// FUN_00420b00, the `DrawTextA` format of the layout 0x006e73d8): with a
+/// font whose `tmCharSet` is `HEBREW_CHARSET` (0xb1) or `ARABIC_CHARSET`
+/// (0xb2), `DT_RIGHT | DT_RTLREADING` (0x20002); otherwise no flag, left
+/// (`DT_LEFT`). Its callers: the dialog line (FUN_0046f630), the
+/// inventory's hover label (FUN_0042bed0) and the load page's dates
+/// (FUN_00459af0). The right-to-left reading order itself is not ported
+/// (no CD font asks for those character sets: `font.txt` gives
+/// `ANSI_CHARSET`).
+pub const HALIGN_2004: i32 = 4;
 
 impl Zone {
     pub const fn new(ml: i32, mr: i32, mt: i32, mb: i32, halign: i32, valign: i32) -> Zone {
@@ -333,6 +345,7 @@ pub fn layout(font: &GdiFont, text: &[u8], w: i32, h: i32, z: Zone) -> Vec<Line>
             let wd: i32 = dx.iter().sum();
             let x = match z.halign {
                 1 => z.ml + avail - wd,
+                HALIGN_2004 if matches!(font.charset, 0xb1 | 0xb2) => z.ml + avail - wd,
                 2 => z.ml + (avail - wd) / 2,
                 _ => z.ml,
             };

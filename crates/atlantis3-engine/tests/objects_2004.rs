@@ -372,3 +372,232 @@ fn followers() {
     g.run_command("(CLEARSUIVEURS=1)");
     assert!(g.followers_2004().is_empty());
 }
+
+/// The hover label (FUN_0042b170 → FUN_0042bed0): the pointer on the
+/// matches' slot prints `A box of matches` (`Objects.txt`) in white at
+/// (px + 50, py − 20) and up; on an empty slot, or with the matches in
+/// the hand, no label.
+#[test]
+fn the_hover_label() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    g.right_click();
+    run(&mut g, &mut t, 0.5);
+    let white = |g: &Game| {
+        let (w, h) = (g.width(), g.height());
+        let lay = Layout::for_width(w);
+        let (px, py) = lay.item_centre(0, h);
+        let (x0, y0) = ((px + 50) as usize, (py - 60).max(0) as usize);
+        let mut n = 0;
+        for y in y0..(py as usize).min(h) {
+            for x in x0..(x0 + 300).min(w) {
+                let c = match g.surface() {
+                    Surface::Rgb565(p) => u32::from(p[y * w + x] == 0xffff),
+                    Surface::Xrgb8888(p) => u32::from(p[y * w + x] & 0xff_ffff == 0xff_ffff),
+                };
+                n += c;
+            }
+        }
+        n
+    };
+    point_slot(&mut g, 3);
+    t += 0.04;
+    g.step(t);
+    let none = white(&g);
+    point_slot(&mut g, 0);
+    t += 0.04;
+    g.step(t);
+    write_ppm(&g, "label.ppm");
+    let label = white(&g);
+    assert!(label > none + 50, "{none} {label}");
+    // In the hand: no label.
+    g.click();
+    t += 0.04;
+    g.step(t);
+    assert_eq!(hand(&g), object(&g, "ALLUMETTES"));
+    t += 0.04;
+    g.step(t);
+    assert!(white(&g) < label, "the hand's object has no label");
+}
+
+/// `DISABLEWARP=1` / `=0` (FUN_00442030): every zone of the current view
+/// disabled (type + 88888) / enabled again, each change a zone table row
+/// (FUN_00422950: the same row updated).
+#[test]
+fn disable_warp() {
+    let Some((mut g, _)) = cabin() else {
+        return;
+    };
+    let kinds = |g: &Game| -> Vec<i32> {
+        g.wam()
+            .view(1)
+            .unwrap()
+            .zones
+            .iter()
+            .map(|z| z.kind)
+            .collect()
+    };
+    let before = kinds(&g);
+    let rows0 = g.zone_table_2004().len();
+    g.run_command("(disablewarp=1)");
+    let off = kinds(&g);
+    assert!(off.iter().all(|&k| k >= 88888), "{off:?}");
+    let added = before.iter().filter(|&&k| k < 88888).count();
+    assert_eq!(g.zone_table_2004().len(), rows0 + added);
+    g.run_command("(disablewarp=0)");
+    let on = kinds(&g);
+    assert!(on.iter().all(|&k| k < 88888), "{on:?}");
+    assert_eq!(g.zone_table_2004().len(), rows0 + added);
+    assert!(g.zone_table_2004()[rows0..]
+        .iter()
+        .all(|r| r.etat == 1 && r.vue == 1));
+}
+
+/// The 2004 `CREATESUJ` (FUN_0043e520: an entry enabled per subject the
+/// character lacks) and `ENABLESUJ` (FUN_0043e5e0: only an existing entry
+/// enabled, none added); `DISABLESUJ` as *Atlantis III*'s.
+#[test]
+fn createsuj_and_enablesuj() {
+    let Some((mut g, _)) = cabin() else {
+        return;
+    };
+    let miranda = g.names().id(defnames::PERSONNAGES, b"MIRANDA").unwrap() as i32;
+    let list = |g: &Game| -> Vec<(i32, u8)> {
+        g.script()
+            .unwrap()
+            .subjects
+            .list(miranda)
+            .iter()
+            .map(|s| (s.index, s.flag))
+            .collect()
+    };
+    let suj = |g: &Game, n: &str| g.names().id(defnames::SUJETS, n.as_bytes()).unwrap() as i32;
+    let before = list(&g).len();
+    g.run_command("(createsuj=MIRANDA,MONSTRE,SOURCE)");
+    let (monstre, source, cintre) = (suj(&g, "MONSTRE"), suj(&g, "SOURCE"), suj(&g, "CINTRE"));
+    let l = list(&g);
+    assert_eq!(l.len(), before + 2, "{l:?}");
+    assert_eq!(&l[before..], [(monstre, 1), (source, 1)]);
+    g.run_command("(createsuj=MIRANDA,MONSTRE)");
+    assert_eq!(list(&g).len(), before + 2);
+    g.run_command("(disablesuj=MIRANDA,MONSTRE)");
+    assert_eq!(list(&g)[before], (monstre, 0));
+    // Not there: nothing added.
+    g.run_command("(enablesuj=MIRANDA,CINTRE)");
+    assert_eq!(list(&g).len(), before + 2);
+    assert!(!list(&g).iter().any(|e| e.0 == cintre));
+    g.run_command("(enablesuj=MIRANDA,MONSTRE)");
+    assert_eq!(list(&g)[before], (monstre, 1));
+}
+
+/// The 2004 yaw limits' keys (@ 0x0044dd26..0x0044de2c): `X=v` sets the
+/// bounds ∓v; `XMIN` / `XMAX` set their bound and X; 999 is −1.
+#[test]
+fn the_yaw_limit_keys() {
+    let Some((mut g, _)) = cabin() else {
+        return;
+    };
+    let v = |g: &Game| {
+        let s = g.script().unwrap();
+        [
+            s.var("LIMITEANGLEWARPX").unwrap(),
+            s.var("LIMITEANGLEWARPXMIN").unwrap(),
+            s.var("LIMITEANGLEWARPXMAX").unwrap(),
+        ]
+    };
+    g.run_command("(limiteanglewarpx=40)");
+    assert_eq!(v(&g), [40, -40, 40]);
+    g.run_command("(limiteanglewarpxmin=30)");
+    assert_eq!(v(&g), [30, 30, 40]);
+    g.run_command("(limiteanglewarpxmax=150)");
+    assert_eq!(v(&g), [150, 30, 150]);
+    g.run_command("(limiteanglewarpx=999)");
+    assert_eq!(v(&g), [-1, 1, -1]);
+}
+
+/// `CHANGETYPEOBJET=NAME,n` (FUN_00466690): the object's slots and their
+/// WAM state records get the click kind n (chapi006 / chapi007 make the
+/// helmets clickable as objects to take or `CLICOBJET`).
+#[test]
+fn changetypeobjet() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    to_view_2(&mut g, &mut t);
+    let ferme = object(&g, "MALLE_FERME");
+    let clicks = |g: &Game| -> Vec<i32> {
+        g.slots()
+            .slots
+            .iter()
+            .filter(|s| s.kind == 2 && s.id == ferme)
+            .map(|s| s.click)
+            .collect()
+    };
+    assert!(!clicks(&g).is_empty());
+    assert!(clicks(&g).contains(&3), "{:?}", clicks(&g));
+    g.run_command("(changetypeobjet=MALLE_FERME,4)");
+    assert!(clicks(&g).iter().all(|&c| c == 4), "{:?}", clicks(&g));
+}
+
+/// `VUEANGLES=n` (@ 0x0044e2e7): the view entered as `VUE=n` does, but
+/// FUN_00442c80's `turn` 0: the camera keeps its orientation instead of
+/// taking `ANGLEWARPX` / `ANGLEWARPY`.
+#[test]
+fn vueangles_keeps_the_camera() {
+    let Some((mut g, _)) = cabin() else {
+        return;
+    };
+    let before = g.camera().angles();
+    g.run_command("(anglewarpx=200)");
+    g.run_command("(vueangles=2)");
+    assert_eq!(g.place().1, Some(2));
+    let after = g.camera().angles();
+    assert!(
+        (after.0 - before.0).abs() < 0.02 && (after.1 - before.1).abs() < 0.02,
+        "{before:?} {after:?}"
+    );
+    g.run_command("(vue=1)");
+    let turned = g.camera().angles();
+    assert!((turned.0 - before.0).abs() > 0.1, "{before:?} {turned:?}");
+}
+
+/// `SPRPLEINECRAN=masque.spr` (FUN_00436790 on `spr\masque.spr`): the
+/// bank's sprite 0 drawn at its own position over every warp draw
+/// (FUN_00444670); `=0` closes it.
+#[test]
+fn sprpleinecran() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    // The top-left 64 × 64 corner's brightness: the mask's vignette is
+    // black there.
+    let corner = |g: &Game| -> u64 {
+        let w = g.width();
+        let mut n = 0u64;
+        for y in 0..64 {
+            for x in 0..64 {
+                n += match g.surface() {
+                    Surface::Rgb565(p) => u64::from(p[y * w + x] >> 11),
+                    Surface::Xrgb8888(p) => u64::from((p[y * w + x] >> 16) & 0xff),
+                };
+            }
+        }
+        n
+    };
+    t += 0.04;
+    g.step(t);
+    let plain = corner(&g);
+    assert!(plain > 0);
+    g.run_command("(sprpleinecran=masque.spr)");
+    assert_eq!(g.spr_plein_ecran_2004(), Some("masque.spr"));
+    t += 0.04;
+    g.step(t);
+    write_ppm(&g, "masque.ppm");
+    assert_eq!(corner(&g), 0, "the mask is drawn");
+    g.run_command("(sprpleinecran=0)");
+    assert_eq!(g.spr_plein_ecran_2004(), None);
+    t += 0.04;
+    g.step(t);
+    assert!(corner(&g) > 0);
+}

@@ -175,6 +175,12 @@ fn new_game_save_and_load_from_the_menus() {
     }
     let bag: Vec<i32> = g.script().unwrap().bag.iter().map(|e| e.id).collect();
     assert!(bag.contains(&obj));
+    // chapi001's `/INIT`: the show / hide rows (the hide table) and
+    // `disablezone=POSE_MALLE` (one zone table row, state 0).
+    let rows = g.script().unwrap().shown.len();
+    assert!(rows >= 4, "{rows}");
+    assert_eq!(g.zone_table_2004().len(), 1);
+    assert_eq!(g.zone_table_2004()[0].etat, 0);
     // Escape: the in-game menu (the screen captured), `BT_SAVE`, `BT_YES`.
     g.escape();
     assert_eq!(g.menu_page(), Some((PAGE_MAIN, 0)));
@@ -195,7 +201,12 @@ fn new_game_save_and_load_from_the_menus() {
         text.contains(&format!("\nNBObjet = {}\n", bag.len())),
         "{text}"
     );
-    assert!(text.contains("\nNBSpwHideTable = 0\nNBZoneTable = 0\nSprPleinEcran = \n"));
+    assert!(
+        text.contains(&format!("\nNBSpwHideTable = {rows}\nId = ")),
+        "{text}"
+    );
+    assert!(text.contains("\nNBZoneTable = 1\nId = "), "{text}");
+    assert!(text.contains("\nEtat = 0\nSprPleinEcran = \n"), "{text}");
     assert!(saved[1].1.starts_with(b"SPRCRYO1"));
 
     // Back to the game; the state changed.
@@ -207,6 +218,23 @@ fn new_game_save_and_load_from_the_menus() {
         s.vars[250] = 0;
         s.bag.clear();
     }
+    let malle = g
+        .names()
+        .id(atlantis2_data::defnames::OBJETS, b"MALLE_FERME")
+        .unwrap() as i32;
+    let malle_shown = |g: &Game| {
+        g.script()
+            .unwrap()
+            .shown
+            .iter()
+            .find(|r| r.id == malle && r.kind == 2)
+            .map(|r| r.shown)
+    };
+    assert_eq!(malle_shown(&g), Some(true));
+    g.run_command("(enablezone=POSE_MALLE)");
+    g.run_command("(hideobjet=MALLE_FERME)");
+    assert_eq!(malle_shown(&g), Some(false));
+    assert_eq!(g.zone_table_2004()[0].etat, 1);
     // Escape, `BT_LOAD`, the list (one save), `SAVE1`.
     g.escape();
     click_on(&mut g, &mut t, b"BT_LOAD");
@@ -219,6 +247,23 @@ fn new_game_save_and_load_from_the_menus() {
     frames(&mut g, &mut t, 2);
     assert_eq!(g.mode(), Mode::Warp);
     assert_eq!(g.place(), ("cabine.wam", Some(1)));
+    // The hide table and the zone table from the file (FUN_00460b50
+    // @ 0x00463037.., @ 0x00463873..): MALLE_FERME's row shown again,
+    // POSE_MALLE disabled again.
+    assert_eq!(malle_shown(&g), Some(true));
+    assert_eq!(g.script().unwrap().shown.len(), rows);
+    assert_eq!(g.zone_table_2004().len(), 1);
+    assert_eq!(g.zone_table_2004()[0].etat, 0);
+    let pose = g
+        .wam()
+        .places
+        .iter()
+        .flat_map(|p| p.views.iter())
+        .flat_map(|v| v.zones.iter())
+        .find(|z| z.name.as_deref() == Some("POSE_MALLE"))
+        .unwrap()
+        .kind;
+    assert!(pose >= 88888, "{pose}");
     let s = g.script().unwrap();
     assert_eq!((s.flags[1234], s.vars[250]), (77, -5));
     assert_eq!(s.bag.iter().map(|e| e.id).collect::<Vec<_>>(), bag);

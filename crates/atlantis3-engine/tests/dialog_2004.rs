@@ -293,3 +293,73 @@ fn every_dial_of_the_scripts() {
         assert!(is_player(n), "PLAYERNAME={n}");
     }
 }
+
+/// `DIAL=161` (chapi012 /001, the lizard clicked at `grottex.wam`): line 2's
+/// speaker `Batracien` has `[Spw]`, `[IdText] LEZARD`, `[Neutre] 3`
+/// (info.txt): no head film; FUN_0046d3f0 shows the `LEZARD` slot playing
+/// animation 3 (the others of `LEZARD` hidden) and `Perform` draws the
+/// panorama in rows 76 .. h − 77 of the back buffer, black above and
+/// below (FUN_00444870 with 0x4c).
+#[test]
+fn a_spw_speaker_shows_its_place_animation() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    for c in ["(changecd=2)", "(changewam=grottex.wam)", "(chapter=12)"] {
+        g.run_command(c);
+    }
+    let lezard = g
+        .names()
+        .id(defnames::PERSONNAGES, b"LEZARD")
+        .expect("LEZARD") as i32;
+    // The view with the lizard's slot of animation 3.
+    let mut view = None;
+    for v in 1..40 {
+        if g.wam().view(v).is_none() {
+            continue;
+        }
+        g.run_command(&format!("(vue={v})"));
+        t += 0.04;
+        g.step(t);
+        if g.mode() != Mode::Warp {
+            continue;
+        }
+        if g.slots()
+            .slots
+            .iter()
+            .any(|s| s.kind == 1 && s.id == lezard && s.state.anim == 3)
+        {
+            view = Some(v);
+            break;
+        }
+    }
+    let Some(view) = view else {
+        panic!("no grottex view with LEZARD's animation 3");
+    };
+    g.run_command("(DIAL=161)");
+    assert_eq!(g.dialog_2004(), Some((161, 1, false, false)));
+    assert!(!g.dialog_2004_spw(), "line 1 is HERO's");
+    g.click();
+    t += 0.04;
+    g.step(t);
+    assert_eq!(g.dialog_2004().map(|d| d.1), Some(2), "view {view}");
+    assert!(g.dialog_2004_spw());
+    assert!(g.dialog_2004_media().unwrap().head.is_none());
+    let shown: Vec<u32> = g
+        .slots()
+        .slots
+        .iter()
+        .filter(|s| s.kind == 1 && s.id == lezard && s.shown)
+        .map(|s| s.state.anim)
+        .collect();
+    assert_eq!(shown, vec![3]);
+    t += 0.04;
+    g.step(t);
+    let (w, h) = (g.width(), g.height());
+    let black = |g: &Game, y: usize| match g.surface() {
+        Surface::Rgb565(p) => p[y * w..(y + 1) * w].iter().all(|&c| c == 0),
+        Surface::Xrgb8888(p) => p[y * w..(y + 1) * w].iter().all(|&c| c & 0xff_ffff == 0),
+    };
+    assert!(black(&g, 0) && black(&g, 75) && black(&g, h - 76));
+    assert!(!black(&g, h / 2));
+}
