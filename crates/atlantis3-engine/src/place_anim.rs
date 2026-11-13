@@ -59,6 +59,57 @@ impl Slot {
     /// the C code does after setting a frame and the mode.
     pub fn restart_clock(&mut self, now: f64) {
         self.start = now;
+        self.offset = 0.0;
+    }
+
+    /// The 2004 program's clock frame (@ 0x0043b11a..0x0043b12f):
+    /// `ftol(((now − start) + acc − offset) · fps)`, acc (+0x464) 0 after
+    /// every write of it.
+    fn clock_frame(&self, now: f64) -> i32 {
+        ((now - self.start - self.offset) * f64::from(self.fps)) as i32
+    }
+}
+
+/// The 2004 program's reading of a WAM state's words (the record as
+/// @ 0x00439040 reads it: shorts at +0x10, +0x12 and +0x1c, the next
+/// state's text at +0x1e).
+mod evo_state {
+    use atlantis2_data::wam::EntityState;
+
+    /// +0x10 (short): the hand-over weight.
+    pub fn weight(s: &EntityState) -> i32 {
+        i32::from(s.weight as u16 as i16)
+    }
+
+    /// +0x12 (short): the limit of the plays in a row of a slot the
+    /// hand-over draws again.
+    pub fn reps(s: &EntityState) -> i32 {
+        i32::from((s.weight as u32 >> 16) as u16 as i16)
+    }
+
+    /// +0x1c (short): the frames a second; 15 when not above 0.
+    pub fn fps(s: &EntityState) -> i32 {
+        let f = i32::from(s.next as u16 as i16);
+        if f > 0 {
+            f
+        } else {
+            15
+        }
+    }
+
+    /// +0x1e: the next state's letter (0 = none).
+    pub fn next_letter(s: &EntityState) -> u8 {
+        (s.next >> 16) as u8
+    }
+
+    /// `atoi(state + 0x1f)`: the next state's animation number, and
+    /// whether its text is empty.
+    pub fn next_anim(s: &EntityState) -> (i32, bool) {
+        let mut b = vec![(s.next >> 24) as u8];
+        for w in [s.first, s.end, s.shown, s.single] {
+            b.extend_from_slice(&w.to_le_bytes());
+        }
+        (atlantis3_data::atl::atoi(&b), b[0] == 0)
     }
 }
 
@@ -115,12 +166,35 @@ pub struct Slot {
     /// Not played by the clock at the view entry (mode 0): its plays are
     /// started by C code (a lid, a door...).
     pub driven: bool,
+    /// The 2004 program's slot (0x4a0 bytes @ 0x006ea3b4 + 0x4a0 k,
+    /// loaded by @ 0x00439040): +0x448 the frames a second, +0x44c the
+    /// state's ([`evo_state::fps`]).
+    pub fps: i32,
+    pub fps_base: i32,
+    /// +0x46c: subtracted from the clock (at the load −(frame / fps),
+    /// integer division; 0 after a restart).
+    pub offset: f64,
+    /// +0x474: the plays in a row of this slot drawn by the hand-over;
+    /// +0x478 their limit (−1 none; the state's +0x12 at the load, set by
+    /// the hand-over when 0).
+    pub reps: i32,
+    pub max_reps: i32,
+    /// (WAM entity, state) of the slot's state record (+0x1c), and of the
+    /// record its next state names (+0x20 at the load, resolved into the
+    /// slot +0x24 after the view's loads); whether its state names one
+    /// (+0x1e ≠ 0).
+    pub rec: (usize, usize),
+    pub link: Option<(usize, usize)>,
+    pub chain: bool,
 }
 
 /// The view's slots.
 #[derive(Default)]
 pub struct Slots {
     pub slots: Vec<Slot>,
+    /// The 2004 program's loader, step and hand-over
+    /// ([`A3Files::is_evolution_2004`]).
+    pub evolution: bool,
     /// The display's format the banks are prepared for.
     pub depth: Depth,
     /// The place animations' folder under `spw\`: `spw512`, `SPW1024`
@@ -193,27 +267,77 @@ impl Slots {
         view: u32,
         world: &str,
         rand: &mut dyn FnMut() -> i32,
-        _now: f64,
+        now: f64,
         shown: impl Fn(i32, i32) -> Option<bool>,
         depth: Depth,
         spw: &'static str,
     ) -> Slots {
         let mut out = Slots {
             slots: Vec::new(),
+            evolution: files.is_evolution_2004(),
             depth,
             spw,
         };
-        for e in &wam.entities {
-            for s in e.state_records().filter(|s| s.view == view) {
+        'load: for (ei, e) in wam.entities.iter().enumerate() {
+            for (si, s) in e.state_records().enumerate() {
+                if s.view != view {
+                    continue;
+                }
                 if out.slots.len() >= MAX_SLOTS - 1 {
                     log::error!("AtlSpw_load : n>MAX_SPW_VISIBLE");
+                    if out.evolution {
+                        break 'load;
+                    }
                     return out;
                 }
                 let name = e.spw_name(&s);
-                out.push_state(files, cache, e, s, &name, world, rand, &shown);
+                out.push_state(
+                    files,
+                    cache,
+                    e,
+                    s,
+                    (ei, si),
+                    &name,
+                    world,
+                    rand,
+                    now,
+                    &shown,
+                );
             }
         }
+        if out.evolution {
+            out.evo_entry(now, rand);
+        }
         out
+    }
+
+    /// The 2004 view entry after its loads (FUN_00442c80): each slot's
+    /// next-state record turned into that record's slot, or dropped when
+    /// the view has none (@ 0x004431be..: then again FUN_00439720), then
+    /// the end-of-play pass over every shown slot at frame −1 (the loads
+    /// leave −1 for a first frame of 0), whatever its mode
+    /// (@ 0x004431df..0x00443418).
+    fn evo_entry(&mut self, now: f64, rand: &mut dyn FnMut() -> i32) {
+        for k in 0..self.slots.len() {
+            let Some(target) = self.slots[k].link else {
+                continue;
+            };
+            match self.slots.iter().position(|s| s.rec == target) {
+                Some(j) => {
+                    self.slots[k].queued = true;
+                    self.slots[k].next = Some(j);
+                }
+                None => {
+                    self.slots[k].queued = false;
+                    self.slots[k].link = None;
+                }
+            }
+        }
+        for k in 0..self.slots.len() {
+            if self.slots[k].shown && self.slots[k].frame == -1 {
+                self.evo_end(k, now, rand, false);
+            }
+        }
     }
 
     /// `AtlSpw_LoadOne` (@ 0x00438530): a slot for the state `s` of the
@@ -229,12 +353,13 @@ impl Slots {
         cache: &mut HashMap<String, Option<Arc<Bank>>>,
         e: &atlantis2_data::wam::Entity,
         s: EntityState,
+        rec: (usize, usize),
         name: &str,
         world: &str,
         rand: &mut dyn FnMut() -> i32,
+        now: f64,
         shown: &dyn Fn(i32, i32) -> Option<bool>,
     ) {
-        let out = &mut self.slots;
         let depth = self.depth;
         // The 2004 program: `spw\<name>` on the current disc (the view
         // entry @ 0x0044307d..0x004430ab formats the name and passes it to
@@ -264,6 +389,15 @@ impl Slots {
         let count = bank.len() as i32;
         let kind = e.kind as i32;
         let id = e.index as i32;
+        let base = name
+            .strip_suffix(".SPW")
+            .or_else(|| name.strip_suffix(".spw"))
+            .unwrap_or(name);
+        if files.is_evolution_2004() {
+            self.push_state_2004(e, s, rec, base, bank, now, shown);
+            return;
+        }
+        let out = &mut self.slots;
         let pause = if s.delay == 0 {
             0
         } else {
@@ -276,10 +410,6 @@ impl Slots {
                 slot_shown = false;
             }
         }
-        let base = name
-            .strip_suffix(".SPW")
-            .or_else(|| name.strip_suffix(".spw"))
-            .unwrap_or(name);
         out.push(Slot {
             name: base.to_string(),
             kind,
@@ -309,6 +439,102 @@ impl Slots {
             queued: false,
             next: None,
             ended: false,
+            fps: 15,
+            fps_base: 15,
+            offset: 0.0,
+            reps: 0,
+            max_reps: 0,
+            rec,
+            link: None,
+            chain: false,
+        });
+    }
+
+    /// The 2004 loader FUN_00439040 (@ 0x004394a5..0x00439664): frame =
+    /// the state's first frame, **−1 for 0**; last = end − 1, or the
+    /// file's count for end 0; +0x14 = 0 (the frame a loop or a hand-over
+    /// starts again at); the mode, click kind and shown flag from the
+    /// state; fps from the state (+0x1c, 15 when not above 0); weight
+    /// +0x10 and play limit +0x12 as they are; no pause drawn; the clocks
+    /// started now, less frame / fps (integer division); the next state
+    /// +0x1e: the state itself when it names itself, else the record of
+    /// the entity in this view with that letter and animation number (1
+    /// for none) (FUN_00469550). Shown as in *Atlantis III*: the state's
+    /// flag, then the show table, hidden when an earlier slot of the
+    /// entity is shown.
+    #[allow(clippy::too_many_arguments)]
+    fn push_state_2004(
+        &mut self,
+        e: &atlantis2_data::wam::Entity,
+        s: EntityState,
+        rec: (usize, usize),
+        name: &str,
+        bank: Arc<Bank>,
+        now: f64,
+        shown: &dyn Fn(i32, i32) -> Option<bool>,
+    ) {
+        let count = bank.len() as i32;
+        let kind = e.kind as i32;
+        let id = e.index as i32;
+        let frame = if s.first == 0 { -1 } else { s.first };
+        let fps = evo_state::fps(&s);
+        let letter = evo_state::next_letter(&s);
+        let link = (letter != 0)
+            .then(|| {
+                let (anim, empty) = evo_state::next_anim(&s);
+                if letter == s.letter as u8 && anim == s.anim as i32 {
+                    return Some(rec);
+                }
+                e.state_records()
+                    .position(|t| {
+                        t.view == s.view
+                            && t.letter as u8 == letter
+                            && ((empty && t.anim == 1) || (!empty && t.anim as i32 == anim))
+                    })
+                    .map(|si| (rec.0, si))
+            })
+            .flatten();
+        let out = &mut self.slots;
+        let mut slot_shown = s.shown != 0;
+        if let Some(v) = shown(id, kind) {
+            slot_shown = v;
+            if out.iter().any(|o| o.id == id && o.kind == kind && o.shown) {
+                slot_shown = false;
+            }
+        }
+        out.push(Slot {
+            name: name.to_string(),
+            kind,
+            id,
+            bank,
+            frame,
+            last: if s.end == 0 { count } else { s.end - 1 },
+            count,
+            first: 0,
+            click: s.click,
+            state: s,
+            shown: slot_shown,
+            mode: s.single,
+            frames: [-2; FRAME_LIST],
+            driven: s.single == 0,
+            blink: false,
+            pause: 0,
+            waiting: false,
+            start: now,
+            fresh: false,
+            animated: true,
+            weight: evo_state::weight(&s),
+            queued: link.is_some(),
+            next: None,
+            ended: false,
+            fps,
+            fps_base: fps,
+            offset: -f64::from(frame / fps),
+            reps: 0,
+            max_reps: evo_state::reps(&s),
+            rec,
+            link,
+            chain: letter != 0,
         });
     }
 
@@ -320,6 +546,15 @@ impl Slots {
             s.id == id && s.kind == kind && (number == 0 || s.state.anim as i32 == number)
         }) {
             s.shown = true;
+            if self.evolution {
+                // FUN_004660d0 (@ 0x00466127..0x0046622f): shown, clocks
+                // restarted, the state's frames a second (the script's
+                // optional rate is never given in the 2004 scripts), the
+                // byte +0x47c cleared; the frame is left as it is.
+                s.restart_clock(now);
+                s.fps = s.fps_base;
+                return;
+            }
             s.fresh = true;
             s.ended = false;
             s.start = now;
@@ -336,7 +571,9 @@ impl Slots {
         {
             s.shown = false;
             s.frame = 0;
-            s.start = now;
+            // The 2004 program's FUN_004663d0: the same, the clocks
+            // restarted (@ 0x00466409..0x0046642c).
+            s.restart_clock(now);
         }
     }
 
@@ -366,6 +603,11 @@ impl Slots {
         let sj = &mut self.slots[j];
         sj.queued = false;
         sj.frame = 0;
+        if self.evolution {
+            // FUN_00466540 with 2 (@ 0x0046665b): j's rate the
+            // state's (no script rate in the 2004 scripts).
+            sj.fps = sj.fps_base;
+        }
         sj.last = if sj.state.end < 1 {
             sj.count
         } else {
@@ -568,6 +810,10 @@ impl Slots {
     }
 
     pub fn step_in(&mut self, now: f64, rand: &mut Rand, dialog: bool) {
+        if self.evolution {
+            self.evo_step(now, &mut || rand.rand(), dialog);
+            return;
+        }
         for s in &mut self.slots {
             if !s.shown || s.mode == 0 || !s.animated || s.waiting {
                 continue;
@@ -633,6 +879,241 @@ impl Slots {
                 }
             }
         }
+    }
+
+    /// The 2004 step FUN_0043b0a0, at the end of every warp draw
+    /// (FUN_00444870 @ 0x00444917, no 15 Hz gate): each shown slot of a
+    /// mode, animated, not pausing, shows its clock's frame
+    /// ([`Slot::clock_frame`], more than one frame), −1 past its last one
+    /// with its clocks restarted (@ 0x0043b0e1..0x0043b1a4); then each
+    /// shown slot of a mode at −1 ends its play ([`Slots::evo_end`],
+    /// @ 0x0043b1c4..0x0043b3fc). The end of a play also calls the
+    /// script's resume FUN_00450f30 when the slot's byte +0x47c is set
+    /// (@ 0x0043b150..0x0043b15a): no writer of 1 found [UNKNOWN], not
+    /// ported. `dialog`: the loop mode is 6 (@ 0x0043b282; [UNKNOWN]
+    /// which mode that is), no hand-over.
+    fn evo_step(&mut self, now: f64, rand: &mut dyn FnMut() -> i32, dialog: bool) {
+        for s in &mut self.slots {
+            if !s.shown || s.mode == 0 || !s.animated || s.waiting {
+                continue;
+            }
+            if s.last > 1 {
+                s.frame = s.clock_frame(now);
+            }
+            if s.frame > s.last - 1 {
+                s.frame = -1;
+            }
+            if s.frame == -1 && s.last > 1 {
+                s.restart_clock(now);
+            }
+        }
+        for k in 0..self.slots.len() {
+            let s = &self.slots[k];
+            if s.shown && s.mode != 0 && s.frame == -1 {
+                self.evo_end(k, now, rand, dialog);
+            }
+        }
+    }
+
+    /// The end of a play of slot k in the 2004 program (the step's second
+    /// loop @ 0x0043b1ed..0x0043b3fc, the view entry's @ 0x004431f8..):
+    /// no pause count: not pausing, mode 1, clocks restarted; a pause
+    /// count: count := last − the clock's frame (0 below 1), and while
+    /// not 0 nothing else. Then, with no successor queued, no pause count,
+    /// a mode and not `dialog`: the hand-over ([`Slots::evo_handover`]),
+    /// which ends it when it answers 1. Not pausing: no successor → hidden
+    /// for a state end of −1, else frame +0x14 (0) and last := the state
+    /// end when not 0 (**every other state plays again**); a successor j
+    /// → k hidden, j shown at its +0x14, j's own successor dropped unless
+    /// its state names a next state, j's clocks restarted.
+    fn evo_end(&mut self, k: usize, now: f64, rand: &mut dyn FnMut() -> i32, dialog: bool) {
+        let s = &mut self.slots[k];
+        if s.pause == 0 {
+            s.waiting = false;
+            s.mode = 1;
+            s.restart_clock(now);
+        } else {
+            s.pause = (s.last - s.clock_frame(now)).max(0);
+            if s.pause != 0 {
+                return;
+            }
+        }
+        let s = &self.slots[k];
+        if !s.queued
+            && s.next.is_none()
+            && s.pause == 0
+            && s.mode != 0
+            && !dialog
+            && self.evo_handover(k, rand)
+        {
+            return;
+        }
+        let s = &mut self.slots[k];
+        if s.waiting {
+            return;
+        }
+        if !s.queued && s.next.is_none() {
+            if s.state.end == -1 {
+                s.shown = false;
+            } else {
+                s.frame = s.first;
+                if s.state.end != 0 {
+                    s.last = s.state.end;
+                }
+            }
+            return;
+        }
+        s.shown = false;
+        if let Some(j) = s.next {
+            let sj = &mut self.slots[j];
+            sj.shown = true;
+            sj.frame = sj.first;
+            if !sj.chain {
+                sj.next = None;
+                sj.queued = false;
+            }
+            sj.restart_clock(now);
+        }
+    }
+
+    /// The 2004 hand-over FUN_0043b420(k): nothing (0) when k has a
+    /// successor or its state's weight (+0x10) is below 1. Candidates: the
+    /// slots of k's entity whose state weight is above 0 (more than 16:
+    /// log `MAX_ANIM`); every other slot whose state weight is 0 gets the
+    /// play limit 1. A candidate without a limit gets 1 when the weights
+    /// sum below 100, −1 (none) when alone, else −1 for the first of the
+    /// largest weight and 1 for the others. Then `r = rand() % 100` along
+    /// the weights (which never change): the slot drawn is k → a play
+    /// more (none past its limit: the draw goes on as if it had missed);
+    /// another j → queued as k's successor (k plays on to its file's end
+    /// first: answer 1 when it was not there yet), j at frame 0 with its
+    /// last frame and a play more. The slot drawn: no pause, mode 1.
+    /// Nothing drawn (weights below 100): k pauses for a play's length
+    /// (count := last, pausing, mode 0); with 100 or more, the first
+    /// candidate other than k is queued as above (no pause). The weights
+    /// and limits here are the WAM's; the cabin's are 100 or 0.
+    fn evo_handover(&mut self, k: usize, rand: &mut dyn FnMut() -> i32) -> bool {
+        if self.slots[k].next.is_some() || evo_state::weight(&self.slots[k].state) < 1 {
+            return false;
+        }
+        let (kind, id) = (self.slots[k].kind, self.slots[k].id);
+        let mut cands: Vec<(usize, i32)> = Vec::new();
+        let (mut total, mut best, mut best_w) = (0, 0, 0);
+        for j in 0..self.slots.len() {
+            let w = evo_state::weight(&self.slots[j].state);
+            let s = &mut self.slots[j];
+            if s.kind == kind && s.id == id && w > 0 {
+                total += s.weight;
+                if best_w < s.weight {
+                    best_w = s.weight;
+                    best = cands.len();
+                }
+                cands.push((j, s.weight));
+                if cands.len() > 16 {
+                    log::error!("!!! Erreur !!! MAX_ANIM");
+                }
+            } else if w == 0 {
+                s.max_reps = 1;
+            }
+        }
+        let n = cands.len();
+        for (i, &(j, _)) in cands.iter().enumerate() {
+            let s = &mut self.slots[j];
+            if s.max_reps == 0 {
+                s.max_reps = if total < 100 || (n > 1 && i != best) {
+                    1
+                } else {
+                    -1
+                };
+            }
+        }
+        if n == 0 {
+            return false;
+        }
+        let mut r = rand() % 100;
+        let mut chosen = false;
+        let mut result = false;
+        for &(j, w) in &cands {
+            if chosen || w <= r {
+                if !chosen {
+                    r -= w;
+                }
+                self.slots[j].reps = 0;
+                continue;
+            }
+            chosen = true;
+            if j == k {
+                let s = &mut self.slots[k];
+                if s.max_reps == -1 {
+                    s.reps = 0;
+                } else if s.reps < s.max_reps {
+                    s.reps += 1;
+                } else {
+                    chosen = false;
+                    r -= w;
+                    s.reps = 0;
+                    continue;
+                }
+            } else {
+                result |= self.queue_successor(k, j);
+                let sj = &mut self.slots[j];
+                if !sj.chain {
+                    sj.next = None;
+                    sj.queued = false;
+                }
+            }
+            let sj = &mut self.slots[j];
+            sj.pause = 0;
+            sj.waiting = false;
+            sj.mode = 1;
+        }
+        if chosen {
+            return result;
+        }
+        if total >= 100 {
+            if let Some(&(j, _)) = cands.iter().find(|c| c.0 != k) {
+                result |= self.queue_successor(k, j);
+                let sj = &mut self.slots[j];
+                sj.next = None;
+                sj.queued = false;
+                return result;
+            }
+        }
+        let s = &mut self.slots[k];
+        s.pause = s.last;
+        s.waiting = true;
+        s.mode = 0;
+        result
+    }
+
+    /// The hand-over's queueing of j after k (FUN_0043b420
+    /// @ 0x0043b5e1..0x0043b672, again @ 0x0043b744..0x0043b7d4): k plays on to its
+    /// file's end (true when it was not there yet: frame := last), queued
+    /// with successor j; j at frame 0, last = state end − 1 (the file's
+    /// count for 0), a play more unless it has no limit.
+    fn queue_successor(&mut self, k: usize, j: usize) -> bool {
+        let sk = &mut self.slots[k];
+        let mut result = false;
+        if sk.last != sk.count {
+            sk.frame = sk.last;
+            sk.last = sk.count;
+            result = true;
+        }
+        sk.queued = true;
+        sk.next = Some(j);
+        let sj = &mut self.slots[j];
+        sj.frame = 0;
+        sj.last = if sj.state.end == 0 {
+            sj.count
+        } else {
+            sj.state.end - 1
+        };
+        if sj.max_reps == -1 {
+            sj.reps = 0;
+        } else {
+            sj.reps += 1;
+        }
+        result
     }
 
     /// The place-sprite hit test of the sprite pass (@ 0x00440bf0 →

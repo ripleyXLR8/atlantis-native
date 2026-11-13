@@ -165,9 +165,13 @@ fn pawns(h: &mut Hx) {
                 &mut g.spw_cache,
                 &e,
                 s,
+                // The record's place: read by the 2004 program's loader
+                // only.
+                (usize::MAX, n),
                 &name,
                 folder,
                 &mut || queue.pop_front().unwrap_or_else(|| rand.rand()),
+                g.now,
                 &|id, kind| {
                     shown
                         .iter()

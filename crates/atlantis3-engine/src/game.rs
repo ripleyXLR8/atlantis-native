@@ -2019,7 +2019,7 @@ impl Game {
             // Tests: the harnesses' stub of @ 0x00440690.
             self.screen.clear();
             self.tr(|| "warp=flat".into());
-            if std::mem::take(&mut self.anim_tick) {
+            if std::mem::take(&mut self.anim_tick) || self.slots.evolution {
                 self.slots.step(self.now, &mut self.rand);
             }
             return true;
@@ -2038,8 +2038,10 @@ impl Game {
             .texel_a3(self.camera.cx, self.camera.cy)
             .and_then(|(f, u, v)| self.slots.hit(f, u, v))
             .map(|(k, kind)| (self.slots.slots[k].click, kind));
-        // The animations' step, once per 15 Hz tick (@ 0x00439c90).
-        if std::mem::take(&mut self.anim_tick) {
+        // The animations' step, once per 15 Hz tick (@ 0x00439c90); the
+        // 2004 program's at the end of every warp draw (FUN_00444870
+        // @ 0x00444917, FUN_0043b0a0: no 15 Hz gate).
+        if std::mem::take(&mut self.anim_tick) || self.slots.evolution {
             self.slots.step(self.now, &mut self.rand);
         }
         // The renderer leaves the control word 0x0e7f.
