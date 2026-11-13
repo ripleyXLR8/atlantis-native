@@ -80,6 +80,7 @@ pub mod catapulte;
 pub mod defender;
 pub mod frogger;
 pub mod hanoi;
+pub mod pong;
 pub mod sim;
 pub mod tron;
 
@@ -259,6 +260,14 @@ pub trait Host {
         false
     }
     fn set_right_click(&mut self, _on: bool) {}
+    /// The pointer's last vertical motion (the float 0x006e9fe4): the
+    /// mouse-move handler @ 0x0042df60 stores the event's vertical delta
+    /// (0x0071a86c, `fild` / `fstp`) before moving the pointer; Pong reads
+    /// it and clears it (@ 0x0049bcdc, @ 0x0049bdb5).
+    fn mouse_dy(&self) -> f32 {
+        0.0
+    }
+    fn set_mouse_dy(&mut self, _dy: f32) {}
 }
 
 /// The key code of a virtual key (the table 0x0071b0d8): the codes'
@@ -305,6 +314,7 @@ pub fn init(id: PuzzleId, host: &mut dyn Host) -> Option<Box<dyn Puzzle>> {
         PuzzleId::Defender => Some(Box::new(defender::Defender::init(host))),
         PuzzleId::Frogger => Some(Box::new(frogger::Frogger::init(host))),
         PuzzleId::Hanoi => Some(Box::new(hanoi::Hanoi::init(host))),
+        PuzzleId::Pong => Some(Box::new(pong::Pong::init(host))),
         PuzzleId::Tron => Some(Box::new(tron::Tron::init(host))),
         _ => None,
     }

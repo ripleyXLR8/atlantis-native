@@ -24,7 +24,7 @@ pub struct SimHost {
     /// MSVC's `rand` state.
     pub seed: u32,
     /// The pointer's vertical motion (0x006e9fe4).
-    pub mouse_dy: i32,
+    pub mouse_dy: f32,
     surface: Option<Surface>,
 }
 
@@ -99,5 +99,11 @@ impl Host for SimHost {
     }
     fn set_key_code(&mut self, code: i32) {
         self.key_code = code;
+    }
+    fn mouse_dy(&self) -> f32 {
+        self.mouse_dy
+    }
+    fn set_mouse_dy(&mut self, dy: f32) {
+        self.mouse_dy = dy;
     }
 }

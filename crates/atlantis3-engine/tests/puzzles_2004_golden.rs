@@ -6,6 +6,7 @@
 //!
 //! `cd2004_catapulte.txt`: `a4cd_catapulte.py` (FUN_00484180).
 //! `cd2004_defender.txt`: `a4cd_defender.py` (FUN_00487460).
+//! `cd2004_pong.txt`: `a4cd_pong.py` (FUN_0049b9a0).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -13,6 +14,7 @@ use std::sync::Arc;
 use atlantis3_data::spr::Bank;
 use atlantis3_engine::puzzles2004::catapulte::{Catapulte, State};
 use atlantis3_engine::puzzles2004::defender;
+use atlantis3_engine::puzzles2004::pong::Pong;
 use atlantis3_engine::puzzles2004::{Host, Puzzle};
 use atlantis3_engine::px::Surface;
 
@@ -25,6 +27,7 @@ pub struct Mock {
     pub right_click: bool,
     pub keys: [bool; 256],
     pub key_code: i32,
+    pub mouse_dy: f32,
     pub seed: u32,
     pub vars: HashMap<String, i32>,
     pub flags: Vec<i32>,
@@ -42,6 +45,7 @@ impl Mock {
             right_click: false,
             keys: [false; 256],
             key_code: 0,
+            mouse_dy: 0.0,
             seed,
             vars: HashMap::new(),
             flags: vec![0; 1000],
@@ -122,6 +126,12 @@ impl Host for Mock {
     }
     fn set_right_click(&mut self, on: bool) {
         self.right_click = on;
+    }
+    fn mouse_dy(&self) -> f32 {
+        self.mouse_dy
+    }
+    fn set_mouse_dy(&mut self, dy: f32) {
+        self.mouse_dy = dy;
     }
 }
 
@@ -394,4 +404,124 @@ fn defender_frames() {
         assert_eq!(g, w, "line {i}");
     }
     assert_eq!(got.len(), want.len());
+}
+
+fn pong_dump(g: &Pong, m: &Mock, tag: &str) -> String {
+    let v = |n: &str| m.vars.get(n).copied().unwrap_or(0);
+    format!(
+        "{tag} ball={},{} vel={},{} pad={},{} spd={},{} hp={},{},{}/{},{},{} arm={}{}{} t={},{},{} gods={} ko={} regrow={} fast={} ready={} delay={} mdy={} vars={},{},{},{},{}",
+        bits(g.ball.0),
+        bits(g.ball.1),
+        bits(g.vel.0),
+        bits(g.vel.1),
+        bits(g.segs[0].p.1),
+        bits(g.segs[1].p.1),
+        bits(g.speeds[0]),
+        bits(g.speeds[1]),
+        g.player.0,
+        g.cpu.0,
+        g.sarco.0,
+        g.segs[2].hp,
+        g.segs[3].hp,
+        g.segs[4].hp,
+        u8::from(g.player.1),
+        u8::from(g.cpu.1),
+        u8::from(g.sarco.1),
+        bits(g.player.2),
+        bits(g.cpu.2),
+        bits(g.sarco.2),
+        g.gods,
+        u8::from(g.knocked),
+        bits(g.regrow),
+        u8::from(g.fast),
+        u8::from(g.cpu_ready),
+        bits(g.cpu_delay),
+        bits(m.mouse_dy),
+        v("PONG_GAGNE"),
+        v("PONG_PERDU"),
+        v("PONG_FRAPPE_SARCOPHAGE"),
+        v("PONG_SAMA_DESACTIVE"),
+        v("PONG_KAMA_DESACTIVE"),
+    )
+}
+
+/// `a4cd_pong.py`'s player and frame times, replayed on the port:
+/// "player", the whole game (three rounds) to `PONG_GAGNE`; "idle", the
+/// paddle left alone to `PONG_PERDU`.
+#[test]
+fn pong_game() {
+    for (name, want) in golden("cd2004_pong.txt") {
+        pong_scenario(&name, &want, name == "idle");
+    }
+}
+
+fn pong_scenario(name: &str, want: &[String], idle: bool) {
+    const TIMES: [f32; 13] = [
+        0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.033, 0.07, 0.013, 0.004,
+    ];
+    const OFFSETS: [i32; 11] = [0, -30, 30, -44, 44, -58, 58, -10, 15, -65, 62];
+    let mut m = Mock::new(4242);
+    let mut g = Pong::new();
+    let mut got = vec![pong_dump(&g, &m, "init")];
+    let (mut py, mut returns, mut coming) = (300i32, 0usize, false);
+    for k in 0..40000 {
+        let dt = TIMES[k % TIMES.len()];
+        let (bx, by) = g.ball;
+        let vx = g.vel.0;
+        let (mut key, mut mdy) = (0, 0);
+        if vx < 0.0 && !coming {
+            coming = true;
+        }
+        if vx > 0.0 && coming {
+            coming = false;
+            returns += 1;
+        }
+        let off = OFFSETS[returns % OFFSETS.len()];
+        let target = f64::from(by) + f64::from(off) - 50.0;
+        let pad = f64::from(g.segs[0].p.1);
+        if vx < 0.0 && bx < 520.0 && !idle {
+            if returns % 7 == 6 {
+                if target > pad + 8.0 {
+                    key = 0x72;
+                } else if target < pad - 8.0 {
+                    key = 0x6d;
+                }
+            } else {
+                // Python's round: half to even.
+                let want = ((target * 600.0 / 500.0).round_ties_even() as i32).clamp(0, 599);
+                if want != py {
+                    mdy = want - py;
+                    py = want;
+                }
+            }
+        }
+        m.frame_t = dt;
+        m.key_code = key;
+        m.pointer.1 = py;
+        if mdy != 0 {
+            m.mouse_dy = mdy as f32;
+        }
+        g.frame(&mut m);
+        let over = m.vars.get("PONG_GAGNE").copied().unwrap_or(0) != 0
+            || m.vars.get("PONG_PERDU").copied().unwrap_or(0) != 0;
+        if k % 10 == 0 || !m.log.is_empty() || over {
+            got.append(&mut m.log);
+            got.push(pong_dump(
+                &g,
+                &m,
+                &format!(
+                    "{k:05} dt={:08x} key={key:x} py={py} mdy={mdy}",
+                    dt.to_bits()
+                ),
+            ));
+        }
+        if over {
+            got.push("end".to_string());
+            break;
+        }
+    }
+    for (i, (g, w)) in got.iter().zip(want.iter()).enumerate() {
+        assert_eq!(g, w, "{name}: line {i}");
+    }
+    assert_eq!(got.len(), want.len(), "{name}");
 }

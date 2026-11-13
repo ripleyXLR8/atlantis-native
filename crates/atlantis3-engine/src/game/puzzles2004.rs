@@ -31,6 +31,8 @@ pub(crate) struct State {
     /// (0x006e9e71).
     pub key_code: i32,
     pub key_ctrl: bool,
+    /// The pointer's last vertical motion (0x006e9fe4).
+    pub mouse_dy: f32,
 }
 
 impl Default for State {
@@ -44,6 +46,7 @@ impl Default for State {
             keys: Box::new([false; 256]),
             key_code: 0,
             key_ctrl: false,
+            mouse_dy: 0.0,
         }
     }
 }
@@ -150,6 +153,8 @@ impl Game {
     /// The free pointer while a game runs: clamped to the stretch
     /// surface (@ 0x0042dfc2..0x0042e00f).
     pub(crate) fn puzzle_pointer_2004(&mut self, dx: i32, dy: i32) {
+        // The event's vertical delta kept as a float (@ 0x0042df73..7d).
+        self.puzzles2004.mouse_dy = dy as f32;
         let (w, h) = if self.puzzles2004.surface.is_some() {
             (pz::WIDTH as i32, pz::HEIGHT as i32)
         } else {
@@ -407,6 +412,12 @@ impl Host for Cx<'_> {
         self.g.right_clicked
     }
 
+    fn mouse_dy(&self) -> f32 {
+        self.g.puzzles2004.mouse_dy
+    }
+    fn set_mouse_dy(&mut self, dy: f32) {
+        self.g.puzzles2004.mouse_dy = dy;
+    }
     fn set_right_click(&mut self, on: bool) {
         self.g.right_clicked = on;
     }
