@@ -346,6 +346,24 @@ impl Script {
             host.turn_now(yaw, a);
             return Some(next);
         }
+        if self.evolution_2004
+            && (key == k.limiteanglewarpx
+                || is(self, "LIMITEANGLEWARPXMIN")
+                || is(self, "LIMITEANGLEWARPXMAX"))
+        {
+            // The 2004 program (@ 0x0044dd26..0x0044de2c), 999 → −1:
+            // `LIMITEANGLEWARPX=v` sets X := v, XMIN := −v, XMAX := v;
+            // `LIMITEANGLEWARPXMIN=v` / `..XMAX=v` set that bound and X := v.
+            let v = if value == 999 { -1 } else { value };
+            self.vars[key] = v;
+            if key == k.limiteanglewarpx {
+                self.set_var("LIMITEANGLEWARPXMIN", -v);
+                self.set_var("LIMITEANGLEWARPXMAX", v);
+            } else {
+                self.vars[k.limiteanglewarpx] = v;
+            }
+            return Some(next);
+        }
         if key == k.limiteanglewarpx || key == k.limiteanglewarpy {
             self.vars[key] = if value == 999 { -1 } else { value };
             return Some(next);

@@ -2086,6 +2086,12 @@ impl Game {
         self.look_acc = fpu.f32(fpu.add(f64::from(self.look_acc), fpu.mul(dt, 25.0)));
         if let Some(s) = self.script.as_ref() {
             self.look.limit_x = s.vars[s.keys.limiteanglewarpx];
+            if self.files.is_evolution_2004() {
+                self.look.limit_x_range = Some((
+                    s.var("LIMITEANGLEWARPXMIN").unwrap_or(0),
+                    s.var("LIMITEANGLEWARPXMAX").unwrap_or(0),
+                ));
+            }
             self.look.limit_y = s.vars[s.keys.limiteanglewarpy];
         }
         let (w, h) = (self.width as u32, self.height as u32);

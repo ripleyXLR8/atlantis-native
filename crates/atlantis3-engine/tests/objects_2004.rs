@@ -490,3 +490,28 @@ fn createsuj_and_enablesuj() {
     g.run_command("(enablesuj=MIRANDA,MONSTRE)");
     assert_eq!(list(&g)[before], (monstre, 1));
 }
+
+/// The 2004 yaw limits' keys (@ 0x0044dd26..0x0044de2c): `X=v` sets the
+/// bounds ∓v; `XMIN` / `XMAX` set their bound and X; 999 is −1.
+#[test]
+fn the_yaw_limit_keys() {
+    let Some((mut g, _)) = cabin() else {
+        return;
+    };
+    let v = |g: &Game| {
+        let s = g.script().unwrap();
+        [
+            s.var("LIMITEANGLEWARPX").unwrap(),
+            s.var("LIMITEANGLEWARPXMIN").unwrap(),
+            s.var("LIMITEANGLEWARPXMAX").unwrap(),
+        ]
+    };
+    g.run_command("(limiteanglewarpx=40)");
+    assert_eq!(v(&g), [40, -40, 40]);
+    g.run_command("(limiteanglewarpxmin=30)");
+    assert_eq!(v(&g), [30, 30, 40]);
+    g.run_command("(limiteanglewarpxmax=150)");
+    assert_eq!(v(&g), [150, 30, 150]);
+    g.run_command("(limiteanglewarpx=999)");
+    assert_eq!(v(&g), [-1, 1, -1]);
+}
