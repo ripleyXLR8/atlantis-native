@@ -4574,6 +4574,30 @@ impl Host for Game {
         self.disable_warp_2004(disable);
     }
 
+    fn change_click_kind_2004(&mut self, id: i32, kind: i32, click: i32) {
+        // FUN_00466690: each slot of (id, kind): its state record's +0x18
+        // (the WAM's, kept for the next view entries) and its own +0x18.
+        for k in 0..self.slots.slots.len() {
+            let s = &mut self.slots.slots[k];
+            if s.id != id || s.kind != kind {
+                continue;
+            }
+            s.click = click;
+            s.state.click = click;
+            let (e, r) = s.rec;
+            if let Some(w) = self
+                .place
+                .wam
+                .entities
+                .get_mut(e)
+                .and_then(|e| e.states.get_mut(r))
+                .and_then(|w| w.get_mut(6))
+            {
+                *w = click as u32;
+            }
+        }
+    }
+
     fn stop_sound_2004(&mut self, name: &str) {
         self.stop_sound_2004_name(name);
     }

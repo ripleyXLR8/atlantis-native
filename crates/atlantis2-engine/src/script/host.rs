@@ -346,6 +346,11 @@ pub trait Host {
     /// toggles every zone of that name in the place's views.
     fn zone_by_name_2004(&mut self, name: &str, on: bool) {}
 
+    /// The 2004 `CHANGETYPEOBJET=NAME,n` (@ 0x0044db19): FUN_00466690
+    /// gives every place-animation slot of (id, kind) and its WAM state
+    /// record (`+0x18`) the click kind n.
+    fn change_click_kind_2004(&mut self, id: i32, kind: i32, click: i32) {}
+
     /// The 2004 `DISABLEWARP=n` (@ 0x0044f76e..0x0044f789): FUN_00442030
     /// enables (n = 0) or disables (n ≠ 0) every zone of the current view.
     fn disable_warp_2004(&mut self, disable: bool) {}

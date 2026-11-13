@@ -515,3 +515,27 @@ fn the_yaw_limit_keys() {
     g.run_command("(limiteanglewarpx=999)");
     assert_eq!(v(&g), [-1, 1, -1]);
 }
+
+/// `CHANGETYPEOBJET=NAME,n` (FUN_00466690): the object's slots and their
+/// WAM state records get the click kind n (chapi006 / chapi007 make the
+/// helmets clickable as objects to take or `CLICOBJET`).
+#[test]
+fn changetypeobjet() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    to_view_2(&mut g, &mut t);
+    let ferme = object(&g, "MALLE_FERME");
+    let clicks = |g: &Game| -> Vec<i32> {
+        g.slots()
+            .slots
+            .iter()
+            .filter(|s| s.kind == 2 && s.id == ferme)
+            .map(|s| s.click)
+            .collect()
+    };
+    assert!(!clicks(&g).is_empty());
+    assert!(clicks(&g).contains(&3), "{:?}", clicks(&g));
+    g.run_command("(changetypeobjet=MALLE_FERME,4)");
+    assert!(clicks(&g).iter().all(|&c| c == 4), "{:?}", clicks(&g));
+}

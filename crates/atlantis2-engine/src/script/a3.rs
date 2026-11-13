@@ -462,6 +462,15 @@ impl Script {
                 host.zone_by_name_2004(name, is(self, "ENABLEZONE"));
                 return Some(next);
             }
+            if is(self, "CHANGETYPEOBJET") {
+                // @ 0x0044db19..0x0044db50: the `#OBJETS#` id, `atoi`
+                // after the comma, FUN_00466690(id, 2, n).
+                let id = self.id(defnames::OBJETS, src, p + 1);
+                let i = self.after_comma(src, p);
+                let n = self.atoi_at(src, i);
+                host.change_click_kind_2004(id, 2, n);
+                return Some(next);
+            }
             if is(self, "DISABLEWARP") {
                 // @ 0x0044f76e..0x0044f789: FUN_00442030(value == 0).
                 host.disable_warp_2004(value != 0);
