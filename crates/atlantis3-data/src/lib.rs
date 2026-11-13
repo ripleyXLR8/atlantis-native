@@ -44,6 +44,7 @@ pub mod db;
 pub mod dialog;
 pub mod evolution2004;
 pub mod evolution2004_cfg;
+pub mod evolution2004_dialog;
 pub mod evolution2004_film;
 pub mod evolution2004_jp6;
 pub mod evolution2004_mls;

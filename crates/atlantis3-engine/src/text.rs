@@ -461,15 +461,36 @@ pub struct Texts {
 impl Texts {
     pub fn load(files: &atlantis3_data::A3Files, language: &str) -> Texts {
         let strip = |p: &str| p.trim_start_matches("Datas/").to_string();
-        let glyphs = files
-            .read(&strip(atlantis3_data::font_txt::TTF_PATH))
-            .and_then(Glyphs::new);
+        // The 2004 program's font and its `font.txt` are in the text
+        // language's folder: FUN_0041f270 builds `loc\text\<SousTitre>\`
+        // + `Atlantis` (0x006add08) through FUN_00419880, then
+        // `%s%s.ttf` (0x006adcfc, @ 0x0041f32a) with the current
+        // directory, and `loc\text\<SousTitre>\font.txt` (0x006adcf0,
+        // @ 0x0041f3f0).
+        let (ttf, font_txt) = if files.is_evolution_2004() {
+            (
+                format!("loc/text/{language}/Atlantis.ttf"),
+                format!("loc/text/{language}/font.txt"),
+            )
+        } else {
+            (
+                strip(atlantis3_data::font_txt::TTF_PATH),
+                strip(atlantis3_data::font_txt::FONT_TXT_PATH),
+            )
+        };
+        let glyphs = files.read(&ttf).and_then(Glyphs::new);
         if glyphs.is_none() {
             log::warn!("font\\Atlantis.ttf missing: no text drawn");
         }
         let fonts = files
-            .read(&strip(atlantis3_data::font_txt::FONT_TXT_PATH))
-            .map(|d| atlantis3_data::font_txt::FontTxt::parse(&d))
+            .read(&font_txt)
+            .map(|d| {
+                if files.is_evolution_2004() {
+                    atlantis3_data::font_txt::FontTxt::parse_2004(&d)
+                } else {
+                    atlantis3_data::font_txt::FontTxt::parse(&d)
+                }
+            })
             .unwrap_or_default();
         let dial = files
             .read(&strip(&atlantis3_data::dialog::dial_path(language)))

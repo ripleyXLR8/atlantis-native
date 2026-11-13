@@ -38,6 +38,7 @@ use std::collections::{BTreeMap, HashMap};
 
 mod board;
 mod credits;
+mod dialog2004;
 mod film;
 mod frame_tab;
 mod hooks;
@@ -48,6 +49,7 @@ mod subtitles;
 
 pub use board::BoardInput;
 pub use credits::{Credits, Print};
+pub use dialog2004::DialogMedia2004;
 #[doc(hidden)]
 pub use hooks::star_room_tables;
 pub use hooks::Screen;
@@ -237,6 +239,12 @@ pub struct Game {
     /// and the `#CINEMATIQUES#` names ([`film`]).
     film: Option<film::FilmPlaying>,
     film_sound: Option<crate::film2004::FilmSound>,
+    /// The 2004 program's dialog running (`AtlDial`, 0x006e6f5c), its
+    /// data (read at the first `DIAL`) and the player perso (`PLAYERNAME`,
+    /// 0x006e6f40).
+    dialog2004: Option<dialog2004::Dialog2004>,
+    dialogs2004: Option<atlantis3_data::evolution2004_dialog::Dialogs2004>,
+    player_2004: String,
     film_percent: f32,
     cinematiques: atlantis3_data::evolution2004_film::Cinematiques,
     /// The 2004 program's `#SONS#` (`PLAYSOUND`'s files).
@@ -493,6 +501,9 @@ impl Game {
             video: None,
             film: None,
             film_sound: None,
+            dialog2004: None,
+            dialogs2004: None,
+            player_2004: atlantis3_data::evolution2004_dialog::DEFAULT_PLAYER.to_string(),
             // The data's 100.0 (0x006ac080).
             film_percent: 100.0,
             cinematiques,
@@ -1621,6 +1632,7 @@ impl Game {
                 }
             }
             Mode::Inventory | Mode::Subjects => self.overlay_frame(),
+            Mode::Dialog if self.dialog2004.is_some() => self.dialog_frame_2004(),
             Mode::Dialog => self.dialog_frame(),
             Mode::Menu => self.menu_frame(),
             Mode::Screen => self.screen_frame(),
@@ -1908,6 +1920,10 @@ impl Game {
             self.with_script(|s, h| {
                 s.dialog_ended(h);
             });
+        }
+        // The 2004 program's light dialog (FUN_00476320 @ 0x00443db6).
+        if self.dialog2004.is_some() {
+            self.light_dialog_2004();
         }
         // 1. The step: 25 Hz ticks of the look or the turn, the centre pick.
         self.warp_step();
@@ -4192,6 +4208,14 @@ impl Host for Game {
         }
         self.look.stop();
         self.centre = self.pick_centre();
+    }
+
+    fn dial_2004(&mut self, line: &[u8]) {
+        Game::dial_2004(self, line);
+    }
+
+    fn player_name_2004(&mut self, name: &str) {
+        Game::player_name_2004(self, name);
     }
 
     fn tangage_warp_2004(&mut self, v: i32, n: [i32; 6]) {

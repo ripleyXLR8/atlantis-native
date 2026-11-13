@@ -235,6 +235,16 @@ impl<D: AsRef<[u8]>> BinkVideo<D> {
         self.next
     }
 
+    /// To key frame `frame` (0-based): the next frame decoded is that one,
+    /// decoded from the state the track has (a key frame does not use the
+    /// previous frame: ScummVM's `BinkDecoder::seekIntern` decodes from
+    /// one as it is). Nothing when `frame` is no key frame.
+    pub fn seek_key_frame(&mut self, frame: u32) {
+        if self.is_key_frame(frame) {
+            self.next = frame;
+        }
+    }
+
     /// Back to before the first frame (`rewind`).
     pub fn rewind(&mut self) {
         self.track.rewind();

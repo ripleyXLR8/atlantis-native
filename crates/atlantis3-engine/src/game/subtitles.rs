@@ -111,6 +111,10 @@ impl Game {
 
     /// The flip's texts (@ 0x0040de60) drawn on the screen.
     pub(crate) fn flip_texts(&mut self) {
+        // The 2004 program's dialog line first (@ 0x0041298d..0x0041299b).
+        if self.dialog2004.is_some() {
+            self.dialog_text_2004();
+        }
         let plan = self.flip_plan();
         if plan.is_empty() {
             return;

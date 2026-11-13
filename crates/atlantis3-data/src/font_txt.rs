@@ -146,6 +146,54 @@ impl FontTxt {
         FontTxt { fonts }
     }
 
+    /// Reads *Atlantis Evolution*'s 2004 `loc\text\<SousTitre>\font.txt`
+    /// (atlantis4-cd-en-3022848 FUN_0041f270 @ 0x0041f3f0..0x0042038a):
+    /// lines read by the shared reader, a line starting with `'` skipped
+    /// (@ 0x0041f484, @ 0x0041fd88); `[Font]` (0x006adc0c) opens a font
+    /// whose lines, up to `[EndFont]` (0x006adc00), are `<key> <value>`:
+    /// `NameID` (the id), `Name` (the TrueType file), `Type` (0x006adbc0,
+    /// the face), `Height` and `Width` (`atoi`), `Weight` (default
+    /// `FW_NORMAL`, 0x006ada3c), `Italic` (the word lower-cased equal to
+    /// `true`, 0x006ac8f0), `Charset` (default `DEFAULT_CHARSET`,
+    /// 0x006adb9c); then the font is made (FUN_0041e480 @ 0x0042038a).
+    /// `[PartitionCode]`, `[PartitionMode]` and `[PartitionOptions]` (the
+    /// line breaking) are not kept here.
+    pub fn parse_2004(data: &[u8]) -> FontTxt {
+        let mut file = Reader::new(data);
+        let mut fonts = Vec::new();
+        while !file.at_end() {
+            let line = file.line();
+            if line.first() == Some(&b'\'') || Reader::new(line).word() != b"[Font]" {
+                continue;
+            }
+            let mut f = FontDef {
+                weight_name: "FW_NORMAL".into(),
+                charset_name: "DEFAULT_CHARSET".into(),
+                ..FontDef::default()
+            };
+            while !file.at_end() {
+                let line = file.line();
+                if line.first() == Some(&b'\'') {
+                    continue;
+                }
+                let mut w = Reader::new(line);
+                match w.word() {
+                    b"[EndFont]" => break,
+                    b"NameID" => f.id = latin1(w.word()),
+                    b"Type" => f.face = latin1(w.word()),
+                    b"Height" => f.height = atoi(w.word()),
+                    b"Width" => f.width = atoi(w.word()),
+                    b"Weight" => f.weight_name = latin1(w.word()),
+                    b"Italic" => f.italic = lower(w.word()) == b"true",
+                    b"Charset" => f.charset_name = latin1(w.word()),
+                    _ => {}
+                }
+            }
+            fonts.push(f);
+        }
+        FontTxt { fonts }
+    }
+
     /// The font `id`: the last line with that id.
     pub fn font(&self, id: &str) -> Option<&FontDef> {
         self.fonts.iter().rev().find(|f| f.id == id)
@@ -155,6 +203,23 @@ impl FontTxt {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fonts_2004() {
+        let t = FontTxt::parse_2004(
+            b"' c\r\n[PartitionCode]\t0x20\r\n[Font]\r\nNameID\tAtlFont_Default \r\n\
+Name\tAtlantis.ttf\r\nType\tArial\r\nHeight\t21\r\nWidth\t0\r\n' x\r\nItalic\tTRUE\r\n\
+[EndFont]\r\n[Font]\r\nNameID F_B\r\nWeight FW_BOLD\r\nCharset ANSI_CHARSET\r\n[EndFont]\r\n",
+        );
+        assert_eq!(t.fonts.len(), 2);
+        let f = t.font("AtlFont_Default").unwrap();
+        assert_eq!((f.face.as_str(), f.height, f.width), ("Arial", 21, 0));
+        assert!(f.italic);
+        assert_eq!(f.weight_name, "FW_NORMAL");
+        assert_eq!(f.charset_name, "DEFAULT_CHARSET");
+        let b = t.font("F_B").unwrap();
+        assert_eq!((b.weight(), b.charset_name.as_str()), (700, "ANSI_CHARSET"));
+    }
 
     #[test]
     fn fonts() {
