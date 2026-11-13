@@ -241,6 +241,13 @@ pub struct Game {
     /// and the `#CINEMATIQUES#` names ([`film`]).
     film: Option<film::FilmPlaying>,
     film_sound: Option<crate::film2004::FilmSound>,
+    /// The cine-in or cine-out running (0x006e01f0 / 0x006e01f4), the
+    /// cine-in and cine-out wanted (0x006e01e8 / 0x006e01ec, set by every
+    /// `CINEMA=`) and Escape / Space in loop mode 5 (0x006e9e70).
+    film_cine: Option<film::Cine>,
+    film_cine_in: bool,
+    film_cine_out: bool,
+    film_skip_key: bool,
     /// The 2004 program's dialog running (`AtlDial`, 0x006e6f5c), its
     /// data (read at the first `DIAL`) and the player perso (`PLAYERNAME`,
     /// 0x006e6f40).
@@ -513,6 +520,10 @@ impl Game {
             video: None,
             film: None,
             film_sound: None,
+            film_cine: None,
+            film_cine_in: false,
+            film_cine_out: false,
+            film_skip_key: false,
             dialog2004: None,
             dialogs2004: None,
             player_2004: atlantis3_data::evolution2004_dialog::DEFAULT_PLAYER.to_string(),
@@ -1077,6 +1088,7 @@ impl Game {
     pub fn new_game(&mut self) -> bool {
         self.video = None;
         self.film = None;
+        self.film_cine = None;
         self.film_sound = None;
         self.audio.stop(CHANNEL_CINEMA);
         self.mode = Mode::Warp;
@@ -1095,8 +1107,8 @@ impl Game {
         // The 2004 program's keyboard callback: Escape (scan code 1) or
         // Space (0x39) in loop mode 5 sets 0x006e9e70 (@ 0x0042c504..
         // 0x0042c51b), which the film's loop reads.
-        if let Some(f) = self.film.as_mut() {
-            f.skip_key = true;
+        if self.film_running_2004() {
+            self.film_skip_key = true;
             return;
         }
         if self.video.as_ref().is_some_and(|v| !v.travel) {
@@ -1666,7 +1678,7 @@ impl Game {
             Mode::Screen => self.screen_frame(),
             Mode::Idle => {}
         }
-        if self.logos_2004.is_some() && self.film.is_none() {
+        if self.logos_2004.is_some() && !self.film_running_2004() {
             self.next_logo_2004();
         }
         // The main loop's per-frame place part, after the mode's frame
@@ -1771,8 +1783,8 @@ impl Game {
     }
 
     fn video_step(&mut self) {
-        if self.film.is_some() {
-            self.film_step();
+        if self.film_running_2004() {
+            self.film_pass_2004();
             return;
         }
         let Some(v) = self.video.as_mut() else {
@@ -2541,6 +2553,10 @@ impl Game {
                 .find_map(|v| v.destinations.iter().find(|d| d.target == next))
                 .cloned()
         });
+        if self.files.is_evolution_2004() {
+            self.move_film_2004(old, next);
+            return;
+        }
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         // The transition sprites (@ 0x00435a90): per `id_spf` of the
@@ -2551,23 +2567,7 @@ impl Game {
                 .sprites
                 .iter()
                 .filter_map(|name| {
-                    let hidden = self.script.as_ref().is_some_and(|s| {
-                        let id = self
-                            .names
-                            .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
-                            .map(|i| (i as i32, 1))
-                            .or_else(|_| {
-                                self.names
-                                    .id(atlantis2_data::defnames::OBJETS, name.as_bytes())
-                                    .map(|i| (i as i32, 2))
-                            });
-                        id.is_ok_and(|(id, kind)| {
-                            s.shown
-                                .iter()
-                                .any(|r| r.id == id && r.kind == kind && !r.shown)
-                        })
-                    });
-                    if hidden {
+                    if self.transition_hidden(name) {
                         return None;
                     }
                     let e = self
@@ -2598,6 +2598,55 @@ impl Game {
             if self.files.size(&path).is_some() {
                 self.start_video(&path, 15, true, Mode::Warp, spf);
             }
+        }
+    }
+
+    /// Whether the show table hides the transition sprite's entity `name`
+    /// (@ 0x0044b8b0; the 2004 program's FUN_004522b0): its
+    /// `#PERSONNAGES#` id (kind 1), else its `#OBJETS#` id (kind 2), with
+    /// a record not shown.
+    pub(crate) fn transition_hidden(&self, name: &str) -> bool {
+        self.script.as_ref().is_some_and(|s| {
+            let id = self
+                .names
+                .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
+                .map(|i| (i as i32, 1))
+                .or_else(|_| {
+                    self.names
+                        .id(atlantis2_data::defnames::OBJETS, name.as_bytes())
+                        .map(|i| (i as i32, 2))
+                });
+            id.is_ok_and(|(id, kind)| {
+                s.shown
+                    .iter()
+                    .any(|r| r.id == id && r.kind == kind && !r.shown)
+            })
+        })
+    }
+
+    /// The 2004 program's move film (`AtlWarp_continue` FUN_00443cc0
+    /// @ 0x00443fa0..0x004440bd): from a view, the transition sprites
+    /// (FUN_004359b0(old, new)); the move's film name (FUN_00469380(old,
+    /// new): the first view `old` of the WAM with a destination to `new`,
+    /// its `+0x10` text); no double click and `binktraj\<name>`
+    /// (FUN_00418740) existing → FUN_00402a70(film, "", 15, 1, 0): a
+    /// travel film, no cine-in. No WAM's move film is on the CD
+    /// (1,239 names; `binktraj\` holds the cintre's two `CINEMA` films and
+    /// the labyrinth's `la*.bik`) [CONFIRMED-DATA].
+    fn move_film_2004(&mut self, old: Option<u32>, next: u32) {
+        let Some(old) = old else {
+            return;
+        };
+        let Some(d) = crate::travel::destination(&self.place.wam, old, next).cloned() else {
+            return;
+        };
+        if self.double_click || d.video.is_empty() {
+            return;
+        }
+        let path = format!("binktraj/{}", d.video);
+        if self.files.size(&path).is_some() {
+            let spf = self.transition_banks_2004(old, next);
+            self.film_begin_2004(&path, "", 15, true, false, spf);
         }
     }
 

@@ -84,6 +84,7 @@ impl Game {
     pub(super) fn new_game_at_2004(&mut self, chapter: i32) -> bool {
         self.video = None;
         self.film = None;
+        self.film_cine = None;
         self.mode = Mode::Warp;
         let ok = self.with_script(|s, h| {
             s.close_interrupt(h);

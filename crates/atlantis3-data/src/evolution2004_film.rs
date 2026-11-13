@@ -234,7 +234,8 @@ pub struct FilmFiles {
     /// exists (then Bink's own sound plays, @ 0x004026c4).
     pub sound: Option<String>,
     /// The caption file, `loc\text\<SousTitre>\<txt>` (FUN_00419880
-    /// @ 0x004022ec), read by FUN_00401120 when it exists.
+    /// @ 0x004022ec), read by FUN_00401120 when it exists (not for a
+    /// travel film).
     pub caption: String,
 }
 
@@ -266,13 +267,43 @@ impl FilmFiles {
         langue: &str,
         sous_titre: &str,
         loc: bool,
+        exists: impl FnMut(&str) -> bool,
+    ) -> FilmFiles {
+        FilmFiles::resolve_bink(
+            file,
+            &txt_name(file),
+            langue,
+            sous_titre,
+            false,
+            loc,
+            exists,
+        )
+    }
+
+    /// `AtlBink_Start(file, txt, fps, traj, loc)`'s paths (FUN_00401d30
+    /// §3 of the note) with its own cue name `txt` and travel flag `traj`:
+    /// the cue `bink\<txt>` (@ 0x00401db4); a cue found or `loc` → the
+    /// film `locink\<Langue>\<file>` (@ 0x0040213e); else a travel film
+    /// takes `file` as given (the caller's full `binktraj\` path,
+    /// FUN_00418740), else `bink\<file>` (@ 0x00401f85). The caption
+    /// (@ 0x0040232e) is read only when not `traj`. The moves pass an
+    /// empty `txt` (the empty string 0x006e0218, @ 0x00444098): `bink\`
+    /// is a folder, not a file (no cue).
+    pub fn resolve_bink(
+        file: &str,
+        txt: &str,
+        langue: &str,
+        sous_titre: &str,
+        traj: bool,
+        loc: bool,
         mut exists: impl FnMut(&str) -> bool,
     ) -> FilmFiles {
-        let txt = txt_name(file);
         let cue_path = format!("bink/{txt}");
-        let cue = exists(&cue_path).then_some(cue_path);
+        let cue = (!txt.is_empty() && exists(&cue_path)).then_some(cue_path);
         let video = if cue.is_some() || loc {
             format!("loc/bink/{langue}/{file}")
+        } else if traj {
+            file.to_string()
         } else {
             format!("bink/{file}")
         };
@@ -352,5 +383,35 @@ mod tests {
             (f.cue, f.video.as_str(), f.sound),
             (None, "bink/jaws.bik", None)
         );
+    }
+
+    #[test]
+    fn the_travel_paths() {
+        // `CINEMA=TRAJECTOIRE_CINTRE1,..,traj006` (chapi018): the film as
+        // given, its Ogg track beside it.
+        let have = ["binktraj/trajcintre1.ogg"];
+        let f = FilmFiles::resolve_bink(
+            "binktraj/trajcintre1.bik",
+            "trajcintre1.txt",
+            "gbr",
+            "gbr",
+            true,
+            false,
+            |p| have.contains(&p),
+        );
+        assert_eq!(f.cue, None);
+        assert_eq!(f.video, "binktraj/trajcintre1.bik");
+        assert_eq!(f.sound.as_deref(), Some("binktraj/trajcintre1.ogg"));
+        // A move's film: no cue name.
+        let f = FilmFiles::resolve_bink(
+            "binktraj/ka001002.bik",
+            "",
+            "gbr",
+            "gbr",
+            true,
+            false,
+            |p| p == "bink/",
+        );
+        assert_eq!((f.cue, f.video.as_str()), (None, "binktraj/ka001002.bik"));
     }
 }
