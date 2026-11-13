@@ -45,15 +45,23 @@ been checked mostly by automated replays against the original's code and
 by the developer's own play, not yet by many players: reports are
 welcome.
 
-*Atlantis Evolution* (2004) is new in 0.7.0: GOG.com's edition, in its five
+*Atlantis Evolution* (2004) is new in 0.7.0 in GOG.com's edition, in its five
 languages, from the splash screens and the main menu through the whole
 story to the end, with its dialogs, inventory, documents, saves and
-puzzles, its videos and sounds decoded as the original decodes them. Its
-engine is a new one (the GOG.com edition is a Tetraedge Engine program,
-not Cryo's), drawn by the graphics card with OpenGL (or WebGL 2 in the
-browser), or by the processor. It has been checked by automated replays
-of the whole story against the original's scripts and by the developer's
-own play (see [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution)).
+puzzles, its videos and sounds decoded as the original decodes them.
+GOG.com does not sell the 2004 program: its edition is a 2012 version of
+the game on the Tetraedge Engine, not on Cryo's engine, so Atlantis Native
+has a new engine for it, drawn by the graphics card with OpenGL (or WebGL 2
+in the browser), or by the processor. It has been checked by automated
+replays of the whole story against the original's scripts and by the
+developer's own play (see [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution)).
+
+**In progress:** the original 2004 CD program of *Atlantis Evolution*
+(Cryo's own engine, grown from *Atlantis III*'s), on a development branch
+(`a4cd/m0`). Its panoramas, chapter scripts, music, Bink films and the
+ship's pitching already run on the *Atlantis III* engine, each traced
+to the original's code; its menus, dialogs, inventory, saves and
+puzzles do not yet. It is not playable yet and not in the releases.
 
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
