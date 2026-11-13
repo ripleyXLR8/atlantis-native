@@ -23,7 +23,11 @@ fn game() -> Option<Game> {
     let src = Arc::new(Evolution2004Source::new(Arc::new(
         atlantis_data::StdDir::new(&dir),
     )));
-    Some(Game::new(A3Files::evolution_2004(src)).expect("the 2004 program's game"))
+    let mut g = Game::new(A3Files::evolution_2004(src)).expect("the 2004 program's game");
+    // The games seed `rand()` with `srand(time(NULL))` at their start
+    // (Pong @ its init): a fixed clock keeps the scripted plays repeatable.
+    g.unix_time = || 1_794_580_000;
+    Some(g)
 }
 
 /// A new game in `chapter` (the intro skipped, then `CHAPTER=n`).
