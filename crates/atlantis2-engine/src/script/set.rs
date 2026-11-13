@@ -665,6 +665,13 @@ impl Script {
             return;
         }
         self.set_current_view(value);
+        if self.evolution_2004 {
+            // atlantis4-cd-en-3022848 @ 0x0044e185..0x0044e1be (`VUEANGLES`
+            // @ 0x0044e35a..0x0044e398): after `AtlWam_SetCurrentVue`
+            // (FUN_00441930), `ARRIVEEVUE` := the new current view's
+            // number (+0x10), not the view left.
+            self.vars[k.arriveevue] = value;
+        }
         self.view_number = value;
         self.vars[k.vue] = value;
         let (x, y) = (self.start_x, self.start_y);

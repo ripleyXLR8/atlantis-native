@@ -118,3 +118,12 @@ fn variable_add_and_subtract() {
     g.run_command("(ANIM_GARDE8+=numframeperso,AEROGARDEW2W4)");
     assert_eq!(var(&g, "ANIM_GARDE8"), 8);
 }
+
+/// `VUE=` (@ 0x0044e185..0x0044e1be): `ARRIVEEVUE` := the new view.
+#[test]
+fn vue_sets_arriveevue_to_the_new_view() {
+    let Some((mut g, _)) = cabin() else { return };
+    g.run_command("(vue=2)");
+    assert_eq!(var(&g, "ARRIVEEVUE"), 2);
+    assert_eq!(var(&g, "VUE"), 2);
+}
