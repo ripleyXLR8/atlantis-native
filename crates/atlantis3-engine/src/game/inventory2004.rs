@@ -22,6 +22,7 @@
 
 use atlantis2_data::defnames;
 use atlantis2_engine::script::{BagEntry, FollowerOp};
+use atlantis3_data::evolution2004_save::{HideEntry, ZoneEntry};
 use atlantis3_data::spr::Bank;
 
 use super::{Game, Mode};
@@ -41,7 +42,13 @@ pub(crate) struct State {
     pub examine: Option<Examine>,
     /// `#COMPOSITIONS#` of `defnames.con`, read at the first use.
     pub compositions: Option<Vec<Composition>>,
+    /// The zone table (0x006e7418, 16-byte rows, count 0x006e7c44): the
+    /// place's zones enabled or disabled by the script, for the saves.
+    pub zone_table: Vec<ZoneEntry>,
 }
+
+/// The disabled zones' type offset (0x15b38).
+const ZONE_OFF: i32 = 88888;
 
 pub(crate) struct Examine {
     pub id: i32,
@@ -520,21 +527,161 @@ impl Game {
     /// emptied by `CHANGEWAM`) that a loaded game applies again: not
     /// ported (the saves').
     pub(crate) fn zone_toggle_2004(&mut self, name: &str, on: bool) {
-        for z in self
+        self.zones_toggle_2004(|_, z| z.name.as_deref() == Some(name), on);
+    }
+
+    /// `DISABLEWARP=n` (@ 0x0044f76e..0x0044f789 → FUN_00442030(n = 0)):
+    /// every zone of the current view (0x006e7c30) enabled (n = 0) or
+    /// disabled (n ≠ 0), each change recorded (FUN_00422950).
+    pub(crate) fn disable_warp_2004(&mut self, disable: bool) {
+        let Some(view) = self.place.view else {
+            return;
+        };
+        self.zones_toggle_2004(|v, _| v == view, !disable);
+    }
+
+    /// The toggles of FUN_004420f0 / FUN_00442030 / FUN_00441ec0 on the
+    /// zones `pick` (view id, zone) chooses: enabling takes 88888 from a
+    /// type > 88887 and records (zone `+4`, the new type, view, 1);
+    /// disabling records (zone `+4`, the type, view, 0) and adds 88888 to
+    /// a type ≤ 88887 (FUN_00422950).
+    fn zones_toggle_2004(
+        &mut self,
+        pick: impl Fn(u32, &atlantis2_data::wam::Zone) -> bool,
+        on: bool,
+    ) {
+        let mut rows = Vec::new();
+        for v in self
             .place
             .wam
             .places
             .iter_mut()
             .flat_map(|p| p.views.iter_mut())
-            .flat_map(|v| v.zones.iter_mut())
-            .filter(|z| z.name.as_deref() == Some(name))
         {
-            if on && z.kind > 0x15b37 {
-                z.kind -= 0x15b38;
-            } else if !on && z.kind <= 0x15b37 {
-                z.kind += 0x15b38;
+            let view = v.id;
+            for z in v.zones.iter_mut().filter(|z| pick(view, z)) {
+                if on && z.kind >= ZONE_OFF {
+                    z.kind -= ZONE_OFF;
+                    rows.push((z.value, z.kind, view as i32, 1));
+                } else if !on && z.kind < ZONE_OFF {
+                    rows.push((z.value, z.kind, view as i32, 0));
+                    z.kind += ZONE_OFF;
+                }
             }
         }
+        for (id, kind, vue, etat) in rows {
+            self.zone_record_2004(id, kind, vue, etat);
+        }
+    }
+
+    /// FUN_00422950(id, type, view, state): the row of (id, type, view)
+    /// gets the state, else a row is appended (no bound check in the
+    /// original: 128 rows fit, 0x006e7418..0x006e7c18).
+    fn zone_record_2004(&mut self, id: i32, kind: i32, vue: i32, etat: i32) {
+        let t = &mut self.inv2004.zone_table;
+        match t
+            .iter_mut()
+            .find(|r| r.id == id && r.vue == vue && r.kind == kind)
+        {
+            Some(r) => r.etat = etat,
+            None => t.push(ZoneEntry {
+                id,
+                kind,
+                vue,
+                etat,
+            }),
+        }
+    }
+
+    /// The loader's zone part (FUN_00460b50 @ 0x00463873..0x004645a5):
+    /// every zone of every view of the place enabled (FUN_00441ec0(view,
+    /// zone, 1)), the table cleared, the file's rows read, then for every
+    /// zone the state of its row (FUN_004229d0(zone `+4`, type, view): no
+    /// row → on) applied by FUN_00441f70(view, zone `+4`, type, state),
+    /// which records the zones it disables.
+    pub(crate) fn load_zone_table_2004(&mut self, rows: &[ZoneEntry]) {
+        self.zones_toggle_2004(|_, _| true, true);
+        self.inv2004.zone_table = rows.to_vec();
+        let mut off = Vec::new();
+        for v in self.place.wam.places.iter().flat_map(|p| p.views.iter()) {
+            for z in &v.zones {
+                let on = self
+                    .inv2004
+                    .zone_table
+                    .iter()
+                    .find(|r| r.id == z.value && r.kind == z.kind && r.vue == v.id as i32)
+                    .is_none_or(|r| r.etat != 0);
+                if !on {
+                    off.push((v.id, z.value, z.kind));
+                }
+            }
+        }
+        for (view, value, kind) in off {
+            self.zones_toggle_2004(
+                |v, z| v == view && z.value == value && z.kind == kind,
+                false,
+            );
+        }
+    }
+
+    /// The loader's hide table (@ 0x00463037..0x00463860): the file's rows
+    /// (`Id`, `Type`, `Etat`) become the table (the script's show rows);
+    /// then for each place-animation slot k whose (id, type) has a row
+    /// (FUN_004664f0 ≠ 2): its shown := the row's state, and 0 when
+    /// another slot of the same (id, type) is shown.
+    pub(crate) fn load_hide_table_2004(&mut self, rows: &[HideEntry]) {
+        if let Some(s) = self.script.as_mut() {
+            s.shown = rows
+                .iter()
+                .map(|r| atlantis2_engine::script::Shown {
+                    id: r.id,
+                    shown: r.etat != 0,
+                    kind: r.kind,
+                })
+                .collect();
+        }
+        let state = |id: i32, kind: i32| {
+            rows.iter()
+                .find(|r| r.id == id && r.kind == kind)
+                .map(|r| r.etat)
+        };
+        for k in 0..self.slots.slots.len() {
+            let (id, kind) = (self.slots.slots[k].id, self.slots.slots[k].kind);
+            let Some(st) = state(id, kind) else {
+                continue;
+            };
+            let other = self
+                .slots
+                .slots
+                .iter()
+                .enumerate()
+                .any(|(j, s)| j != k && s.id == id && s.kind == kind && s.shown);
+            self.slots.slots[k].shown = st == 1 && !other;
+        }
+    }
+
+    /// The tables as the save writes them (FUN_0045f080): the hide
+    /// table's rows (`Id`, `Type`, `Etat`) and the zone table.
+    pub(crate) fn save_tables_2004_of(
+        &self,
+        s: &atlantis2_engine::script::Script,
+    ) -> (Vec<HideEntry>, Vec<ZoneEntry>) {
+        let hide = s
+            .shown
+            .iter()
+            .map(|r| HideEntry {
+                id: r.id,
+                kind: r.kind,
+                etat: i32::from(r.shown),
+            })
+            .collect();
+        (hide, self.inv2004.zone_table.clone())
+    }
+
+    /// Tests: the zone table.
+    #[doc(hidden)]
+    pub fn zone_table_2004(&self) -> &[ZoneEntry] {
+        &self.inv2004.zone_table
     }
 
     /// The followers (tests).

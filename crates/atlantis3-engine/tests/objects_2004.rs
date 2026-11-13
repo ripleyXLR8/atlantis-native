@@ -420,3 +420,36 @@ fn the_hover_label() {
     g.step(t);
     assert!(white(&g) < label, "the hand's object has no label");
 }
+
+/// `DISABLEWARP=1` / `=0` (FUN_00442030): every zone of the current view
+/// disabled (type + 88888) / enabled again, each change a zone table row
+/// (FUN_00422950: the same row updated).
+#[test]
+fn disable_warp() {
+    let Some((mut g, _)) = cabin() else {
+        return;
+    };
+    let kinds = |g: &Game| -> Vec<i32> {
+        g.wam()
+            .view(1)
+            .unwrap()
+            .zones
+            .iter()
+            .map(|z| z.kind)
+            .collect()
+    };
+    let before = kinds(&g);
+    let rows0 = g.zone_table_2004().len();
+    g.run_command("(disablewarp=1)");
+    let off = kinds(&g);
+    assert!(off.iter().all(|&k| k >= 88888), "{off:?}");
+    let added = before.iter().filter(|&&k| k < 88888).count();
+    assert_eq!(g.zone_table_2004().len(), rows0 + added);
+    g.run_command("(disablewarp=0)");
+    let on = kinds(&g);
+    assert!(on.iter().all(|&k| k < 88888), "{on:?}");
+    assert_eq!(g.zone_table_2004().len(), rows0 + added);
+    assert!(g.zone_table_2004()[rows0..]
+        .iter()
+        .all(|r| r.etat == 1 && r.vue == 1));
+}

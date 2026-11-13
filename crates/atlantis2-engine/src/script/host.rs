@@ -346,6 +346,10 @@ pub trait Host {
     /// toggles every zone of that name in the place's views.
     fn zone_by_name_2004(&mut self, name: &str, on: bool) {}
 
+    /// The 2004 `DISABLEWARP=n` (@ 0x0044f76e..0x0044f789): FUN_00442030
+    /// enables (n = 0) or disables (n ≠ 0) every zone of the current view.
+    fn disable_warp_2004(&mut self, disable: bool) {}
+
     /// The bag bar after an object was put in: `visible` is the count of
     /// the current world's entries (@ 0x00475870, kept @ 0x00671ee8), then
     /// @ 0x004757b0 until it returns 0: the bar scrolls to its end.

@@ -439,6 +439,11 @@ impl Script {
                 host.zone_by_name_2004(name, is(self, "ENABLEZONE"));
                 return Some(next);
             }
+            if is(self, "DISABLEWARP") {
+                // @ 0x0044f76e..0x0044f789: FUN_00442030(value == 0).
+                host.disable_warp_2004(value != 0);
+                return Some(next);
+            }
             if let Some(op) = op {
                 if op != F::Clear {
                     let name: String = self
@@ -915,6 +920,8 @@ impl Script {
         if !self.run_init(host) {
             log::error!("SetVariables(): PB avec la zone INIT du Fichier scenar");
         }
+        // @ 0x00461d0b: the hide table cleared before the view.
+        self.shown.clear();
         self.run_command(host, format!("(Vue={})", d.vue).as_bytes());
         // @ 0x00461d27..0x00461ee7: the 300 variables, then the 0x800 flags.
         for (k, v) in self.vars.iter_mut().enumerate().take(300) {

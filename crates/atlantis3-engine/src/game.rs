@@ -4253,6 +4253,9 @@ impl Host for Game {
                     faces: Default::default(),
                     cube: String::new(),
                 };
+                // The 2004 program's `CHANGEWAM` (FUN_00441a50 @ 0x00441bcd
+                // → FUN_00422920): the zone table cleared.
+                self.inv2004.zone_table.clear();
                 // The Land of the Dead's map banks (@ 0x004c372b), the
                 // jewel case's (@ 0x004c367e).
                 if name.eq_ignore_ascii_case("ldmorts.wam") {
@@ -4559,6 +4562,10 @@ impl Host for Game {
 
     fn zone_by_name_2004(&mut self, name: &str, on: bool) {
         self.zone_toggle_2004(name, on);
+    }
+
+    fn disable_warp_2004(&mut self, disable: bool) {
+        self.disable_warp_2004(disable);
     }
 
     fn stop_sound_2004(&mut self, name: &str) {
