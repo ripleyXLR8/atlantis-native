@@ -352,6 +352,12 @@ impl Script {
         let k = self.keys.clone();
         if key == k.anglewarpx || key == k.anglewarpy {
             // Not stored: `Interp_GereFrame` writes the camera's angles.
+            let mut value = value;
+            if self.evolution_2004 && key == k.anglewarpy && value >= 500 {
+                // atlantis4-cd-en-3022848 @ 0x0044dc2c..0x0044dc3b: a pitch
+                // of 500 or more is 500 − v (`anglewarpy=510` is −10°).
+                value = 500 - value;
+            }
             let a = deg_to_rad_a3(self.fpu, value);
             if key == k.anglewarpx {
                 self.angle_x = a;

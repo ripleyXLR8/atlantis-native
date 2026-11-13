@@ -166,3 +166,20 @@ fn gotoframeperso_from_a_variable() {
     g.run_command(&format!("(GOTOFRAMEPERSO={name},0)"));
     assert_eq!(g.slots().slots[k].frame, 0);
 }
+
+/// `ANGLEWARPY` of 500 or more is 500 − v (@ 0x0044dc2c; chapi030
+/// `anglewarpy=510`, `523`); `ANGLEWARPX` is not changed.
+#[test]
+fn anglewarpy_above_500() {
+    let Some((mut g, _)) = cabin() else { return };
+    let y = |g: &Game| g.script().unwrap().angle_y;
+    g.run_command("(anglewarpy=-10)");
+    let minus10 = y(&g);
+    g.run_command("(anglewarpy=0)");
+    g.run_command("(anglewarpy=510)");
+    assert_eq!(y(&g), minus10);
+    g.run_command("(anglewarpy=-23)");
+    let minus23 = y(&g);
+    g.run_command("(anglewarpy=523)");
+    assert_eq!(y(&g), minus23);
+}
