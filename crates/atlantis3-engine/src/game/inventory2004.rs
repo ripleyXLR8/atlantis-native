@@ -221,8 +221,19 @@ impl Game {
         let scroll = self.inventory.scroll as i32;
         let hand = self.object_in_hand();
         if py > h as i32 - lay.bar {
-            // The hover label (FUN_0042bed0) is not ported: its layout's
-            // fifth argument (4, @ 0x0042bf2e) is not *Atlantis III*'s.
+            // The hover label (@ 0x0042b35b..0x0042b3f1): the bag's entry
+            // at the pointer's slot, its `#OBJETS#` name (FUN_004674d0)
+            // matched against the `Objects.txt` keys; not the hand's object
+            // → FUN_0042bed0(its text) into the back buffer.
+            let hover = lay
+                .index_at(h, self.pointer, scroll)
+                .and_then(|i| usize::try_from(i).ok())
+                .and_then(|i| bag.get(i))
+                .map(|e| e.id)
+                .filter(|&id| id != hand);
+            if let Some(id) = hover {
+                self.draw_object_label(id);
+            }
             if self.click || self.right_clicked {
                 let hit = lay
                     .index_at(h, self.pointer, scroll)

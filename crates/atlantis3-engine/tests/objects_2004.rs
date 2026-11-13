@@ -372,3 +372,51 @@ fn followers() {
     g.run_command("(CLEARSUIVEURS=1)");
     assert!(g.followers_2004().is_empty());
 }
+
+/// The hover label (FUN_0042b170 → FUN_0042bed0): the pointer on the
+/// matches' slot prints `A box of matches` (`Objects.txt`) in white at
+/// (px + 50, py − 20) and up; on an empty slot, or with the matches in
+/// the hand, no label.
+#[test]
+fn the_hover_label() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    g.right_click();
+    run(&mut g, &mut t, 0.5);
+    let white = |g: &Game| {
+        let (w, h) = (g.width(), g.height());
+        let lay = Layout::for_width(w);
+        let (px, py) = lay.item_centre(0, h);
+        let (x0, y0) = ((px + 50) as usize, (py - 60).max(0) as usize);
+        let mut n = 0;
+        for y in y0..(py as usize).min(h) {
+            for x in x0..(x0 + 300).min(w) {
+                let c = match g.surface() {
+                    Surface::Rgb565(p) => u32::from(p[y * w + x] == 0xffff),
+                    Surface::Xrgb8888(p) => u32::from(p[y * w + x] & 0xff_ffff == 0xff_ffff),
+                };
+                n += c;
+            }
+        }
+        n
+    };
+    point_slot(&mut g, 3);
+    t += 0.04;
+    g.step(t);
+    let none = white(&g);
+    point_slot(&mut g, 0);
+    t += 0.04;
+    g.step(t);
+    write_ppm(&g, "label.ppm");
+    let label = white(&g);
+    assert!(label > none + 50, "{none} {label}");
+    // In the hand: no label.
+    g.click();
+    t += 0.04;
+    g.step(t);
+    assert_eq!(hand(&g), object(&g, "ALLUMETTES"));
+    t += 0.04;
+    g.step(t);
+    assert!(white(&g) < label, "the hand's object has no label");
+}

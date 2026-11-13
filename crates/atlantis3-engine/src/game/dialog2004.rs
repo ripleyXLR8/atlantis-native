@@ -678,9 +678,9 @@ impl Game {
     /// layout (9, 11, 21, 19) then white at (10, 10, 20, 20), both with the
     /// arguments (4, 1) (@ 0x0046f663, @ 0x0046f7ce). The 2004 program
     /// draws with GDI's `DrawTextA` (FUN_004213a0, FUN_004211d0; the last
-    /// argument 1 aligns to the bottom, @ 0x0042127a); the meaning of the
-    /// 4 is [UNKNOWN]: the port draws with *Atlantis III*'s dialog layouts
-    /// ([`crate::text::DIALOG_SHADOW`], [`crate::text::DIALOG_TEXT`]).
+    /// argument 1 aligns to the bottom, @ 0x0042127a; the 4 is
+    /// [`crate::text::HALIGN_2004`]: left, right-to-left for a Hebrew or
+    /// Arabic font): *Atlantis III*'s dialog layouts with that code.
     pub(crate) fn dialog_text_2004(&mut self) {
         if !self.startup.config.subtitle_on {
             return;
@@ -699,8 +699,14 @@ impl Game {
             w,
             h,
             &text,
-            crate::text::DIALOG_SHADOW,
-            crate::text::DIALOG_TEXT,
+            crate::text::Zone {
+                halign: crate::text::HALIGN_2004,
+                ..crate::text::DIALOG_SHADOW
+            },
+            crate::text::Zone {
+                halign: crate::text::HALIGN_2004,
+                ..crate::text::DIALOG_TEXT
+            },
             0xffffff,
         ));
     }

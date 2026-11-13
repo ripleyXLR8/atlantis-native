@@ -1454,7 +1454,17 @@ impl Game {
         else {
             return;
         };
-        let Some(key) = usize::try_from(e.id)
+        self.draw_object_label(e.id);
+    }
+
+    /// The hover label of object `id` (@ 0x0042a530; the 2004 program's
+    /// FUN_0042bed0, the same but for the layout's horizontal alignment 4,
+    /// which FUN_00420b00 turns into `DT_RIGHT | DT_RTLREADING` only for a
+    /// Hebrew or Arabic font (`tmCharSet` 0xb1 / 0xb2), left otherwise —
+    /// the CD's `font.txt` fonts are `ANSI_CHARSET`; white, as every
+    /// `AtlFont_Print` (FUN_004211d0 `SetTextColor(0xffffff)`)).
+    pub(crate) fn draw_object_label(&mut self, id: i32) {
+        let Some(key) = usize::try_from(id)
             .ok()
             .and_then(|i| self.names.name(atlantis2_data::defnames::OBJETS, i))
             .map(|n| String::from_utf8_lossy(n).into_owned())
@@ -1485,7 +1495,13 @@ impl Game {
         else {
             return;
         };
-        let (_, zone, _) = crate::inventory::label(font, &text, self.pointer, w as i32, h as i32);
+        let halign = if self.files.is_evolution_2004() {
+            crate::text::HALIGN_2004
+        } else {
+            0
+        };
+        let (_, zone, _) =
+            crate::inventory::label_aligned(font, &text, self.pointer, w as i32, h as i32, halign);
         if let Some(t) = self.texts.as_ref() {
             with_px!(&mut self.screen, s => t.print(
                 s,
