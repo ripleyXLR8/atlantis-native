@@ -448,6 +448,26 @@ impl Script {
             self.click = click;
             return Some(next);
         }
+        if self.evolution_2004 && is(self, "TANGAGEWARP") {
+            // @ 0x004502bd: v the value; v ≠ 0: six numbers, each read by
+            // `atol` (FUN_00668e71) past the previous one's digits and then
+            // every non-digit (a sign too, @ 0x004502f6..0x004503ee).
+            let mut n = [0; 6];
+            if value != 0 {
+                let mut i = p + 1;
+                for x in n.iter_mut() {
+                    while self.b(src, i).is_ascii_digit() {
+                        i += 1;
+                    }
+                    while !matches!(self.b(src, i), 0 | b'0'..=b'9') {
+                        i += 1;
+                    }
+                    *x = self.atoi_at(src, i);
+                }
+            }
+            host.tangage_warp_2004(value, n);
+            return Some(next);
+        }
         if is(self, "INITRECALAGE") {
             host.init_recalage(self.angle_x, self.angle_y);
             return Some(next);

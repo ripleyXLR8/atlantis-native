@@ -1,7 +1,7 @@
 //! Turning the view: the mouse gives the camera two speeds, which decay
 //! every frame, and the angles are kept within the script's limits.
 
-use crate::camera::Camera;
+use crate::camera::CameraOps;
 use crate::fpu::Fpu;
 
 /// The mouse sensitivity of the data section (@ 0x005da268): a mouse move
@@ -67,8 +67,8 @@ impl Look {
     /// both speeds × 0.8, the camera turned by them (yaw about the world's
     /// Y axis, pitch about its own X axis), then the angles read back and
     /// brought within the limits, which also stop that turn.
-    pub fn frame(&mut self, cam: &mut Camera) {
-        let fpu = cam.fpu;
+    pub fn frame<C: CameraOps>(&mut self, cam: &mut C) {
+        let fpu = cam.fpu();
         let decay = f64::from(f32::from_bits(0x3f4c_cccd)); // 0.8 @ 0x005c62bc
         self.yaw_speed = fpu.f32(fpu.mul(f64::from(self.yaw_speed), decay));
         self.pitch_speed = fpu.f32(fpu.mul(f64::from(self.pitch_speed), decay));
@@ -99,8 +99,8 @@ impl Look {
     /// [`Look::frame`] under *Atlantis III*'s camera lock (0x0077b8ac):
     /// the speeds decay, the rotations do nothing, the limits are tested
     /// on the camera as it is (a speed is zeroed where it is outside).
-    pub fn frame_locked(&mut self, cam: &Camera) {
-        let fpu = cam.fpu;
+    pub fn frame_locked<C: CameraOps>(&mut self, cam: &C) {
+        let fpu = cam.fpu();
         let decay = f64::from(f32::from_bits(0x3f4c_cccd));
         self.yaw_speed = fpu.f32(fpu.mul(f64::from(self.yaw_speed), decay));
         self.pitch_speed = fpu.f32(fpu.mul(f64::from(self.pitch_speed), decay));
@@ -134,7 +134,7 @@ fn over(fpu: Fpu, angle: f32, limit: f32) -> Option<f32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::camera::deg_to_rad;
+    use crate::camera::{deg_to_rad, Camera};
 
     #[test]
     fn turns_and_stops_at_the_limit() {

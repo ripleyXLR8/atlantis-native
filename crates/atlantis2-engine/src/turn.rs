@@ -12,7 +12,7 @@
 //! own Z axis (@ 0x0045bb45..0x0045bbae), during which the turn's yaw and
 //! pitch are not applied.
 
-use crate::camera::Camera;
+use crate::camera::{Camera, CameraOps};
 use crate::fpu::Fpu;
 
 /// π as the float @ 0x005c678c.
@@ -206,8 +206,8 @@ impl Turn {
     /// ([`Turn::zoom_step`]), then the roll (@ 0x0045bb45: the camera
     /// turned about its own Z axis by the step, the step added to the
     /// sum); whether the turn goes on.
-    pub fn step(&mut self, cam: &mut Camera, zoom: &mut Zoom, screen: (u32, u32)) -> Step {
-        let fpu: Fpu = cam.fpu;
+    pub fn step<C: CameraOps>(&mut self, cam: &mut C, zoom: &mut Zoom, screen: (u32, u32)) -> Step {
+        let fpu: Fpu = cam.fpu();
         let prev = self.done;
         if self.done >= self.brake {
             let rem = fpu.sub(d(self.dist), d(self.done));
@@ -263,11 +263,11 @@ impl Turn {
     /// by minus the sum, then the sum and the step 0) and FUN_0045b680
     /// (the next warp frame skips its draw once) run. Then the camera's field
     /// of view (FUN_004a4950). True when the draw is to be skipped.
-    fn zoom_step(&self, cam: &mut Camera, zoom: &mut Zoom, (w, h): (u32, u32)) -> bool {
+    fn zoom_step<C: CameraOps>(&self, cam: &mut C, zoom: &mut Zoom, (w, h): (u32, u32)) -> bool {
         if d(zoom.current) <= d(zoom.target) {
             return false;
         }
-        let fpu = cam.fpu;
+        let fpu = cam.fpu();
         let x = fpu.sub(d(zoom.current), d(zoom.step));
         let mut skip = false;
         if x > d(zoom.target) {

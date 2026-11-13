@@ -290,6 +290,12 @@ pub trait Host {
     /// The 2004 `FADEMUSIK` (@ 0x0044f298): `<couche>,<volume>,<ms>`.
     fn fade_music_2004(&mut self, value: &str) {}
 
+    /// The 2004 `TANGAGEWARP=v,ax,ay,az,amp,speed,damp`
+    /// (atlantis4-cd-en-3022848 @ 0x004502bd): `v` 0 stops the ship's
+    /// pitching (FUN_004455b0); else `n` holds the six numbers after it
+    /// (axis, amplitude in degrees, speed, damping) for FUN_00445450.
+    fn tangage_warp_2004(&mut self, v: i32, n: [i32; 6]) {}
+
     /// The world's part of `Interp_SetMonde` (@ 0x00484df0): its object
     /// and subject sprite banks, its dialog texts, and its disc (1 → CD 1,
     /// 2 → CD 2, 3 → CD 3, 4 → CD 4, 6 → CD 4; 5, Tibet, keeps the disc in

@@ -676,6 +676,66 @@ impl Camera {
     }
 }
 
+/// The quaternion of the rotation by `angle` (radians) about `axis`, as
+/// the turns build it: the axis-angle matrix, then its quaternion
+/// (FUN_004c6d10 then FUN_004c8a10, as [`Camera::yaw`]; *Atlantis III*'s
+/// @ 0x004fd9e0 / @ 0x004fd590, atlantis4-cd-en-3022848's FUN_004c8a40 /
+/// FUN_004c87f0).
+pub fn rotation(fpu: Fpu, axis: [f32; 3], angle: f32) -> [f32; 4] {
+    matrix_to_quat(fpu, &axis_angle(fpu, axis, angle))
+}
+
+/// *Atlantis III*'s q v q* (@ 0x00434a40; atlantis4-cd-en-3022848
+/// FUN_00432ff0), as [`Camera::texel_a3`] uses it.
+pub fn rotate_a3(fpu: Fpu, q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
+    rot_a3(fpu, q, v)
+}
+
+/// *Atlantis III*'s q* v q (@ 0x0043a6a0; atlantis4-cd-en-3022848
+/// FUN_0043bdc0), as [`Camera::texel_a3`] uses it.
+pub fn rotate_back_a3(fpu: Fpu, q: [f32; 4], v: [f32; 3]) -> [f32; 3] {
+    rotb_a3(fpu, q, v)
+}
+
+/// What the look ([`crate::look::Look::frame`]) and the turns
+/// ([`crate::turn::Turn::step`]) do to the camera: [`Camera`]'s own
+/// methods, or another model of its node (*Atlantis Evolution*'s 2004
+/// program turns it inside the ship's node while the ship pitches).
+pub trait CameraOps {
+    fn fpu(&self) -> Fpu;
+    /// [`Camera::yaw`].
+    fn yaw(&mut self, angle: f32);
+    /// [`Camera::pitch`].
+    fn pitch(&mut self, angle: f32);
+    /// [`Camera::roll`].
+    fn roll(&mut self, angle: f32);
+    /// [`Camera::angles`].
+    fn angles(&self) -> (f32, f32);
+    /// [`Camera::set_fov`].
+    fn set_fov(&mut self, fov: f32, width: u32, height: u32);
+}
+
+impl CameraOps for Camera {
+    fn fpu(&self) -> Fpu {
+        self.fpu
+    }
+    fn yaw(&mut self, angle: f32) {
+        Camera::yaw(self, angle);
+    }
+    fn pitch(&mut self, angle: f32) {
+        Camera::pitch(self, angle);
+    }
+    fn roll(&mut self, angle: f32) {
+        Camera::roll(self, angle);
+    }
+    fn angles(&self) -> (f32, f32) {
+        Camera::angles(self)
+    }
+    fn set_fov(&mut self, fov: f32, width: u32, height: u32) {
+        Camera::set_fov(self, fov, width, height);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
