@@ -125,6 +125,9 @@ impl Game {
             camera: g.camera(),
         };
         self.puzzles.after_load();
+        // @ 0x00460cd7, right after `LOADING` := 1: the followers' list
+        // emptied (FUN_0043d710), before the chapter's `/INIT` runs.
+        self.inv2004.followers.clear();
         let vars = g.vars.clone();
         let ok = self.with_script(|s, h| s.load_2004(h, &data, &vars));
         if ok {
@@ -143,6 +146,11 @@ impl Game {
                     }
                 }
                 None => log::warn!("Load: PLAYERNAME {index:?} is not a player perso"),
+            }
+            // @ 0x004648ba..0x004648d3: the ship's pitching stopped
+            // (FUN_004455b0) unless `TANGAGEWARP` is 1.
+            if self.script.as_ref().and_then(|s| s.var("TANGAGEWARP")) != Some(1) {
+                self.ship.stop();
             }
             self.load_hide_table_2004(&g.hide_table);
             self.load_zone_table_2004(&g.zone_table);

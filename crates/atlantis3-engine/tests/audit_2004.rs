@@ -234,3 +234,19 @@ fn no_world_slot_flags() {
         "the view, place and chapter slots"
     );
 }
+
+/// The loader: the followers emptied (FUN_0043d710 @ 0x00460cd7) and the
+/// pitching stopped unless `TANGAGEWARP` = 1 (@ 0x004648ba..0x004648d3;
+/// `TANGAGEWARP=` stores nothing, so it stops).
+#[test]
+fn the_loader_clears_followers_and_pitching() {
+    let Some((mut g, _)) = cabin() else { return };
+    g.run_command("(ADDSUIVEUR=MIRANDA)");
+    g.run_command("(tangagewarp=1,0,0,1,2,3,0)");
+    assert!(g.ship().on);
+    let name = g.quick_save_now(1);
+    let data = g.saved(&name).unwrap().to_vec();
+    assert!(g.load_save_text(&name, data));
+    assert!(g.followers_2004().is_empty());
+    assert!(!g.ship().on);
+}
