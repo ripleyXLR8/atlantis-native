@@ -215,3 +215,22 @@ fn playername_index_and_load() {
     assert_eq!(var(&g, "PLAYERNAME"), 8);
     assert_eq!(g.player_2004(), "HewittCosmo");
 }
+
+/// The 2004 program never reads or writes the flags 897 and 1000..1031
+/// (*Atlantis III*'s per-world slots); its scripts use 1001 and 1011 as
+/// counters.
+#[test]
+fn no_world_slot_flags() {
+    let Some((mut g, _)) = cabin() else { return };
+    for (f, v) in [(897, 4), (1001, 5), (1011, 3), (1021, 2)] {
+        g.run_command(&format!("(flag{f}={v})"));
+    }
+    g.run_command("(vue=2)");
+    g.run_command("(changewam=cabine.wam)");
+    g.run_command("(vue=1)");
+    assert_eq!(
+        [897, 1001, 1011, 1021].map(|f| flag(&g, f)),
+        [4, 5, 3, 2],
+        "the view, place and chapter slots"
+    );
+}

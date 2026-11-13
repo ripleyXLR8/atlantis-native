@@ -416,7 +416,12 @@ impl Script {
         if key == k.chapter {
             let r = self.change_chapter(host, value);
             // The chapter global after the new `/INIT` (@ 0x004487d8), which
-            // a `chapter=` inside it may have changed again.
+            // a `chapter=` inside it may have changed again. Not in the 2004
+            // program (atlantis4-cd-en-3022848 @ 0x0044e0c0..0x0044e10e:
+            // no slot).
+            if self.evolution_2004 {
+                return r;
+            }
             if let Some(w) = self.world_slot("Chapter") {
                 let c = self.chapter;
                 self.set_flag(FLAG_WORLD_CHAPTER + w, c);
@@ -871,6 +876,14 @@ impl Script {
         }
         self.wam = name.as_bytes().to_vec();
         self.current_view = None;
+        if self.evolution_2004 {
+            // atlantis4-cd-en-3022848 @ 0x0044ca69..0x0044cb33: the place
+            // loaded (FUN_00441a50), the world only checked for the log
+            // "Vous vous foutez de moi ? - Changewam" (0x0070d3f4, 1 from
+            // the start-up on), the place kept (0x006e7c34): no
+            // interdimension flag, no show / hide list, no world slot.
+            return true;
+        }
         let lower = name.to_ascii_lowercase();
         // `Interp_SetInterdimFlag` (@ 0x0044b910): flag 897 (0x0077d2f0)
         // tells the interdimension's first view entry to set its puzzle up.
@@ -1098,8 +1111,14 @@ impl Script {
     }
 
     /// The view's slot of its world, written by the view entry
-    /// (`AtlWarp_EnterVue` @ 0x0043fc5a).
+    /// (`AtlWarp_EnterVue` @ 0x0043fc5a). Not in *Atlantis Evolution*'s
+    /// 2004 program, which has no per-world slots: it never reads or
+    /// writes the flags 897 and 1000..1031 (its data use 1001 and 1011 as
+    /// counters).
     pub fn note_world_view(&mut self, view: i32) {
+        if self.evolution_2004 {
+            return;
+        }
         if let Some(w) = self.world_slot("Vue") {
             self.set_flag(FLAG_WORLD_VIEW + w, view);
         }
