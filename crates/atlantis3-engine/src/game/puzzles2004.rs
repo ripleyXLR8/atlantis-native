@@ -33,6 +33,10 @@ pub(crate) struct State {
     pub key_ctrl: bool,
     /// The pointer's last vertical motion (0x006e9fe4).
     pub mouse_dy: f32,
+    /// A game's travel film (Bulle) and its transition sprites.
+    pub film: Option<(crate::film2004::Film, Vec<Bank>)>,
+    /// The games' program-wide globals ([`Host::kept`]).
+    pub kept: std::collections::HashMap<String, i32>,
 }
 
 impl Default for State {
@@ -47,6 +51,8 @@ impl Default for State {
             key_code: 0,
             key_ctrl: false,
             mouse_dy: 0.0,
+            film: None,
+            kept: std::collections::HashMap::new(),
         }
     }
 }
@@ -414,6 +420,116 @@ impl Host for Cx<'_> {
 
     fn mouse_dy(&self) -> f32 {
         self.g.puzzles2004.mouse_dy
+    }
+    fn film_start(&mut self, file: &str, fps: i32, spf: &[&str]) -> bool {
+        let depth = self.g.depth();
+        // FUN_00436150, then FUN_00435f50 per name (`spf\`, FUN_00418f10).
+        let banks: Vec<Bank> = spf
+            .iter()
+            .filter_map(|n| {
+                let b = self
+                    .g
+                    .files
+                    .read(&format!("spf/{n}"))
+                    .and_then(|d| Bank::parse(&d, depth).ok());
+                if b.is_none() {
+                    log::warn!("spf\\{n}: not found");
+                }
+                b
+            })
+            .collect();
+        self.g.puzzles2004.film = None;
+        if fps != 15 && fps != 25 {
+            log::warn!("AtlBink_start({file}): frame rate incorrect (p_Fps={fps}).");
+            return false;
+        }
+        let path = format!("binktraj/{file}");
+        let Some(data) = self.g.files.read(&path) else {
+            log::warn!("AtlBink_start({path}): cinematique introuvable");
+            return false;
+        };
+        match crate::film2004::Film::open(file, Arc::from(data), depth, self.g.now) {
+            Ok(f) => {
+                self.g.tr(|| format!("film {file} {}", spf.join(",")));
+                self.g.puzzles2004.film = Some((f, banks));
+                true
+            }
+            Err(e) => {
+                log::warn!("AtlBink_start - Trajectoire non ouverte : {path} ({e:?})");
+                false
+            }
+        }
+    }
+    fn film_frame_num(&self) -> i32 {
+        self.g
+            .puzzles2004
+            .film
+            .as_ref()
+            .map_or(-1, |f| f.0.frame_num as i32)
+    }
+    fn film_frames(&self) -> i32 {
+        self.g
+            .puzzles2004
+            .film
+            .as_ref()
+            .map_or(-1, |f| f.0.frames() as i32)
+    }
+    fn film_draw(&mut self) -> bool {
+        let now = self.g.now;
+        let depth = self.g.depth();
+        let p = &mut self.g.puzzles2004;
+        let Some((film, spf)) = p.film.as_mut() else {
+            return false;
+        };
+        if !film.time_come(now) {
+            return false;
+        }
+        if !film.drawn() && !film.do_frame() {
+            return false;
+        }
+        let (w, h) = film.size();
+        let n = film.frame_num;
+        let surf = p
+            .surface
+            .get_or_insert_with(|| Surface::new(depth, pz::WIDTH * pz::HEIGHT));
+        let top = pz::HEIGHT.saturating_sub(h) >> 1;
+        let cw = w.min(pz::WIDTH);
+        match surf {
+            Surface::Rgb565(out) => {
+                for y in 0..h.min(pz::HEIGHT - top) {
+                    out[(top + y) * pz::WIDTH..][..cw].copy_from_slice(&film.rgb565[y * w..][..cw]);
+                }
+                crate::travel::draw_transition_sprites(out, pz::WIDTH, pz::HEIGHT, spf, n);
+            }
+            Surface::Xrgb8888(out) => {
+                for y in 0..h.min(pz::HEIGHT - top) {
+                    out[(top + y) * pz::WIDTH..][..cw].copy_from_slice(&film.xrgb[y * w..][..cw]);
+                }
+                crate::travel::draw_transition_sprites(out, pz::WIDTH, pz::HEIGHT, spf, n);
+            }
+        }
+        true
+    }
+    fn film_next(&mut self) -> bool {
+        let Some(f) = self.g.puzzles2004.film.as_mut() else {
+            return false;
+        };
+        if f.0.next_frame() {
+            return true;
+        }
+        // @ 0x00402f73: the last frame shown, `NUMFRAMEVIDEO` := FrameNum.
+        let n = f.0.frame_num as i32;
+        self.set_var("NUMFRAMEVIDEO", n);
+        false
+    }
+    fn film_close(&mut self) {
+        self.g.puzzles2004.film = None;
+    }
+    fn kept(&self, key: &str) -> Option<i32> {
+        self.g.puzzles2004.kept.get(key).copied()
+    }
+    fn keep(&mut self, key: &str, v: i32) {
+        self.g.puzzles2004.kept.insert(key.to_string(), v);
     }
     fn set_mouse_dy(&mut self, dy: f32) {
         self.g.puzzles2004.mouse_dy = dy;

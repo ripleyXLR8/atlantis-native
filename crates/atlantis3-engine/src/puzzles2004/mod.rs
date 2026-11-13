@@ -76,6 +76,7 @@
 //! game's init and driven through [`Host`] (the game's view of the
 //! engine). The engine's side is `game::puzzles2004`.
 
+pub mod bulle;
 pub mod catapulte;
 pub mod defender;
 pub mod frogger;
@@ -268,6 +269,43 @@ pub trait Host {
         0.0
     }
     fn set_mouse_dy(&mut self, _dy: f32) {}
+    /// A travel film inside a game (Bulle): the transition sprites list
+    /// emptied (FUN_00436150) then `spf\<name>` added for each of `spf`
+    /// (FUN_00435f50), then `AtlBink_Start(binktraj\<file>, "", fps,
+    /// traj 1, loc 0)` (FUN_00401d30; the path by FUN_00418740). False
+    /// when it does not open.
+    fn film_start(&mut self, _file: &str, _fps: i32, _spf: &[&str]) -> bool {
+        false
+    }
+    /// FUN_00402de0: the film's `FrameNum` (handle +0xc), −1 without a
+    /// film.
+    fn film_frame_num(&self) -> i32 {
+        -1
+    }
+    /// FUN_00402e00: its `Frames` (+0x8), −1 without a film.
+    fn film_frames(&self) -> i32 {
+        -1
+    }
+    /// FUN_00402e20(0x80000000): `BinkWait` = 0 → the frame decoded and
+    /// copied into the stretch surface at y = (600 − film height) >> 1,
+    /// the transition sprites over it (FUN_004360f0(`FrameNum` − 1));
+    /// whether it was drawn.
+    fn film_draw(&mut self) -> bool {
+        false
+    }
+    /// FUN_00402f60: the last frame (false) or `BinkNextFrame`.
+    fn film_next(&mut self) -> bool {
+        false
+    }
+    /// FUN_00403230: the film closed.
+    fn film_close(&mut self) {}
+    /// A game's program-wide global (one that outlives its sessions: the
+    /// original's init does not reset it), `None` before any session set
+    /// it.
+    fn kept(&self, _key: &str) -> Option<i32> {
+        None
+    }
+    fn keep(&mut self, _key: &str, _v: i32) {}
 }
 
 /// The key code of a virtual key (the table 0x0071b0d8): the codes'
@@ -310,6 +348,7 @@ pub trait Puzzle: std::any::Any {
 /// `None` for the games ported elsewhere or not yet.
 pub fn init(id: PuzzleId, host: &mut dyn Host) -> Option<Box<dyn Puzzle>> {
     match id {
+        PuzzleId::Bulle => Some(Box::new(bulle::Bulle::init(host))),
         PuzzleId::Catapulte => Some(Box::new(catapulte::Catapulte::init(host))),
         PuzzleId::Defender => Some(Box::new(defender::Defender::init(host))),
         PuzzleId::Frogger => Some(Box::new(frogger::Frogger::init(host))),

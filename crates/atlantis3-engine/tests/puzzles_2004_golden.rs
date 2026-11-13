@@ -7,11 +7,13 @@
 //! `cd2004_catapulte.txt`: `a4cd_catapulte.py` (FUN_00484180).
 //! `cd2004_defender.txt`: `a4cd_defender.py` (FUN_00487460).
 //! `cd2004_pong.txt`: `a4cd_pong.py` (FUN_0049b9a0).
+//! `cd2004_bulle.txt`: `a4cd_bulle.py` (FUN_0048dcf0).
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use atlantis3_data::spr::Bank;
+use atlantis3_engine::puzzles2004::bulle::{self, Bulle};
 use atlantis3_engine::puzzles2004::catapulte::{Catapulte, State};
 use atlantis3_engine::puzzles2004::defender;
 use atlantis3_engine::puzzles2004::pong::Pong;
@@ -524,4 +526,251 @@ fn pong_scenario(name: &str, want: &[String], idle: bool) {
         assert_eq!(g, w, "{name}: line {i}");
     }
     assert_eq!(got.len(), want.len(), "{name}");
+}
+
+/// `a4cd_bulle.py`'s world: the films simulated by their frame counts (a
+/// frame drawn each pass), the helmet in the bag, the clock and the key.
+struct BulleMock {
+    m: Mock,
+    counts: HashMap<String, i32>,
+    film: Option<(String, i32, i32)>,
+}
+
+impl Host for BulleMock {
+    fn clock(&self) -> f64 {
+        self.m.clock
+    }
+    fn frame_time(&self) -> f32 {
+        0.04
+    }
+    fn pointer(&self) -> (i32, i32) {
+        self.m.pointer
+    }
+    fn set_pointer(&mut self, x: i32, y: i32) {
+        self.m.pointer = (x, y);
+    }
+    fn click(&self) -> bool {
+        self.m.click
+    }
+    fn set_click(&mut self, on: bool) {
+        self.m.click = on;
+    }
+    fn key(&self, _vk: u8) -> bool {
+        false
+    }
+    fn srand_time(&mut self) {}
+    fn rand(&mut self) -> i32 {
+        self.m.rand()
+    }
+    fn var(&self, name: &str) -> i32 {
+        self.m.var(name)
+    }
+    fn set_var(&mut self, name: &str, v: i32) {
+        self.m.set_var(name, v);
+    }
+    fn flag(&self, n: usize) -> i32 {
+        self.m.flag(n)
+    }
+    fn set_flag(&mut self, n: usize, v: i32) {
+        self.m.set_flag(n, v);
+    }
+    fn bank(&mut self, _file: &str) -> Option<Arc<Bank>> {
+        None
+    }
+    fn read(&mut self, _path: &str) -> Option<Vec<u8>> {
+        None
+    }
+    fn sfx_load(&mut self, _file: &str) {}
+    fn sfx_play(&mut self, _file: &str) {}
+    fn sfx_remove(&mut self, _file: &str) {}
+    fn surface(&mut self) -> &mut Surface {
+        &mut self.m.surface
+    }
+    fn draw_pointer(&mut self) {}
+    fn flip(&mut self) {}
+    fn script_prologue(&mut self) -> bool {
+        true
+    }
+    fn key_code(&self) -> i32 {
+        self.m.key_code
+    }
+    fn in_bag(&self, name: &str) -> bool {
+        name == "CASQUE_C17"
+    }
+    fn film_start(&mut self, file: &str, fps: i32, spf: &[&str]) -> bool {
+        for s in spf {
+            self.m.log.push(format!("spf {s}"));
+        }
+        self.m.log.push(format!("film {file} fps={fps} traj=1"));
+        self.film = Some((file.to_string(), 1, self.counts[file]));
+        true
+    }
+    fn film_frame_num(&self) -> i32 {
+        self.film.as_ref().map_or(-1, |f| f.1)
+    }
+    fn film_frames(&self) -> i32 {
+        self.film.as_ref().map_or(-1, |f| f.2)
+    }
+    fn film_draw(&mut self) -> bool {
+        true
+    }
+    fn film_next(&mut self) -> bool {
+        let f = self.film.as_mut().unwrap();
+        if f.1 == f.2 {
+            let n = f.1;
+            self.m.set_var("NUMFRAMEVIDEO", n);
+            return false;
+        }
+        f.1 += 1;
+        true
+    }
+    fn film_close(&mut self) {
+        if self.film.take().is_some() {
+            self.m.log.push("close".to_string());
+        }
+    }
+}
+
+fn bulle_dump(g: &Bulle, h: &BulleMock, tag: &str) -> String {
+    let v = |n: &str| h.m.var(n);
+    let film = h
+        .film
+        .as_ref()
+        .map_or("-".to_string(), |f| format!("{}:{}/{}", f.0, f.1, f.2));
+    format!(
+        "{tag} level={} restart={} driving={} won={} cell={} dir={} next={} idx={} chosen={} turn={} star={} timer={} tlen={} from={},{} to={},{} car={},{} film={film} vars={},{},{},{},{}",
+        g.level,
+        u8::from(g.restart),
+        u8::from(g.driving),
+        u8::from(g.won),
+        g.cell,
+        g.dir,
+        g.next,
+        g.idx,
+        u8::from(g.chosen),
+        g.turn,
+        u8::from(g.star),
+        u8::from(g.timer_on),
+        bits(g.timer_len),
+        bits(g.from.0),
+        bits(g.from.1),
+        bits(g.to.0),
+        bits(g.to.1),
+        bits(g.car.0),
+        bits(g.car.1),
+        v("BULLE_DEBUT"),
+        v("BULLE_ETOILE"),
+        v("BULLE_PERDU"),
+        v("BULLE_NB_MORTS"),
+        v("BULLE_GAGNE"),
+    )
+}
+
+/// `a4cd_bulle.py`'s player: the first step of a shortest drive (no
+/// U-turn, open edges) from the crossroads ahead to the level's end.
+fn bulle_plan(g: &Bulle) -> Option<i32> {
+    let n = bulle::size(g.level);
+    let end = bulle::start_end(g.level).1;
+    let ahead = bulle::next_cell(g.level, g.cell, g.dir);
+    if ahead == end || !(0..n * n).contains(&ahead) {
+        return None;
+    }
+    let start = (ahead, g.dir);
+    let mut prev = HashMap::new();
+    prev.insert(start, None);
+    let mut q = std::collections::VecDeque::from([start]);
+    while let Some((c, din)) = q.pop_front() {
+        if c == end {
+            let mut s = (c, din);
+            while prev[&s] != Some(start) {
+                s = prev[&s].unwrap();
+            }
+            return Some(s.1);
+        }
+        for o in 0..4 {
+            if o == (din + 2) % 4 {
+                continue;
+            }
+            let (r, cc) = (c / n, c % n);
+            let (r, cc) = match o {
+                0 => (r - 1, cc),
+                1 => (r, cc + 1),
+                2 => (r + 1, cc),
+                _ => (r, cc - 1),
+            };
+            let t = n * r + cc;
+            if !(0..n).contains(&r)
+                || !(0..n).contains(&cc)
+                || bulle::edge(g.level, c, t).is_none_or(|e| e <= 0)
+            {
+                continue;
+            }
+            if let std::collections::hash_map::Entry::Vacant(e) = prev.entry((t, o)) {
+                e.insert(Some((c, din)));
+                q.push_back((t, o));
+            }
+        }
+    }
+    None
+}
+
+/// `a4cd_bulle.py`'s two drives replayed on the port: "drive" wins both
+/// levels, "crash" hits the route's wall.
+#[test]
+fn bulle_drives() {
+    let text = std::fs::read_to_string(format!(
+        "{}/tests/golden/cd2004_bulle.txt",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let counts: HashMap<String, i32> = text
+        .lines()
+        .filter_map(|l| l.strip_prefix("# frames "))
+        .map(|l| {
+            let (n, c) = l.split_once(' ').unwrap();
+            (n.to_string(), c.parse().unwrap())
+        })
+        .collect();
+    for (name, want) in golden("cd2004_bulle.txt") {
+        let mut h = BulleMock {
+            m: Mock::new(0),
+            counts: counts.clone(),
+            film: None,
+        };
+        let mut g = Bulle::init(&mut h);
+        let mut got = vec![bulle_dump(&g, &h, "init")];
+        for k in 0..30000 {
+            h.m.clock = format!("{:.2}", 0.04 * (k + 1) as f64).parse().unwrap();
+            let mut key = 0;
+            if name == "drive" && g.star {
+                if let Some(o) = bulle_plan(&g) {
+                    key = [0x6d, 0x70, 0x72, 0x6f][o as usize];
+                }
+            }
+            h.m.key_code = key;
+            g.frame(&mut h);
+            let ev = !h.m.log.is_empty();
+            if k % 10 == 0 || ev {
+                got.push(bulle_dump(
+                    &g,
+                    &h,
+                    &format!("{k:05} clock={:.2} key={key:x}", h.m.clock),
+                ));
+            }
+            // The harness logs the step line after the frame's events.
+            if ev {
+                let line = got.pop().unwrap();
+                got.append(&mut h.m.log);
+                got.push(line);
+            }
+            if h.m.var("BULLE_GAGNE") != 0 || h.m.var("BULLE_PERDU") != 0 {
+                got.push("end".to_string());
+                break;
+            }
+        }
+        for (i, (g, w)) in got.iter().zip(want.iter()).enumerate() {
+            assert_eq!(g, w, "{name}: line {i}");
+        }
+        assert_eq!(got.len(), want.len(), "{name}");
+    }
 }

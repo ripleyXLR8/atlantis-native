@@ -92,6 +92,19 @@ impl Film {
         !self.drawn && ms >= self.video.frame_time_ms(self.frame_num - 1)
     }
 
+    /// `BinkWait` = 0 for frame `frame_num` whether it was drawn or not
+    /// (a caller that draws again without `BinkNextFrame`, as Bulle's
+    /// frame while its start timer runs: [INFERRED, RAD's API]).
+    pub fn time_come(&self, now: f64) -> bool {
+        let ms = ((now - self.start) * 1000.0).max(0.0) as u64;
+        ms >= self.video.frame_time_ms(self.frame_num - 1)
+    }
+
+    /// Whether frame `frame_num` was decoded.
+    pub fn drawn(&self) -> bool {
+        self.drawn
+    }
+
     /// `BinkDoFrame` and `BinkCopyToBuffer` (@ 0x00402e40, @ 0x00402e97)
     /// into the display's format. The copy's flags are the surface's type
     /// (FUN_00401ba0: 3 for 32 bits, 9..12 for the 16-bit layouts), no

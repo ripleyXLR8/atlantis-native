@@ -1,0 +1,368 @@
+# PUZ_BULLE's frame FUN_0048dcf0 under emulation (films simulated, no draw).
+# Producer: a4cd_bulle.py (original code of atlantis4-cd-en-3022848,
+#   MD5 2199bc93d2ac3f8b4279e0db898559e8); x87 cw 0x027f; clock 0.04 s per frame.
+# frames LA001D.bik 15
+# frames LA003D.bik 15
+# frames LA005001.bik 60
+# frames LA005D.bik 15
+# frames LA006002.bik 60
+# frames LA006D.bik 15
+# frames LA007G.bik 15
+# frames LA008G.bik 15
+# frames LA009005.bik 60
+# frames LA009D.bik 15
+# frames LA010006.bik 60
+# frames LA010D.bik 15
+# frames LA010G.bik 15
+# frames LA011G.bik 15
+# frames LA012G.bik 15
+# frames LA013009.bik 60
+# frames LA014010.bik 60
+== drive
+init level=1 restart=1 driving=0 won=0 cell=0 dir=0 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=00000000,00000000 to=00000000,00000000 car=00000000,00000000 film=- vars=1,0,0,0,0
+00000 clock=0.04 key=0 level=1 restart=1 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b2c000,43f54000 film=- vars=1,0,0,0,0
+film LA009005.bik fps=15 traj=1
+00001 clock=0.08 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00010 clock=0.44 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00020 clock=0.84 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00030 clock=1.24 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00040 clock=1.64 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00050 clock=2.04 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00060 clock=2.44 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00070 clock=2.84 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00080 clock=3.24 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00090 clock=3.64 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00100 clock=4.04 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00110 clock=4.44 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00120 clock=4.84 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00130 clock=5.24 key=6d level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b12ccd,43f54000 film=LA009005.bik:8/60 vars=1,1,0,0,0
+00140 clock=5.64 key=6d level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43aeeccd,43f54000 film=LA009005.bik:18/60 vars=1,1,0,0,0
+00150 clock=6.04 key=6d level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43acaccd,43f54000 film=LA009005.bik:28/60 vars=1,1,0,0,0
+00160 clock=6.44 key=6d level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43aa6ccd,43f54000 film=LA009005.bik:38/60 vars=1,1,0,0,0
+00170 clock=6.84 key=6d level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43a82ccd,43f54000 film=LA009005.bik:48/60 vars=1,1,0,0,0
+00180 clock=7.24 key=6d level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43a5eccd,43f54000 film=LA009005.bik:58/60 vars=1,1,0,0,0
+close
+film LA005D.bik fps=15 traj=1
+00183 clock=7.36 key=6d level=1 restart=0 driving=0 won=0 cell=13 dir=0 next=0 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f54000 film=LA005D.bik:1/15 vars=1,1,0,0,0
+00190 clock=7.64 key=70 level=1 restart=0 driving=0 won=0 cell=13 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f54000 film=LA005D.bik:8/15 vars=1,1,0,0,0
+close
+spf PNDL011007.spr
+film LA014010.bik fps=15 traj=1
+00198 clock=7.96 key=70 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f54000 film=LA014010.bik:1/60 vars=1,1,0,0,0
+00200 clock=8.04 key=70 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f4cccd film=LA014010.bik:3/60 vars=1,1,0,0,0
+00210 clock=8.44 key=70 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f28ccd film=LA014010.bik:13/60 vars=1,1,0,0,0
+00220 clock=8.84 key=70 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f04ccd film=LA014010.bik:23/60 vars=1,1,0,0,0
+00230 clock=9.24 key=70 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43ee0ccd film=LA014010.bik:33/60 vars=1,1,0,0,0
+00240 clock=9.64 key=70 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43ebcccd film=LA014010.bik:43/60 vars=1,1,0,0,0
+00250 clock=10.04 key=70 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43e98ccd film=LA014010.bik:53/60 vars=1,1,0,0,0
+close
+spf PND011D.spr
+film LA010D.bik fps=15 traj=1
+00258 clock=10.36 key=70 level=1 restart=0 driving=0 won=0 cell=9 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43a54000,43e7c000 film=LA010D.bik:1/15 vars=1,1,0,0,0
+00260 clock=10.44 key=6d level=1 restart=0 driving=0 won=0 cell=9 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43a54000,43e7c000 film=LA010D.bik:3/15 vars=1,1,0,0,0
+00270 clock=10.84 key=6d level=1 restart=0 driving=0 won=0 cell=9 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43a54000,43e7c000 film=LA010D.bik:13/15 vars=1,1,0,0,0
+close
+spf PNDL011007.spr
+film LA010006.bik fps=15 traj=1
+00273 clock=10.96 key=6d level=1 restart=0 driving=1 won=0 cell=9 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43a54000,43e7c000 film=LA010006.bik:1/60 vars=1,1,0,0,0
+00280 clock=11.24 key=6d level=1 restart=0 driving=1 won=0 cell=9 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43a6d333,43e7c000 film=LA010006.bik:8/60 vars=1,1,0,0,0
+00290 clock=11.64 key=6d level=1 restart=0 driving=1 won=0 cell=9 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43a91333,43e7c000 film=LA010006.bik:18/60 vars=1,1,0,0,0
+00300 clock=12.04 key=6d level=1 restart=0 driving=1 won=0 cell=9 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43ab5333,43e7c000 film=LA010006.bik:28/60 vars=1,1,0,0,0
+00310 clock=12.44 key=6d level=1 restart=0 driving=1 won=0 cell=9 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43ad9333,43e7c000 film=LA010006.bik:38/60 vars=1,1,0,0,0
+00320 clock=12.84 key=6d level=1 restart=0 driving=1 won=0 cell=9 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43afd333,43e7c000 film=LA010006.bik:48/60 vars=1,1,0,0,0
+00330 clock=13.24 key=6d level=1 restart=0 driving=1 won=0 cell=9 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=43b2c000,43e7c000 car=43b21333,43e7c000 film=LA010006.bik:58/60 vars=1,1,0,0,0
+close
+spf PND011G.spr
+film LA008G.bik fps=15 traj=1
+00333 clock=13.36 key=6d level=1 restart=0 driving=0 won=0 cell=10 dir=0 next=0 idx=-1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43e7c000 to=43b2c000,43da4000 car=43b2c000,43e7c000 film=LA008G.bik:1/15 vars=1,1,0,0,0
+00340 clock=13.64 key=6f level=1 restart=0 driving=0 won=0 cell=10 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43e7c000 to=43b2c000,43da4000 car=43b2c000,43e7c000 film=LA008G.bik:8/15 vars=1,1,0,0,0
+close
+spf PNGL011007.spr
+spf PS011007.SPR
+film LA010006.bik fps=15 traj=1
+00348 clock=13.96 key=6f level=1 restart=0 driving=1 won=0 cell=10 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43e7c000 to=43b2c000,43da4000 car=43b2c000,43e7c000 film=LA010006.bik:1/60 vars=1,1,0,0,0
+00350 clock=14.04 key=6f level=1 restart=0 driving=1 won=0 cell=10 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43e7c000 to=43b2c000,43da4000 car=43b2c000,43e74ccd film=LA010006.bik:3/60 vars=1,1,0,0,0
+00360 clock=14.44 key=6f level=1 restart=0 driving=1 won=0 cell=10 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43e7c000 to=43b2c000,43da4000 car=43b2c000,43e50ccd film=LA010006.bik:13/60 vars=1,1,0,0,0
+00370 clock=14.84 key=6f level=1 restart=0 driving=1 won=0 cell=10 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43e7c000 to=43b2c000,43da4000 car=43b2c000,43e2cccd film=LA010006.bik:23/60 vars=1,1,0,0,0
+00380 clock=15.24 key=6f level=1 restart=0 driving=1 won=0 cell=10 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43e7c000 to=43b2c000,43da4000 car=43b2c000,43e08ccd film=LA010006.bik:33/60 vars=1,1,0,0,0
+00390 clock=15.64 key=6f level=1 restart=0 driving=1 won=0 cell=10 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43e7c000 to=43b2c000,43da4000 car=43b2c000,43de4ccd film=LA010006.bik:43/60 vars=1,1,0,0,0
+00400 clock=16.04 key=6f level=1 restart=0 driving=1 won=0 cell=10 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43e7c000 to=43b2c000,43da4000 car=43b2c000,43dc0ccd film=LA010006.bik:53/60 vars=1,1,0,0,0
+close
+spf PNG011G.spr
+spf PS007G.spr
+film LA007G.bik fps=15 traj=1
+00408 clock=16.36 key=6f level=1 restart=0 driving=0 won=0 cell=6 dir=3 next=3 idx=-1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43b2c000,43da4000 film=LA007G.bik:1/15 vars=1,1,0,0,0
+00410 clock=16.44 key=6f level=1 restart=0 driving=0 won=0 cell=6 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43b2c000,43da4000 film=LA007G.bik:3/15 vars=1,1,0,0,0
+00420 clock=16.84 key=6f level=1 restart=0 driving=0 won=0 cell=6 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43b2c000,43da4000 film=LA007G.bik:13/15 vars=1,1,0,0,0
+close
+film LA010006.bik fps=15 traj=1
+00423 clock=16.96 key=6f level=1 restart=0 driving=1 won=0 cell=6 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43b2c000,43da4000 film=LA010006.bik:1/60 vars=1,1,0,0,0
+00430 clock=17.24 key=6f level=1 restart=0 driving=1 won=0 cell=6 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43b12ccd,43da4000 film=LA010006.bik:8/60 vars=1,1,0,0,0
+00440 clock=17.64 key=6f level=1 restart=0 driving=1 won=0 cell=6 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43aeeccd,43da4000 film=LA010006.bik:18/60 vars=1,1,0,0,0
+00450 clock=18.04 key=6f level=1 restart=0 driving=1 won=0 cell=6 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43acaccd,43da4000 film=LA010006.bik:28/60 vars=1,1,0,0,0
+00460 clock=18.44 key=6f level=1 restart=0 driving=1 won=0 cell=6 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43aa6ccd,43da4000 film=LA010006.bik:38/60 vars=1,1,0,0,0
+00470 clock=18.84 key=6f level=1 restart=0 driving=1 won=0 cell=6 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43a82ccd,43da4000 film=LA010006.bik:48/60 vars=1,1,0,0,0
+00480 clock=19.24 key=6f level=1 restart=0 driving=1 won=0 cell=6 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43b2c000,43da4000 to=43a54000,43da4000 car=43a5eccd,43da4000 film=LA010006.bik:58/60 vars=1,1,0,0,0
+close
+film LA006002.bik fps=15 traj=1
+00483 clock=19.36 key=6f level=1 restart=0 driving=1 won=0 cell=5 dir=3 next=3 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43a54000,43da4000 to=4397c000,43da4000 car=43a54000,43da4000 film=LA006002.bik:1/60 vars=1,1,0,0,0
+00490 clock=19.64 key=6d level=1 restart=0 driving=1 won=0 cell=5 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43da4000 to=4397c000,43da4000 car=43a3accd,43da4000 film=LA006002.bik:8/60 vars=1,1,0,0,0
+00500 clock=20.04 key=6d level=1 restart=0 driving=1 won=0 cell=5 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43da4000 to=4397c000,43da4000 car=43a16ccd,43da4000 film=LA006002.bik:18/60 vars=1,1,0,0,0
+00510 clock=20.44 key=6d level=1 restart=0 driving=1 won=0 cell=5 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43da4000 to=4397c000,43da4000 car=439f2ccd,43da4000 film=LA006002.bik:28/60 vars=1,1,0,0,0
+00520 clock=20.84 key=6d level=1 restart=0 driving=1 won=0 cell=5 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43da4000 to=4397c000,43da4000 car=439ceccd,43da4000 film=LA006002.bik:38/60 vars=1,1,0,0,0
+00530 clock=21.24 key=6d level=1 restart=0 driving=1 won=0 cell=5 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43da4000 to=4397c000,43da4000 car=439aaccd,43da4000 film=LA006002.bik:48/60 vars=1,1,0,0,0
+00540 clock=21.64 key=6d level=1 restart=0 driving=1 won=0 cell=5 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a54000,43da4000 to=4397c000,43da4000 car=43986ccd,43da4000 film=LA006002.bik:58/60 vars=1,1,0,0,0
+close
+film LA003D.bik fps=15 traj=1
+00543 clock=21.76 key=6d level=1 restart=0 driving=0 won=0 cell=4 dir=0 next=0 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43da4000 to=4397c000,43ccc000 car=4397c000,43da4000 film=LA003D.bik:1/15 vars=1,1,0,0,0
+00550 clock=22.04 key=70 level=1 restart=0 driving=0 won=0 cell=4 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43da4000 to=4397c000,43ccc000 car=4397c000,43da4000 film=LA003D.bik:8/15 vars=1,1,0,0,0
+close
+film LA005001.bik fps=15 traj=1
+00558 clock=22.36 key=70 level=1 restart=0 driving=1 won=0 cell=4 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43da4000 to=4397c000,43ccc000 car=4397c000,43da4000 film=LA005001.bik:1/60 vars=1,1,0,0,0
+00560 clock=22.44 key=70 level=1 restart=0 driving=1 won=0 cell=4 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43da4000 to=4397c000,43ccc000 car=4397c000,43d9cccd film=LA005001.bik:3/60 vars=1,1,0,0,0
+00570 clock=22.84 key=70 level=1 restart=0 driving=1 won=0 cell=4 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43da4000 to=4397c000,43ccc000 car=4397c000,43d78ccd film=LA005001.bik:13/60 vars=1,1,0,0,0
+00580 clock=23.24 key=70 level=1 restart=0 driving=1 won=0 cell=4 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43da4000 to=4397c000,43ccc000 car=4397c000,43d54ccd film=LA005001.bik:23/60 vars=1,1,0,0,0
+00590 clock=23.64 key=70 level=1 restart=0 driving=1 won=0 cell=4 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43da4000 to=4397c000,43ccc000 car=4397c000,43d30ccd film=LA005001.bik:33/60 vars=1,1,0,0,0
+00600 clock=24.04 key=70 level=1 restart=0 driving=1 won=0 cell=4 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43da4000 to=4397c000,43ccc000 car=4397c000,43d0cccd film=LA005001.bik:43/60 vars=1,1,0,0,0
+00610 clock=24.44 key=70 level=1 restart=0 driving=1 won=0 cell=4 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43da4000 to=4397c000,43ccc000 car=4397c000,43ce8ccd film=LA005001.bik:53/60 vars=1,1,0,0,0
+close
+film LA001D.bik fps=15 traj=1
+00618 clock=24.76 key=70 level=1 restart=0 driving=0 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=4397c000,43ccc000 film=LA001D.bik:1/15 vars=1,1,0,0,0
+00620 clock=24.84 key=70 level=1 restart=0 driving=0 won=0 cell=0 dir=1 next=1 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=4397c000,43ccc000 film=LA001D.bik:3/15 vars=1,1,0,0,0
+00630 clock=25.24 key=70 level=1 restart=0 driving=0 won=0 cell=0 dir=1 next=1 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=4397c000,43ccc000 film=LA001D.bik:13/15 vars=1,1,0,0,0
+close
+spf PS001002.SPR
+film LA013009.bik fps=15 traj=1
+00633 clock=25.36 key=70 level=1 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=4397c000,43ccc000 film=LA013009.bik:1/60 vars=1,1,0,0,0
+00640 clock=25.64 key=70 level=1 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=43995333,43ccc000 film=LA013009.bik:8/60 vars=1,1,0,0,0
+00650 clock=26.04 key=70 level=1 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=439b9333,43ccc000 film=LA013009.bik:18/60 vars=1,1,0,0,0
+00660 clock=26.44 key=70 level=1 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=439dd333,43ccc000 film=LA013009.bik:28/60 vars=1,1,0,0,0
+00670 clock=26.84 key=70 level=1 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=43a01333,43ccc000 film=LA013009.bik:38/60 vars=1,1,0,0,0
+00680 clock=27.24 key=70 level=1 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=43a25333,43ccc000 film=LA013009.bik:48/60 vars=1,1,0,0,0
+00690 clock=27.64 key=70 level=1 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4397c000,43ccc000 to=43a54000,43ccc000 car=43a49333,43ccc000 film=LA013009.bik:58/60 vars=1,1,0,0,0
+close
+spf PS002003.SPR
+film LA009005.bik fps=15 traj=1
+00693 clock=27.76 key=70 level=1 restart=0 driving=1 won=0 cell=1 dir=1 next=1 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43a54000,43ccc000 to=43b2c000,43ccc000 car=43a54000,43ccc000 film=LA009005.bik:1/60 vars=1,1,0,0,0
+00700 clock=28.04 key=0 level=1 restart=0 driving=1 won=0 cell=1 dir=1 next=1 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43a54000,43ccc000 to=43b2c000,43ccc000 car=43a6d333,43ccc000 film=LA009005.bik:8/60 vars=1,1,0,0,0
+00710 clock=28.44 key=0 level=1 restart=0 driving=1 won=0 cell=1 dir=1 next=1 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43a54000,43ccc000 to=43b2c000,43ccc000 car=43a91333,43ccc000 film=LA009005.bik:18/60 vars=1,1,0,0,0
+00720 clock=28.84 key=0 level=1 restart=0 driving=1 won=0 cell=1 dir=1 next=1 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43a54000,43ccc000 to=43b2c000,43ccc000 car=43ab5333,43ccc000 film=LA009005.bik:28/60 vars=1,1,0,0,0
+00730 clock=29.24 key=0 level=1 restart=0 driving=1 won=0 cell=1 dir=1 next=1 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43a54000,43ccc000 to=43b2c000,43ccc000 car=43ad9333,43ccc000 film=LA009005.bik:38/60 vars=1,1,0,0,0
+00740 clock=29.64 key=0 level=1 restart=0 driving=1 won=0 cell=1 dir=1 next=1 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43a54000,43ccc000 to=43b2c000,43ccc000 car=43afd333,43ccc000 film=LA009005.bik:48/60 vars=1,1,0,0,0
+00750 clock=30.04 key=0 level=1 restart=0 driving=1 won=0 cell=1 dir=1 next=1 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43a54000,43ccc000 to=43b2c000,43ccc000 car=43b21333,43ccc000 film=LA009005.bik:58/60 vars=1,1,0,0,0
+close
+00753 clock=30.16 key=0 level=2 restart=1 driving=0 won=0 cell=2 dir=1 next=1 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43a54000,43ccc000 to=43b2c000,43ccc000 car=43b2c000,43ccc000 film=- vars=1,1,0,0,0
+film LA013009.bik fps=15 traj=1
+00755 clock=30.24 key=6d level=2 restart=0 driving=1 won=0 cell=33 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b04000,4400a000 to=43a2c000,4400a000 car=43b00666,4400a000 film=LA013009.bik:2/60 vars=1,1,0,0,0
+00760 clock=30.44 key=6d level=2 restart=0 driving=1 won=0 cell=33 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b04000,4400a000 to=43a2c000,4400a000 car=43aee666,4400a000 film=LA013009.bik:7/60 vars=1,1,0,0,0
+00770 clock=30.84 key=6d level=2 restart=0 driving=1 won=0 cell=33 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b04000,4400a000 to=43a2c000,4400a000 car=43aca666,4400a000 film=LA013009.bik:17/60 vars=1,1,0,0,0
+00780 clock=31.24 key=6d level=2 restart=0 driving=1 won=0 cell=33 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b04000,4400a000 to=43a2c000,4400a000 car=43aa6666,4400a000 film=LA013009.bik:27/60 vars=1,1,0,0,0
+00790 clock=31.64 key=6d level=2 restart=0 driving=1 won=0 cell=33 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b04000,4400a000 to=43a2c000,4400a000 car=43a82666,4400a000 film=LA013009.bik:37/60 vars=1,1,0,0,0
+00800 clock=32.04 key=6d level=2 restart=0 driving=1 won=0 cell=33 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b04000,4400a000 to=43a2c000,4400a000 car=43a5e666,4400a000 film=LA013009.bik:47/60 vars=1,1,0,0,0
+00810 clock=32.44 key=6d level=2 restart=0 driving=1 won=0 cell=33 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43b04000,4400a000 to=43a2c000,4400a000 car=43a3a666,4400a000 film=LA013009.bik:57/60 vars=1,1,0,0,0
+close
+film LA009D.bik fps=15 traj=1
+00814 clock=32.60 key=6d level=2 restart=0 driving=0 won=0 cell=32 dir=0 next=0 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,4400a000 to=43a2c000,43f3c000 car=43a2c000,4400a000 film=LA009D.bik:1/15 vars=1,1,0,0,0
+00820 clock=32.84 key=6f level=2 restart=0 driving=0 won=0 cell=32 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,4400a000 to=43a2c000,43f3c000 car=43a2c000,4400a000 film=LA009D.bik:7/15 vars=1,1,0,0,0
+close
+spf PNGL011007.spr
+film LA014010.bik fps=15 traj=1
+00829 clock=33.20 key=6f level=2 restart=0 driving=1 won=0 cell=32 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,4400a000 to=43a2c000,43f3c000 car=43a2c000,4400a000 film=LA014010.bik:1/60 vars=1,1,0,0,0
+00830 clock=33.24 key=6f level=2 restart=0 driving=1 won=0 cell=32 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,4400a000 to=43a2c000,43f3c000 car=43a2c000,44008333 film=LA014010.bik:2/60 vars=1,1,0,0,0
+00840 clock=33.64 key=6f level=2 restart=0 driving=1 won=0 cell=32 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,4400a000 to=43a2c000,43f3c000 car=43a2c000,43fec666 film=LA014010.bik:12/60 vars=1,1,0,0,0
+00850 clock=34.04 key=6f level=2 restart=0 driving=1 won=0 cell=32 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,4400a000 to=43a2c000,43f3c000 car=43a2c000,43fc8666 film=LA014010.bik:22/60 vars=1,1,0,0,0
+00860 clock=34.44 key=6f level=2 restart=0 driving=1 won=0 cell=32 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,4400a000 to=43a2c000,43f3c000 car=43a2c000,43fa4666 film=LA014010.bik:32/60 vars=1,1,0,0,0
+00870 clock=34.84 key=6f level=2 restart=0 driving=1 won=0 cell=32 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,4400a000 to=43a2c000,43f3c000 car=43a2c000,43f80666 film=LA014010.bik:42/60 vars=1,1,0,0,0
+00880 clock=35.24 key=6f level=2 restart=0 driving=1 won=0 cell=32 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,4400a000 to=43a2c000,43f3c000 car=43a2c000,43f5c666 film=LA014010.bik:52/60 vars=1,1,0,0,0
+close
+spf PNG011G.spr
+film LA011G.bik fps=15 traj=1
+00889 clock=35.60 key=6f level=2 restart=0 driving=0 won=0 cell=26 dir=3 next=3 idx=-1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=43a2c000,43f3c000 film=LA011G.bik:1/15 vars=1,1,0,0,0
+00890 clock=35.64 key=6d level=2 restart=0 driving=0 won=0 cell=26 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=43a2c000,43f3c000 film=LA011G.bik:2/15 vars=1,1,0,0,0
+00900 clock=36.04 key=6d level=2 restart=0 driving=0 won=0 cell=26 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=43a2c000,43f3c000 film=LA011G.bik:12/15 vars=1,1,0,0,0
+close
+spf PNDL011007.spr
+film LA010006.bik fps=15 traj=1
+00904 clock=36.20 key=6d level=2 restart=0 driving=1 won=0 cell=26 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=43a2c000,43f3c000 film=LA010006.bik:1/60 vars=1,1,0,0,0
+00910 clock=36.44 key=6d level=2 restart=0 driving=1 won=0 cell=26 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=43a16666,43f3c000 film=LA010006.bik:7/60 vars=1,1,0,0,0
+00920 clock=36.84 key=6d level=2 restart=0 driving=1 won=0 cell=26 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=439f2666,43f3c000 film=LA010006.bik:17/60 vars=1,1,0,0,0
+00930 clock=37.24 key=6d level=2 restart=0 driving=1 won=0 cell=26 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=439ce666,43f3c000 film=LA010006.bik:27/60 vars=1,1,0,0,0
+00940 clock=37.64 key=6d level=2 restart=0 driving=1 won=0 cell=26 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=439aa666,43f3c000 film=LA010006.bik:37/60 vars=1,1,0,0,0
+00950 clock=38.04 key=6d level=2 restart=0 driving=1 won=0 cell=26 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=43986666,43f3c000 film=LA010006.bik:47/60 vars=1,1,0,0,0
+00960 clock=38.44 key=6d level=2 restart=0 driving=1 won=0 cell=26 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43a2c000,43f3c000 to=43954000,43f3c000 car=43962666,43f3c000 film=LA010006.bik:57/60 vars=1,1,0,0,0
+close
+spf PND011D.spr
+film LA006D.bik fps=15 traj=1
+00964 clock=38.60 key=6d level=2 restart=0 driving=0 won=0 cell=25 dir=0 next=0 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43f3c000 to=43954000,43e64000 car=43954000,43f3c000 film=LA006D.bik:1/15 vars=1,1,0,0,0
+00970 clock=38.84 key=70 level=2 restart=0 driving=0 won=0 cell=25 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43f3c000 to=43954000,43e64000 car=43954000,43f3c000 film=LA006D.bik:7/15 vars=1,1,0,0,0
+close
+spf PNDL011007.spr
+film LA014010.bik fps=15 traj=1
+00979 clock=39.20 key=70 level=2 restart=0 driving=1 won=0 cell=25 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43f3c000 to=43954000,43e64000 car=43954000,43f3c000 film=LA014010.bik:1/60 vars=1,1,0,0,0
+00980 clock=39.24 key=70 level=2 restart=0 driving=1 won=0 cell=25 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43f3c000 to=43954000,43e64000 car=43954000,43f38666 film=LA014010.bik:2/60 vars=1,1,0,0,0
+00990 clock=39.64 key=70 level=2 restart=0 driving=1 won=0 cell=25 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43f3c000 to=43954000,43e64000 car=43954000,43f14666 film=LA014010.bik:12/60 vars=1,1,0,0,0
+01000 clock=40.04 key=70 level=2 restart=0 driving=1 won=0 cell=25 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43f3c000 to=43954000,43e64000 car=43954000,43ef0666 film=LA014010.bik:22/60 vars=1,1,0,0,0
+01010 clock=40.44 key=70 level=2 restart=0 driving=1 won=0 cell=25 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43f3c000 to=43954000,43e64000 car=43954000,43ecc666 film=LA014010.bik:32/60 vars=1,1,0,0,0
+01020 clock=40.84 key=70 level=2 restart=0 driving=1 won=0 cell=25 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43f3c000 to=43954000,43e64000 car=43954000,43ea8666 film=LA014010.bik:42/60 vars=1,1,0,0,0
+01030 clock=41.24 key=70 level=2 restart=0 driving=1 won=0 cell=25 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43f3c000 to=43954000,43e64000 car=43954000,43e84666 film=LA014010.bik:52/60 vars=1,1,0,0,0
+close
+spf PND011D.spr
+film LA010D.bik fps=15 traj=1
+01039 clock=41.60 key=70 level=2 restart=0 driving=0 won=0 cell=19 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=43954000,43e64000 film=LA010D.bik:1/15 vars=1,1,0,0,0
+01040 clock=41.64 key=6d level=2 restart=0 driving=0 won=0 cell=19 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=43954000,43e64000 film=LA010D.bik:2/15 vars=1,1,0,0,0
+01050 clock=42.04 key=6d level=2 restart=0 driving=0 won=0 cell=19 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=43954000,43e64000 film=LA010D.bik:12/15 vars=1,1,0,0,0
+close
+film LA014010.bik fps=15 traj=1
+01054 clock=42.20 key=6d level=2 restart=0 driving=1 won=0 cell=19 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=43954000,43e64000 film=LA014010.bik:1/60 vars=1,1,0,0,0
+01060 clock=42.44 key=6d level=2 restart=0 driving=1 won=0 cell=19 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=4396999a,43e64000 film=LA014010.bik:7/60 vars=1,1,0,0,0
+01070 clock=42.84 key=6d level=2 restart=0 driving=1 won=0 cell=19 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=4398d99a,43e64000 film=LA014010.bik:17/60 vars=1,1,0,0,0
+01080 clock=43.24 key=6d level=2 restart=0 driving=1 won=0 cell=19 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=439b199a,43e64000 film=LA014010.bik:27/60 vars=1,1,0,0,0
+01090 clock=43.64 key=6d level=2 restart=0 driving=1 won=0 cell=19 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=439d599a,43e64000 film=LA014010.bik:37/60 vars=1,1,0,0,0
+01100 clock=44.04 key=6d level=2 restart=0 driving=1 won=0 cell=19 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=439f999a,43e64000 film=LA014010.bik:47/60 vars=1,1,0,0,0
+01110 clock=44.44 key=6d level=2 restart=0 driving=1 won=0 cell=19 dir=1 next=0 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43954000,43e64000 to=43a2c000,43e64000 car=43a1d99a,43e64000 film=LA014010.bik:57/60 vars=1,1,0,0,0
+close
+film LA012G.bik fps=15 traj=1
+01114 clock=44.60 key=6d level=2 restart=0 driving=0 won=0 cell=20 dir=0 next=0 idx=-1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43e64000 to=43a2c000,43d8c000 car=43a2c000,43e64000 film=LA012G.bik:1/15 vars=1,1,0,0,0
+01120 clock=44.84 key=6f level=2 restart=0 driving=0 won=0 cell=20 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43e64000 to=43a2c000,43d8c000 car=43a2c000,43e64000 film=LA012G.bik:7/15 vars=1,1,0,0,0
+close
+film LA014010.bik fps=15 traj=1
+01129 clock=45.20 key=6f level=2 restart=0 driving=1 won=0 cell=20 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43e64000 to=43a2c000,43d8c000 car=43a2c000,43e64000 film=LA014010.bik:1/60 vars=1,1,0,0,0
+01130 clock=45.24 key=6f level=2 restart=0 driving=1 won=0 cell=20 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43e64000 to=43a2c000,43d8c000 car=43a2c000,43e60666 film=LA014010.bik:2/60 vars=1,1,0,0,0
+01140 clock=45.64 key=6f level=2 restart=0 driving=1 won=0 cell=20 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43e64000 to=43a2c000,43d8c000 car=43a2c000,43e3c666 film=LA014010.bik:12/60 vars=1,1,0,0,0
+01150 clock=46.04 key=6f level=2 restart=0 driving=1 won=0 cell=20 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43e64000 to=43a2c000,43d8c000 car=43a2c000,43e18666 film=LA014010.bik:22/60 vars=1,1,0,0,0
+01160 clock=46.44 key=6f level=2 restart=0 driving=1 won=0 cell=20 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43e64000 to=43a2c000,43d8c000 car=43a2c000,43df4666 film=LA014010.bik:32/60 vars=1,1,0,0,0
+01170 clock=46.84 key=6f level=2 restart=0 driving=1 won=0 cell=20 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43e64000 to=43a2c000,43d8c000 car=43a2c000,43dd0666 film=LA014010.bik:42/60 vars=1,1,0,0,0
+01180 clock=47.24 key=6f level=2 restart=0 driving=1 won=0 cell=20 dir=0 next=3 idx=-1 chosen=1 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43e64000 to=43a2c000,43d8c000 car=43a2c000,43dac666 film=LA014010.bik:52/60 vars=1,1,0,0,0
+close
+film LA011G.bik fps=15 traj=1
+01189 clock=47.60 key=6f level=2 restart=0 driving=0 won=0 cell=14 dir=3 next=3 idx=-1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=43a2c000,43d8c000 film=LA011G.bik:1/15 vars=1,1,0,0,0
+01190 clock=47.64 key=6f level=2 restart=0 driving=0 won=0 cell=14 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=43a2c000,43d8c000 film=LA011G.bik:2/15 vars=1,1,0,0,0
+01200 clock=48.04 key=6f level=2 restart=0 driving=0 won=0 cell=14 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=43a2c000,43d8c000 film=LA011G.bik:12/15 vars=1,1,0,0,0
+close
+film LA010006.bik fps=15 traj=1
+01204 clock=48.20 key=6f level=2 restart=0 driving=1 won=0 cell=14 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=43a2c000,43d8c000 film=LA010006.bik:1/60 vars=1,1,0,0,0
+01210 clock=48.44 key=6f level=2 restart=0 driving=1 won=0 cell=14 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=43a16666,43d8c000 film=LA010006.bik:7/60 vars=1,1,0,0,0
+01220 clock=48.84 key=6f level=2 restart=0 driving=1 won=0 cell=14 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=439f2666,43d8c000 film=LA010006.bik:17/60 vars=1,1,0,0,0
+01230 clock=49.24 key=6f level=2 restart=0 driving=1 won=0 cell=14 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=439ce666,43d8c000 film=LA010006.bik:27/60 vars=1,1,0,0,0
+01240 clock=49.64 key=6f level=2 restart=0 driving=1 won=0 cell=14 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=439aa666,43d8c000 film=LA010006.bik:37/60 vars=1,1,0,0,0
+01250 clock=50.04 key=6f level=2 restart=0 driving=1 won=0 cell=14 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=43986666,43d8c000 film=LA010006.bik:47/60 vars=1,1,0,0,0
+01260 clock=50.44 key=6f level=2 restart=0 driving=1 won=0 cell=14 dir=3 next=3 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=43a2c000,43d8c000 to=43954000,43d8c000 car=43962666,43d8c000 film=LA010006.bik:57/60 vars=1,1,0,0,0
+close
+film LA006002.bik fps=15 traj=1
+01264 clock=50.60 key=6f level=2 restart=0 driving=1 won=0 cell=13 dir=3 next=3 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=43954000,43d8c000 to=4387c000,43d8c000 car=43954000,43d8c000 film=LA006002.bik:1/60 vars=1,1,0,0,0
+01270 clock=50.84 key=6d level=2 restart=0 driving=1 won=0 cell=13 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43d8c000 to=4387c000,43d8c000 car=4393e666,43d8c000 film=LA006002.bik:7/60 vars=1,1,0,0,0
+01280 clock=51.24 key=6d level=2 restart=0 driving=1 won=0 cell=13 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43d8c000 to=4387c000,43d8c000 car=4391a666,43d8c000 film=LA006002.bik:17/60 vars=1,1,0,0,0
+01290 clock=51.64 key=6d level=2 restart=0 driving=1 won=0 cell=13 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43d8c000 to=4387c000,43d8c000 car=438f6666,43d8c000 film=LA006002.bik:27/60 vars=1,1,0,0,0
+01300 clock=52.04 key=6d level=2 restart=0 driving=1 won=0 cell=13 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43d8c000 to=4387c000,43d8c000 car=438d2666,43d8c000 film=LA006002.bik:37/60 vars=1,1,0,0,0
+01310 clock=52.44 key=6d level=2 restart=0 driving=1 won=0 cell=13 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43d8c000 to=4387c000,43d8c000 car=438ae666,43d8c000 film=LA006002.bik:47/60 vars=1,1,0,0,0
+01320 clock=52.84 key=6d level=2 restart=0 driving=1 won=0 cell=13 dir=3 next=0 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=43954000,43d8c000 to=4387c000,43d8c000 car=4388a666,43d8c000 film=LA006002.bik:57/60 vars=1,1,0,0,0
+close
+film LA001D.bik fps=15 traj=1
+01324 clock=53.00 key=6d level=2 restart=0 driving=0 won=0 cell=12 dir=0 next=0 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43d8c000 to=4387c000,43cb4000 car=4387c000,43d8c000 film=LA001D.bik:1/15 vars=1,1,0,0,0
+01330 clock=53.24 key=6d level=2 restart=0 driving=0 won=0 cell=12 dir=0 next=0 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4387c000,43d8c000 to=4387c000,43cb4000 car=4387c000,43d8c000 film=LA001D.bik:7/15 vars=1,1,0,0,0
+close
+film LA009005.bik fps=15 traj=1
+01339 clock=53.60 key=6d level=2 restart=0 driving=1 won=0 cell=12 dir=0 next=0 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4387c000,43d8c000 to=4387c000,43cb4000 car=4387c000,43d8c000 film=LA009005.bik:1/60 vars=1,1,0,0,0
+01340 clock=53.64 key=6d level=2 restart=0 driving=1 won=0 cell=12 dir=0 next=0 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4387c000,43d8c000 to=4387c000,43cb4000 car=4387c000,43d88666 film=LA009005.bik:2/60 vars=1,1,0,0,0
+01350 clock=54.04 key=6d level=2 restart=0 driving=1 won=0 cell=12 dir=0 next=0 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4387c000,43d8c000 to=4387c000,43cb4000 car=4387c000,43d64666 film=LA009005.bik:12/60 vars=1,1,0,0,0
+01360 clock=54.44 key=6d level=2 restart=0 driving=1 won=0 cell=12 dir=0 next=0 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4387c000,43d8c000 to=4387c000,43cb4000 car=4387c000,43d40666 film=LA009005.bik:22/60 vars=1,1,0,0,0
+01370 clock=54.84 key=6d level=2 restart=0 driving=1 won=0 cell=12 dir=0 next=0 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4387c000,43d8c000 to=4387c000,43cb4000 car=4387c000,43d1c666 film=LA009005.bik:32/60 vars=1,1,0,0,0
+01380 clock=55.24 key=6d level=2 restart=0 driving=1 won=0 cell=12 dir=0 next=0 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4387c000,43d8c000 to=4387c000,43cb4000 car=4387c000,43cf8666 film=LA009005.bik:42/60 vars=1,1,0,0,0
+01390 clock=55.64 key=6d level=2 restart=0 driving=1 won=0 cell=12 dir=0 next=0 idx=-1 chosen=1 turn=1 star=1 timer=0 tlen=00000000 from=4387c000,43d8c000 to=4387c000,43cb4000 car=4387c000,43cd4666 film=LA009005.bik:52/60 vars=1,1,0,0,0
+close
+film LA005001.bik fps=15 traj=1
+01399 clock=56.00 key=6d level=2 restart=0 driving=1 won=0 cell=6 dir=0 next=0 idx=-1 chosen=0 turn=1 star=1 timer=0 tlen=00000000 from=4387c000,43cb4000 to=4387c000,43bdc000 car=4387c000,43cb4000 film=LA005001.bik:1/60 vars=1,1,0,0,0
+01400 clock=56.04 key=70 level=2 restart=0 driving=1 won=0 cell=6 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43cb4000 to=4387c000,43bdc000 car=4387c000,43cb0666 film=LA005001.bik:2/60 vars=1,1,0,0,0
+01410 clock=56.44 key=70 level=2 restart=0 driving=1 won=0 cell=6 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43cb4000 to=4387c000,43bdc000 car=4387c000,43c8c666 film=LA005001.bik:12/60 vars=1,1,0,0,0
+01420 clock=56.84 key=70 level=2 restart=0 driving=1 won=0 cell=6 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43cb4000 to=4387c000,43bdc000 car=4387c000,43c68666 film=LA005001.bik:22/60 vars=1,1,0,0,0
+01430 clock=57.24 key=70 level=2 restart=0 driving=1 won=0 cell=6 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43cb4000 to=4387c000,43bdc000 car=4387c000,43c44666 film=LA005001.bik:32/60 vars=1,1,0,0,0
+01440 clock=57.64 key=70 level=2 restart=0 driving=1 won=0 cell=6 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43cb4000 to=4387c000,43bdc000 car=4387c000,43c20666 film=LA005001.bik:42/60 vars=1,1,0,0,0
+01450 clock=58.04 key=70 level=2 restart=0 driving=1 won=0 cell=6 dir=0 next=1 idx=-1 chosen=1 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43cb4000 to=4387c000,43bdc000 car=4387c000,43bfc666 film=LA005001.bik:52/60 vars=1,1,0,0,0
+close
+spf PS002D.spr
+film LA001D.bik fps=15 traj=1
+01459 clock=58.40 key=70 level=2 restart=0 driving=0 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=4387c000,43bdc000 film=LA001D.bik:1/15 vars=1,1,0,0,0
+01460 clock=58.44 key=0 level=2 restart=0 driving=0 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=4387c000,43bdc000 film=LA001D.bik:2/15 vars=1,1,0,0,0
+01470 clock=58.84 key=0 level=2 restart=0 driving=0 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=4387c000,43bdc000 film=LA001D.bik:12/15 vars=1,1,0,0,0
+close
+spf PNDL011007.spr
+spf PS002003.SPR
+film LA013009.bik fps=15 traj=1
+01474 clock=59.00 key=0 level=2 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=4387c000,43bdc000 film=LA013009.bik:1/60 vars=1,1,0,0,0
+01480 clock=59.24 key=0 level=2 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=4389199a,43bdc000 film=LA013009.bik:7/60 vars=1,1,0,0,0
+01490 clock=59.64 key=0 level=2 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=438b599a,43bdc000 film=LA013009.bik:17/60 vars=1,1,0,0,0
+01500 clock=60.04 key=0 level=2 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=438d999a,43bdc000 film=LA013009.bik:27/60 vars=1,1,0,0,0
+01510 clock=60.44 key=0 level=2 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=438fd99a,43bdc000 film=LA013009.bik:37/60 vars=1,1,0,0,0
+01520 clock=60.84 key=0 level=2 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=4392199a,43bdc000 film=LA013009.bik:47/60 vars=1,1,0,0,0
+01530 clock=61.24 key=0 level=2 restart=0 driving=1 won=0 cell=0 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=4394599a,43bdc000 film=LA013009.bik:57/60 vars=1,1,0,0,0
+close
+spf PED011D.spr
+film LA001D.bik fps=15 traj=1
+01534 clock=61.40 key=0 level=2 restart=0 driving=0 won=1 cell=1 dir=1 next=1 idx=-1 chosen=0 turn=2 star=1 timer=0 tlen=00000000 from=4387c000,43bdc000 to=43954000,43bdc000 car=43954000,43bdc000 film=LA001D.bik:1/15 vars=1,1,0,0,1
+end
+== crash
+init level=1 restart=1 driving=0 won=0 cell=0 dir=0 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=00000000,00000000 to=00000000,00000000 car=00000000,00000000 film=- vars=1,0,0,0,0
+00000 clock=0.04 key=0 level=1 restart=1 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b2c000,43f54000 film=- vars=1,0,0,0,0
+film LA009005.bik fps=15 traj=1
+00001 clock=0.08 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00010 clock=0.44 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00020 clock=0.84 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00030 clock=1.24 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00040 clock=1.64 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00050 clock=2.04 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00060 clock=2.44 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00070 clock=2.84 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00080 clock=3.24 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00090 clock=3.64 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00100 clock=4.04 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00110 clock=4.44 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00120 clock=4.84 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=0 timer=1 tlen=40a00000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b28666,43f54000 film=LA009005.bik:1/60 vars=1,0,0,0,0
+00130 clock=5.24 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43b12ccd,43f54000 film=LA009005.bik:8/60 vars=1,1,0,0,0
+00140 clock=5.64 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43aeeccd,43f54000 film=LA009005.bik:18/60 vars=1,1,0,0,0
+00150 clock=6.04 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43acaccd,43f54000 film=LA009005.bik:28/60 vars=1,1,0,0,0
+00160 clock=6.44 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43aa6ccd,43f54000 film=LA009005.bik:38/60 vars=1,1,0,0,0
+00170 clock=6.84 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43a82ccd,43f54000 film=LA009005.bik:48/60 vars=1,1,0,0,0
+00180 clock=7.24 key=0 level=1 restart=0 driving=1 won=0 cell=14 dir=3 next=0 idx=0 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43b2c000,43f54000 to=43a54000,43f54000 car=43a5eccd,43f54000 film=LA009005.bik:58/60 vars=1,1,0,0,0
+close
+film LA005D.bik fps=15 traj=1
+00183 clock=7.36 key=0 level=1 restart=0 driving=0 won=0 cell=13 dir=0 next=3 idx=1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f54000 film=LA005D.bik:1/15 vars=1,1,0,0,0
+00190 clock=7.64 key=0 level=1 restart=0 driving=0 won=0 cell=13 dir=0 next=3 idx=1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f54000 film=LA005D.bik:8/15 vars=1,1,0,0,0
+close
+spf PNDL011007.spr
+film LA014010.bik fps=15 traj=1
+00198 clock=7.96 key=0 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=3 idx=1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f54000 film=LA014010.bik:1/60 vars=1,1,0,0,0
+00200 clock=8.04 key=0 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=3 idx=1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f4cccd film=LA014010.bik:3/60 vars=1,1,0,0,0
+00210 clock=8.44 key=0 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=3 idx=1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f28ccd film=LA014010.bik:13/60 vars=1,1,0,0,0
+00220 clock=8.84 key=0 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=3 idx=1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43f04ccd film=LA014010.bik:23/60 vars=1,1,0,0,0
+00230 clock=9.24 key=0 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=3 idx=1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43ee0ccd film=LA014010.bik:33/60 vars=1,1,0,0,0
+00240 clock=9.64 key=0 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=3 idx=1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43ebcccd film=LA014010.bik:43/60 vars=1,1,0,0,0
+00250 clock=10.04 key=0 level=1 restart=0 driving=1 won=0 cell=13 dir=0 next=3 idx=1 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43f54000 to=43a54000,43e7c000 car=43a54000,43e98ccd film=LA014010.bik:53/60 vars=1,1,0,0,0
+close
+spf PND011G.spr
+film LA010G.bik fps=15 traj=1
+00258 clock=10.36 key=0 level=1 restart=0 driving=0 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=43a54000,43e7c000 film=LA010G.bik:1/15 vars=1,1,0,0,0
+00260 clock=10.44 key=0 level=1 restart=0 driving=0 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=43a54000,43e7c000 film=LA010G.bik:3/15 vars=1,1,0,0,0
+00270 clock=10.84 key=0 level=1 restart=0 driving=0 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=43a54000,43e7c000 film=LA010G.bik:13/15 vars=1,1,0,0,0
+close
+film LA006002.bik fps=15 traj=1
+00273 clock=10.96 key=0 level=1 restart=0 driving=1 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=43a54000,43e7c000 film=LA006002.bik:1/60 vars=1,1,0,0,0
+00280 clock=11.24 key=0 level=1 restart=0 driving=1 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=43a3accd,43e7c000 film=LA006002.bik:8/60 vars=1,1,0,0,0
+00290 clock=11.64 key=0 level=1 restart=0 driving=1 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=43a16ccd,43e7c000 film=LA006002.bik:18/60 vars=1,1,0,0,0
+00300 clock=12.04 key=0 level=1 restart=0 driving=1 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=439f2ccd,43e7c000 film=LA006002.bik:28/60 vars=1,1,0,0,0
+00310 clock=12.44 key=0 level=1 restart=0 driving=1 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=439ceccd,43e7c000 film=LA006002.bik:38/60 vars=1,1,0,0,0
+00320 clock=12.84 key=0 level=1 restart=0 driving=1 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=439aaccd,43e7c000 film=LA006002.bik:48/60 vars=1,1,0,0,0
+00330 clock=13.24 key=0 level=1 restart=0 driving=1 won=0 cell=9 dir=3 next=0 idx=2 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=43a54000,43e7c000 to=4397c000,43e7c000 car=43986ccd,43e7c000 film=LA006002.bik:58/60 vars=1,1,0,0,0
+close
+spf PED011D.spr
+film LA001D.bik fps=15 traj=1
+00333 clock=13.36 key=0 level=1 restart=0 driving=0 won=0 cell=8 dir=0 next=0 idx=3 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=4397c000,43e7c000 to=4397c000,43da4000 car=4397c000,43e7c000 film=LA001D.bik:1/15 vars=1,1,0,0,0
+00340 clock=13.64 key=0 level=1 restart=0 driving=0 won=0 cell=8 dir=0 next=0 idx=3 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=4397c000,43e7c000 to=4397c000,43da4000 car=4397c000,43e7c000 film=LA001D.bik:8/15 vars=1,1,0,0,0
+close
+spf PND011007.spr
+film LA009005.bik fps=15 traj=1
+00348 clock=13.96 key=0 level=1 restart=0 driving=1 won=0 cell=8 dir=0 next=0 idx=3 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=4397c000,43e7c000 to=4397c000,43da4000 car=4397c000,43e7c000 film=LA009005.bik:1/60 vars=1,1,0,0,0
+00350 clock=14.04 key=0 level=1 restart=0 driving=1 won=0 cell=8 dir=0 next=0 idx=3 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=4397c000,43e7c000 to=4397c000,43da4000 car=4397c000,43e74ccd film=LA009005.bik:3/60 vars=1,1,0,0,0
+00360 clock=14.44 key=0 level=1 restart=0 driving=1 won=0 cell=8 dir=0 next=0 idx=3 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=4397c000,43e7c000 to=4397c000,43da4000 car=4397c000,43e50ccd film=LA009005.bik:13/60 vars=1,1,0,0,0
+close
+00366 clock=14.68 key=0 level=1 restart=1 driving=0 won=0 cell=8 dir=0 next=0 idx=3 chosen=0 turn=0 star=1 timer=0 tlen=00000000 from=4397c000,43e7c000 to=4397c000,43da4000 car=4397c000,43e3b333 film=- vars=1,1,1,1,0
+end
