@@ -177,15 +177,25 @@ impl Script {
     /// INIT du Fichier scenar"). Not ported: the dword 0x006ffc18 := 0 and
     /// FUN_00456ad0, called before the load [UNKNOWN: not read yet].
     pub fn new_game_2004(&mut self, host: &mut dyn Host) -> bool {
+        self.new_game_2004_at(host, 0)
+    }
+
+    /// The 2004 start page's new game of a player (FUN_00457850): chapter
+    /// 0 for player 1, 999, 998, 997, 996 for players 2..5 (`CHAPTER` and
+    /// 0x0070fbf8 set to it, @ 0x00458787..0x0045878e), after the player's
+    /// resets (FUN_004569e0 the flags and `GAMEOVER`, FUN_0043eb20 the
+    /// dialog table). [`Script::new_game_2004`] is player 1's.
+    pub fn new_game_2004_at(&mut self, host: &mut dyn Host, chapter: i32) -> bool {
+        self.subjects.reset_a3();
         self.bag.clear();
         self.vars.iter_mut().for_each(|v| *v = 0);
         self.flags.iter_mut().for_each(|f| *f = 0);
         let k = self.keys.clone();
         self.vars[k.limiteanglewarpy] = 50;
         self.vars[k.limiteanglewarpx] = -1;
-        self.vars[k.chapter] = 0;
-        self.chapter = 0;
-        if !self.load_chapter(host, 0) {
+        self.vars[k.chapter] = chapter;
+        self.chapter = chapter;
+        if !self.load_chapter(host, chapter) {
             self.fail("Fichier scenar non trouve".into());
             return false;
         }
@@ -868,6 +878,100 @@ impl Script {
         }
         log::info!("-- Fin de Load --");
         self.fatal.is_none()
+    }
+
+    /// *Atlantis Evolution*'s 2004 loader (atlantis4-cd-en-3022848
+    /// FUN_00460b50, log `-- Debut Load --`), the script side, in its
+    /// order: `LOADING` := 1 (@ 0x00460ccc: what the chapter's `/INIT` sees),
+    /// the disc (`Menu_TestChangeCD(CurrentCD)` @ 0x00461b06, here
+    /// `(changecd=n)`), the place loaded (FUN_00441a50), `(monde=n)` run,
+    /// the chapter loaded (`LoadCurrentChap` FUN_00450a80; missing:
+    /// `SetVariables(): chapitre introuvable`, the load stops) and its
+    /// `/INIT` run (FUN_00451210), `(Vue=n)` run (@ 0x00461d1f), then the
+    /// 300 variables and the flags cleared and set from the file, the bag
+    /// rebuilt from the object names ([`Script::restore_bag_2004`]) and the
+    /// subject table. The music's couches and the ship's pitching are not
+    /// in the file: the chapter's `/INIT` sets them again.
+    pub fn load_2004(&mut self, host: &mut dyn Host, d: &LoadData, vars: &[i32]) -> bool {
+        log::info!("-- Debut Load --");
+        self.set_var_a3("LOADING", 1);
+        self.run_command(host, format!("(changecd={})", d.current_cd).as_bytes());
+        if !host.load_wam(&d.wam) {
+            self.fail(format!("Load: {} introuvable", d.wam));
+            return false;
+        }
+        self.wam = d.wam.as_bytes().to_vec();
+        self.current_view = None;
+        self.run_command(host, format!("(monde={})", d.monde).as_bytes());
+        self.previous_chapter = self.chapter;
+        self.chapter = d.chapter;
+        if !self.load_chapter(host, d.chapter) {
+            self.fail(format!(
+                "SetVariables(): chapitre introuvable scenar\\chapi{:03}.con",
+                d.chapter
+            ));
+            return false;
+        }
+        if !self.run_init(host) {
+            log::error!("SetVariables(): PB avec la zone INIT du Fichier scenar");
+        }
+        self.run_command(host, format!("(Vue={})", d.vue).as_bytes());
+        // @ 0x00461d27..0x00461ee7: the 300 variables, then the 0x800 flags.
+        for (k, v) in self.vars.iter_mut().enumerate().take(300) {
+            *v = vars.get(k).copied().unwrap_or(0);
+        }
+        self.flags.iter_mut().for_each(|f| *f = 0);
+        for &(i, v) in &d.flags {
+            if let Some(f) = usize::try_from(i).ok().and_then(|i| self.flags.get_mut(i)) {
+                *f = v;
+            }
+        }
+        self.restore_bag_2004(host, &d.objects);
+        self.subjects.reset_a3();
+        for (perso, list) in &d.subjects {
+            for (i, &(etat, id, value)) in list.iter().enumerate() {
+                self.subjects.set_entry(
+                    *perso,
+                    i,
+                    super::Subject {
+                        value,
+                        index: id,
+                        flag: u8::from(etat),
+                    },
+                );
+            }
+            self.subjects.set_count(*perso, list.len() as i32);
+        }
+        if let Some(q) = d.camera {
+            host.set_camera_quaternion(q);
+        }
+        log::info!("-- Fin de Load --");
+        self.fatal.is_none()
+    }
+
+    /// The bag rebuilt by the 2004 loader (FUN_0042b960 empties the object
+    /// list; each name looked up in the defnames, FUN_00467e60 /
+    /// FUN_00466f70, and added, FUN_0042a980): the one place the save code
+    /// touches the bag, as *Atlantis III*'s ([`Script::load_a3`]) by the
+    /// names' letters.
+    pub fn restore_bag_2004(&mut self, host: &mut dyn Host, objects: &[Vec<u8>]) {
+        self.bag.clear();
+        let letters =
+            |n: &[u8]| -> Vec<u8> { n.iter().copied().filter(u8::is_ascii_alphabetic).collect() };
+        for name in objects {
+            let want = letters(name);
+            let found = (0..self.names.len(defnames::OBJETS)).find(|&i| {
+                self.names
+                    .name(defnames::OBJETS, i)
+                    .is_some_and(|n| letters(n).eq_ignore_ascii_case(&want))
+            });
+            let Some(id) = found else {
+                log::warn!("Load: objet {} inconnu", String::from_utf8_lossy(name));
+                continue;
+            };
+            let sprite = self.names.param_of(defnames::OBJETS, id);
+            self.bag_add(host, id as i32, sprite as u8);
+        }
     }
 
     /// `LOADVUEMONDE` (@ 0x0044890f): back to the current world's place,

@@ -43,6 +43,7 @@ mod film;
 mod frame_tab;
 mod hooks;
 mod inventory2004;
+mod menus2004;
 mod pages;
 mod sfx;
 mod sfx2004;
@@ -254,6 +255,13 @@ pub struct Game {
     sfx2004: sfx2004::Sfx2004,
     /// The intro's videos still to play ([`intro_videos`]).
     intro_next: Vec<(&'static str, u32)>,
+    /// The 2004 program's start-up logos still to play (FUN_0045e970:
+    /// `loc\text\<SousTitre>\logos.txt`'s films, last first); `Some`
+    /// while the logo sequence runs (loop mode 1).
+    logos_2004: Option<Vec<String>>,
+    /// The 2004 program's `Puzzles` counters (`Atlantis4.cfg`,
+    /// 0x00719b58..), written back by its options' writer.
+    puzzles_2004: [i32; 8],
     /// The click flags (@ 0x007592b8, double click @ 0x007592bb) and the
     /// last left press (@ 0x00759280).
     click: bool,
@@ -514,6 +522,8 @@ impl Game {
             sons,
             sfx2004: Default::default(),
             intro_next: Vec::new(),
+            logos_2004: None,
+            puzzles_2004: [0; 8],
             click: false,
             double_click: false,
             last_press: None,
@@ -963,6 +973,9 @@ impl Game {
         let Some(d) = self.read_save(name) else {
             return false;
         };
+        if self.files.is_evolution_2004() {
+            return self.load_text_2004(&d);
+        }
         let save = atlantis3_data::save::SaveGame::parse(&d);
         let data = load_data(&save);
         self.puzzles.after_load();
@@ -1652,6 +1665,9 @@ impl Game {
             Mode::Menu => self.menu_frame(),
             Mode::Screen => self.screen_frame(),
             Mode::Idle => {}
+        }
+        if self.logos_2004.is_some() && self.film.is_none() {
+            self.next_logo_2004();
         }
         // The main loop's per-frame place part, after the mode's frame
         // (@ 0x004d5df9 → 0x004c1950).
@@ -2843,6 +2859,10 @@ impl Game {
     /// The text of a save of the script's state (the writer @ 0x00459ee0).
     fn save_text(&self, s: &Script) -> Vec<u8> {
         use atlantis3_data::save::{PersoDialogs, SaveGame, Subject};
+        if self.files.is_evolution_2004() {
+            // The 2004 program's writer (FUN_0045f080).
+            return self.save_text_2004(s);
+        }
         let obj_name = |id: i32| {
             usize::try_from(id)
                 .ok()

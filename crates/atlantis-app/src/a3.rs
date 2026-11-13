@@ -76,18 +76,21 @@ pub fn label(dir: &Path) -> Result<String, OpenError> {
 struct WithCfg {
     install: StdDir,
     cfg: PathBuf,
+    /// The settings file's name in the install (`Datas/Atlantis3.cfg`;
+    /// the 2004 program's `datas/Atlantis4.cfg`, as
+    /// [`atlantis3_data::evolution2004::Evolution2004Source`] maps it).
+    name: &'static str,
 }
 
 impl WithCfg {
-    fn is_cfg(name: &str) -> bool {
-        name.replace('\\', "/")
-            .eq_ignore_ascii_case(atlantis3_data::cfg::CFG_PATH)
+    fn is_cfg(&self, name: &str) -> bool {
+        name.replace('\\', "/").eq_ignore_ascii_case(self.name)
     }
 }
 
 impl FileSource for WithCfg {
     fn size(&self, name: &str) -> Option<u64> {
-        if Self::is_cfg(name) {
+        if self.is_cfg(name) {
             if let Ok(m) = std::fs::metadata(&self.cfg) {
                 return Some(m.len());
             }
@@ -96,7 +99,7 @@ impl FileSource for WithCfg {
     }
 
     fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
-        if Self::is_cfg(name) {
+        if self.is_cfg(name) {
             if let Ok(d) = std::fs::read(&self.cfg) {
                 let start = usize::try_from(offset).ok()?.min(d.len());
                 return Some(d[start..(start + len).min(d.len())].to_vec());
@@ -144,6 +147,7 @@ pub fn open_in(dir: &Path, base: &Path, original: bool) -> Result<(Game, String)
     let files = A3Files::new(Arc::new(WithCfg {
         install: StdDir::new(dir),
         cfg: cfg_path.clone(),
+        name: atlantis3_data::cfg::CFG_PATH,
     }));
     let label = files
         .edition_label()
@@ -243,9 +247,9 @@ pub struct A3App {
     shift_until: Option<Instant>,
     /// The window ended for the game library's screen.
     to_library: bool,
-    /// A new game when the window opens, past the intro and the menus
-    /// ([`run_evolution_2004`]).
-    new_game_now: bool,
+    /// The 2004 program ([`run_evolution_2004`]): its start-up logos and
+    /// start page in place of the intro.
+    evolution_2004: bool,
 }
 
 /// The first free `a3-<n>.png` in `dir`.
@@ -285,7 +289,7 @@ impl A3App {
             shown,
             shift_until: None,
             to_library: false,
-            new_game_now: false,
+            evolution_2004: false,
         }
     }
 
@@ -386,15 +390,11 @@ impl A3App {
 
     /// Escape on the credits page (@ 0x00457360): `Atlantis3.cfg`
     /// written, then the end.
-    fn write_cfg(&self) {
+    fn write_cfg(&mut self) {
         let Some(path) = self.game.menus().cfg_path.clone() else {
             return;
         };
-        let data = self
-            .game
-            .startup
-            .config
-            .write(&self.game.startup.install_language);
+        let data = self.game.cfg_file_text();
         if let Err(e) = std::fs::write(&path, data) {
             log::warn!("{}: {e}", path.display());
         }
@@ -440,9 +440,10 @@ impl ApplicationHandler for A3App {
         self.grab();
         self.start = Instant::now();
         self.next_frame = self.start;
-        if self.new_game_now {
+        if self.evolution_2004 {
+            // Loop mode 1 (FUN_0045e970): the logos, then the start page.
             self.intro_done = true;
-            self.game.new_game();
+            self.game.start_logos_2004();
         } else if self.no_intro {
             self.intro_done = true;
             if !self.game.show_start_page() {
@@ -554,26 +555,45 @@ impl ApplicationHandler for A3App {
 /// development entry while the port is in progress, atlantis4-re decision
 /// 0008): the CD install read through
 /// [`atlantis3_data::evolution2004::Evolution2004Source`], its saves and
-/// settings in the player's `atlantis-evolution-2004` folder, a new game
-/// at once (no intro, no menus: not ported yet).
+/// settings in the player's `atlantis-evolution-2004` folder (its saves
+/// in `save/`, its `Atlantis4.cfg` read from there once the menus wrote
+/// it); the start-up's logos, then the start page.
 pub fn run_evolution_2004(dir: &Path, fullscreen: bool) -> Result<(), String> {
+    let game = open_evolution_2004(dir, &evolution_2004_data_dir())?;
+    let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
+    let mut app = A3App::new(game, fullscreen, true);
+    app.evolution_2004 = true;
+    el.run_app(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))
+}
+
+/// The 2004 program's folder in the per-user data folder.
+pub fn evolution_2004_data_dir() -> PathBuf {
+    crate::desktop::data_dir().join("atlantis-evolution-2004")
+}
+
+/// The 2004 program's game in `dir`, its saves and `Atlantis4.cfg` in
+/// `base` (the install's `datas\Atlantis4.cfg` until the menus write the
+/// player's own).
+pub fn open_evolution_2004(dir: &Path, base: &Path) -> Result<Game, String> {
     use atlantis3_data::evolution2004::Evolution2004Source;
-    let base = crate::desktop::data_dir().join("atlantis-evolution-2004");
-    let _ = std::fs::create_dir_all(&base);
-    let src = Evolution2004Source::new(Arc::new(StdDir::new(dir)));
+    let _ = std::fs::create_dir_all(base);
+    let cfg_path = base.join("Atlantis4.cfg");
+    let src = Evolution2004Source::new(Arc::new(WithCfg {
+        install: StdDir::new(dir),
+        cfg: cfg_path.clone(),
+        name: "datas/Atlantis4.cfg",
+    }));
     let files = A3Files::evolution_2004(Arc::new(src));
     let mut game = Game::new(files).map_err(|e| format!("{}: {e}", dir.display()))?;
     game.save_dir = Some(base.join("save"));
+    game.menus_mut().cfg_path = Some(cfg_path);
     log::info!(
         "Atlantis Evolution (2004), development entry, {}; data in {}",
         crate::version_string(),
         base.display()
     );
-    let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
-    let mut app = A3App::new(game, fullscreen, true);
-    app.new_game_now = true;
-    el.run_app(&mut app)
-        .map_err(|e| format!("The window failed: {e}"))
+    Ok(game)
 }
 
 pub fn run_window(game: Game, fullscreen: bool, no_intro: bool) -> Result<(), String> {

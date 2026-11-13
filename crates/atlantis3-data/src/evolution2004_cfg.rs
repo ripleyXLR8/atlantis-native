@@ -273,6 +273,108 @@ impl Config {
     }
 }
 
+/// The writer `AtlConfig_MainWrite` (FUN_0040c940, run by every click of
+/// the in-game menu, @ 0x00459eff): `datas\Atlantis4.cfg` (0x006acb3c, not
+/// the data disc's folder) opened with `_open(path, 0x4301, 0x80)`
+/// (`_O_TEXT | _O_TRUNC | _O_CREAT | _O_WRONLY`: each LF written as CR LF),
+/// then only the lines that differ from the defaults, from *Atlantis III*'s
+/// options as the engine keeps them (`c`), the `Puzzles` counters and the
+/// registry's `Language` / `LanguageST` (0x00719c78 / 0x00719d78, compared
+/// with `Langue` / `SousTitre`):
+///
+/// - `Resolution` unless 800 x 600 (@ 0x0040c9f7..0x0040ca0d: the writer's
+///   test is *Atlantis III*'s, the reader's default 1024 x 768);
+/// - `PixelFormat = 32bits` over 16 bits; `FullScreen = false` when off;
+/// - `Langue`, `SousTitre` when they differ from the registry's;
+/// - `SubTitleOn = false` when off; `WarpRes` always; `Smooth = false`,
+///   `Cursor = false` when off; `InvertMouseY = true` when on;
+/// - `GlobalVolume` (`ftol` of the float), `SFXVolume`, `VoicesVolume`,
+///   `MusicVolume1` (`ftol`) when not 99;
+/// - `Humeur = true`, `SuperCine = true`, `LogFile = true` when on;
+/// - `Time` (the play time counted first, by the caller) and `Puzzles`
+///   always.
+pub fn write(
+    c: &crate::cfg::Config,
+    puzzles: &[i32; 8],
+    language: &[u8],
+    language_st: &[u8],
+) -> Vec<u8> {
+    let mut s: Vec<u8> = Vec::new();
+    let mut line = |text: &[u8]| s.extend_from_slice(text);
+    if c.resolution != (800, 600) {
+        line(format!("Resolution\t\t= {} {}\n", c.resolution.0, c.resolution.1).as_bytes());
+    }
+    if c.pixel_format.bits() > 16 {
+        line(b"PixelFormat\t\t= 32bits\n");
+    }
+    if !c.full_screen {
+        line(b"FullScreen\t= false\n");
+    }
+    if c.langue != language {
+        line(b"Langue\t\t= ");
+        line(&c.langue);
+        line(b"\n");
+    }
+    if c.sous_titre != language_st {
+        line(b"SousTitre\t\t= ");
+        line(&c.sous_titre);
+        line(b"\n");
+    }
+    if !c.subtitle_on {
+        line(b"SubTitleOn\t\t= false\n");
+    }
+    line(format!("WarpRes\t\t= {}\n", c.warp_res).as_bytes());
+    if !c.smooth {
+        line(b"Smooth\t\t= false\n");
+    }
+    if !c.cursor {
+        line(b"Cursor\t\t= false\n");
+    }
+    if c.invert_mouse_y {
+        line(b"InvertMouseY\t= true\n");
+    }
+    if c.global_volume != 99 {
+        line(format!("GlobalVolume\t= {}\n", c.global_volume).as_bytes());
+    }
+    if c.sfx_volume != 99 {
+        line(format!("SFXVolume\t\t= {}\n", c.sfx_volume).as_bytes());
+    }
+    if c.voices_volume != 99 {
+        line(format!("VoicesVolume\t= {}\n", c.voices_volume).as_bytes());
+    }
+    if c.music_volume != 99 {
+        line(format!("MusicVolume1\t\t= {}\n", c.music_volume).as_bytes());
+    }
+    if c.humeur {
+        line(b"Humeur\t = true\n");
+    }
+    if c.super_cine {
+        line(b"SuperCine\t = true\n");
+    }
+    if c.log_file {
+        line(b"LogFile\t\t= true\n");
+    }
+    let t = c.time;
+    line(format!("Time\t\t{} {} {} {} {}\n", t[0], t[1], t[2], t[3], t[4]).as_bytes());
+    let p = puzzles;
+    line(
+        format!(
+            "Puzzles\t\t{} {} {} {} {} {} {} {}\n",
+            p[0], p[1], p[2], p[3], p[4], p[5], p[6], p[7]
+        )
+        .as_bytes(),
+    );
+    // `_write` in text mode: LF → CR LF.
+    let mut out = Vec::with_capacity(s.len() + 32);
+    for b in s {
+        if b == b'\n' {
+            out.push(b'\r');
+        }
+        out.push(b);
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -330,5 +432,26 @@ mod tests {
         assert_eq!((c.music_volume1, c.global_volume), (95.0, 95.0));
         assert!(!c.log_file && !c.subtitle_on);
         assert_eq!(c.puzzles, [0; 8]);
+    }
+
+    /// The writer's lines (FUN_0040c940): only what differs from the
+    /// defaults, CR LF, read back by the reader.
+    #[test]
+    fn the_writer_s_text() {
+        let mut c = Config::parse(b"").to_a3();
+        c.langue = b"gbr".to_vec();
+        c.sous_titre = b"gbr".to_vec();
+        let t = write(&c, &[0; 8], b"gbr", b"gbr");
+        assert_eq!(
+            t,
+            b"Resolution\t\t= 1024 768\r\nWarpRes\t\t= 768\r\nTime\t\t0 0 0 0 0\r\n\
+              Puzzles\t\t0 0 0 0 0 0 0 0\r\n"
+        );
+        c.subtitle_on = false;
+        c.music_volume = 47;
+        let t = write(&c, &[0; 8], b"gbr", b"gbr");
+        let back = Config::parse(&t);
+        assert!(!back.subtitle_on);
+        assert_eq!(back.music_volume1, 47.0);
     }
 }

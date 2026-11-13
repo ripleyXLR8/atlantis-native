@@ -253,12 +253,25 @@ impl FilmFiles {
         file: &str,
         langue: &str,
         sous_titre: &str,
+        exists: impl FnMut(&str) -> bool,
+    ) -> FilmFiles {
+        FilmFiles::resolve_loc(file, langue, sous_titre, false, exists)
+    }
+
+    /// [`FilmFiles::resolve`] with `AtlBink_Start`'s fifth argument `loc`
+    /// (a cue file found *or* the argument set → the film, @ 0x0040213e,
+    /// from `loc\bink\<Langue>\`); the start-up's logos pass 1.
+    pub fn resolve_loc(
+        file: &str,
+        langue: &str,
+        sous_titre: &str,
+        loc: bool,
         mut exists: impl FnMut(&str) -> bool,
     ) -> FilmFiles {
         let txt = txt_name(file);
         let cue_path = format!("bink/{txt}");
         let cue = exists(&cue_path).then_some(cue_path);
-        let video = if cue.is_some() {
+        let video = if cue.is_some() || loc {
             format!("loc/bink/{langue}/{file}")
         } else {
             format!("bink/{file}")

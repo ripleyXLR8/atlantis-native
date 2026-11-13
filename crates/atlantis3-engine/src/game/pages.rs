@@ -338,12 +338,19 @@ impl Game {
                     self.page_left();
                     self.new_game();
                 }
+                Event::NewGameAt(chapter) => {
+                    self.page_left();
+                    self.new_game_at_2004(chapter);
+                }
                 Event::Load(name) => {
                     self.page_left();
                     self.video = None;
                     self.mode = Mode::Warp;
                     // Back to the game follows (`Event::Resume`).
                     self.load_named(&name);
+                }
+                Event::Save(name) if self.files.is_evolution_2004() => {
+                    self.write_menu_save_2004(&name)
                 }
                 Event::Save(name) => self.write_menu_save(&name),
                 Event::Resume => self.back_to_game(),
@@ -533,7 +540,7 @@ impl Game {
     /// in whole seconds (`__ftol` of the clock's difference; the second
     /// read's difference, 0x00789d30, is 0), and the mark restarted
     /// (@ 0x0040945f..0x00409505, @ 0x004520e3..0x0045218b).
-    fn play_time_count(&mut self) {
+    pub(super) fn play_time_count(&mut self) {
         if let Some(k) = self.play_slot {
             let t = &mut self.startup.config.time[k];
             *t = t.wrapping_add((self.now - self.play_mark) as i32);
@@ -552,7 +559,20 @@ impl Game {
     /// `Atlantis3.cfg`'s text as its writer makes it (@ 0x00408f80): the
     /// play time counted first.
     pub(super) fn cfg_text(&mut self) -> Vec<u8> {
+        if self.files.is_evolution_2004() {
+            return self.cfg_text_2004();
+        }
         self.play_time_count();
+        self.startup.config.write(&self.startup.install_language)
+    }
+
+    /// The settings file's text for the app's own write (the credits'
+    /// Escape): *Atlantis III*'s options as they are; the 2004 program's
+    /// `Atlantis4.cfg` as FUN_0040c940 writes it.
+    pub fn cfg_file_text(&mut self) -> Vec<u8> {
+        if self.files.is_evolution_2004() {
+            return self.cfg_text_2004();
+        }
         self.startup.config.write(&self.startup.install_language)
     }
 

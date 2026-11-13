@@ -48,6 +48,7 @@ pub mod evolution2004_dialog;
 pub mod evolution2004_film;
 pub mod evolution2004_jp6;
 pub mod evolution2004_mls;
+pub mod evolution2004_save;
 pub mod evolution2004_sfx;
 pub mod exe;
 pub mod files;
