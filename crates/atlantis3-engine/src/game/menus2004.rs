@@ -97,7 +97,8 @@ impl Game {
     /// The 2004 loader (FUN_00460b50) on the save `text`: the script's part
     /// ([`Script::load_2004`]), then the hide table (applied to the view's
     /// place animations) and the zone table (applied to the place's
-    /// zones); `SprPleinEcran` is read but not applied.
+    /// zones), then `SprPleinEcran` (a name not empty
+    /// opened by FUN_00436790 @ 0x0046488c; the port opens `spr\` + its file part).
     pub(super) fn load_text_2004(&mut self, text: &[u8]) -> bool {
         let g = SaveGame2004::parse(text);
         let data = LoadData {
@@ -129,6 +130,11 @@ impl Game {
         if ok {
             self.load_hide_table_2004(&g.hide_table);
             self.load_zone_table_2004(&g.zone_table);
+            let spr = String::from_utf8_lossy(&g.spr_plein_ecran).into_owned();
+            let file = spr.rsplit(['\\', '/']).next().unwrap_or("").trim();
+            if !file.is_empty() {
+                atlantis2_engine::script::Host::spr_plein_ecran_2004(self, Some(file));
+            }
         }
         self.after_load_hook();
         ok
@@ -183,6 +189,13 @@ impl Game {
             dialogs,
             hide_table,
             zone_table,
+            // The bank's name (0x0070c970): the path FUN_00418d50 built,
+            // `spr\<name>` here (the original's exact prefix [UNKNOWN]).
+            spr_plein_ecran: self
+                .spr_plein_ecran
+                .as_ref()
+                .map(|(n, _)| format!("spr\\{n}").into_bytes())
+                .unwrap_or_default(),
             quaternion: q.map(Some),
             ..Default::default()
         };

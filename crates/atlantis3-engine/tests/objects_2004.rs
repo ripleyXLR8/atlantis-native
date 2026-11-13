@@ -561,3 +561,43 @@ fn vueangles_keeps_the_camera() {
     let turned = g.camera().angles();
     assert!((turned.0 - before.0).abs() > 0.1, "{before:?} {turned:?}");
 }
+
+/// `SPRPLEINECRAN=masque.spr` (FUN_00436790 on `spr\masque.spr`): the
+/// bank's sprite 0 drawn at its own position over every warp draw
+/// (FUN_00444670); `=0` closes it.
+#[test]
+fn sprpleinecran() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    // The top-left 64 × 64 corner's brightness: the mask's vignette is
+    // black there.
+    let corner = |g: &Game| -> u64 {
+        let w = g.width();
+        let mut n = 0u64;
+        for y in 0..64 {
+            for x in 0..64 {
+                n += match g.surface() {
+                    Surface::Rgb565(p) => u64::from(p[y * w + x] >> 11),
+                    Surface::Xrgb8888(p) => u64::from((p[y * w + x] >> 16) & 0xff),
+                };
+            }
+        }
+        n
+    };
+    t += 0.04;
+    g.step(t);
+    let plain = corner(&g);
+    assert!(plain > 0);
+    g.run_command("(sprpleinecran=masque.spr)");
+    assert_eq!(g.spr_plein_ecran_2004(), Some("masque.spr"));
+    t += 0.04;
+    g.step(t);
+    write_ppm(&g, "masque.ppm");
+    assert_eq!(corner(&g), 0, "the mask is drawn");
+    g.run_command("(sprpleinecran=0)");
+    assert_eq!(g.spr_plein_ecran_2004(), None);
+    t += 0.04;
+    g.step(t);
+    assert!(corner(&g) > 0);
+}

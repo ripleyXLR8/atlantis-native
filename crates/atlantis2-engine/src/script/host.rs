@@ -346,6 +346,10 @@ pub trait Host {
     /// toggles every zone of that name in the place's views.
     fn zone_by_name_2004(&mut self, name: &str, on: bool) {}
 
+    /// The 2004 `SPRPLEINECRAN=name` / `=0`: the full-screen sprite's bank
+    /// opened (`spr\<name>`) or closed.
+    fn spr_plein_ecran_2004(&mut self, name: Option<&str>) {}
+
     /// The 2004 view entry's `turn` (FUN_00442c80's second argument): 0
     /// while `VUEANGLES` enters its view, 1 otherwise.
     fn view_turn_2004(&mut self, turn: bool) {}

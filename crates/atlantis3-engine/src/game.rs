@@ -250,6 +250,9 @@ pub struct Game {
     film_skip_key: bool,
     /// `VUEANGLES` entering its view: FUN_00442c80's `turn` 0.
     view_no_turn_2004: bool,
+    /// The 2004 full-screen sprite (`SPRPLEINECRAN`, the bank name
+    /// 0x0070c970): its name and bank, drawn over every warp draw.
+    spr_plein_ecran: Option<(String, Bank)>,
     /// The 2004 program's dialog running (`AtlDial`, 0x006e6f5c), its
     /// data (read at the first `DIAL`) and the player perso (`PLAYERNAME`,
     /// 0x006e6f40).
@@ -527,6 +530,7 @@ impl Game {
             film_cine_out: false,
             film_skip_key: false,
             view_no_turn_2004: false,
+            spr_plein_ecran: None,
             dialog2004: None,
             dialogs2004: None,
             player_2004: atlantis3_data::evolution2004_dialog::DEFAULT_PLAYER.to_string(),
@@ -800,6 +804,12 @@ impl Game {
 
     pub fn camera(&self) -> &Camera {
         &self.camera
+    }
+
+    /// Tests: the 2004 full-screen sprite's name (`SPRPLEINECRAN`).
+    #[doc(hidden)]
+    pub fn spr_plein_ecran_2004(&self) -> Option<&str> {
+        self.spr_plein_ecran.as_ref().map(|(n, _)| n.as_str())
     }
 
     /// The camera's angles in degrees (yaw, pitch).
@@ -2216,6 +2226,17 @@ impl Game {
         }
         let sprites = self.slots.slots.iter().any(|s| s.shown);
         self.render_cube(&m, proj, sprites);
+        // The 2004 full-screen sprite (FUN_00444670 @ 0x00444772..
+        // 0x004447f0): with a bank name, its sprite 0 at its own position
+        // (x 0x80000000), alpha 1, over the view (a surface of the
+        // destination's size and format, @ 0x004446a7..0x004446bf).
+        if let Some((_, bank)) = &self.spr_plein_ecran {
+            let (w, h) = (self.width, self.height);
+            with_px!(&mut self.screen, s => {
+                let mut t = Target::screen(s.as_mut_slice(), w, h);
+                bank.draw(&mut t, None, 0, 0);
+            });
+        }
         // The sprite pass's hit test, against the frames just drawn
         // (0x0076e928 cleared @ 0x00440c07, set @ 0x00439a47 / 0x00439a5b).
         self.cursor_hit = self
@@ -4576,6 +4597,26 @@ impl Host for Game {
 
     fn disable_warp_2004(&mut self, disable: bool) {
         self.disable_warp_2004(disable);
+    }
+
+    fn spr_plein_ecran_2004(&mut self, name: Option<&str>) {
+        // A bank open is closed first (FUN_00436970 @ 0x00450617 /
+        // 0x00450750), then `spr\<name>` opened (FUN_00436790: a missing
+        // file logs `AtlSpr_OpenBank : le fichier .. n'existe pas` and
+        // leaves the name empty).
+        self.spr_plein_ecran = None;
+        let Some(name) = name else {
+            return;
+        };
+        let path = format!("spr/{name}");
+        match self
+            .files
+            .read(&path)
+            .and_then(|d| Bank::parse(&d, self.screen.depth()).ok())
+        {
+            Some(b) => self.spr_plein_ecran = Some((name.to_string(), b)),
+            None => log::warn!("AtlSpr_OpenBank : le fichier {path} n'existe pas"),
+        }
     }
 
     fn view_turn_2004(&mut self, turn: bool) {

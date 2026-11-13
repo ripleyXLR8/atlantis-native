@@ -462,6 +462,16 @@ impl Script {
                 host.zone_by_name_2004(name, is(self, "ENABLEZONE"));
                 return Some(next);
             }
+            if is(self, "SPRPLEINECRAN") {
+                // @ 0x00450518..0x004507a6: `0` → the bank closed
+                // (FUN_00436970) and the name emptied; else the word
+                // between the `=` and the `)`: a bank open closed, then
+                // `spr\<word>` opened (FUN_00418d50, FUN_00436790).
+                let t = self.line_text(src, p + 1);
+                let name = t.split(')').next().unwrap_or("").trim().to_string();
+                host.spr_plein_ecran_2004((!name.starts_with('0')).then_some(name.as_str()));
+                return Some(next);
+            }
             if is(self, "VUEANGLES") {
                 // @ 0x0044e2e7..0x0044e3f3: `VUE`'s code without its
                 // transition block (0x0070d082) and with the view entry's

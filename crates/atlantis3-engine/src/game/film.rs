@@ -393,7 +393,11 @@ impl Game {
     /// FUN_00412be0 then FUN_00444870(screen, band): the screen black, the
     /// panorama in rows band .. h − band − 1 (no cursor: the mode is 5).
     pub(crate) fn draw_letterbox_2004(&mut self, band: usize) {
-        if !self.draw_warp_only() {
+        // FUN_00444870 draws no full-screen sprite (FUN_00444670 does).
+        let spr = self.spr_plein_ecran.take();
+        let drawn = self.draw_warp_only();
+        self.spr_plein_ecran = spr;
+        if !drawn {
             self.screen.clear();
             return;
         }
