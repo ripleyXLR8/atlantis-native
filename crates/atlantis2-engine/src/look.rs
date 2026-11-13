@@ -26,6 +26,11 @@ pub struct Look {
     /// `LIMITEANGLEWARPX` / `LIMITEANGLEWARPY` in degrees, −1 for none.
     pub limit_x: i32,
     pub limit_y: i32,
+    /// *Atlantis Evolution*'s 2004 program's yaw bounds
+    /// (`LIMITEANGLEWARPXMIN`, `LIMITEANGLEWARPXMAX`, degrees), used while
+    /// `limit_x` is not −1 (atlantis4-cd-en-3022848 FUN_0042e3b0
+    /// @ 0x0042e4a8..0x0042e5a8); `None`: ±`limit_x`.
+    pub limit_x_range: Option<(i32, i32)>,
 }
 
 impl Default for Look {
@@ -37,6 +42,7 @@ impl Default for Look {
             invert_y: false,
             limit_x: NO_LIMIT,
             limit_y: DEFAULT_LIMIT_Y,
+            limit_x_range: None,
         }
     }
 }
@@ -87,11 +93,32 @@ impl Look {
             }
         }
         if self.limit_x != NO_LIMIT {
-            if let Some(turn) = over(fpu, yaw, lim_x) {
+            if let Some(turn) = self.over_x(fpu, yaw, lim_x) {
                 cam.yaw(turn);
                 self.yaw_speed = 0.0;
             }
         }
+    }
+
+    /// The yaw's turn back within the limits: ±`limit_x`, or the 2004
+    /// program's bounds (@ 0x0042e575..0x0042e5a8: above XMAX → yaw −
+    /// XMAX, else below XMIN → yaw − XMIN).
+    fn over_x(&self, fpu: Fpu, yaw: f32, lim_x: f32) -> Option<f32> {
+        let Some((min, max)) = self.limit_x_range else {
+            return over(fpu, yaw, lim_x);
+        };
+        let pi = f64::from(f32::from_bits(0x4049_0fdb));
+        let k = f64::from(f32::from_bits(0x3bb6_0b61));
+        let rad = |deg: i32| fpu.f32(fpu.mul(fpu.mul(f64::from(deg), pi), k));
+        let (min, max) = (rad(min), rad(max));
+        let bound = if max < yaw {
+            max
+        } else if yaw < min {
+            min
+        } else {
+            return None;
+        };
+        Some(fpu.f32(fpu.sub(f64::from(yaw), f64::from(bound))))
     }
 }
 
@@ -112,7 +139,7 @@ impl Look {
         if self.limit_y != NO_LIMIT && over(fpu, pitch, lim_y).is_some() {
             self.pitch_speed = 0.0;
         }
-        if self.limit_x != NO_LIMIT && over(fpu, yaw, lim_x).is_some() {
+        if self.limit_x != NO_LIMIT && self.over_x(fpu, yaw, lim_x).is_some() {
             self.yaw_speed = 0.0;
         }
     }
@@ -165,5 +192,27 @@ mod tests {
         look.frame(&mut cam);
         let (yaw, _) = cam.angles();
         assert!(yaw.to_degrees().abs() <= 30.001, "{}", yaw.to_degrees());
+    }
+
+    #[test]
+    fn the_2004_yaw_bounds() {
+        let fpu = Fpu::Double;
+        let mut cam = Camera::new(fpu, 640, 480);
+        // `LIMITEANGLEWARPXMIN=30`, `..XMAX=150` (chapi041): X = 150.
+        let mut look = Look {
+            limit_x: 150,
+            limit_x_range: Some((30, 150)),
+            ..Look::default()
+        };
+        for (from, to) in [(10, 30.0), (170, 150.0), (90, 90.0)] {
+            cam.enter(deg_to_rad(fpu, from), 0.0);
+            look.frame(&mut cam);
+            let (yaw, _) = cam.angles();
+            assert!(
+                (yaw.to_degrees() - to).abs() < 1e-3,
+                "{from}: {}",
+                yaw.to_degrees()
+            );
+        }
     }
 }

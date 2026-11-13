@@ -271,8 +271,8 @@ impl Menus {
     /// the thumbnail; then a used slot shows `BACKSPR_SAVEk` and
     /// `SPR_SAVEk` with the bank `save\<name>` (loaded again when the name
     /// changed, FUN_00425d80), an empty one hides `BACKSPR_SAVEk`. The
-    /// layout's horizontal code 4 is `[UNKNOWN]` (FUN_004211d0 does not
-    /// read it): left-aligned here, as the 2004 dialogs' port.
+    /// layout's horizontal code 4 is [`crate::text::HALIGN_2004`] (left,
+    /// right-to-left for a Hebrew or Arabic font).
     pub(super) fn load_slots_2004(&mut self, env: &mut Env<'_>, screen: &mut crate::px::Surface) {
         let (w, files, depth) = (self.width, env.files, self.depth);
         for k in 1..=LOAD_SLOTS {
@@ -284,7 +284,14 @@ impl Menus {
             it.el.displayed = false;
             let (x, y) = (it.el.pos[0], it.el.pos[1]);
             let date = self.dates.get(i).cloned().unwrap_or_else(|| EMPTY.into());
-            let zone = Zone::new(x + 0x14, 0x338 - x, y, 0x317 - y, 0, 1);
+            let zone = Zone::new(
+                x + 0x14,
+                0x338 - x,
+                y,
+                0x317 - y,
+                crate::text::HALIGN_2004,
+                1,
+            );
             self.print(env, screen, FontId::Default, &date, zone, 0xff_ffff);
             let name = self.names.get(i).cloned().unwrap_or_else(|| EMPTY.into());
             let used = name != EMPTY;

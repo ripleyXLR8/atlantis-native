@@ -491,6 +491,22 @@ pub fn background_names(fond: &str, warp: &str, number: i32) -> [String; 2] {
     ]
 }
 
+/// The two background pictures FUN_004700d0 tries for a line whose
+/// speaker shows a place animation (@ 0x004703c3..0x0047068d): the warp
+/// name becomes its first `len − 8` bytes + the animation state's `+0xc`
+/// (the view it was made for, `%04d` by FUN_00448cf0(x, 4)); then
+/// `binkdial\` + `Fond` + that name + the head number modulo 3 on 2
+/// digits + `.jpg`, and when missing `Fond` + that name without its last
+/// 4 bytes + `0000` + the 2 digits + `.jpg`.
+pub fn background_names_anim(fond: &str, warp: &str, made_for: u32, number: i32) -> [String; 2] {
+    let nn = format!("{:02}", number % 3);
+    let stem = warp.get(..warp.len().saturating_sub(8)).unwrap_or("");
+    [
+        format!("binkdial/{fond}{stem}{made_for:04}{nn}.jpg"),
+        format!("binkdial/{fond}{stem}0000{nn}.jpg"),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -604,6 +620,13 @@ mod tests {
             background_names("hh", "c10001.jp6", 4),
             [
                 "binkdial/hhc1000101.jpg".to_string(),
+                "binkdial/hhc1000001.jpg".to_string()
+            ]
+        );
+        assert_eq!(
+            background_names_anim("hh", "c10001.jp6", 3, 4),
+            [
+                "binkdial/hhc1000301.jpg".to_string(),
                 "binkdial/hhc1000001.jpg".to_string()
             ]
         );

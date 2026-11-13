@@ -11,20 +11,20 @@
 //! FUN_0046ea60, `Display` FUN_0046f630. Its data are
 //! [`atlantis3_data::evolution2004_dialog`].
 //!
-//! The RE note is atlantis4-re `subsystems/cd2004-dialogs.md`. Not ported
-//! (the note's open items): the speakers shown by a place animation
-//! (`[Spw]`, FUN_0046d3f0, and the warp drawn into the letterbox by
-//! FUN_00444870), the head and background picked from a place animation
-//! that shows the speaker (`[IdText]`: FUN_0046f980's and FUN_004700d0's
-//! lookups of the animation table 0x006ea3ac), and the debug fill of a
-//! head that failed to open (FUN_004c2bb0 with 0x7e7eff).
+//! The RE note is atlantis4-re `subsystems/cd2004-dialogs.md`. With the
+//! speakers shown by a place animation (`[Spw]`, FUN_0046d3f0, and the
+//! panorama drawn letterboxed by FUN_00444870), the head and background
+//! picked from a place animation that shows the speaker (`[IdText]`:
+//! FUN_0046f980's and FUN_004700d0's lookups of the animation table
+//! 0x006ea3ac) and the debug fill of a head that failed to open
+//! (FUN_004c2bb0 with 0x7e7eff).
 
 use std::sync::Arc;
 
 use atlantis3_data::bink::BinkVideo;
 use atlantis3_data::evolution2004_dialog::{
-    background_names, head_name, is_player, parse_com_2004, parse_info_2004, voice_name,
-    DialOptions, Dialogs2004,
+    background_names, background_names_anim, head_name, is_player, parse_com_2004, parse_info_2004,
+    voice_name, DialOptions, Dialogs2004,
 };
 
 use super::{stretch_video, Game, Mode};
@@ -184,6 +184,9 @@ pub(crate) struct Dialog2004 {
     /// The dialog surface (CDialogue +0x30), in the display's format.
     pub surface: Surface,
     pub size: (usize, usize),
+    /// The line's speaker has `[Spw]` (FUN_004758f0): shown by a place
+    /// animation, no head film.
+    pub spw: bool,
 }
 
 impl Game {
@@ -271,6 +274,7 @@ impl Game {
             background_path: String::new(),
             surface: Surface::new(depth, size.0 * size.1),
             size,
+            spw: false,
         });
         // `CDialogue::Open(n)`: the fallback of a missing dialog, line 0,
         // `NextReplique`, `Perform` (their results ignored).
@@ -328,16 +332,20 @@ impl Game {
         }
         let speaker = self.speaker_2004_of(n, line);
         let perso = self.dialogs_2004().perso(&speaker);
+        run.spw = perso.spw;
         if !run.voixoff {
             if perso.spw {
-                // @ 0x0046de36..0x0046ded2: the head closed, then FUN_0046d3f0.
+                // @ 0x0046de36..0x0046ded2: the stretch surface closed, the
+                // head closed and its path emptied, then FUN_0046d3f0.
                 run.head = None;
-                self.not_ported("a 2004 dialog's [Spw] speaker (its place animation)");
+                self.spw_speaker_2004(&perso);
             } else {
                 self.line_head_2004(run, n, line, &speaker);
             }
         } else if !run.light && perso.spw {
-            self.not_ported("a 2004 dialog's [Spw] speaker (its place animation)");
+            // @ 0x0046ded2 from the voice-over test: a voice-over line of
+            // a `[Spw]` speaker (not light) shows its animation too.
+            self.spw_speaker_2004(&perso);
         }
         // The voice: `loc\voix\<Langue>\AT<dddd><ll>.ogg` (FUN_004710f0),
         // `LoadSfx(.., 1, 2, 0)` then, loaded, `PlaySfx` (@ 0x0046df1d,
@@ -383,13 +391,17 @@ impl Game {
             .head_number(n, line, &mut || rand.rand());
         self.rand = rand;
         let perso = self.dialogs_2004().perso(speaker);
-        if !is_player(speaker) && !perso.id_texts.is_empty() {
-            // FUN_0046f980 / FUN_004700d0 look for a shown place animation
-            // of the speaker's `[IdText]`s; without one, `Nom[0]` and the
-            // view's name, as here.
-            self.not_ported("a 2004 dialog head picked from a place animation ([IdText])");
-        }
-        let head = head_name(perso.nom(0), number);
+        // FUN_0046f980 and FUN_004700d0: a speaker that is not the player
+        // (FUN_00410520) with a shown place animation of one of its
+        // `[IdText]`s takes `Nom[k]` / `Fond[k]` of that IdText and the
+        // animation state's view in the background's name.
+        let anim = if is_player(speaker) {
+            None
+        } else {
+            self.shown_id_text_2004(&perso)
+        };
+        let k = anim.map_or(0, |(k, _)| k);
+        let head = head_name(perso.nom(k), number);
         let warp = self
             .place
             .cube
@@ -397,7 +409,10 @@ impl Game {
             .next()
             .unwrap_or_default()
             .to_string();
-        let [bg1, bg2] = background_names(perso.fond(0), &warp, number);
+        let [bg1, bg2] = match anim {
+            Some((_, made_for)) => background_names_anim(perso.fond(k), &warp, made_for, number),
+            None => background_names(perso.fond(k), &warp, number),
+        };
         let bg = if self.files.size(&bg1).is_some() {
             bg1
         } else {
@@ -426,6 +441,77 @@ impl Game {
                 None => log::warn!("Probleme d'ouverture du Bink : {head}"),
             }
         }
+    }
+
+    /// The lookup of FUN_0046f980 and FUN_004700d0: the index k of the
+    /// first `[IdText]` that the hide table does not hide (FUN_004522b0)
+    /// with a place-animation slot (table 0x006ea3ac) of kind 1, its
+    /// `#PERSONNAGES#` id (FUN_00466f70(0, ..)) and shown (+0x28 = 1); and
+    /// that slot's state `+0xc` (the view the animation was made for).
+    fn shown_id_text_2004(
+        &self,
+        perso: &atlantis3_data::evolution2004_dialog::Perso2004,
+    ) -> Option<(usize, u32)> {
+        perso.id_texts.iter().enumerate().find_map(|(k, name)| {
+            if self.transition_hidden(name) {
+                return None;
+            }
+            let id = self
+                .names
+                .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
+                .ok()? as i32;
+            self.slots
+                .slots
+                .iter()
+                .find(|s| s.kind == 1 && s.id == id && s.shown)
+                .map(|s| (k, s.state.made_for))
+        })
+    }
+
+    /// FUN_0046d3f0, a `[Spw]` speaker's line: a head number drawn from
+    /// its `[Neutre]` (FUN_0046d290: `Neutre[rand() % n]`; the original
+    /// divides by zero without one); the first `[IdText]` not hidden
+    /// (FUN_004522b0) whose `#PERSONNAGES#` id has a slot of kind 1
+    /// playing that animation number (state `+0x04`, shown or not) →
+    /// FUN_00466540(id, number, 1, 1, 0): every slot of (id, 1) hidden
+    /// (FUN_004663d0), the one of that number shown (FUN_004660d0), and
+    /// the hide table's row of (id, 1) shown (FUN_00466460).
+    fn spw_speaker_2004(&mut self, perso: &atlantis3_data::evolution2004_dialog::Perso2004) {
+        if perso.neutre.is_empty() {
+            log::warn!("[Spw] speaker without [Neutre]: the original divides by zero");
+            return;
+        }
+        let r = self.rand.rand() as usize;
+        let number = perso.neutre[r % perso.neutre.len()];
+        let found = perso.id_texts.iter().find_map(|name| {
+            if self.transition_hidden(name) {
+                return None;
+            }
+            let id = self
+                .names
+                .id(atlantis2_data::defnames::PERSONNAGES, name.as_bytes())
+                .ok()? as i32;
+            self.slots
+                .slots
+                .iter()
+                .any(|s| s.kind == 1 && s.id == id && s.state.anim as i32 == number)
+                .then_some(id)
+        });
+        let Some(id) = found else {
+            return;
+        };
+        log::debug!("[Spw] speaker: perso {id} animation {number}");
+        self.slots.hide(id, 1, self.now);
+        self.slots.show(id, 1, number, self.now);
+        if let Some(s) = self.script.as_mut() {
+            s.show_row(id, true, 1);
+        }
+    }
+
+    /// Tests: the current 2004 line's speaker has `[Spw]`.
+    #[doc(hidden)]
+    pub fn dialog_2004_spw(&self) -> bool {
+        self.dialog2004.as_ref().is_some_and(|d| d.spw)
     }
 
     /// `CDialogue::Perform` (FUN_0046dfa0): the voice's end goes to the
@@ -462,6 +548,20 @@ impl Game {
             return true;
         }
         let Some(h) = run.head.as_mut() else {
+            // @ 0x0046e33d..: no head. `[Spw]` → the stretch surface is
+            // closed, so FUN_00411c30 is the back buffer: cleared to 0
+            // (FUN_004a58d0) and the panorama drawn in rows 0x4c ..
+            // h − 0x4c − 1 (FUN_00444870); `Render` then draws nothing.
+            // Else the dialog surface filled with 0x7e7eff (FUN_004c2bb0, a
+            // head that failed to open).
+            if run.spw {
+                self.draw_letterbox_2004(LETTERBOX);
+            } else {
+                match &mut run.surface {
+                    Surface::Xrgb8888(s) => s.fill(0x007e_7eff),
+                    Surface::Rgb565(s) => s.fill(<u16 as PagePixel>::from_argb(0x007e_7eff)),
+                }
+            }
             return true;
         };
         if !h.step(self.now) {
@@ -557,8 +657,10 @@ impl Game {
         let Some(run) = self.dialog2004.as_ref() else {
             return;
         };
-        if run.voixoff {
-            // The panorama already is on the screen (Perform's draw).
+        if run.voixoff || (run.spw && run.head.is_none()) {
+            // The panorama already is on the screen (Perform's draw);
+            // `Render` (FUN_0046ea60) draws nothing for a `[Spw]` speaker
+            // without a head.
             return;
         }
         let (w, h) = run.size;
@@ -576,9 +678,9 @@ impl Game {
     /// layout (9, 11, 21, 19) then white at (10, 10, 20, 20), both with the
     /// arguments (4, 1) (@ 0x0046f663, @ 0x0046f7ce). The 2004 program
     /// draws with GDI's `DrawTextA` (FUN_004213a0, FUN_004211d0; the last
-    /// argument 1 aligns to the bottom, @ 0x0042127a); the meaning of the
-    /// 4 is [UNKNOWN]: the port draws with *Atlantis III*'s dialog layouts
-    /// ([`crate::text::DIALOG_SHADOW`], [`crate::text::DIALOG_TEXT`]).
+    /// argument 1 aligns to the bottom, @ 0x0042127a; the 4 is
+    /// [`crate::text::HALIGN_2004`]: left, right-to-left for a Hebrew or
+    /// Arabic font): *Atlantis III*'s dialog layouts with that code.
     pub(crate) fn dialog_text_2004(&mut self) {
         if !self.startup.config.subtitle_on {
             return;
@@ -597,8 +699,14 @@ impl Game {
             w,
             h,
             &text,
-            crate::text::DIALOG_SHADOW,
-            crate::text::DIALOG_TEXT,
+            crate::text::Zone {
+                halign: crate::text::HALIGN_2004,
+                ..crate::text::DIALOG_SHADOW
+            },
+            crate::text::Zone {
+                halign: crate::text::HALIGN_2004,
+                ..crate::text::DIALOG_TEXT
+            },
             0xffffff,
         ));
     }
