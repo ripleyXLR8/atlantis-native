@@ -77,6 +77,7 @@
 //! engine). The engine's side is `game::puzzles2004`.
 
 pub mod bulle;
+pub mod caisses;
 pub mod catapulte;
 pub mod defender;
 pub mod frogger;
@@ -345,17 +346,17 @@ pub trait Puzzle: std::any::Any {
 
 /// `INITPUZZLE`: the game's init (loads, set-up). The engine then runs
 /// the start's common part ([`PuzzleId::mode`], [`PuzzleId::cfg_index`]).
-/// `None` for the games ported elsewhere or not yet.
+/// All eight are ported (the `Option` kept for the engine's "not ported" path).
 pub fn init(id: PuzzleId, host: &mut dyn Host) -> Option<Box<dyn Puzzle>> {
     match id {
         PuzzleId::Bulle => Some(Box::new(bulle::Bulle::init(host))),
+        PuzzleId::Caisses => Some(Box::new(caisses::Caisses::init(host))),
         PuzzleId::Catapulte => Some(Box::new(catapulte::Catapulte::init(host))),
         PuzzleId::Defender => Some(Box::new(defender::Defender::init(host))),
         PuzzleId::Frogger => Some(Box::new(frogger::Frogger::init(host))),
         PuzzleId::Hanoi => Some(Box::new(hanoi::Hanoi::init(host))),
         PuzzleId::Pong => Some(Box::new(pong::Pong::init(host))),
         PuzzleId::Tron => Some(Box::new(tron::Tron::init(host))),
-        _ => None,
     }
 }
 

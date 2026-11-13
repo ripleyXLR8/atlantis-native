@@ -1,0 +1,46 @@
+# PUZ_CAISSES: FUN_0047d180's four levels under emulation.
+# Producer: a4cd_caisses_levels.py (original code of atlantis4-cd-en-3022848,
+#   MD5 2199bc93d2ac3f8b4279e0db898559e8).
+# 'level L start=(row,col) org=(+8,+0xc) cell=(+0x10,+0x14) size=(+0x18 cols,+0x1c rows)',
+# then each row (the outer key, the player's 0x00716dc0, drawn at y = oy + h·row)
+#   with its cells by column (the inner key, 0x00716dc4, x = ox + w·col).
+level 0 start=(4,4) org=(200,100) cell=(50,50) size=(8,8)
+  rows (outer keys) 0..7, cols (inner keys) 0..7, cells 64
+  row 0: 22111222
+  row 1: 22141222
+  row 2: 22101111
+  row 3: 11130341
+  row 4: 14030111
+  row 5: 11113122
+  row 6: 22214122
+  row 7: 22211122
+level 1 start=(1,1) org=(175,75) cell=(50,50) size=(9,9)
+  rows (outer keys) 0..8, cols (inner keys) 0..8, cells 81
+  row 0: 111112222
+  row 1: 100012222
+  row 2: 103312111
+  row 3: 103012141
+  row 4: 111011141
+  row 5: 211000041
+  row 6: 210001001
+  row 7: 210001111
+  row 8: 211111222
+level 2 start=(3,2) org=(150,125) cell=(50,50) size=(10,7)
+  rows (outer keys) 0..6, cols (inner keys) 0..9, cells 70
+  row 0: 2111111122
+  row 1: 2100000111
+  row 2: 1131110001
+  row 3: 1000300301
+  row 4: 1044103011
+  row 5: 1144100012
+  row 6: 2111111112
+level 3 start=(2,1) org=(250,100) cell=(50,50) size=(6,8)
+  rows (outer keys) 0..7, cols (inner keys) 0..5, cells 48
+  row 0: 211112
+  row 1: 110012
+  row 2: 103012
+  row 3: 113011
+  row 4: 110301
+  row 5: 143001
+  row 6: 144541
+  row 7: 111111

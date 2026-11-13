@@ -8,12 +8,15 @@
 //! `cd2004_defender.txt`: `a4cd_defender.py` (FUN_00487460).
 //! `cd2004_pong.txt`: `a4cd_pong.py` (FUN_0049b9a0).
 //! `cd2004_bulle.txt`: `a4cd_bulle.py` (FUN_0048dcf0).
+//! `cd2004_caisses.txt`: `a4cd_caisses.py` (FUN_00477320);
+//! `cd2004_caisses_levels.txt`: `a4cd_caisses_levels.py` (FUN_0047d180).
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
 use atlantis3_data::spr::Bank;
 use atlantis3_engine::puzzles2004::bulle::{self, Bulle};
+use atlantis3_engine::puzzles2004::caisses::{self, Caisses};
 use atlantis3_engine::puzzles2004::catapulte::{Catapulte, State};
 use atlantis3_engine::puzzles2004::defender;
 use atlantis3_engine::puzzles2004::pong::Pong;
@@ -767,6 +770,101 @@ fn bulle_drives() {
                 got.push("end".to_string());
                 break;
             }
+        }
+        for (i, (g, w)) in got.iter().zip(want.iter()).enumerate() {
+            assert_eq!(g, w, "{name}: line {i}");
+        }
+        assert_eq!(got.len(), want.len(), "{name}");
+    }
+}
+
+/// `cd2004_caisses_levels.txt` (`a4cd_caisses_levels.py`: FUN_0047d180's
+/// maps) against the port's [`caisses::LEVELS`].
+#[test]
+fn caisses_levels() {
+    let path = format!(
+        "{}/tests/golden/cd2004_caisses_levels.txt",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let text = std::fs::read_to_string(path).unwrap();
+    let mut want = Vec::new();
+    for l in text.lines().filter(|l| !l.starts_with('#')) {
+        let l = l.trim();
+        if let Some(r) = l.strip_prefix("row ") {
+            want.push(r.split(": ").nth(1).unwrap().to_string());
+        } else if l.starts_with("level") {
+            want.push(l.to_string());
+        }
+    }
+    let mut got = Vec::new();
+    for (i, d) in caisses::LEVELS.iter().enumerate() {
+        got.push(format!(
+            "level {i} start=({},{}) org=({},{}) cell=({},{}) size=({},{})",
+            d.start.0, d.start.1, d.org.0, d.org.1, d.cell.0, d.cell.1, d.cols, d.rows
+        ));
+        got.extend(d.cells[..d.rows as usize].iter().map(|s| s.to_string()));
+    }
+    assert_eq!(got, want);
+}
+
+fn caisses_dump(g: &Caisses, m: &Mock, tag: &str) -> String {
+    let grid = &g.grids[g.level.min(3)];
+    let rows: Vec<String> = (0..grid.rows)
+        .map(|r| (0..grid.cols).map(|c| grid.get(r, c).to_string()).collect())
+        .collect();
+    let v = |n: &str| m.vars.get(n).copied().unwrap_or(0);
+    format!(
+        "{tag} level={} pos={},{} click={} key={:x} vars={},{} cells={}",
+        g.level,
+        bits(g.pos.0),
+        bits(g.pos.1),
+        u8::from(m.click),
+        m.key_code,
+        v("CAISSES_GAGNE"),
+        v("CAISSES_QUIT"),
+        rows.join("/")
+    )
+}
+
+/// `a4cd_caisses.py`'s steps replayed on the port (the click decoded as
+/// the harness's collision answered): the four levels won, and a quit.
+#[test]
+fn caisses_frames() {
+    use caisses::{Click, Dir};
+    for (name, want) in golden("cd2004_caisses.txt") {
+        let mut m = Mock::new(0);
+        let mut g = Caisses::new();
+        let mut got = vec![caisses_dump(&g, &m, "init")];
+        for line in want.iter().filter(|l| l.as_bytes()[0].is_ascii_digit()) {
+            let p: Vec<&str> = line.split(' ').collect();
+            let click = match &p[1]["click=".len()..] {
+                "-" => None,
+                "reset" => Some(Click::Reset),
+                "quit" => Some(Click::Quit),
+                "miss" => Some(Click::Miss),
+                "up" => Some(Click::Arrow(Dir::Up)),
+                "down" => Some(Click::Arrow(Dir::Down)),
+                "left" => Some(Click::Arrow(Dir::Left)),
+                "right" => Some(Click::Arrow(Dir::Right)),
+                c => panic!("{c}"),
+            };
+            m.key_code = i32::from_str_radix(&p[2]["key=".len()..], 16).unwrap();
+            if click.is_some() {
+                m.click = true;
+            }
+            let over = m.vars.get("CAISSES_GAGNE").copied().unwrap_or(0) != 0
+                || m.vars.get("CAISSES_QUIT").copied().unwrap_or(0) != 0;
+            if !over {
+                // A click left set and no new target: nothing hit.
+                let click = if m.click {
+                    click.or(Some(Click::Miss))
+                } else {
+                    None
+                };
+                g.play(click, &mut m);
+            }
+            got.append(&mut m.log);
+            got.push(caisses_dump(&g, &m, &p[..3].join(" ")));
         }
         for (i, (g, w)) in got.iter().zip(want.iter()).enumerate() {
             assert_eq!(g, w, "{name}: line {i}");
