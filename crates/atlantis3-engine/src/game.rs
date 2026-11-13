@@ -4509,7 +4509,16 @@ impl Host for Game {
     }
 
     fn puzzle_2004(&mut self, op: atlantis2_engine::script::PuzzleOp, name: &str) {
-        self.puzzle_op_2004(op, name);
+        self.puzzle_op_2004(op, name, None);
+    }
+
+    fn puzzle_2004_with_script(
+        &mut self,
+        op: atlantis2_engine::script::PuzzleOp,
+        name: &str,
+        script: &mut Script,
+    ) {
+        self.puzzle_op_2004(op, name, Some(script));
     }
 
     fn zone_by_name_2004(&mut self, name: &str, on: bool) {

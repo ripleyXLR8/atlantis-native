@@ -4,7 +4,7 @@
 
 use std::sync::Arc;
 
-use atlantis2_engine::script::PuzzleOp;
+use atlantis2_engine::script::{PuzzleOp, Script};
 use atlantis3_data::spr::Bank;
 
 use super::{stretch_video, Game, Mode};
@@ -27,6 +27,10 @@ pub(crate) struct State {
     pub fin_in_frame: bool,
     /// The virtual keys held (`GetKeyboardState`).
     pub keys: Box<[bool; 256]>,
+    /// The last key's code (0x006e9e6c) and Ctrl at that event
+    /// (0x006e9e71).
+    pub key_code: i32,
+    pub key_ctrl: bool,
 }
 
 impl Default for State {
@@ -38,6 +42,8 @@ impl Default for State {
             surface: None,
             fin_in_frame: false,
             keys: Box::new([false; 256]),
+            key_code: 0,
+            key_ctrl: false,
         }
     }
 }
@@ -45,27 +51,32 @@ impl Default for State {
 impl Game {
     /// `INITPUZZLE` / `STARTPUZZLE` / `FINPUZZLE` (the dispatchers
     /// FUN_004759c0, FUN_00475f80, FUN_00475ca0).
-    pub(crate) fn puzzle_op_2004(&mut self, op: PuzzleOp, name: &str) {
+    /// `script`: the interpreter when it runs the key (taken out of the
+    /// game meanwhile).
+    pub(crate) fn puzzle_op_2004(&mut self, op: PuzzleOp, name: &str, script: Option<&mut Script>) {
         let Some(id) = PuzzleId::from_name(name) else {
             log::warn!("{op:?}PUZZLE={name}: no such game");
             return;
         };
         log::info!("{op:?}PUZZLE={name}");
         match op {
-            PuzzleOp::Init => self.init_puzzle_2004(id),
+            PuzzleOp::Init => self.init_puzzle_2004(id, script),
             PuzzleOp::Start => self.start_puzzle_2004(id),
             PuzzleOp::Fin => self.fin_puzzle_2004(id),
         }
     }
 
     /// A game's init, which ends with its start.
-    fn init_puzzle_2004(&mut self, id: PuzzleId) {
+    fn init_puzzle_2004(&mut self, id: PuzzleId, mut script: Option<&mut Script>) {
         // A game already loaded is dropped (the original overwrites its
         // globals; no CD script inits a second one).
         if let Some(mut g) = self.puzzles2004.game.take() {
-            g.free(&mut Cx { g: self });
+            g.free(&mut Cx {
+                g: self,
+                s: script.as_deref_mut(),
+            });
         }
-        let made = pz::init(id, &mut Cx { g: self });
+        let made = pz::init(id, &mut Cx { g: self, s: script });
         match made {
             Some(g) => {
                 self.puzzles2004.game = Some(g);
@@ -108,7 +119,7 @@ impl Game {
         }
         match self.puzzles2004.game.take() {
             Some(mut g) => {
-                g.free(&mut Cx { g: self });
+                g.free(&mut Cx { g: self, s: None });
                 self.puzzles2004.loaded = None;
             }
             // Its own frame runs: freed when it returns.
@@ -122,9 +133,9 @@ impl Game {
         let running = self.puzzles2004.mode;
         if running.is_some() && running == self.puzzles2004.loaded {
             if let Some(mut g) = self.puzzles2004.game.take() {
-                g.frame(&mut Cx { g: self });
+                g.frame(&mut Cx { g: self, s: None });
                 if std::mem::take(&mut self.puzzles2004.fin_in_frame) {
-                    g.free(&mut Cx { g: self });
+                    g.free(&mut Cx { g: self, s: None });
                     self.puzzles2004.loaded = None;
                 } else {
                     self.puzzles2004.game = Some(g);
@@ -151,7 +162,14 @@ impl Game {
     /// A virtual key pressed or released (the state `GetKeyboardState`
     /// gives the games).
     pub fn key_2004(&mut self, vk: u8, down: bool) {
-        self.puzzles2004.keys[usize::from(vk)] = down;
+        let p = &mut self.puzzles2004;
+        p.keys[usize::from(vk)] = down;
+        // The key handlers: a press stores its code (0x0042c470 @
+        // 0x0042c4fe), a release 0 (0x0042c3f0 @ 0x0042c400); both Ctrl
+        // (@ 0x0042c417 / 0x0042c4f5). The press handler's flags
+        // 0x00719d8e / 0x00719d8c are not ported [UNKNOWN].
+        p.key_code = if down { pz::key_code_of_vk(vk) } else { 0 };
+        p.key_ctrl = p.keys[0x11];
     }
 
     /// Tests: the game whose loop mode runs.
@@ -178,6 +196,22 @@ impl Game {
 /// The games' [`Host`]: the game engine while a game runs.
 pub(crate) struct Cx<'a> {
     pub g: &'a mut Game,
+    /// The interpreter when it runs the key (`INITPUZZLE`): the game's
+    /// own is taken out meanwhile.
+    pub s: Option<&'a mut Script>,
+}
+
+impl Cx<'_> {
+    fn script(&self) -> Option<&Script> {
+        self.s.as_deref().or(self.g.script.as_deref())
+    }
+
+    fn script_mut(&mut self) -> Option<&mut Script> {
+        match self.s.as_deref_mut() {
+            Some(s) => Some(s),
+            None => self.g.script.as_deref_mut(),
+        }
+    }
 }
 
 impl Host for Cx<'_> {
@@ -220,29 +254,30 @@ impl Host for Cx<'_> {
     }
 
     fn var(&self, name: &str) -> i32 {
-        self.g
-            .script
-            .as_ref()
-            .and_then(|s| s.var(name))
-            .unwrap_or(0)
+        self.script().and_then(|s| s.var(name)).unwrap_or(0)
     }
 
     fn set_var(&mut self, name: &str, v: i32) {
         self.g.tr(|| format!("var {name} {v}"));
-        self.g.set_var(name, v);
+        if let Some(s) = self.script_mut() {
+            if let Ok(k) = s
+                .names
+                .id(atlantis2_data::defnames::VARIABLES, name.as_bytes())
+            {
+                s.vars[k] = v;
+            }
+        }
     }
 
     fn flag(&self, n: usize) -> i32 {
-        self.g
-            .script
-            .as_ref()
+        self.script()
             .and_then(|s| s.flags.get(n).copied())
             .unwrap_or(0)
     }
 
     fn set_flag(&mut self, n: usize, v: i32) {
         self.g.tr(|| format!("flag {n} {v}"));
-        if let Some(f) = self.g.script.as_mut().and_then(|s| s.flags.get_mut(n)) {
+        if let Some(f) = self.script_mut().and_then(|s| s.flags.get_mut(n)) {
             *f = v;
         }
     }
@@ -346,5 +381,25 @@ impl Host for Cx<'_> {
         if let Some(t) = self.g.trace.as_mut() {
             t.push(line);
         }
+    }
+
+    fn key_code(&self) -> i32 {
+        self.g.puzzles2004.key_code
+    }
+
+    fn set_key_code(&mut self, code: i32) {
+        self.g.puzzles2004.key_code = code;
+    }
+
+    fn key_ctrl(&self) -> bool {
+        self.g.puzzles2004.key_ctrl
+    }
+
+    fn in_bag(&self, name: &str) -> bool {
+        self.script().is_some_and(|s| {
+            s.names
+                .id(atlantis2_data::defnames::OBJETS, name.as_bytes())
+                .is_ok_and(|id| s.bag.iter().any(|e| e.id == id as i32))
+        })
     }
 }

@@ -1082,7 +1082,7 @@ impl Script {
     ) -> usize {
         let t = self.line_text(src, p + 1);
         let name = t.split(')').next().unwrap_or("").to_string();
-        host.puzzle_2004(op, &name);
+        host.puzzle_2004_with_script(op, &name, self);
         if op == super::PuzzleOp::Start {
             return self.wait(next);
         }

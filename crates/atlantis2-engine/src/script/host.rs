@@ -348,6 +348,14 @@ pub trait Host {
     /// After `STARTPUZZLE` the section waits ([`PuzzleOp::Start`]).
     fn puzzle_2004(&mut self, op: PuzzleOp, name: &str) {}
 
+    /// The same with the interpreter at hand (the games' inits read and
+    /// write variables and the bag while the script runs the key). By
+    /// default [`Host::puzzle_2004`].
+    fn puzzle_2004_with_script(&mut self, op: PuzzleOp, name: &str, script: &mut Script) {
+        let _ = script;
+        self.puzzle_2004(op, name);
+    }
+
     /// The 2004 `ENABLEZONE=NAME` / `DISABLEZONE=NAME` (@ 0x0044f7ac..
     /// 0x0044f8e7): the name is the text up to the `)`; FUN_004420f0
     /// toggles every zone of that name in the place's views.
