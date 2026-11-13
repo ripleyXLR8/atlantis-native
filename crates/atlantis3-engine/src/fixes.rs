@@ -35,23 +35,40 @@ pub struct Fixes {
     /// `fix_warpres_cd`: the options page's `Version = CD` rule (and a
     /// missing `warp\Warp1024\`) applied at start-up ([`Fixes::apply`]).
     pub warpres_cd: bool,
+    /// `fix_smooth_turn` (*Atlantis Evolution*'s 2004 program only): the
+    /// warp is drawn with the camera turned by the part of the next 1/25 s
+    /// look step already elapsed. The original turns the camera only at
+    /// its 25 Hz look steps (FUN_0042e3b0: speeds × 0.8, then the turns),
+    /// so on a 60 Hz display the turn moves in visible steps. The step
+    /// itself, its speeds, inertia and limits are unchanged; only the
+    /// drawn orientation is interpolated ([`crate::Game`]'s render).
+    pub smooth_turn: bool,
 }
 
 impl Default for Fixes {
     /// Every fix on.
     fn default() -> Fixes {
-        Fixes { warpres_cd: true }
+        Fixes {
+            warpres_cd: true,
+            smooth_turn: true,
+        }
     }
 }
 
 impl Fixes {
     /// Every fix off: the original game (`--original`).
     pub fn original() -> Fixes {
-        Fixes { warpres_cd: false }
+        Fixes {
+            warpres_cd: false,
+            smooth_turn: false,
+        }
     }
 
     /// The keys of `settings.ini`, with their fields.
-    const KEYS: [(&'static str, Field); 1] = [("fix_warpres_cd", |f| &mut f.warpres_cd)];
+    const KEYS: [(&'static str, Field); 2] = [
+        ("fix_warpres_cd", |f| &mut f.warpres_cd),
+        ("fix_smooth_turn", |f| &mut f.smooth_turn),
+    ];
 
     /// `key = value` lines over the defaults; unknown keys and bad values
     /// keep the default.

@@ -2123,6 +2123,58 @@ impl Game {
         }
     }
 
+    /// The warp's camera matrix as drawn. With `fix_smooth_turn` on the
+    /// 2004 data, while the player looks around (no turn, no camera lock),
+    /// the camera of the next look step (a copy of the look and the camera
+    /// run one step, [`Look::frame`]) is blended with the current one by
+    /// the step's elapsed part (`look_acc`, in 0..1): the turn is drawn
+    /// continuously instead of in 1/25 s steps. The game's own camera is
+    /// not changed. Otherwise the camera's matrix, as the original.
+    /// Tests: [`Game::render_matrix`] and the camera's own matrix.
+    #[doc(hidden)]
+    pub fn test_matrices(&self) -> ([f32; 9], [f32; 9]) {
+        (self.render_matrix(), self.camera.matrix())
+    }
+
+    fn render_matrix(&self) -> [f32; 9] {
+        let smooth = self.fixes.smooth_turn
+            && self.files.is_evolution_2004()
+            && self.mode == Mode::Warp
+            && self.moving.turn.is_none()
+            && !self.puzzles.cam_lock
+            && !self.harness_turns;
+        let frac = self.look_acc;
+        if !smooth || !(frac > 0.0 && frac < 1.0) {
+            return self.camera.matrix();
+        }
+        let mut next = self.camera.clone();
+        let mut look = self.look.clone();
+        if self.ship.engaged() {
+            let mut ship = self.ship.clone();
+            look.frame(&mut crate::tangage::ShipCamera {
+                cam: &mut next,
+                ship: &mut ship,
+            });
+        } else {
+            look.frame(&mut next);
+        }
+        let (a, mut b) = (self.camera.q, next.q);
+        if a.iter().zip(&b).map(|(x, y)| x * y).sum::<f32>() < 0.0 {
+            b = b.map(|x| -x);
+        }
+        let mut q = [0.0f32; 4];
+        for k in 0..4 {
+            q[k] = a[k] + (b[k] - a[k]) * frac;
+        }
+        let n = q.iter().map(|x| x * x).sum::<f32>().sqrt();
+        if n > 0.0 {
+            q = q.map(|x| x / n);
+        }
+        let mut drawn = self.camera.clone();
+        drawn.q = q;
+        drawn.matrix()
+    }
+
     /// @ 0x004317a0: `dt` since the last step (at most 0.5 s) × 25 into the
     /// accumulator; per whole tick, a turn step or the look's inertia and
     /// limits, and the 76° field of view; then the centre pick.
@@ -2261,7 +2313,7 @@ impl Game {
         if self.place.faces.any_empty() {
             return false;
         }
-        let m = self.camera.matrix();
+        let m = self.render_matrix();
         let proj = self.camera.projection();
         if self.slots.evolution {
             // FUN_00444e70 → FUN_00439fc0: the sounds before the sprites.
