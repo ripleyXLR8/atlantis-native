@@ -316,6 +316,13 @@ pub trait Host {
         0
     }
 
+    /// The 2004 `PLAYVOICE=d,l,r,g,b` (atlantis4-cd-en-3022848 @ 0x0044ec99:
+    /// five numbers, FUN_004109f0(d, l, r, g, b, 1)).
+    fn play_voice_2004(&mut self, values: [i32; 5]) {
+        let [d, l, r, g, _] = values;
+        self.play_voice([d, l, r, g]);
+    }
+
     /// The world's part of `Interp_SetMonde` (@ 0x00484df0): its object
     /// and subject sprite banks, its dialog texts, and its disc (1 → CD 1,
     /// 2 → CD 2, 3 → CD 3, 4 → CD 4, 6 → CD 4; 5, Tibet, keeps the disc in

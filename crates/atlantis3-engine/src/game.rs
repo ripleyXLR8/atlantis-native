@@ -4399,6 +4399,11 @@ impl Host for Game {
             .map_or(0, |s| s.frame)
     }
 
+    fn play_voice_2004(&mut self, values: [i32; 5]) {
+        let [d, l, r, g, b] = values;
+        self.play_voice_c(d, l, r, g, b);
+    }
+
     fn tangage_warp_2004(&mut self, v: i32, n: [i32; 6]) {
         if v == 0 {
             self.ship.stop();

@@ -568,6 +568,25 @@ impl Script {
             host.new_sound(&format!("sound{value:03}.apc"));
             return Some(next);
         }
+        if self.evolution_2004 && is(self, "PLAYVOICE") {
+            // atlantis4-cd-en-3022848 @ 0x0044ec99..0x0044ed49: the value,
+            // then four more numbers, each `atol` past the previous one's
+            // digits and the non-digits after them; FUN_004109f0(n1, n2,
+            // n3, n4, n5, 1).
+            let mut n = [value, 0, 0, 0, 0];
+            let mut i = p + 1;
+            for x in n.iter_mut().skip(1) {
+                while self.b(src, i).is_ascii_digit() {
+                    i += 1;
+                }
+                while !matches!(self.b(src, i), 0 | b'0'..=b'9') {
+                    i += 1;
+                }
+                *x = self.atoi_at(src, i);
+            }
+            host.play_voice_2004(n);
+            return Some(next);
+        }
         if is(self, "PLAYVOICE") {
             let mut i = p + 1;
             let n = [0; 4].map(|_| self.parse_int(src, &mut i));
@@ -819,7 +838,9 @@ impl Script {
             host.quick_load(value, self);
             return Some(self.len(src));
         }
-        if key == k.monde {
+        // The 2004 program has no `MONDE` branch (atlantis4-cd-en-3022848
+        // FUN_0044c850): the default store, its world 0x0070d3f4 stays 1.
+        if key == k.monde && !self.evolution_2004 {
             self.vars[key] = value;
             self.a3.world = value;
             self.bag.clear();
@@ -841,11 +862,12 @@ impl Script {
             return Some(next);
         }
         if self.evolution_2004 && key == self.keys.changecd {
+            // @ 0x00450919..0x0045093a: FUN_0045d580(n), FUN_00452310(n),
+            // the line's end: the variable is not stored.
             host.change_cd_2004(value);
+            return Some(next);
         }
-        // `CHANGECD` and every other key: the default store [the 2004
-        // branch (@ 0x00450908..0x0045093a) stores nothing itself; the
-        // store is kept: UNKNOWN whether the variable is read].
+        // `CHANGECD` and every other key: the default store.
         self.vars[key] = value;
         Some(next)
     }

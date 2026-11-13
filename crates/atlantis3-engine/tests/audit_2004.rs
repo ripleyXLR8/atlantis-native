@@ -263,3 +263,20 @@ fn new_game_clears_the_hide_table() {
     assert!(g.new_game());
     assert!(!has(&g));
 }
+
+/// `CHANGECD=` stores nothing (@ 0x00450919..0x0045093a); `MONDE=` is a
+/// plain store (no branch); `PLAYVOICE=` reads five numbers (@ 0x0044ec99).
+#[test]
+fn changecd_monde_playvoice() {
+    let Some((mut g, _)) = cabin() else { return };
+    g.set_var("CHANGECD", -7);
+    g.run_command("(changecd=1)");
+    assert_eq!(var(&g, "CHANGECD"), -7);
+    g.run_command("(monde=3)");
+    assert_eq!(var(&g, "MONDE"), 3);
+    assert_eq!(g.script().unwrap().a3.world, 1, "0x0070d3f4 stays 1");
+    g.trace = Some(Vec::new());
+    g.run_command("(playvoice=1,2,3,4,5)");
+    let trace = g.trace.take().unwrap();
+    assert!(trace.iter().any(|l| l == "voice 1 2 3 4 5"), "{trace:?}");
+}
