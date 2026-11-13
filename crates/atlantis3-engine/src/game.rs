@@ -1396,7 +1396,9 @@ impl Game {
         });
     }
 
-    /// The pointer `Interface.spr` #40 at the free pointer (@ 0x004281e0).
+    /// The pointer `Interface.spr` #40 at the free pointer (@ 0x004281e0;
+    /// the 2004 program's FUN_00429460, the same code, draws the frame
+    /// its `SetCurseur` calls set: #29, [`pointer_frame`]).
     fn draw_pointer(&mut self) {
         if let Some(bank) = &self.interface {
             let (w, h) = (self.width, self.height);
@@ -1405,7 +1407,7 @@ impl Game {
                 w,
                 h,
                 bank,
-                40,
+                pointer_frame(self.files.is_evolution_2004()),
                 self.pointer.0,
                 self.pointer.1,
                 1.0,
@@ -2153,7 +2155,11 @@ impl Game {
         let Some((kind, mode)) = hit.or(zone_kind.map(|k| (k, 0))) else {
             return;
         };
-        let range = cursor_range(kind, mode, self.cursor_range);
+        let range = if self.files.is_evolution_2004() {
+            cursor_range_2004(kind, mode, self.cursor_range)
+        } else {
+            cursor_range(kind, mode, self.cursor_range)
+        };
         if range.0 != self.cursor_range.0 {
             self.cursor_range = range;
             self.cursor_frame = range.0;
@@ -4349,6 +4355,39 @@ pub fn cursor_range(kind: i32, mode: i32, current: (i32, i32)) -> (i32, i32) {
         },
         1 if kind <= 2 => (13, 25),
         _ => (25, 40),
+    }
+}
+
+/// The 2004 program's cursor frame range (FUN_00444cb0 → FUN_00429260 →
+/// FUN_00429290 @ 0x00429290..0x004292e4; start, end exclusive) in its
+/// own `spr\Interface.spr` (60,605 bytes; the CD's `interface_.SPR` is
+/// *Atlantis III*'s bank, never named): mode 0 (a zone) 1..9 on a move
+/// (types 1, 2), 10..22 on 3 and above, else `current`; mode 1 (an
+/// object sprite) 10..22 whatever its click kind; mode 2 (a character
+/// sprite) 23..28 for click kind 2, 10..22 for 4 and 6, else `current`.
+/// Frames 1..8 are the move cursor, 10..21 the action cursor, 23..27 the
+/// talk cursor, 29 the free pointer.
+pub fn cursor_range_2004(kind: i32, mode: i32, current: (i32, i32)) -> (i32, i32) {
+    match (mode, kind) {
+        (0, 1 | 2) => (1, 9),
+        (0, k) if k > 2 => (10, 22),
+        (0, _) => current,
+        (1, _) => (10, 22),
+        (_, 2) => (23, 28),
+        (_, 4 | 6) => (10, 22),
+        _ => current,
+    }
+}
+
+/// The free pointer's frame in `spr\Interface.spr`: #40 (@ 0x00427f80's
+/// callers), the 2004 program's #29 (every `AtlInterfaceJeu_SetCurseur`
+/// call of FUN_00429180 pushes 0x1d, e.g. @ 0x004286c2 at the inventory's
+/// opening).
+pub fn pointer_frame(evolution_2004: bool) -> usize {
+    if evolution_2004 {
+        29
+    } else {
+        40
     }
 }
 
