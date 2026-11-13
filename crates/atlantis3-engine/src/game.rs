@@ -4384,6 +4384,16 @@ impl Host for Game {
         Game::player_name_2004(self, name);
     }
 
+    fn perso_frame_2004(&mut self, id: i32) -> i32 {
+        // @ 0x0044cc14..0x0044cc4a: slot −4 (id) and +0x28 (shown), any
+        // kind; the frame +0x08 (table 0x006ea3b4, 0x4a0 bytes a slot).
+        self.slots
+            .slots
+            .iter()
+            .find(|s| s.id == id && s.shown)
+            .map_or(0, |s| s.frame)
+    }
+
     fn tangage_warp_2004(&mut self, v: i32, n: [i32; 6]) {
         if v == 0 {
             self.ship.stop();

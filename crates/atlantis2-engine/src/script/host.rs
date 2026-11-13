@@ -304,6 +304,14 @@ pub trait Host {
     /// @ 0x0044df59): the perso who says the `HERO` lines.
     fn player_name_2004(&mut self, name: &str) {}
 
+    /// The 2004 `KEY+=NUMFRAMEPERSO,NAME` (atlantis4-cd-en-3022848
+    /// @ 0x0044cc0b..0x0044cc52): the frame (+0x08) of the first
+    /// place-animation slot of id `id` (any kind) that is shown, 0 without
+    /// one.
+    fn perso_frame_2004(&mut self, id: i32) -> i32 {
+        0
+    }
+
     /// The world's part of `Interp_SetMonde` (@ 0x00484df0): its object
     /// and subject sprite banks, its dialog texts, and its disc (1 → CD 1,
     /// 2 → CD 2, 3 → CD 3, 4 → CD 4, 6 → CD 4; 5, Tibet, keeps the disc in

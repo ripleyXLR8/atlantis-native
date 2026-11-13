@@ -75,6 +75,9 @@ impl Script {
         if found {
             if self.at_ci(src, p, b"FLAG") && self.b(src, p + 4).is_ascii_digit() {
                 let flag = self.atoi_at(src, p + 4);
+                if self.evolution_2004 {
+                    return Some(self.set_flag_2004(src, p, flag));
+                }
                 while super::eval::is_key_byte(self.b(src, p)) && p < self.len(src) {
                     p += 1;
                 }
@@ -452,6 +455,67 @@ impl Script {
         }
         self.vars[key] = value;
         Some(self.after_cr(src, q))
+    }
+
+    /// *Atlantis Evolution*'s 2004 `FLAGnnn` line (atlantis4-cd-en-3022848
+    /// @ 0x0044c904..0x0044ca0a), `p` at the `F`: the first `+`, `=` or `-`
+    /// from there is the operator; `++` and `--` add or subtract 1, `+=n`
+    /// and `-=n` add or subtract `atol(n)`; `=` stores `atol` of the text
+    /// after it only when that text starts with a digit (`isdigit`
+    /// @ 0x0044c966): otherwise the text up to the `)` is looked up as a
+    /// variable's name (@ 0x0044c99d..0x0044c9aa) and nothing is stored.
+    /// Any other operator stores nothing. The line ends after its CR.
+    fn set_flag_2004(&mut self, src: Src, p: usize, flag: i32) -> usize {
+        let mut i = p;
+        while !matches!(self.b(src, i), b'+' | b'=' | b'-') && i < self.len(src) {
+            i += 1;
+        }
+        let old = usize::try_from(flag)
+            .ok()
+            .and_then(|f| self.flags.get(f))
+            .copied();
+        let new = match (self.b(src, i), self.b(src, i + 1)) {
+            (b'+', b'+') => old.map(|v| v.wrapping_add(1)),
+            (b'+', b'=') => old.map(|v| v.wrapping_add(self.atoi_at(src, i + 2))),
+            (b'-', b'-') => old.map(|v| v.wrapping_sub(1)),
+            (b'-', b'=') => old.map(|v| v.wrapping_sub(self.atoi_at(src, i + 2))),
+            (b'=', d) if d.is_ascii_digit() => Some(self.atoi_at(src, i + 1)),
+            _ => return self.after_cr(src, i),
+        };
+        match (usize::try_from(flag).ok(), new) {
+            (Some(f), Some(v)) if f < self.flags.len() => self.flags[f] = v,
+            // The original writes past the table; the data never do.
+            _ => self.warn("SetVariables: flag hors table", &flag.to_string()),
+        }
+        self.after_cr(src, i)
+    }
+
+    /// The 2004 program's `KEY+=` (atlantis4-cd-en-3022848
+    /// @ 0x0044cb73..0x0044cc78), `p` at the `+`: the value is `atol` of
+    /// the text after `+=` when it starts with a digit; else the text up
+    /// to a `)`, `(` or `,` names a variable (its value, 0 when unknown,
+    /// @ 0x0044cbcb..0x0044cbf3), except `NUMFRAMEPERSO,NAME`: the frame
+    /// (+0x08) of the first place-animation slot whose id is NAME's
+    /// `#PERSONNAGES#` id and that is shown, 0 without one
+    /// (@ 0x0044cbfa..0x0044cc52).
+    pub(super) fn add_assign_2004(&mut self, host: &mut dyn Host, src: Src, p: usize) -> i32 {
+        let q = p + 2;
+        if self.b(src, q).is_ascii_digit() {
+            return self.atoi_at(src, q);
+        }
+        let mut name = vec![self.b(src, q)];
+        let mut i = q + 1;
+        while !matches!(self.b(src, i), b')' | b'(' | b',') && i < self.len(src) {
+            name.push(self.b(src, i));
+            i += 1;
+        }
+        name.make_ascii_uppercase();
+        let var = self.names.id(defnames::VARIABLES, &name).ok();
+        if var.is_some() && var == self.names.id(defnames::VARIABLES, b"NUMFRAMEPERSO").ok() {
+            let id = self.id(defnames::PERSONNAGES, src, i + 1);
+            return host.perso_frame_2004(id);
+        }
+        var.map_or(0, |k| self.vars[k])
     }
 
     /// The position after the first `,` at or after `p` (the handler's

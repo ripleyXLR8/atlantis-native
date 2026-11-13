@@ -311,6 +311,18 @@ impl Script {
             self.vars[key] = self.vars[key].wrapping_sub(1);
             return Some(next);
         }
+        if self.evolution_2004 && self.at(src, p, b"+=") {
+            // atlantis4-cd-en-3022848 @ 0x0044cb73..0x0044cc78.
+            let v = self.add_assign_2004(host, src, p);
+            self.vars[key] = self.vars[key].wrapping_add(v);
+            return Some(next);
+        }
+        if self.evolution_2004 && self.at(src, p, b"-=") {
+            // @ 0x0044cc7d..0x0044ccc1: `atol` of the text after `-=`.
+            let v = self.atoi_at(src, p + 2);
+            self.vars[key] = self.vars[key].wrapping_sub(v);
+            return Some(next);
+        }
         let value = self.atoi_at(src, p + 1);
         if is(self, "CINEMA") && !self.at_ci(src, p + 1, b"?") {
             if self.evolution_2004 {
