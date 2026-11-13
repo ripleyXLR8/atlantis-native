@@ -37,6 +37,12 @@ fn in_chapter(chapter: i32) -> Option<(Game, f64)> {
     g.step(0.0);
     g.skip();
     g.step(0.01);
+    // The cabin's `vue=1` leaves `ARRIVEEVUE` = 1 (the new view,
+    // @ 0x0044e185): the next `Interp_GereFrame` runs the arrival scan,
+    // which here would be the new chapter's (chapter 31's /001 Cosmo's
+    // greeting, chapter 42's /001 dialog 722) and its dialog would keep
+    // the game from starting. In the game that scan is the cabin's.
+    g.set_var("ARRIVEEVUE", 0);
     g.run_command(&format!("(chapter={chapter})"));
     g.step(0.02);
     Some((g, 0.02))
