@@ -153,3 +153,16 @@ fn credits_then_escape() {
     assert!(g.credits().is_some());
     assert!(g.credits_escape());
 }
+
+/// `GOTOFRAMEPERSO=NAME,VAR` (@ 0x0044fd8c..0x0044fd9b): `atol` 0 and not
+/// `0`: the frame is the variable's value (chapi025 `ANIM_GARDE8`).
+#[test]
+fn gotoframeperso_from_a_variable() {
+    let Some((mut g, _)) = cabin() else { return };
+    let (k, name) = shown_perso(&g);
+    g.run_command("(ANIM_GARDE8=3)");
+    g.run_command(&format!("(GOTOFRAMEPERSO={name},ANIM_GARDE8)"));
+    assert_eq!(g.slots().slots[k].frame, 3);
+    g.run_command(&format!("(GOTOFRAMEPERSO={name},0)"));
+    assert_eq!(g.slots().slots[k].frame, 0);
+}

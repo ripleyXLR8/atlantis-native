@@ -893,7 +893,16 @@ impl Script {
             self.id(section, src, p + 1)
         };
         let i = self.after_comma(src, p);
-        let n = self.atoi_at(src, i);
+        let mut n = self.atoi_at(src, i);
+        if self.evolution_2004 && key == k.gotoframeperso && n == 0 && self.b(src, i) != b'0' {
+            // atlantis4-cd-en-3022848 @ 0x0044fd8c..0x0044fd9b: `atol` 0 and
+            // the text not starting with `0`: the frame is the value of the
+            // variable it names (`GOTOFRAMEPERSO=NAME,ANIM_GARDE8`).
+            match self.names.id(defnames::VARIABLES, self.tail(src, i)) {
+                Ok(v) => n = self.vars[v],
+                Err(e) => log::warn!("GOTOFRAMEPERSO: {e}"),
+            }
+        }
         let op = if key == k.playanimp || key == k.playanimo {
             AnimOp::Play {
                 kind,
