@@ -296,6 +296,14 @@ pub trait Host {
     /// (axis, amplitude in degrees, speed, damping) for FUN_00445450.
     fn tangage_warp_2004(&mut self, v: i32, n: [i32; 6]) {}
 
+    /// The 2004 `DIAL=` (atlantis4-cd-en-3022848 @ 0x0044e6a2): `line` is
+    /// the line after its `=`. The section waits after the call.
+    fn dial_2004(&mut self, line: &[u8]) {}
+
+    /// The 2004 `PLAYERNAME=<perso>` (atlantis4-cd-en-3022848
+    /// @ 0x0044df59): the perso who says the `HERO` lines.
+    fn player_name_2004(&mut self, name: &str) {}
+
     /// The world's part of `Interp_SetMonde` (@ 0x00484df0): its object
     /// and subject sprite banks, its dialog texts, and its disc (1 → CD 1,
     /// 2 → CD 2, 3 → CD 3, 4 → CD 4, 6 → CD 4; 5, Tibet, keeps the disc in

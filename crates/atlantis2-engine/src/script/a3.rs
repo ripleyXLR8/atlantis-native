@@ -390,7 +390,23 @@ impl Script {
             return Some(next);
         }
         if key == k.dial {
+            if self.evolution_2004 {
+                return Some(self.dial_2004(host, src, p, next));
+            }
             return Some(self.dial_a3(host, src, p, next));
+        }
+        if self.evolution_2004 && is(self, "PLAYERNAME") {
+            // @ 0x0044df59: the word after `=` (FUN_0044c770) to the host,
+            // which keeps it when it is a player perso (FUN_00410520,
+            // FUN_0040eca0) or logs `Le Perso %s n'existe pas pour les
+            // dialogues` (0x006afafc).
+            let t = self.line_text(src, p + 1);
+            let name: String = t
+                .chars()
+                .take_while(|&c| !matches!(c, ' ' | '\t' | ',' | ';' | '(' | ')'))
+                .collect();
+            host.player_name_2004(&name);
+            return Some(next);
         }
         if key == k.sujet {
             return Some(next);
@@ -870,6 +886,20 @@ impl Script {
         } else {
             next
         }
+    }
+
+    /// The 2004 `DIAL=<n>[,<n>..][,off][,light][,%<x>]`
+    /// (atlantis4-cd-en-3022848 @ 0x0044e6a2..0x0044e9a5): the line after
+    /// its `=` to the host, which reads the options, draws the dialog and
+    /// calls `AtlDial_Start` (FUN_00410110); then the section waits
+    /// (0x0070fc04 := 1 unless 0x0070fc05, @ 0x0044e995..0x0044e99e) until
+    /// the dialog's close resumes it (`Interp_CloseInterrupt` FUN_00452ef0
+    /// @ 0x004112aa).
+    fn dial_2004(&mut self, host: &mut dyn Host, src: Src, p: usize, next: usize) -> usize {
+        let line = self.line_text(src, p + 1);
+        let next = self.wait(next);
+        host.dial_2004(line.as_bytes());
+        next
     }
 
     /// `DIAL=n[, voixoff]` (@ 0x00448d04): the value's letters removed,
