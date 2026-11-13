@@ -14,6 +14,25 @@
 //! | 1024 | 720 | 256 | 100 | #43 | `<World>Sujets80.spr` |
 //!
 //! Another width keeps the 640 values.
+//!
+//! *Atlantis Evolution*'s 2004 program (atlantis4-cd-en-3022848) sets them
+//! when `CHANGECD=n` loads the disc's subject bank (FUN_0043dae0, from
+//! FUN_00452310): the bank `spr\suj0<n>.spr` stripped of its last four
+//! characters, then the width's suffix and `.spr` (0x006aef5c); a fourth
+//! global 0x0070c0a0, the ring's frame, is 30 (`interface.SPR` has 31
+//! frames, no #41..#43):
+//!
+//! | Width | x0 | y0 | cell | ring | bank |
+//! |---|---|---|---|---|---|
+//! | 640 | 450 | 160 | 64 | #30 | `suj0<n>52.spr` (not on the CD) |
+//! | 800 | 560 | 200 | 80 | #30 | `suj0<n>64.spr` (not on the CD) |
+//! | 1024 | 720 | 256 | **64** | #30 | `suj0<n>.spr` |
+//!
+//! Another width sets nothing: the data's 450, 160, 64, 64 (0x006aef4c..
+//! 0x006aef58), ring 0 (0x0070c0a0 is `.bss`), no bank. The draw
+//! (FUN_0043e790, new) skips a subject whose value is not above 0
+//! (@ 0x0043e8d0); the rest is *Atlantis III*'s, and so is the hit test
+//! (FUN_0043e9a0 → FUN_0043e480, identical to @ 0x0043ba40 → @ 0x0043b5b0).
 
 use atlantis2_engine::script::{Subject, SubjectTable};
 
@@ -45,6 +64,33 @@ impl Layout {
             ring,
             suffix,
         }
+    }
+
+    /// The 2004 program's geometry (FUN_0043dae0 @ 0x0043db64..0x0043df0e)
+    /// and the bank's suffix: `None` for a width it sets nothing for.
+    pub fn for_width_2004(width: usize) -> (Layout, Option<&'static str>) {
+        let (x0, y0, c, suffix) = match width {
+            640 => (450, 160, 64, Some("52")),
+            800 => (560, 200, 80, Some("64")),
+            1024 => (720, 256, 64, Some("")),
+            _ => (450, 160, 64, None),
+        };
+        let lay = Layout {
+            x0,
+            y0,
+            cw: c,
+            ch: c,
+            ring: if suffix.is_some() { 30 } else { 0 },
+            suffix: suffix.unwrap_or(""),
+        };
+        (lay, suffix)
+    }
+
+    /// The 2004 subject bank of disc `n` (1..4, FUN_00452310): `None`
+    /// when the width loads none.
+    pub fn bank_path_2004(width: usize, n: i32) -> Option<String> {
+        let (_, suffix) = Self::for_width_2004(width);
+        suffix.map(|s| format!("spr/suj0{n}{s}.spr"))
     }
 
     /// The subject bank of a world (`MONDE` @ 0x0044bb30 → @ 0x0043aa40):
@@ -136,4 +182,34 @@ pub struct Cell {
     pub y: i32,
     pub alpha: f32,
     pub ring: (i32, i32),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_2004_layout_by_width() {
+        let (l, s) = Layout::for_width_2004(1024);
+        assert_eq!(
+            (l.x0, l.y0, l.cw, l.ch, l.ring, s),
+            (720, 256, 64, 64, 30, Some(""))
+        );
+        let (l, s) = Layout::for_width_2004(800);
+        assert_eq!(
+            (l.x0, l.y0, l.cw, l.ring, s),
+            (560, 200, 80, 30, Some("64"))
+        );
+        let (l, s) = Layout::for_width_2004(1280);
+        assert_eq!((l.x0, l.y0, l.cw, l.ring, s), (450, 160, 64, 0, None));
+        assert_eq!(
+            Layout::bank_path_2004(1024, 3).as_deref(),
+            Some("spr/suj03.spr")
+        );
+        assert_eq!(
+            Layout::bank_path_2004(640, 1).as_deref(),
+            Some("spr/suj0152.spr")
+        );
+        assert_eq!(Layout::bank_path_2004(1280, 1), None);
+    }
 }

@@ -144,6 +144,13 @@ impl Cinematiques {
     /// copied up to CR, LF, NUL, space, `,`, tab, `/` or `)`
     /// (`DefName_CopyParam` FUN_00467620).
     pub fn parse(defnames: &[u8]) -> Cinematiques {
+        Self::parse_section(defnames, TAG)
+    }
+
+    /// [`Cinematiques::parse`] for the section that starts with `tag`
+    /// (the 2004 program's sections 5..8 are read alike: `#SONS#`,
+    /// [`crate::evolution2004_sfx`]).
+    pub fn parse_section(defnames: &[u8], tag: &[u8]) -> Cinematiques {
         let mut out = Cinematiques::default();
         let mut inside = false;
         for raw in defnames.split(|&c| c == b'\n') {
@@ -156,7 +163,7 @@ impl Cinematiques {
                 &line[s..]
             };
             if t.starts_with(b"#") {
-                inside = t.starts_with(TAG);
+                inside = t.starts_with(tag);
                 continue;
             }
             if !inside || t.is_empty() || t.starts_with(b"//") {

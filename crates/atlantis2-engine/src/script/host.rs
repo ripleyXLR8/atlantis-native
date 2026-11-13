@@ -317,6 +317,14 @@ pub trait Host {
     /// (FUN_00452310).
     fn change_cd_2004(&mut self, n: i32) {}
 
+    /// *Atlantis Evolution*'s 2004 `PLAYSOUND=<name>` (atlantis4-cd-en-3022848
+    /// @ 0x0044ea14..0x0044eb7a): `name` is the text from the `=` to the
+    /// `)`, a `#SONS#` name of `defnames.con`.
+    fn play_sound_2004(&mut self, name: &str) {}
+
+    /// The 2004 `STOPSOUND=<name>` (@ 0x0044eb7f..0x0044ec7f).
+    fn stop_sound_2004(&mut self, name: &str) {}
+
     /// The bag bar after an object was put in: `visible` is the count of
     /// the current world's entries (@ 0x00475870, kept @ 0x00671ee8), then
     /// @ 0x004757b0 until it returns 0: the bar scrolls to its end.

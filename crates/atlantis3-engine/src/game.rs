@@ -43,6 +43,7 @@ mod frame_tab;
 mod hooks;
 mod pages;
 mod sfx;
+mod sfx2004;
 mod subtitles;
 
 pub use board::BoardInput;
@@ -238,6 +239,10 @@ pub struct Game {
     film_sound: Option<crate::film2004::FilmSound>,
     film_percent: f32,
     cinematiques: atlantis3_data::evolution2004_film::Cinematiques,
+    /// The 2004 program's `#SONS#` (`PLAYSOUND`'s files).
+    sons: atlantis3_data::evolution2004_film::Cinematiques,
+    /// The 2004 program's `AtlSound` samples and channels.
+    sfx2004: sfx2004::Sfx2004,
     /// The intro's videos still to play ([`intro_videos`]).
     intro_next: Vec<(&'static str, u32)>,
     /// The click flags (@ 0x007592b8, double click @ 0x007592bb) and the
@@ -290,6 +295,8 @@ pub struct Game {
     subjects_bank: Option<Bank>,
     arrows: Option<Bank>,
     banks_world: i32,
+    /// The 2004 program's disc of the banks (`CHANGECD=n`, 1..4; 0 none).
+    disc_2004: i32,
     /// The place sprite under the centre when a click was made (the
     /// render's hit, @ 0x0077b670): its slot's character or object id and
     /// click kind.
@@ -419,6 +426,11 @@ impl Game {
         } else {
             Default::default()
         };
+        let sons = if files.is_evolution_2004() {
+            atlantis3_data::evolution2004_sfx::sons(&defnames)
+        } else {
+            Default::default()
+        };
         script.evolution_2004 = files.is_evolution_2004();
         let fpu = Fpu::Double;
         let mut renderer = Renderer::new(Variant::PII, fpu, width, height);
@@ -484,6 +496,8 @@ impl Game {
             // The data's 100.0 (0x006ac080).
             film_percent: 100.0,
             cinematiques,
+            sons,
+            sfx2004: Default::default(),
             intro_next: Vec::new(),
             click: false,
             double_click: false,
@@ -511,6 +525,7 @@ impl Game {
             subjects_bank: None,
             arrows: None,
             banks_world: 0,
+            disc_2004: 0,
             sprite_hit: None,
             current_cd: 0,
             texts: None,
@@ -1174,6 +1189,10 @@ impl Game {
 
     /// The world's sprite banks, opened again when the world changed.
     fn world_banks(&mut self) {
+        if self.files.is_evolution_2004() {
+            self.disc_banks_reload_2004();
+            return;
+        }
         let world = self.world;
         if world == self.banks_world {
             return;
@@ -1195,6 +1214,68 @@ impl Game {
         self.subjects_bank = lay.bank_path(world).and_then(|p| open(&self.files, p));
         if self.arrows.is_none() {
             self.arrows = open(&self.files, "spr/fleche.SPR".into());
+        }
+    }
+
+    /// The 2004 program's `CHANGECD=n` banks (FUN_00452310, a `switch` on
+    /// 1..4; another `n` loads nothing): `spr\suj0<n>.spr` for the subject
+    /// menu (FUN_0043dae0, [`crate::subjects::Layout::for_width_2004`]),
+    /// `spr\invent0<n>.spr` for the inventory's objects (FUN_0042a460,
+    /// name 0x006e7d58) and for the object in the hand (FUN_0042a570, name
+    /// 0x006e7db0: the same file), `spr\suiveurs.spr` for the followers
+    /// (FUN_0043d140, name 0x006ffc30; the followers are not ported). Each
+    /// loader frees its previous bank when the name changed. The program
+    /// has no `MONDE`: these are its only banks of objects and subjects.
+    pub(crate) fn disc_banks_2004(&mut self, n: i32) {
+        if !(1..=4).contains(&n) {
+            return;
+        }
+        self.disc_2004 = n;
+        self.disc_banks_reload_2004();
+        self.not_ported("the 2004 followers (suiveurs.spr, ADDSUIVEUR)");
+    }
+
+    /// The 2004 banks of [`Game::disc_banks_2004`] parsed again when the
+    /// disc or the depth changed.
+    fn disc_banks_reload_2004(&mut self) {
+        let n = self.disc_2004;
+        if n == 0 || n == self.banks_world {
+            return;
+        }
+        self.banks_world = n;
+        let depth = self.depth();
+        let open = |files: &A3Files, path: &str| {
+            let b = files.read(path).and_then(|d| Bank::parse(&d, depth).ok());
+            if b.is_none() {
+                log::warn!("{path}: not found");
+            }
+            b
+        };
+        let invent = format!("spr/invent0{n}.spr");
+        self.objects = open(&self.files, &invent);
+        self.objects_hand = self.objects.clone();
+        self.subjects_bank = crate::subjects::Layout::bank_path_2004(self.width, n)
+            .and_then(|p| open(&self.files, &p));
+        if self.arrows.is_none() {
+            self.arrows = open(&self.files, "spr/fleche.SPR");
+        }
+    }
+
+    /// Tests: the sprite counts of the objects', the hand's and the
+    /// subjects' banks (`None`: not loaded), after the banks were opened.
+    #[doc(hidden)]
+    pub fn object_banks(&mut self) -> [Option<usize>; 3] {
+        self.world_banks();
+        [&self.objects, &self.objects_hand, &self.subjects_bank].map(|b| b.as_ref().map(Bank::len))
+    }
+
+    /// The subject menu's geometry: *Atlantis III*'s by width, or the 2004
+    /// program's.
+    fn subject_layout(&self) -> crate::subjects::Layout {
+        if self.files.is_evolution_2004() {
+            crate::subjects::Layout::for_width_2004(self.width).0
+        } else {
+            crate::subjects::Layout::for_width(self.width)
         }
     }
 
@@ -1455,7 +1536,7 @@ impl Game {
             // The flip (@ 0x00427ed1), before the pick.
             self.flip_texts();
             if std::mem::take(&mut self.click) {
-                let lay = crate::subjects::Layout::for_width(self.width);
+                let lay = self.subject_layout();
                 let r = self.script.as_ref().map_or(-2, |s| {
                     lay.pick(&s.subjects, s.vars[s.keys.clicperso], self.pointer)
                 });
@@ -1476,14 +1557,19 @@ impl Game {
 
     /// The subjects of `CLICPERSO` (@ 0x0043b850).
     fn draw_subjects(&mut self) {
-        let lay = crate::subjects::Layout::for_width(self.width);
+        let lay = self.subject_layout();
+        let evolution = self.files.is_evolution_2004();
         let Some(s) = self.script.as_ref() else {
             return;
         };
         let cells = lay.cells(&s.subjects.list(s.vars[s.keys.clicperso]));
         let (w, h) = (self.width, self.height);
         for c in cells {
-            if let (Some(bank), Ok(v)) = (&self.subjects_bank, usize::try_from(c.value)) {
+            // The 2004 draw (FUN_0043e790 @ 0x0043e8d0) skips a value ≤ 0.
+            let shown = !evolution || c.value > 0;
+            if let (true, Some(bank), Ok(v)) =
+                (shown, &self.subjects_bank, usize::try_from(c.value))
+            {
                 Self::aff_centre(&mut self.screen, w, h, bank, v, c.x, c.y, c.alpha);
             }
             if let Some(bank) = &self.interface {
@@ -2031,6 +2117,10 @@ impl Game {
         }
         let m = self.camera.matrix();
         let proj = self.camera.projection();
+        if self.slots.evolution {
+            // FUN_00444e70 → FUN_00439fc0: the sounds before the sprites.
+            self.anim_sounds_2004();
+        }
         let sprites = self.slots.slots.iter().any(|s| s.shown);
         self.render_cube(&m, proj, sprites);
         // The sprite pass's hit test, against the frames just drawn
@@ -4295,9 +4385,6 @@ impl Host for Game {
 
     /// `MONDE=n` (@ 0x0044bb30): the dialogs freed and loaded again for
     /// the world (`Dial_Free`, `Dial_Init`).
-    /// The 2004 program's `CHANGECD=n`: the disc folder switched. The
-    /// disc's banks (FUN_00452310: `sujNN.spr`, `inventNN.spr`,
-    /// `suiveurs.spr`) are not ported yet.
     fn start_music_2004(&mut self, value: &str) {
         self.with_music_2004(|m, b| m.start_musik_value(b, value));
     }
@@ -4310,12 +4397,24 @@ impl Host for Game {
         self.with_music_2004(|m, b| m.fade_musik_value(b, value));
     }
 
+    /// The 2004 program's `CHANGECD=n` (@ 0x0045091a..0x00450920): the
+    /// disc folder switched (`Menu_TestChangeCD`), then the disc's banks
+    /// (FUN_00452310, [`Game::disc_banks_2004`]).
     fn change_cd_2004(&mut self, n: i32) {
         log::info!("Menu_TestChangeCD : {n}");
         match u32::try_from(n) {
             Ok(n) => self.files.set_disc(n),
             Err(_) => log::warn!("CHANGECD={n}: no such disc"),
         }
+        self.disc_banks_2004(n);
+    }
+
+    fn play_sound_2004(&mut self, name: &str) {
+        self.play_sound_2004_name(name);
+    }
+
+    fn stop_sound_2004(&mut self, name: &str) {
+        self.stop_sound_2004_name(name);
     }
 
     fn set_monde(&mut self, monde: i32) -> bool {

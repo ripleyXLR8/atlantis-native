@@ -30,8 +30,13 @@ pub const OBJECT_CHANNELS: usize = 6;
 /// channels 1..5, [`crate::music2004`]), [`crate::music2004::SLOTS`] of
 /// them.
 pub const CHANNEL_MUSIC_2004: usize = CHANNEL_OBJECTS + OBJECT_CHANNELS;
+/// The first of the 2004 program's four 3D sound channels
+/// (`AtlSound_PlaySfx3D`, 0x006ea2a8 + 0x1c k: [`crate::game`]'s
+/// `sfx2004`), [`SFX3D_SLOTS`] of them.
+pub const CHANNEL_SFX3D_2004: usize = CHANNEL_MUSIC_2004 + crate::music2004::SLOTS;
+pub const SFX3D_SLOTS: usize = 4;
 /// How many channels the mix has.
-pub const CHANNELS: usize = CHANNEL_MUSIC_2004 + crate::music2004::SLOTS;
+pub const CHANNELS: usize = CHANNEL_SFX3D_2004 + SFX3D_SLOTS;
 
 #[derive(Clone, Debug, Default)]
 struct Channel {

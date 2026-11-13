@@ -130,7 +130,9 @@ impl Game {
             self.music2004
                 .duck((100.0 - self.film_percent) * 0.01, 1000);
         }
-        // The sound track (@ 0x004026a2..0x004028c1): a previous film's
+        // The place animations' sounds stopped (FUN_00439dc0 @ 0x004026a2).
+        self.anim_sounds_stop_2004();
+        // The sound track (@ 0x004026a7..0x004028c1): a previous film's
         // stream stopped and closed first, then the new one played.
         if let Some(s) = self.film_sound.take() {
             s.stop(&self.audio);

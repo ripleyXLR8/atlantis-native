@@ -396,6 +396,14 @@ impl Script {
             return Some(next);
         }
         if is(self, "PLAYSOUND") {
+            if self.evolution_2004 {
+                // @ 0x0044ea29..0x0044eb2d: the text from the `=` to the
+                // `)`, its `#SONS#` file, `AtlSound_LoadSfx(sfx\file, 0, 0,
+                // 0)` and `AtlSound_PlaySfx`.
+                let t = self.line_text(src, p + 1);
+                host.play_sound_2004(t.split(')').next().unwrap_or(""));
+                return Some(next);
+            }
             host.new_sound(&format!("sound{value:03}.apc"));
             return Some(next);
         }
@@ -406,6 +414,13 @@ impl Script {
             return Some(next);
         }
         if key == k.stopsound {
+            if self.evolution_2004 {
+                // @ 0x0044eb94..0x0044ec2c: the same file, then
+                // `AtlSound_RemoveSfx` (FUN_0042fdd0).
+                let t = self.line_text(src, p + 1);
+                host.stop_sound_2004(t.split(')').next().unwrap_or(""));
+                return Some(next);
+            }
             self.warn("SetVariables() : STOPSOUND a faire", "");
             return Some(next);
         }
