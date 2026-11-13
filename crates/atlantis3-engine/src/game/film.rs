@@ -392,7 +392,7 @@ impl Game {
 
     /// FUN_00412be0 then FUN_00444870(screen, band): the screen black, the
     /// panorama in rows band .. h − band − 1 (no cursor: the mode is 5).
-    fn draw_letterbox_2004(&mut self, band: usize) {
+    pub(crate) fn draw_letterbox_2004(&mut self, band: usize) {
         if !self.draw_warp_only() {
             self.screen.clear();
             return;

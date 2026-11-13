@@ -757,7 +757,7 @@ impl Script {
     }
 
     /// FUN_0048c730: the row of (id, kind) updated, or appended.
-    fn show_row(&mut self, id: i32, shown: bool, kind: i32) {
+    pub fn show_row(&mut self, id: i32, shown: bool, kind: i32) {
         match self.shown.iter_mut().find(|r| r.id == id && r.kind == kind) {
             Some(r) => r.shown = shown,
             None => self.shown.push(Shown { id, shown, kind }),
