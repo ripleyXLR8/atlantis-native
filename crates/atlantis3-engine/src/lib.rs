@@ -30,6 +30,7 @@ pub mod maps;
 pub mod menu;
 pub mod music2004;
 pub mod place_anim;
+pub mod puzzles2004;
 pub mod px;
 pub mod startup;
 pub mod subjects;

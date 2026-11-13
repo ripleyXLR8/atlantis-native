@@ -341,6 +341,13 @@ pub trait Host {
     /// @ 0x0044cccf).
     fn followers_2004(&mut self, op: FollowerOp, name: &str) {}
 
+    /// The 2004 `INITPUZZLE=` / `STARTPUZZLE=` / `FINPUZZLE=<PUZ_name>`
+    /// (atlantis4-cd-en-3022848 @ 0x0044d8e2, @ 0x0044d962, @ 0x0044d9fa):
+    /// the text from the `=` to the `)`, which the dispatchers FUN_004759c0,
+    /// FUN_00475f80 and FUN_00475ca0 compare with the eight `PUZ_` names.
+    /// After `STARTPUZZLE` the section waits ([`PuzzleOp::Start`]).
+    fn puzzle_2004(&mut self, op: PuzzleOp, name: &str) {}
+
     /// The 2004 `ENABLEZONE=NAME` / `DISABLEZONE=NAME` (@ 0x0044f7ac..
     /// 0x0044f8e7): the name is the text up to the `)`; FUN_004420f0
     /// toggles every zone of that name in the place's views.
@@ -436,6 +443,21 @@ pub trait Host {
     /// `CtrlScenarIN` entered (*Atlantis III* @ 0x0044a2f0): for observers
     /// only.
     fn scenar_in_called(&mut self) {}
+}
+
+/// The 2004 program's puzzle keys ([`Host::puzzle_2004`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PuzzleOp {
+    /// `INITPUZZLE` (FUN_004759c0): the game's set-up, which ends with its
+    /// start.
+    Init,
+    /// `STARTPUZZLE` (FUN_00475f80): the game's start (stretch surface,
+    /// loop mode, `Puzzles` flag); the section then waits until the game's
+    /// first frame resumes it.
+    Start,
+    /// `FINPUZZLE` (FUN_00475ca0): the game's end (banks and sounds freed,
+    /// loop mode 3).
+    Fin,
 }
 
 /// The 2004 program's followers' keys ([`Host::followers_2004`]).

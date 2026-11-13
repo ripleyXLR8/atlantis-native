@@ -508,6 +508,45 @@ impl Script {
         }
     }
 
+    /// The 2004 puzzles' scan (atlantis4-cd-en-3022848 FUN_00450f00, which
+    /// every game's frame calls): 0x006af4de := 1, the body of the first
+    /// `/puz` entry of the whole text whose condition holds (FUN_00451540)
+    /// run as a section (`RunSection` FUN_00451080), 0x006af4de := 0.
+    pub fn puz_scan_2004(&mut self, host: &mut dyn Host) {
+        if let Some(body) = self.puz_find_2004(host) {
+            self.run_section(host, body);
+        }
+    }
+
+    /// FUN_00451540: from the text's start, each position's header noted
+    /// (FUN_00451110); `/puz` compared over 4 bytes (`_mbsnbcmp`
+    /// FUN_0066924e, case-sensitive); there the condition after it
+    /// (EvalCondition FUN_0044ba60 at the `/puz` itself, which skips the
+    /// keyword) true → the position after its CR LF; false → one byte on.
+    /// A `#` skips its line. Up to the chapter's end (0x0070fbf4).
+    fn puz_find_2004(&mut self, host: &mut dyn Host) -> Option<usize> {
+        let mut p = 0;
+        loop {
+            if self.fatal.is_some() {
+                return None;
+            }
+            self.note_header(p);
+            if self.at(S, p, b"/puz") {
+                if let Some(r) = self.eval_condition(host, p) {
+                    return Some(r + 2);
+                }
+                p += 1;
+            }
+            if self.b(S, p) == b'#' {
+                p = self.after_cr(S, p);
+            }
+            p += 1;
+            if p >= self.chapter_size {
+                return None;
+            }
+        }
+    }
+
     /// `RunOneCommand` (@ 0x00481800): a `(KEY=value)` command of the
     /// engine through the `/set` handler, with no resume point.
     pub fn run_command(&mut self, host: &mut dyn Host, command: &[u8]) {

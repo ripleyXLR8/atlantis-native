@@ -45,6 +45,7 @@ mod hooks;
 mod inventory2004;
 mod menus2004;
 mod pages;
+mod puzzles2004;
 mod sfx;
 mod sfx2004;
 mod subtitles;
@@ -118,6 +119,9 @@ pub enum Mode {
     Menu,
     /// Modes 9..18: a full-screen puzzle or map ([`Screen`]).
     Screen,
+    /// The 2004 program's modes 13..21: a mini-game
+    /// ([`crate::puzzles2004`]).
+    Puzzle2004,
     /// Nothing to show (before the intro, after the game stopped).
     Idle,
 }
@@ -262,6 +266,10 @@ pub struct Game {
     /// The 2004 program's `Puzzles` counters (`Atlantis4.cfg`,
     /// 0x00719b58..), written back by its options' writer.
     puzzles_2004: [i32; 8],
+    /// The 2004 program's mini-games ([`crate::puzzles2004`]).
+    puzzles2004: puzzles2004::State,
+    /// The previous frame's duration (FUN_004a2630), seconds.
+    frame_t: f32,
     /// The click flags (@ 0x007592b8, double click @ 0x007592bb) and the
     /// last left press (@ 0x00759280).
     click: bool,
@@ -524,6 +532,8 @@ impl Game {
             intro_next: Vec::new(),
             logos_2004: None,
             puzzles_2004: [0; 8],
+            puzzles2004: Default::default(),
+            frame_t: 0.0,
             click: false,
             double_click: false,
             last_press: None,
@@ -1108,6 +1118,10 @@ impl Game {
     /// turning, the turn speeds gain dx / 2000 and lose dy / 2000; the
     /// centre zone is picked again.
     pub fn mouse_motion(&mut self, dx: i32, dy: i32) {
+        if self.mode == Mode::Puzzle2004 {
+            self.puzzle_pointer_2004(dx, dy);
+            return;
+        }
         if matches!(
             self.mode,
             Mode::Inventory | Mode::Subjects | Mode::Menu | Mode::Screen
@@ -1631,6 +1645,7 @@ impl Game {
         // The previous frame's duration (the 2004 pitching's `t`).
         let frame_t = self.ship_last.map_or(0.0, |t| now - t);
         self.ship_last = Some(now);
+        self.frame_t = frame_t as f32;
         self.now = now;
         if let (Some(a), Some(s)) = (self.angle_x_now, self.script.as_mut()) {
             s.angle_x = a;
@@ -1664,6 +1679,7 @@ impl Game {
             Mode::Dialog => self.dialog_frame(),
             Mode::Menu => self.menu_frame(),
             Mode::Screen => self.screen_frame(),
+            Mode::Puzzle2004 => self.puzzle_frame_2004(),
             Mode::Idle => {}
         }
         if self.logos_2004.is_some() && self.film.is_none() {
@@ -4490,6 +4506,10 @@ impl Host for Game {
 
     fn followers_2004(&mut self, op: atlantis2_engine::script::FollowerOp, name: &str) {
         self.followers_op_2004(op, name);
+    }
+
+    fn puzzle_2004(&mut self, op: atlantis2_engine::script::PuzzleOp, name: &str) {
+        self.puzzle_op_2004(op, name);
     }
 
     fn zone_by_name_2004(&mut self, name: &str, on: bool) {

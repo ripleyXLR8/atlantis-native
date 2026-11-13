@@ -318,6 +318,20 @@ impl Script {
             }
             return Some(self.cinema_a3(host, src, p, value, next));
         }
+        if self.evolution_2004 {
+            use super::PuzzleOp as P;
+            let op = [
+                ("INITPUZZLE", P::Init),
+                ("STARTPUZZLE", P::Start),
+                ("FINPUZZLE", P::Fin),
+            ]
+            .into_iter()
+            .find(|(n, _)| is(self, n))
+            .map(|(_, op)| op);
+            if let Some(op) = op {
+                return Some(self.puzzle_2004(host, src, p, op, next));
+            }
+        }
         if is(self, "ANGLEMONS") || is(self, "ANGLEDAME") {
             // Angles of two characters (@ 0x0040d290 / 0x0040d280); no
             // shipped line sets them.
@@ -1045,6 +1059,34 @@ impl Script {
         } else {
             next
         }
+    }
+
+    /// The 2004 puzzle keys (atlantis4-cd-en-3022848 @ 0x0044d8e2..
+    /// 0x0044da9e): the text from the `=` up to the `)` (counted up to and
+    /// without the `)`, @ 0x0044d902..0x0044d91b), its `#PUZZLES#` id
+    /// looked up (`DefName_GetIdName(7, text)` FUN_00466f70, which only
+    /// logs an unknown name; the id is not used: the port leaves the
+    /// lookup out, its section 7 is not read), then the dispatcher with the
+    /// text. `STARTPUZZLE`'s dispatcher returns 1 (every path of
+    /// FUN_00475f80), so the section waits (0x0070fc04 := 1 unless
+    /// 0x0070fc05, @ 0x0044d9db..0x0044d9e9; resume position 0x006af4e0
+    /// @ 0x0044d9f2) until the game's first frame calls
+    /// `Interp_CloseInterrupt(1)`.
+    fn puzzle_2004(
+        &mut self,
+        host: &mut dyn Host,
+        src: Src,
+        p: usize,
+        op: super::PuzzleOp,
+        next: usize,
+    ) -> usize {
+        let t = self.line_text(src, p + 1);
+        let name = t.split(')').next().unwrap_or("").to_string();
+        host.puzzle_2004(op, &name);
+        if op == super::PuzzleOp::Start {
+            return self.wait(next);
+        }
+        next
     }
 
     /// The 2004 `DIAL=<n>[,<n>..][,off][,light][,%<x>]`
