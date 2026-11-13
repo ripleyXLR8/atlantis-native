@@ -250,3 +250,16 @@ fn the_loader_clears_followers_and_pitching() {
     assert!(g.followers_2004().is_empty());
     assert!(!g.ship().on);
 }
+
+/// A new game clears the hide table (0x006fcc18, its count 0x006ffc18
+/// := 0 @ 0x00457b16).
+#[test]
+fn new_game_clears_the_hide_table() {
+    let Some((mut g, _)) = cabin() else { return };
+    g.run_command("(hideperso=MIRANDA)");
+    let miranda = g.names().id(defnames::PERSONNAGES, b"MIRANDA").unwrap() as i32;
+    let has = |g: &Game| g.script().unwrap().shown.iter().any(|r| r.id == miranda);
+    assert!(has(&g));
+    assert!(g.new_game());
+    assert!(!has(&g));
+}

@@ -168,14 +168,17 @@ impl Script {
     }
 
     /// *Atlantis Evolution*'s 2004 new game (start page
-    /// atlantis4-cd-en-3022848 @ 0x00457ae0..0x00457b5c): the bag
-    /// (0x006fcc1c, 0x400 entries of 12 bytes), the 300 variables
+    /// atlantis4-cd-en-3022848 @ 0x00457ae0..0x00457b5c): the hide table
+    /// (0x006fcc18, 0x400 rows of 12 bytes: id, shown, kind; its count
+    /// 0x006ffc18 := 0 @ 0x00457b16, the same in every player's branch,
+    /// e.g. @ 0x00458718..0x0045874e), the 300 variables
     /// (0x0070d4f8) and the 0x800 flags (0x0070dbdc) cleared,
     /// `LIMITEANGLEWARPY` = 50, `LIMITEANGLEWARPX` = −1, `CHAPTER` = 0, the
     /// chapter number (0x0070fbf8) 0, then (FUN_004a2640) chapter 0 loaded
     /// ("Fichier scenar non trouve") and its `/INIT` run ("PB avec la zone
-    /// INIT du Fichier scenar"). Not ported: the dword 0x006ffc18 := 0 and
-    /// FUN_00456ad0, called before the load [UNKNOWN: not read yet].
+    /// INIT du Fichier scenar"). The bag is emptied by the click's resets
+    /// before (FUN_0042b960). Not ported: FUN_00456ad0, called before the
+    /// load [UNKNOWN: not read yet].
     pub fn new_game_2004(&mut self, host: &mut dyn Host) -> bool {
         self.new_game_2004_at(host, 0)
     }
@@ -188,6 +191,7 @@ impl Script {
     pub fn new_game_2004_at(&mut self, host: &mut dyn Host, chapter: i32) -> bool {
         self.subjects.reset_a3();
         self.bag.clear();
+        self.shown.clear();
         self.vars.iter_mut().for_each(|v| *v = 0);
         self.flags.iter_mut().for_each(|f| *f = 0);
         let k = self.keys.clone();
