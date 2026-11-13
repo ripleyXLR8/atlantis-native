@@ -2258,7 +2258,7 @@ impl Game {
             .camera
             .ray(self.camera.cx, self.camera.cy)
             .map(f64::from);
-        wam::pick(&view.zones, d)
+        self.pick_zone(&view.zones, d)
     }
 
     /// The warp drawn into the screen (@ 0x00440690), then the cursor
@@ -3982,7 +3982,19 @@ impl Game {
     pub fn pick_at(&self, sx: f32, sy: f32) -> Option<usize> {
         let view = self.place.wam.view(self.place.view?)?;
         let d = self.camera.ray(sx, sy).map(f64::from);
-        wam::pick(&view.zones, d)
+        self.pick_zone(&view.zones, d)
+    }
+
+    /// The first zone of `zones` containing direction `d`. The 2004
+    /// program's pick (atlantis4-cd-en-3022848 FUN_0046a4a0) takes only a
+    /// zone whose type is below 1000: a disabled zone (type + 88888,
+    /// `DISABLEZONE`) is passed over, and what lies behind it is clicked.
+    /// Atlantis III's (@ 0x00463310) has no such test.
+    fn pick_zone(&self, zones: &[wam::Zone], d: [f64; 3]) -> Option<usize> {
+        if self.files.is_evolution_2004() {
+            return zones.iter().position(|z| z.kind < 1000 && z.contains(d));
+        }
+        wam::pick(zones, d)
     }
 
     /// The `defnames.con` names.

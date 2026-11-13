@@ -376,3 +376,82 @@ fn a_sprite_low_on_a_768_face() {
     );
     assert_eq!(g.object_in_hand(), 0);
 }
+
+/// A disabled zone is passed over by the 2004 centre pick (FUN_0046a4a0:
+/// type < 1000 only): in the Limule (chapter 6), once the helmet is on,
+/// `ZONE_CONSOLE_LIMULE` is disabled and the console sprite in front of
+/// it takes the click (`CLICOBJET=CONSOLE_LIMULE`, the departure to
+/// chapter 7), not the zone's "empty hand" line (dialog 1247).
+#[test]
+fn a_disabled_zone_is_not_picked() {
+    let Some(dir) = std::env::var_os("ATLANTIS4_CD").map(std::path::PathBuf::from) else {
+        atlantis3_data::testing::missing("ATLANTIS4_CD not set");
+        return;
+    };
+    let src = std::sync::Arc::new(atlantis3_data::evolution2004::Evolution2004Source::new(
+        std::sync::Arc::new(atlantis_data::StdDir::new(&dir)),
+    ));
+    let mut g = Game::new(atlantis3_data::A3Files::evolution_2004(src)).unwrap();
+    assert!(g.new_game());
+    let mut t = 0.0;
+    g.step(t);
+    g.skip();
+    t += 0.02;
+    g.step(t);
+    g.run_command("(chapter=5)");
+    t += 0.02;
+    g.step(t);
+    for c in [
+        "(tangagewarp=0,0,0,0,0,0,0)",
+        "(changewam=limule.wam)",
+        "(vue=11)",
+        "(chapter=6)",
+    ] {
+        g.run_command(c);
+    }
+    for _ in 0..600 {
+        t += 1.0 / 30.0;
+        g.step(t);
+    }
+    assert_eq!(g.place().1, Some(11));
+    // Helmet on: the script's own lines of /008 and /010.
+    for c in [
+        "(flag14=1)",
+        "(showobjet=CONSOLE_LIMULE)",
+        "(disablezone=ZONE_CONSOLE_LIMULE)",
+        "(sacados=CASQUE_SUR_TETE)",
+        "(objetenmain=0)",
+    ] {
+        g.run_command(c);
+    }
+    t += 0.04;
+    g.step(t);
+    // The disabled zone is not under the centre when aimed at.
+    assert!(!g.aim_at_zone(|z| z.name.as_deref() == Some("ZONE_CONSOLE_LIMULE")));
+    let console = g
+        .names()
+        .id(atlantis2_data::defnames::OBJETS, b"CONSOLE_LIMULE")
+        .unwrap() as i32;
+    assert!(g.click_sprite(console, 2));
+    let mut left = false;
+    let mut modes = Vec::new();
+    for _ in 0..600 {
+        t += 1.0 / 30.0;
+        g.step(t);
+        if modes.last() != Some(&g.mode()) {
+            modes.push(g.mode());
+        }
+        if g.mode() != Mode::Warp {
+            g.skip();
+        }
+        if g.script().unwrap().chapter == 7 {
+            left = true;
+            break;
+        }
+    }
+    assert!(
+        left,
+        "the console click did not start chapter 7: {modes:?} {:?}",
+        g.place()
+    );
+}
