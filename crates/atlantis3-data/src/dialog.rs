@@ -369,6 +369,32 @@ pub fn parse_dial(data: &[u8]) -> DialTxt {
     out
 }
 
+/// Reads *Atlantis Evolution*'s 2004 `dial.txt` (atlantis4-cd-en-3022848
+/// FUN_0040fd20, `loc\text\<SousTitre>\dial.txt` @ 0x0040fd57): no
+/// `#NEW` and no voice; each content line is `<dialog> <line> <speaker>
+/// <text>`: two numbers (FUN_00449240 twice), the speaker word
+/// (FUN_00449180), then the rest of the line (FUN_00449d70) as the text,
+/// given to `AddDialogEntry(d, l, speaker, ..)` (FUN_0046bb40) and
+/// `AddDialogText(d, l, text)` (FUN_0046c110). The speaker is kept as read
+/// (the lower-casing of *Atlantis III*'s reader is not in this one).
+pub fn parse_dial_2004(data: &[u8]) -> DialTxt {
+    let mut out = DialTxt::default();
+    for (_, line) in ContentLines::new(data) {
+        let mut w = Reader::new(line);
+        let dialog = atoi(w.word());
+        let number = atoi(w.word());
+        let speaker = latin1(w.word());
+        out.lines.push(DialLine {
+            speaker,
+            voice: String::new(),
+            dialog,
+            line: number,
+            text: w.line().to_vec(),
+        });
+    }
+    out
+}
+
 /// A dialog line as `CDialogue` holds it after the three files.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DialogEntry {
@@ -473,6 +499,18 @@ mod tests {
 [Stretch]\t1.5\r\n[GlobalWeight]\t0.75\r\n[Focale1]\t\t60.0,50.0,40.0\r\n\
 [Focale2]\t\t30.0 // c\r\n[IdText]\t\tA_B\r\n[IdText]\t\tC\r\n[FinPerso]\r\n\
 stray line\r\n[Perso] Other\r\n[Mesh] Ot\r\n[FinPerso]";
+
+    #[test]
+    fn dial_2004() {
+        let d = parse_dial_2004(
+            b"// c\r\n1\t1\tNarrateur\tIt was a night, in June.\r\n\r\n2\t2\tHERO\t\tI'd stay. \r\n",
+        );
+        assert_eq!(d.lines.len(), 2);
+        let l = &d.lines[1];
+        assert_eq!((l.dialog, l.line, l.speaker.as_str()), (2, 2, "HERO"));
+        assert_eq!(l.text, b"I'd stay. ");
+        assert_eq!(d.lines[0].text, b"It was a night, in June.");
+    }
 
     #[test]
     fn info_blocks() {

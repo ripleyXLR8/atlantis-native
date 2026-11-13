@@ -709,9 +709,9 @@ impl Music2004 {
     /// FUN_00430c50(target, ms) (FUN_00430bf0 with 1000 ms): the factor
     /// faded to `target` clamped to 0..99. The Bink cinematics call it
     /// (`AtlBink_Start` FUN_00401d30 @ 0x0040269a with `(100 − x) · 0.01`
-    /// over 1000 ms when the `DIAL` option `x%` (0x006ac080, 100 by
+    /// over 1000 ms when the `CINEMA=` option `%x` (0x006ac080, 100 by
     /// default) is above 0; their end FUN_00403230 @ 0x0040332e with 1.0
-    /// over 2000 ms). The port plays no Bink file yet: not called.
+    /// over 2000 ms): `crate::game::Game`'s films call it.
     pub fn duck(&mut self, target: f32, ms: i32) {
         self.factor_target = target.clamp(0.0, 99.0);
         self.factor_start = self.factor;

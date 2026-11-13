@@ -38,6 +38,7 @@ use std::collections::{BTreeMap, HashMap};
 
 mod board;
 mod credits;
+mod film;
 mod frame_tab;
 mod hooks;
 mod pages;
@@ -222,6 +223,14 @@ pub struct Game {
     ticks: u32,
     anim_tick: bool,
     video: Option<Playing>,
+    /// *Atlantis Evolution*'s 2004 film (`AtlBink`, loop mode 5:
+    /// [`Mode::Video`] here), its sound track (which plays on after the
+    /// film's natural end), the `%` of the last `CINEMA=` line (0x006ac080)
+    /// and the `#CINEMATIQUES#` names ([`film`]).
+    film: Option<film::FilmPlaying>,
+    film_sound: Option<crate::film2004::FilmSound>,
+    film_percent: f32,
+    cinematiques: atlantis3_data::evolution2004_film::Cinematiques,
     /// The intro's videos still to play ([`intro_videos`]).
     intro_next: Vec<(&'static str, u32)>,
     /// The click flags (@ 0x007592b8, double click @ 0x007592bb) and the
@@ -398,6 +407,11 @@ impl Game {
             .ok_or_else(|| GameError::Missing("scenar\\defnames.con".into()))?;
         let names = DefNames::parse(&defnames).map_err(|e| GameError::Script(e.to_string()))?;
         let mut script = Script::new_a3(&defnames).map_err(GameError::Script)?;
+        let cinematiques = if files.is_evolution_2004() {
+            atlantis3_data::evolution2004_film::Cinematiques::parse(&defnames)
+        } else {
+            Default::default()
+        };
         script.evolution_2004 = files.is_evolution_2004();
         let fpu = Fpu::Double;
         let mut renderer = Renderer::new(Variant::PII, fpu, width, height);
@@ -456,6 +470,11 @@ impl Game {
             ticks: 0,
             anim_tick: false,
             video: None,
+            film: None,
+            film_sound: None,
+            // The data's 100.0 (0x006ac080).
+            film_percent: 100.0,
+            cinematiques,
             intro_next: Vec::new(),
             click: false,
             double_click: false,
@@ -999,6 +1018,8 @@ impl Game {
     /// first warp frame's arrival scan plays chapter 1's three cinematics.
     pub fn new_game(&mut self) -> bool {
         self.video = None;
+        self.film = None;
+        self.film_sound = None;
         self.audio.stop(CHANNEL_CINEMA);
         self.mode = Mode::Warp;
         let ok = if self.files.is_evolution_2004() {
@@ -1013,6 +1034,13 @@ impl Game {
     /// Space or Escape (`WM_KEYDOWN` in the cinematic's wait loop
     /// @ 0x00421c5b): the cinematic stops. Travel videos ignore keys.
     pub fn skip(&mut self) {
+        // The 2004 program's keyboard callback: Escape (scan code 1) or
+        // Space (0x39) in loop mode 5 sets 0x006e9e70 (@ 0x0042c504..
+        // 0x0042c51b), which the film's loop reads.
+        if let Some(f) = self.film.as_mut() {
+            f.skip_key = true;
+            return;
+        }
         if self.video.as_ref().is_some_and(|v| !v.travel) {
             self.end_video();
         }
@@ -1492,6 +1520,7 @@ impl Game {
         self.main_loop_hook();
         if self.files.is_evolution_2004() {
             self.music_2004_frame(ticked);
+            self.film_sound_frame();
         }
     }
 
@@ -1588,6 +1617,10 @@ impl Game {
     }
 
     fn video_step(&mut self) {
+        if self.film.is_some() {
+            self.film_step();
+            return;
+        }
         let Some(v) = self.video.as_mut() else {
             self.mode = Mode::Idle;
             return;
@@ -4086,6 +4119,10 @@ impl Host for Game {
 
     fn wam_commands(&mut self, wam: &str, flags: &[i32]) -> Vec<String> {
         crate::wam_setup::commands(wam, flags)
+    }
+
+    fn play_cinema_2004(&mut self, line: &[u8]) -> bool {
+        self.cinema_2004(line)
     }
 
     fn play_cinema(&mut self, n: i32, fps: i32) -> bool {

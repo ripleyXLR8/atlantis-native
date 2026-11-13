@@ -156,6 +156,14 @@ impl Script {
             self.fail(format!("chapitre {} introuvable", self.chapter));
             return false;
         }
+        if self.evolution_2004 {
+            // The 2004 program's start-up runs no `/INIT`: `RunInit`
+            // (atlantis4-cd-en-3022848 FUN_00451210) is called by
+            // `chapter=` (@ 0x0044e0c0), the load (@ 0x00461cce) and the
+            // new game (FUN_004a2640 @ 0x004a26c8) only. Chapter 0's block
+            // plays the intro film (`cinema=INTRO`): with a new game.
+            return true;
+        }
         self.run_init(host)
     }
 
@@ -295,6 +303,9 @@ impl Script {
         }
         let value = self.atoi_at(src, p + 1);
         if is(self, "CINEMA") && !self.at_ci(src, p + 1, b"?") {
+            if self.evolution_2004 {
+                return Some(self.cinema_2004(host, src, p, next));
+            }
             return Some(self.cinema_a3(host, src, p, value, next));
         }
         if is(self, "ANGLEMONS") || is(self, "ANGLEDAME") {
@@ -808,6 +819,29 @@ impl Script {
             }
         }
         let started = host.play_cinema(n, fps);
+        self.double_click = false;
+        self.click = false;
+        self.click_aux = 0;
+        if started {
+            self.wait(next)
+        } else {
+            next
+        }
+    }
+
+    /// The 2004 `CINEMA=<name>,<options>` (atlantis4-cd-en-3022848
+    /// @ 0x0044ccc6): the line from its `=` to the host (which reads the
+    /// options and starts `AtlBink`); after the call the click flags
+    /// 0x006e9feb, 0x006e9fe8 and 0x006e9fe9 are cleared (@ 0x0044d7d6..),
+    /// and the section waits when the film started (@ 0x0044d804..0x0044d809:
+    /// 0x0070fc04 := 1 when the call returned 1).
+    fn cinema_2004(&mut self, host: &mut dyn Host, src: Src, p: usize, next: usize) -> usize {
+        let line = self.line_text(src, p);
+        let started = host.play_cinema_2004(line.as_bytes());
+        if started {
+            // `AtlBink_Start` @ 0x004028cd..0x004028e9: `NUMFRAMEVIDEO` := 0.
+            self.set_var("NUMFRAMEVIDEO", 0);
+        }
         self.double_click = false;
         self.click = false;
         self.click_aux = 0;

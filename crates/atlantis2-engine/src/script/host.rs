@@ -276,6 +276,14 @@ pub trait Host {
     /// @ 0x0044edc0): `value` (the line's text) is `<couche>,<playlist>`.
     fn start_music_2004(&mut self, value: &str) {}
 
+    /// The 2004 `CINEMA=<name>,<options>` (atlantis4-cd-en-3022848
+    /// @ 0x0044ccc6..0x0044d6c8, then `AtlBink_Start` through FUN_00402a70):
+    /// `line` is the line from its `=`. Whether the film started (then the
+    /// section waits for its end).
+    fn play_cinema_2004(&mut self, line: &[u8]) -> bool {
+        false
+    }
+
     /// The 2004 `STOPMUSIK` (@ 0x0044f068): `value` starts with the couche.
     fn stop_music_2004(&mut self, value: &str) {}
 

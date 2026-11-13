@@ -9,6 +9,7 @@
 //!
 //! - [`startup`]: `Atlantis3.cfg`, the install's language and the screen;
 //! - [`cinema`]: the cinematics and the intro, sound included;
+//! - [`film2004`]: *Atlantis Evolution*'s 2004 Bink films and their Ogg sound;
 //! - [`audio`]: the port's mix of the sound outputs;
 //! - [`fixes`]: the port's bug fixes (`settings.ini`, off with `--original`).
 
@@ -18,6 +19,7 @@ pub mod audio;
 pub mod caption;
 pub mod cinema;
 pub mod dialog;
+pub mod film2004;
 pub mod fixes;
 pub mod game;
 pub mod inventory;

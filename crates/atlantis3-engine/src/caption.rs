@@ -25,6 +25,10 @@ pub enum CaptionOp {
 pub struct CaptionFade {
     pub caption: Caption,
     pub opacity: f32,
+    /// The fade-out step: 0.02 (@ 0x007003f4); *Atlantis Evolution*'s
+    /// 2004 program's `AtlBink` steps by 0.05 both ways
+    /// (atlantis4-cd-en-3022848 @ 0x004033f9, 0.05 at 0x00699358).
+    pub down: f32,
 }
 
 /// The floats of the block: 0.02 (@ 0x007003f4), 0.05 (@ 0x007003e4),
@@ -38,6 +42,19 @@ impl CaptionFade {
         CaptionFade {
             caption,
             opacity: 0.0,
+            down: DOWN,
+        }
+    }
+
+    /// The 2004 program's caption (`AtlBink`, atlantis4-cd-en-3022848
+    /// FUN_00403390 @ 0x004033d0..0x00403537): the same steps and colour
+    /// (255, 230, 200 at 0x0069934c..0x00699354) with a fade-out of 0.05 a
+    /// drawn frame.
+    pub fn new_2004(caption: Caption) -> CaptionFade {
+        CaptionFade {
+            caption,
+            opacity: 0.0,
+            down: UP,
         }
     }
 
@@ -55,7 +72,7 @@ impl CaptionFade {
         let o = f64::from(self.opacity);
         if frame > self.caption.fade_out_frame {
             if o > 0.0 {
-                let v = fpu.sub(o, f64::from(DOWN));
+                let v = fpu.sub(o, f64::from(self.down));
                 self.opacity = fpu.f32(v);
                 // `fst` then the compare of the unrounded value.
                 if v <= 0.0 {

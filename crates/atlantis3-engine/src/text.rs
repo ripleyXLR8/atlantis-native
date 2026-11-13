@@ -474,11 +474,15 @@ impl Texts {
         let dial = files
             .read(&strip(&atlantis3_data::dialog::dial_path(language)))
             .map(|d| {
-                atlantis3_data::dialog::parse_dial(&d)
-                    .lines
-                    .into_iter()
-                    .map(|l| ((l.dialog, l.line), l.text))
-                    .collect()
+                if files.is_evolution_2004() {
+                    atlantis3_data::dialog::parse_dial_2004(&d)
+                } else {
+                    atlantis3_data::dialog::parse_dial(&d)
+                }
+                .lines
+                .into_iter()
+                .map(|l| ((l.dialog, l.line), l.text))
+                .collect()
             })
             .unwrap_or_default();
         Texts {

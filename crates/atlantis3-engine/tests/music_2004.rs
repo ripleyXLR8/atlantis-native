@@ -1,5 +1,5 @@
 //! *Atlantis Evolution*'s 2004 music on the CD (`ATLANTIS4_CD`): a new
-//! game's chapter 1 `/INIT` starts its three couches
+//! game's chapter 1 `/INIT` (after chapter 0's intro film) starts its three couches
 //! (`startmusik=1,muzik20`, `=2,muzik21`, `=3,muzik24`, chapi001.con), each
 //! a playlist of one Ogg file on disc 1, faded in from 0.
 
@@ -25,6 +25,11 @@ fn game() -> Option<Game> {
 fn chapter_1_starts_three_couches() {
     let Some(mut g) = game() else { return };
     assert!(g.new_game());
+    // Chapter 0's `/INIT` waits for its intro film (`cinema=INTRO`,
+    // `tests/film_2004.rs`): skipped, chapter 1's `/INIT` runs.
+    assert!(g.music2004_opened.is_empty());
+    g.skip();
+    g.step(0.0);
     assert_eq!(
         g.music2004_opened,
         [
