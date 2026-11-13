@@ -69,11 +69,14 @@ impl Game {
         if o.cine_out() {
             self.not_ported("the 2004 films' cine-out animation");
         }
-        self.film_start(&file, o.fps)
+        self.film_start_2004(&file, o.fps, false)
     }
 
-    /// FUN_00402a70 then `AtlBink_Start(file, txt, fps, 0, 0)`.
-    fn film_start(&mut self, file: &str, fps: i32) -> bool {
+    /// FUN_00402a70 then `AtlBink_Start(file, txt, fps, 0, loc)`: `loc`, the
+    /// fifth argument (1 for the start-up's logos, FUN_0045e970), takes the
+    /// film from `loc\bink\<Langue>\` even without a cue file (§3 of the
+    /// note).
+    pub(super) fn film_start_2004(&mut self, file: &str, fps: i32, loc: bool) -> bool {
         // FUN_00402a70: 0x006e9e70, 0x006e9fe8, 0x006e9feb := 0
         // (@ 0x00402a94..0x00402aa0); loop mode 5 already: refused
         // (`AtlBink_start(%s): deja en AtlMain_loop_BINK!!` @ 0x00402aba).
@@ -86,7 +89,8 @@ impl Game {
         let langue = self.startup.voice_language();
         let sous_titre = self.startup.text_language();
         let files = &self.files;
-        let paths = FilmFiles::resolve(file, &langue, &sous_titre, |p| files.size(p).is_some());
+        let paths =
+            FilmFiles::resolve_loc(file, &langue, &sous_titre, loc, |p| files.size(p).is_some());
         // AtlBink_LoadUnderTitleFile (FUN_00401590), the cue file.
         let cues = paths
             .cue

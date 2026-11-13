@@ -196,6 +196,11 @@ pub enum ElementType {
     BtAnime,
     /// `BT_ANIME2`.
     BtAnime2,
+    /// `BT_ANIME3`: *Atlantis Evolution*'s 2004 program's button class
+    /// (atlantis4-cd-en-3022848, string 0x006ae254): frame 0 at rest, 1
+    /// pressed, 2 .. n − 1 an animation while hovered (FUN_00426440
+    /// @ 0x00426896..0x0042693e, FUN_00426b10 @ 0x00426d23).
+    BtAnime3,
     /// `BT_IMG_ANIME`.
     BtImgAnime,
     /// `BT_LOCK` (4 of the 8 shipped ones name another `BT_LOCK` with
@@ -225,6 +230,7 @@ impl ElementType {
             b"IMG_ANIME" => ElementType::ImgAnime,
             b"BT_ANIME" => ElementType::BtAnime,
             b"BT_ANIME2" => ElementType::BtAnime2,
+            b"BT_ANIME3" => ElementType::BtAnime3,
             b"BT_IMG_ANIME" => ElementType::BtImgAnime,
             b"BT_LOCK" => ElementType::BtLock,
             b"BT_LOCK1" => ElementType::BtLock1,

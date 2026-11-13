@@ -327,21 +327,30 @@ impl SaveGame {
 
 /// The loader's byte-by-byte line reader (@ 0x00418a20 one byte at a time,
 /// compared with LF): a CR stays in the line.
-struct Lines<'a> {
-    data: &'a [u8],
+pub(crate) struct Lines<'a> {
+    pub(crate) data: &'a [u8],
     pos: usize,
 }
 
-impl Lines<'_> {
+impl<'a> Lines<'a> {
+    pub(crate) fn new(data: &'a [u8]) -> Lines<'a> {
+        Lines { data, pos: 0 }
+    }
+
+    /// Where the next line starts.
+    pub(crate) fn pos(&self) -> usize {
+        self.pos
+    }
+
     /// The bytes up to `end` (consumed, not returned) or the end of data.
-    fn until(&mut self, end: u8) -> Vec<u8> {
+    pub(crate) fn until(&mut self, end: u8) -> Vec<u8> {
         let rest = &self.data[self.pos.min(self.data.len())..];
         let n = rest.iter().position(|&b| b == end).unwrap_or(rest.len());
         self.pos += (n + 1).min(rest.len());
         rest[..n].to_vec()
     }
 
-    fn line(&mut self) -> Vec<u8> {
+    pub(crate) fn line(&mut self) -> Vec<u8> {
         self.until(b'\n')
     }
 }
@@ -349,7 +358,7 @@ impl Lines<'_> {
 /// The value of a `key = value` line: from two bytes after the first `=`
 /// to the end (@ 0x004458a0, 0x00445480); without `=`, from the second
 /// byte.
-fn value(line: &[u8]) -> &[u8] {
+pub(crate) fn value(line: &[u8]) -> &[u8] {
     let start = line.iter().position(|&b| b == b'=').map_or(1, |p| p + 2);
     line.get(start..).unwrap_or(&[])
 }

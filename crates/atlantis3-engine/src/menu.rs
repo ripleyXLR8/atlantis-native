@@ -38,6 +38,8 @@ use atlantis3_data::A3Files;
 
 use crate::text::{layout, FontId, GdiFont, Line, Texts, Zone};
 
+pub mod evolution;
+
 /// `__ftol` (@ 0x006d34bc): truncation.
 fn ftol(v: f64) -> i32 {
     v as i32
@@ -323,6 +325,11 @@ pub struct Page {
     pub tip_el: Option<usize>,
     /// +0x40: the tooltips are on (set by the page handlers).
     pub tooltips: bool,
+    /// *Atlantis Evolution*'s 2004 program's element machinery
+    /// (atlantis4-cd-en-3022848: hover FUN_00426b10, click FUN_00426e40,
+    /// element pass FUN_00426440): `BT_ANIME3`, the hover's clearing, the
+    /// click sounds by name.
+    pub evolution: bool,
 }
 
 /// The tooltip's context of an element pass.
@@ -389,6 +396,7 @@ impl Page {
             items,
             tip_el: None,
             tooltips: false,
+            evolution: files.is_evolution_2004(),
         })
     }
 
@@ -414,9 +422,14 @@ impl Page {
 
     /// The hover test's answer at `pointer` without its effects (tests).
     pub fn hit(&self, pointer: (i32, i32)) -> Option<usize> {
-        self.items
-            .iter()
-            .position(|it| Self::hoverable(it) && it.opaque(pointer))
+        self.items.iter().position(|it| {
+            let can = if self.evolution {
+                it.el.displayed && it.el.selectable
+            } else {
+                Self::hoverable(it)
+            };
+            can && it.opaque(pointer)
+        })
     }
 
     /// The click test's element at `pointer` without its effects (tests:
@@ -442,9 +455,17 @@ impl Page {
     /// their byte.
     pub fn hover(&mut self, p: (i32, i32), now: f64) -> Option<usize> {
         let n = self.items.len();
+        let evolution = self.evolution;
         for k in 0..n {
             let it = &mut self.items[k];
-            if !Self::hoverable(it) {
+            if evolution {
+                // FUN_00426b10: displayed and selectable (no `BT_LOCK`
+                // test), else the hovered byte cleared (@ 0x00426b6c).
+                if !(it.el.displayed && it.el.selectable) {
+                    it.hovered = false;
+                    continue;
+                }
+            } else if !Self::hoverable(it) {
                 continue;
             }
             if !it.opaque(p) {
@@ -465,6 +486,23 @@ impl Page {
                 }
                 if !it.hovered {
                     // @ 0x004263f9..0x00426418
+                    it.off = (((now - it.t0) + it.acc2)
+                        - f64::from(it.frame) * f64::from(it.el.frame_time))
+                        as f32;
+                }
+            }
+            if it.kind() == ElementType::BtAnime3 {
+                // @ 0x00426d53..0x00426de7: as `BT_ANIME2`, the clock
+                // started at frame 2.
+                if !it.playing {
+                    it.acc = 0.0;
+                    it.acc2 = 0.0;
+                    it.t0 = now;
+                    it.off = ((now - it.t0) + it.acc2) as f32;
+                    it.playing = true;
+                    it.frame = 2;
+                }
+                if !it.hovered {
                     it.off = (((now - it.t0) + it.acc2)
                         - f64::from(it.frame) * f64::from(it.el.frame_time))
                         as f32;
@@ -516,7 +554,8 @@ impl Page {
                         it.start_clock(now);
                     }
                 }
-                ElementType::BtAnime2 => it.frame = 0,
+                // `BT_ANIME3` (@ 0x00427025): the same.
+                ElementType::BtAnime2 | ElementType::BtAnime3 => it.frame = 0,
                 ElementType::BtLock => it.frame = if it.frame == 2 { 0 } else { 2 },
                 ElementType::BtLock1 => {
                     it.frame = if it.frame == it.count() - 1 {
@@ -546,7 +585,11 @@ impl Page {
                 }
             }
             if let Some(s) = sound.filter(|s| !s.is_empty()) {
-                out.push(Event::Command(play_sound(&s)));
+                out.push(Event::Command(if self.evolution {
+                    play_sound_2004(&s)
+                } else {
+                    play_sound(&s)
+                }));
             }
             return Some(k);
         }
@@ -695,6 +738,27 @@ impl Page {
                         0
                     }
                 }
+                // FUN_00426440 @ 0x004268c6..0x0042693e: frame 1 while
+                // pressed, else the hover animation over frames 2 .. n − 1
+                // (the frame drawn, then the next from the clock); at rest
+                // as `BT_ANIME`.
+                ElementType::BtAnime3 => {
+                    if it.hovered {
+                        if button && it.el.clickable {
+                            1
+                        } else {
+                            it.playing = true;
+                            let f = it.frame + 2;
+                            let m = n - 2;
+                            it.frame = if m > 0 { it.clock(now) % m } else { 0 };
+                            f
+                        }
+                    } else if !it.el.selectable && n >= 4 {
+                        3
+                    } else {
+                        0
+                    }
+                }
                 ElementType::BtAnime => {
                     if it.hovered {
                         if button && it.el.clickable {
@@ -767,6 +831,17 @@ impl Page {
         self.hover(pointer, now);
         self.pass(screen, w, h, now, false, None)
     }
+}
+
+/// The 2004 click sound (FUN_00426e40 @ 0x004272f4..0x004273e7): the
+/// element's `soundOnClickUp` name looked up in `#SONS#`
+/// (`DefName_GetIdName(5, ..)`), its file under `sfx\` loaded and played
+/// as the script's `PLAYSOUND=` does: the command `(PLAYSOUND=<name>)`.
+fn play_sound_2004(v: &[u8]) -> Vec<u8> {
+    let mut s = b"(PLAYSOUND=".to_vec();
+    s.extend_from_slice(v);
+    s.push(b')');
+    s
 }
 
 /// `(PlaySound = v)` (@ 0x00426945, format 0x00716dd0).
@@ -875,6 +950,9 @@ pub enum Event {
     Player(i32),
     /// The start page's empty slot: the new game `(chapter=600)`.
     NewGame,
+    /// The 2004 start page's empty slot: the new game at the player's
+    /// chapter ([`evolution::NEW_GAME_CHAPTERS`]).
+    NewGameAt(i32),
     /// The flags and the bag reset then the loader (@ 0x0045b750).
     Load(String),
     /// The save writer (@ 0x00459ee0), thumbnails included.
@@ -988,6 +1066,13 @@ pub struct Menus {
     /// bytes written.
     pub cfg_path: Option<std::path::PathBuf>,
     pub cfg_written: Option<Vec<u8>>,
+    /// *Atlantis Evolution*'s 2004 program's pages (atlantis4-cd-en-3022848,
+    /// [`evolution`]): set by [`Menus::load`] from the data.
+    pub evolution: bool,
+    /// 0x007129b5 of the 2004 program: a colour depth change done by the
+    /// options' `BT_BACK`, kept until the back to the game enters the view
+    /// again (FUN_00456ad0).
+    pub depth_changed: bool,
 }
 
 impl Default for Menus {
@@ -1019,6 +1104,8 @@ impl Default for Menus {
             capture: None,
             cfg_path: None,
             cfg_written: None,
+            evolution: false,
+            depth_changed: false,
         }
     }
 }
@@ -1037,6 +1124,15 @@ impl Menus {
         let lang = String::from_utf8_lossy(&config.sous_titre).into_owned();
         let langue =
             String::from_utf8_lossy(&langue_layout(&config.version, &config.langue)).into_owned();
+        self.evolution = files.is_evolution_2004();
+        // The 2004 program's language page is always `i_langue_full`
+        // (FUN_00456e40 @ 0x004571fe: the text `full`, then `i_langue_` +
+        // it).
+        let langue = if self.evolution {
+            "i_langue_full".to_string()
+        } else {
+            langue
+        };
         let list: [(u8, &str, Option<&str>); 7] = [
             (PAGE_START, "i_debut", Some("i_debut")),
             (PAGE_MAIN, "i_princ", Some("i_princ")),
@@ -1186,6 +1282,12 @@ impl Menus {
             return ev;
         }
         match self.page {
+            PAGE_START if self.evolution => self.page_start_2004(env, &mut ev),
+            PAGE_MAIN if self.evolution => self.page_main_2004(env, &mut ev),
+            PAGE_LOAD if self.evolution => self.page_load_2004(env, &mut ev),
+            PAGE_VOLUMES if self.evolution => self.page_volumes_2004(env, &mut ev),
+            PAGE_OPTIONS if self.evolution => self.page_options_2004(env, &mut ev),
+            PAGE_SAVE if self.evolution => self.page_save_2004(env, &mut ev),
             PAGE_START => self.page_start(env, &mut ev),
             PAGE_MAIN => self.page_main(env, &mut ev),
             PAGE_LOAD => self.page_load(env, &mut ev),
@@ -1232,7 +1334,11 @@ impl Menus {
             self.tip_text(env, screen, &text);
         }
         if page == PAGE_LOAD && self.sub == 1 {
-            self.load_slots(env, screen);
+            if self.evolution {
+                self.load_slots_2004(env, screen);
+            } else {
+                self.load_slots(env, screen);
+            }
         }
         ev
     }
