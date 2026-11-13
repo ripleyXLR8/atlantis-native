@@ -4385,8 +4385,8 @@ impl Host for Game {
         Game::dial_2004(self, line);
     }
 
-    fn player_name_2004(&mut self, name: &str) {
-        Game::player_name_2004(self, name);
+    fn player_name_2004(&mut self, name: &str) -> Option<i32> {
+        Game::player_name_2004(self, name)
     }
 
     fn perso_frame_2004(&mut self, id: i32) -> i32 {

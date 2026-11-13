@@ -470,7 +470,11 @@ impl Script {
                 .chars()
                 .take_while(|&c| !matches!(c, ' ' | '\t' | ',' | ';' | '(' | ')'))
                 .collect();
-            host.player_name_2004(&name);
+            // A player perso: FUN_0040eca0 (@ 0x0044dfb1) stores its index
+            // in the list in `PLAYERNAME` (@ 0x0040eccc).
+            if let Some(index) = host.player_name_2004(&name) {
+                self.vars[key] = index;
+            }
             return Some(next);
         }
         if key == k.sujet {

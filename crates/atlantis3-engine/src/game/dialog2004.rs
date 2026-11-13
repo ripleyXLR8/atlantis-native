@@ -217,15 +217,22 @@ impl Game {
         d
     }
 
-    /// `PLAYERNAME=` (@ 0x0044df59): kept when it is a player perso.
-    pub(crate) fn player_name_2004(&mut self, name: &str) {
+    /// `PLAYERNAME=` (@ 0x0044df59): kept when it is a player perso
+    /// (FUN_00410520), then FUN_0040eca0: the name set and its index in
+    /// the list (FUN_00410590) given back for `PLAYERNAME`.
+    pub(crate) fn player_name_2004(&mut self, name: &str) -> Option<i32> {
         if is_player(name) {
             self.player_2004 = name.to_string();
             if let Some(d) = self.dialogs2004.as_mut() {
                 d.player = name.to_string();
             }
+            atlantis3_data::evolution2004_dialog::PLAYERS
+                .iter()
+                .position(|&p| p == name)
+                .map(|i| i as i32)
         } else {
             log::warn!("Le Perso {name} n'existe pas pour les dialogues");
+            None
         }
     }
 

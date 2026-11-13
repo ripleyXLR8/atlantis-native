@@ -196,3 +196,22 @@ fn rnd_every_second() {
     run(&mut g, &mut t, 1.2);
     assert_eq!(var(&g, "RND"), 34);
 }
+
+/// `PLAYERNAME=` stores the perso's index in the player list
+/// (FUN_0040eca0 @ 0x0040eccc); the loader sets the perso of that index
+/// again (@ 0x004645af..0x004645d7).
+#[test]
+fn playername_index_and_load() {
+    let Some((mut g, _)) = cabin() else { return };
+    g.run_command("(PLAYERNAME=HewittCosmo)");
+    assert_eq!(g.player_2004(), "HewittCosmo");
+    assert_eq!(var(&g, "PLAYERNAME"), 8);
+    let name = g.quick_save_now(1);
+    let data = g.saved(&name).unwrap().to_vec();
+    g.run_command("(PLAYERNAME=Hewitt)");
+    assert_eq!(g.player_2004(), "Hewitt");
+    assert_eq!(var(&g, "PLAYERNAME"), 0);
+    assert!(g.load_save_text(&name, data));
+    assert_eq!(var(&g, "PLAYERNAME"), 8);
+    assert_eq!(g.player_2004(), "HewittCosmo");
+}

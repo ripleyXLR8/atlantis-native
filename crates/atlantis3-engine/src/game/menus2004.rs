@@ -128,6 +128,22 @@ impl Game {
         let vars = g.vars.clone();
         let ok = self.with_script(|s, h| s.load_2004(h, &data, &vars));
         if ok {
+            // @ 0x004645af..0x004645d7: FUN_0040eca0(FUN_0040ecf0(
+            // vars[PLAYERNAME])): the player perso of the list index the
+            // file's `PLAYERNAME` holds set again (and its index stored).
+            let index = self.script.as_ref().and_then(|s| s.var("PLAYERNAME"));
+            let name = index
+                .and_then(|i| usize::try_from(i).ok())
+                .and_then(|i| atlantis3_data::evolution2004_dialog::PLAYERS.get(i));
+            match name {
+                Some(name) => {
+                    let i = self.player_name_2004(name);
+                    if let Some(i) = i {
+                        self.set_var("PLAYERNAME", i);
+                    }
+                }
+                None => log::warn!("Load: PLAYERNAME {index:?} is not a player perso"),
+            }
             self.load_hide_table_2004(&g.hide_table);
             self.load_zone_table_2004(&g.zone_table);
             let spr = String::from_utf8_lossy(&g.spr_plein_ecran).into_owned();

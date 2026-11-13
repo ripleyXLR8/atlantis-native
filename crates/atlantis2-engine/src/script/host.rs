@@ -301,8 +301,12 @@ pub trait Host {
     fn dial_2004(&mut self, line: &[u8]) {}
 
     /// The 2004 `PLAYERNAME=<perso>` (atlantis4-cd-en-3022848
-    /// @ 0x0044df59): the perso who says the `HERO` lines.
-    fn player_name_2004(&mut self, name: &str) {}
+    /// @ 0x0044df59): the perso who says the `HERO` lines. Its index in
+    /// the player persos' list (FUN_00410590, which FUN_0040eca0 stores in
+    /// `PLAYERNAME` @ 0x0040eccc), `None` when it is not one of them.
+    fn player_name_2004(&mut self, name: &str) -> Option<i32> {
+        None
+    }
 
     /// The 2004 `KEY+=NUMFRAMEPERSO,NAME` (atlantis4-cd-en-3022848
     /// @ 0x0044cc0b..0x0044cc52): the frame (+0x08) of the first
