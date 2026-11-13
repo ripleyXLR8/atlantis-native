@@ -411,6 +411,40 @@ impl Script {
         if key == k.sujet {
             return Some(next);
         }
+        if self.evolution_2004 {
+            use super::FollowerOp as F;
+            let op = [
+                ("ADDSUIVEUR", F::Add),
+                ("KILLSUIVEUR", F::Kill),
+                ("ENABLESUIVEUR", F::Enable),
+                ("DISABLESUIVEUR", F::Disable),
+                ("CLEARSUIVEURS", F::Clear),
+            ]
+            .into_iter()
+            .find(|(n, _)| is(self, n))
+            .map(|(_, op)| op);
+            if is(self, "ENABLEZONE") || is(self, "DISABLEZONE") {
+                let t = self.line_text(src, p + 1);
+                let name = t.split(')').next().unwrap_or("");
+                host.zone_by_name_2004(name, is(self, "ENABLEZONE"));
+                return Some(next);
+            }
+            if let Some(op) = op {
+                if op != F::Clear {
+                    let name: String = self
+                        .line_text(src, p + 1)
+                        .chars()
+                        .take_while(|&c| {
+                            !matches!(c, ' ' | '\t' | '\r' | '\n' | ',' | ';' | '(' | ')')
+                        })
+                        .collect();
+                    host.followers_2004(op, &name);
+                } else if value != 0 {
+                    host.followers_2004(op, "");
+                }
+                return Some(next);
+            }
+        }
         if is(self, "PLAYSOUND") {
             if self.evolution_2004 {
                 // @ 0x0044ea29..0x0044eb2d: the text from the `=` to the
@@ -645,7 +679,13 @@ impl Script {
                 self.empty_hand();
             } else {
                 let id = self.id(defnames::OBJETS, src, p + 1);
-                self.hold(id);
+                if self.evolution_2004 && !self.bag.iter().any(|e| e.id == id) {
+                    // `AtlInterfaceJeu_SetObjetEnMain` (FUN_00429600,
+                    // @ 0x00450871): an object not in the bag is refused.
+                    log::warn!("AtlInterfaceJeu_SetObjetEnMain() : id invalide ({id}).");
+                } else {
+                    self.hold(id);
+                }
             }
             return Some(next);
         }

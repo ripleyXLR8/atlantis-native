@@ -678,10 +678,11 @@ impl Script {
         let monde = self.vars[self.keys.monde];
         let world = if monde == 6 { 2 } else { monde };
         self.bag.push(BagEntry { sprite, id, world });
-        if self.is_a3() {
+        if self.is_a3() && !self.evolution_2004 {
             // Atlantis III mirrors the object in the flags: 1100 + id = its
             // world, 1500 + id = its sprite (atlantis3-gog-fr-3473408
-            // @ 0x00429720).
+            // @ 0x00429720). The 2004 program's node (FUN_0042c360) keeps
+            // id, sprite and name only.
             self.set_bag_flags(id, world, i32::from(sprite));
         }
         if self.bag.len() > 0x59 {
@@ -699,7 +700,7 @@ impl Script {
     pub fn bag_remove(&mut self, id: i32) {
         if let Some(i) = self.bag.iter().position(|e| e.id == id) {
             self.bag.remove(i);
-            if self.is_a3() {
+            if self.is_a3() && !self.evolution_2004 {
                 self.set_bag_flags(id, 0, 0);
             }
         } else if self.is_a3() {

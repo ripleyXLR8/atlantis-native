@@ -333,6 +333,19 @@ pub trait Host {
     /// The 2004 `STOPSOUND=<name>` (@ 0x0044eb7f..0x0044ec7f).
     fn stop_sound_2004(&mut self, name: &str) {}
 
+    /// The 2004 program's followers (`SetVariables` @ 0x0044e599..0x0044e687):
+    /// `ADDSUIVEUR`, `KILLSUIVEUR`, `ENABLESUIVEUR`, `DISABLESUIVEUR` with
+    /// the name after the `=` (up to a blank, a comma, a `;` or a
+    /// parenthesis, FUN_0044a130 / FUN_0044ade0), `CLEARSUIVEURS` when its
+    /// value is not 0 (`test edi, edi` @ 0x0044e67e, edi the line's `atoi`
+    /// @ 0x0044cccf).
+    fn followers_2004(&mut self, op: FollowerOp, name: &str) {}
+
+    /// The 2004 `ENABLEZONE=NAME` / `DISABLEZONE=NAME` (@ 0x0044f7ac..
+    /// 0x0044f8e7): the name is the text up to the `)`; FUN_004420f0
+    /// toggles every zone of that name in the place's views.
+    fn zone_by_name_2004(&mut self, name: &str, on: bool) {}
+
     /// The bag bar after an object was put in: `visible` is the count of
     /// the current world's entries (@ 0x00475870, kept @ 0x00671ee8), then
     /// @ 0x004757b0 until it returns 0: the bar scrolls to its end.
@@ -423,4 +436,19 @@ pub trait Host {
     /// `CtrlScenarIN` entered (*Atlantis III* @ 0x0044a2f0): for observers
     /// only.
     fn scenar_in_called(&mut self) {}
+}
+
+/// The 2004 program's followers' keys ([`Host::followers_2004`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FollowerOp {
+    /// `ADDSUIVEUR` (FUN_0043d240): appended, no duplicate test.
+    Add,
+    /// `KILLSUIVEUR` (FUN_0043d440): every follower of that name removed.
+    Kill,
+    /// `ENABLESUIVEUR` (FUN_0043d550): every follower of that name enabled.
+    Enable,
+    /// `DISABLESUIVEUR` (FUN_0043d630).
+    Disable,
+    /// `CLEARSUIVEURS` (FUN_0043d710): the list emptied.
+    Clear,
 }

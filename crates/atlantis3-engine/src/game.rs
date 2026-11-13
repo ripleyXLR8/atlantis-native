@@ -42,6 +42,7 @@ mod dialog2004;
 mod film;
 mod frame_tab;
 mod hooks;
+mod inventory2004;
 mod pages;
 mod sfx;
 mod sfx2004;
@@ -305,6 +306,9 @@ pub struct Game {
     banks_world: i32,
     /// The 2004 program's disc of the banks (`CHANGECD=n`, 1..4; 0 none).
     disc_2004: i32,
+    /// The 2004 program's followers and object shown big
+    /// ([`inventory2004`]).
+    inv2004: inventory2004::State,
     /// The place sprite under the centre when a click was made (the
     /// render's hit, @ 0x0077b670): its slot's character or object id and
     /// click kind.
@@ -537,6 +541,7 @@ impl Game {
             arrows: None,
             banks_world: 0,
             disc_2004: 0,
+            inv2004: Default::default(),
             sprite_hit: None,
             current_cd: 0,
             texts: None,
@@ -1152,6 +1157,10 @@ impl Game {
         if self.puzzles.freeze {
             return;
         }
+        if self.files.is_evolution_2004() {
+            self.right_click_2004();
+            return;
+        }
         // The right button's byte (0x007592b9), read by the screens and the
         // hunt: set, then cleared again (@ 0x00431676) once the button
         // opened or closed the inventory or closed the subject menu (the
@@ -1234,7 +1243,7 @@ impl Game {
     /// `spr\invent0<n>.spr` for the inventory's objects (FUN_0042a460,
     /// name 0x006e7d58) and for the object in the hand (FUN_0042a570, name
     /// 0x006e7db0: the same file), `spr\suiveurs.spr` for the followers
-    /// (FUN_0043d140, name 0x006ffc30; the followers are not ported). Each
+    /// (FUN_0043d140, name 0x006ffc30; [`inventory2004`]). Each
     /// loader frees its previous bank when the name changed. The program
     /// has no `MONDE`: these are its only banks of objects and subjects.
     pub(crate) fn disc_banks_2004(&mut self, n: i32) {
@@ -1243,7 +1252,6 @@ impl Game {
         }
         self.disc_2004 = n;
         self.disc_banks_reload_2004();
-        self.not_ported("the 2004 followers (suiveurs.spr, ADDSUIVEUR)");
     }
 
     /// The 2004 banks of [`Game::disc_banks_2004`] parsed again when the
@@ -1270,6 +1278,7 @@ impl Game {
         if self.arrows.is_none() {
             self.arrows = open(&self.files, "spr/fleche.SPR");
         }
+        self.inv2004.followers_bank = open(&self.files, "spr/suiveurs.spr");
     }
 
     /// Tests: the sprite counts of the objects', the hand's and the
@@ -1326,6 +1335,8 @@ impl Game {
 
     fn close_inventory(&mut self) {
         self.inventory.open = false;
+        // The 2004 program's close (FUN_00428750) ends an object shown big.
+        self.inv2004.examine = None;
         self.mode = self.prev_mode;
         // The turn speeds zeroed (@ 0x00431760), the pointer cursor and
         // the hand cleared, the click flags cleared; alpha kept.
@@ -1511,6 +1522,10 @@ impl Game {
     /// warp drawn, not stepped, without its cursor; the overlay; the
     /// pointer; then the pick.
     fn overlay_frame(&mut self) {
+        if self.mode == Mode::Inventory && self.files.is_evolution_2004() {
+            self.inventory_frame_2004();
+            return;
+        }
         self.draw_warp_only();
         if self.mode == Mode::Inventory {
             // @ 0x00427c40: the items, the arrows, the bar, the pointer,
@@ -2099,11 +2114,20 @@ impl Game {
         // fade's step, then the items at the new alpha.
         if !self.inventory.open && self.inventory.alpha > 0.0 {
             self.inventory.fade_step(self.now);
-            self.draw_inventory_items();
+            if self.files.is_evolution_2004() {
+                self.draw_inventory_items_2004();
+            } else {
+                self.draw_inventory_items();
+            }
         }
         // Then, neither the inventory nor the subject menu open
-        // (@ 0x00427f38), the warp cursor a puzzle set (@ 0x00428870).
+        // (@ 0x00427f38), the warp cursor a puzzle set (@ 0x00428870);
+        // the 2004 program's followers first (FUN_00428940
+        // @ 0x004290d0..: FUN_0043d000, FUN_00429ad0).
         if self.mode == Mode::Warp {
+            if self.files.is_evolution_2004() {
+                self.draw_followers_2004();
+            }
             self.draw_warp_cursor();
         }
         true
@@ -2233,8 +2257,11 @@ impl Game {
             });
         }
         // The object in the hand, centred on the screen (@ 0x00428500,
-        // `<World>ObjetsEnMain.SPR`), the zone's cursor over it.
-        if let Some(sprite) = self
+        // `<World>ObjetsEnMain.SPR`), the zone's cursor over it; the 2004
+        // program's from its bag (FUN_00429780).
+        if self.files.is_evolution_2004() {
+            self.draw_hand_2004();
+        } else if let Some(sprite) = self
             .script
             .as_ref()
             .filter(|s| s.vars[s.keys.objetenmain] != 0 && s.cursor_objects)
@@ -2312,6 +2339,10 @@ impl Game {
             }
             3 => self.set_script_var(|k| k.clicobjet, id),
             4 => self.set_script_var(|k| k.clicperso, id),
+            // The 2004 program's FUN_004441a0 (@ 0x0044428a..0x004442c4):
+            // 5 as 3, 6 as 4.
+            5 if self.files.is_evolution_2004() => self.set_script_var(|k| k.clicobjet, id),
+            6 if self.files.is_evolution_2004() => self.set_script_var(|k| k.clicperso, id),
             _ => {}
         }
         if kind == 2 && hand == 0 {
@@ -4435,6 +4466,14 @@ impl Host for Game {
 
     fn play_sound_2004(&mut self, name: &str) {
         self.play_sound_2004_name(name);
+    }
+
+    fn followers_2004(&mut self, op: atlantis2_engine::script::FollowerOp, name: &str) {
+        self.followers_op_2004(op, name);
+    }
+
+    fn zone_by_name_2004(&mut self, name: &str, on: bool) {
+        self.zone_toggle_2004(name, on);
     }
 
     fn stop_sound_2004(&mut self, name: &str) {

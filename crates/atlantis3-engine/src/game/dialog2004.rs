@@ -682,7 +682,11 @@ pub struct DialogMedia2004 {
 /// The background picture into its surface (FUN_00453df0): rows centred
 /// vertically (`(H − h) / 2` when the surface is taller, @ 0x00453ea0..),
 /// from x = 0; the rest kept.
-fn load_background(bg: &mut [u32], (w, h): (usize, usize), img: &atlantis4_data::jpeg::Decoded) {
+pub(super) fn load_background(
+    bg: &mut [u32],
+    (w, h): (usize, usize),
+    img: &atlantis4_data::jpeg::Decoded,
+) {
     let (iw, ih, c) = (
         img.width as usize,
         img.height as usize,

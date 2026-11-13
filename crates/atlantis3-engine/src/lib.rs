@@ -23,6 +23,7 @@ pub mod film2004;
 pub mod fixes;
 pub mod game;
 pub mod inventory;
+pub mod inventory2004;
 pub mod licorne;
 pub mod lipsync;
 pub mod maps;

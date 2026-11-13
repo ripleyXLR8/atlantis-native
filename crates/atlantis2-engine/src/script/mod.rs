@@ -46,7 +46,7 @@ use atlantis2_data::defnames::{self, DefNames, NameError};
 use crate::fpu::Fpu;
 
 pub use frame::DEMONS;
-pub use host::{AnimOp, DialStart, Host};
+pub use host::{AnimOp, DialStart, FollowerOp, Host};
 pub use subjects::{Subject, SubjectTable};
 
 pub(crate) const CR: u8 = b'\r';
