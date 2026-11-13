@@ -152,8 +152,8 @@ impl Game {
             }
         }
         self.light_dialog_2004();
-        // FUN_00476320's map for `GAMEBOY` in the hand (FUN_00409970) is
-        // not ported.
+        // FUN_00476320's `GAMEBOY` in the hand: the Gameboy (FUN_00409970).
+        self.carte_hand_2004();
     }
 
     /// The free pointer while a game runs: clamped to the stretch
