@@ -77,6 +77,7 @@
 //! engine). The engine's side is `game::puzzles2004`.
 
 pub mod catapulte;
+pub mod defender;
 pub mod hanoi;
 pub mod tron;
 
@@ -249,6 +250,13 @@ pub trait Host {
     fn in_bag(&self, _name: &str) -> bool {
         false
     }
+    /// The right button's byte (0x006e9fe9): set by the mouse handler
+    /// (@ 0x0042e212), cleared by the games themselves (Defender's bomb,
+    /// @ 0x00487be5).
+    fn right_click(&self) -> bool {
+        false
+    }
+    fn set_right_click(&mut self, _on: bool) {}
 }
 
 /// The key code of a virtual key (the table 0x0071b0d8): the codes'
@@ -292,6 +300,7 @@ pub trait Puzzle: std::any::Any {
 pub fn init(id: PuzzleId, host: &mut dyn Host) -> Option<Box<dyn Puzzle>> {
     match id {
         PuzzleId::Catapulte => Some(Box::new(catapulte::Catapulte::init(host))),
+        PuzzleId::Defender => Some(Box::new(defender::Defender::init(host))),
         PuzzleId::Hanoi => Some(Box::new(hanoi::Hanoi::init(host))),
         PuzzleId::Tron => Some(Box::new(tron::Tron::init(host))),
         _ => None,

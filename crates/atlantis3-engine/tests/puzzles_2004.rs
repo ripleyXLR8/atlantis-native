@@ -243,3 +243,145 @@ fn catapulte_won_from_chapter_110() {
     assert_ne!(g.mode(), Mode::Puzzle2004);
     assert_eq!(g.puzzle_2004(), None);
 }
+
+/// The ship's five ground points (FUN_004888b0) at world (x, y).
+fn ground_at(ground: &atlantis3_data::spr::Bank, x: i32, y: i32) -> bool {
+    let pts = [
+        (x, y),
+        (x + 20, y + 10),
+        (x - 20, y + 10),
+        (x + 10, y + 10),
+        (x - 10, y + 10),
+    ];
+    (x / 800 - 1..x / 800 + 2).filter(|k| *k >= 0).any(|k| {
+        pts.iter()
+            .any(|&(px, py)| ground.opaque_at((k % 4) as usize, Some(800 * k), 600, px, py))
+    })
+}
+
+/// `PUZ_DEFENDER` from chapter 22's /004 (view 9, the seat's button): the
+/// film, then the game; flown by the pointer (a height clear of the
+/// ground a little ahead, away from the enemies' shots, level with the
+/// god when the scroll stops) and fired with X (the key code) every
+/// frame: KAMA, ENNA and ZANAT destroyed, `DEFENDER_GAGNE` = 1, and the
+/// chapter's /005 runs `FINPUZZLE`, the film and chapter 23.
+#[test]
+fn defender_won_from_chapter_22() {
+    use atlantis3_engine::puzzles2004::defender::{Defender, State};
+    let Some((mut g, mut t)) = in_chapter(22) else {
+        return;
+    };
+    g.unix_time = || 1_100_000_000;
+    // The disc of chapters 18.. (chapter 18's /009 `CHANGECD=3`): the
+    // level and the ground's pictures are on disc 3.
+    g.run_command("(changecd=3)");
+    let button = g
+        .names()
+        .id(atlantis2_data::defnames::OBJETS, b"BOUTON_SIEGE")
+        .unwrap();
+    g.set_var("VUE", 9);
+    g.set_var("CLICOBJET", button as i32);
+    g.ctrl_scenar_in();
+    for _ in 0..2000 {
+        if g.puzzle_2004() == Some(PuzzleId::Defender) {
+            break;
+        }
+        t += 0.04;
+        g.step(t);
+        g.skip();
+    }
+    assert_eq!(g.puzzle_2004(), Some(PuzzleId::Defender));
+    assert_eq!(g.puzzles_2004_cfg()[2], 1);
+    let ground = bank(&g, "fond_chop.spr");
+    let st = |g: &Game| -> State { g.puzzle_2004_state::<Defender>().unwrap().st.clone() };
+    let mut shots = [false; 3];
+    let mut frames = 0;
+    let mut lives_lost = 0;
+    while g.script().unwrap().var("DEFENDER_GAGNE") == Some(0) {
+        frames += 1;
+        assert!(frames < 6_000, "not won");
+        let s = st(&g);
+        let ahead = (s.speed.max(0.0) * 0.4) as i32;
+        let x = 150;
+        let wx = ftol_scroll(s.scroll) + x;
+        // The target height: level with the active god (its centre a
+        // little below), else high.
+        let god = s
+            .gods
+            .iter()
+            .find(|gd| gd.active && gd.energy > 0.0)
+            .map(|gd| gd.pos.1 as i32 - 10);
+        let want = god.unwrap_or(120);
+        let danger = |y: i32| -> i32 {
+            s.shots
+                .iter()
+                .filter(|sh| matches!(sh.kind, 1 | 3 | 4 | 5))
+                .map(|sh| {
+                    let dx = (sh.pos.0 as i32 - wx).abs();
+                    let dy = (sh.pos.1 as i32 - y).abs();
+                    if dx < 140 && dy < 45 {
+                        1000 - dy * 10
+                    } else {
+                        0
+                    }
+                })
+                .sum()
+        };
+        let best = (30..560)
+            .step_by(5)
+            .filter(|&y| {
+                (0..=ahead)
+                    .step_by(5)
+                    .all(|d| !ground_at(&ground, wx + d, y))
+            })
+            .min_by_key(|&y| danger(y) + (y - want).abs())
+            .unwrap_or(s.ship.screen.1 as i32);
+        point(&mut g, x, best);
+        g.key_2004(0x58, true);
+        t += 0.04;
+        g.step(t);
+        g.key_2004(0x58, false);
+        let s2 = match g.puzzle_2004_state::<Defender>() {
+            Some(d) => d.st.clone(),
+            None => break,
+        };
+        if s2.lives < s.lives {
+            lives_lost += 1;
+        }
+        assert_eq!(g.script().unwrap().var("DEFENDER_PERDU"), Some(0), "lost");
+        for (k, met) in shots.iter_mut().enumerate() {
+            if !*met && s2.gods[k].active && s2.gods[k].energy > 0.0 {
+                *met = true;
+                if let Some(surf) = g.puzzle_2004_surface() {
+                    write_ppm(&format!("defender_god{k}"), surf, 800, 600);
+                }
+            }
+        }
+        if frames == 200 {
+            if let Some(surf) = g.puzzle_2004_surface() {
+                write_ppm("defender_flight", surf, 800, 600);
+            }
+        }
+    }
+    eprintln!("defender: won in {frames} frames, {lives_lost} lives lost");
+    assert!(shots.iter().all(|&s| s), "every god met");
+    // /005: FINPUZZLE, the film, chapter 23.
+    for _ in 0..3 {
+        t += 0.04;
+        g.step(t);
+    }
+    assert_eq!(g.script().unwrap().var("DEFENDER_GAGNE"), Some(2));
+    assert_eq!(g.puzzle_2004(), None);
+    assert_ne!(g.mode(), Mode::Puzzle2004);
+}
+
+fn ftol_scroll(s: f32) -> i32 {
+    s as i32
+}
+
+/// The pointer moved to (x, y) (relative motion, clamped to the stretch
+/// surface).
+fn point(g: &mut Game, x: i32, y: i32) {
+    let (px, py) = g.pointer();
+    g.mouse_motion(x - px, y - py);
+}

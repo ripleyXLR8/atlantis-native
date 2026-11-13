@@ -402,4 +402,12 @@ impl Host for Cx<'_> {
                 .is_ok_and(|id| s.bag.iter().any(|e| e.id == id as i32))
         })
     }
+
+    fn right_click(&self) -> bool {
+        self.g.right_clicked
+    }
+
+    fn set_right_click(&mut self, on: bool) {
+        self.g.right_clicked = on;
+    }
 }
