@@ -328,6 +328,9 @@ impl Engine {
         }
         // FUN_0042d198 (@ 0x0042c25f) on every exit: the bow rises when bow
         // mode is on.
+        // The cursor's click animation is cancelled (0x004968b8 = 0 @
+        // 0x0042c241).
+        self.cursor_state.click_anim = false;
         if self.bow_mode {
             self.raise_bow().await;
         }
@@ -439,6 +442,9 @@ impl Engine {
             self.vars.set("objetenmain", 0);
         }
         self.bar_slide_out(hooks).await;
+        // FUN_004278a0 cancels the cursor's click animation after the
+        // pick-up's slide-out (0x004968b8 = 0 @ 0x00427b5d).
+        self.cursor_state.click_anim = false;
         // The timers resume from their values, ChapterTime from 0, as after
         // the inventory bar (FUN_0042c59c @ 0x0042c844 ends the slide-out).
         self.rebase_con_clocks();
@@ -736,6 +742,33 @@ mod tests {
         }
         let got = *got.borrow();
         assert_eq!(got, Some((7, 9, true, true)));
+    }
+
+    /// Closing the bar (`FUN_0042c098` @ 0x0042c241) and the pick-up
+    /// (`FUN_004278a0` @ 0x00427b5d) cancel the cursor's click animation.
+    #[test]
+    fn the_bars_cancel_the_click_animation() {
+        for pickup in [false, true] {
+            let got = Rc::new(RefCell::new(None));
+            let g2 = got.clone();
+            let ran = with_engine(
+                "the_bars_cancel_the_click_animation",
+                move |mut e| async move {
+                    e.cursor_state.click_anim = true;
+                    if pickup {
+                        e.display_pickup(&mut NoScripts).await;
+                    } else {
+                        e.display_bar(&mut NoScripts).await;
+                    }
+                    *g2.borrow_mut() = Some(e.cursor_state.click_anim);
+                },
+                click_at_40,
+            );
+            if !ran {
+                return;
+            }
+            assert_eq!(*got.borrow(), Some(false), "pickup {pickup}");
+        }
     }
 
     /// Each bar frame polls NewSound (FUN_00432178): a sample that ended

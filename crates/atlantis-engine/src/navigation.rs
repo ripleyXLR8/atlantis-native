@@ -346,7 +346,7 @@ impl Engine {
                         || self.vars.get("gameover") != 0
                         || self.vars.get("exit") != 0);
                 if !pass_ended {
-                    // FUN_004278a0 starts the click animation (0x004278b5).
+                    // FUN_004278a0 starts the click animation (0x004278df).
                     self.cursor_state.click_anim = true;
                     hooks.npc_click(self, centre_perso, action).await;
                 }
@@ -1244,6 +1244,54 @@ mod tests {
             ],
             "{scans:?}"
         );
+    }
+
+    struct ClickAnim(Rc<Cell<Option<bool>>>);
+
+    impl ScriptHooks for ClickAnim {
+        fn zone_click<'a>(&'a mut self, e: &'a mut Engine, _z: u32) -> HookFuture<'a, ()> {
+            self.0.set(Some(e.cursor_state.click_anim));
+            ready(())
+        }
+    }
+
+    /// `FUN_004278a0` starts the cursor's click animation at its entry
+    /// (0x004968b8 = 1 @ 0x004278df), for every click the place loop
+    /// hands it (0x00423d12), not only on a character or an object.
+    #[test]
+    fn every_click_starts_the_click_animation() {
+        let got = Rc::new(Cell::new(None));
+        let (g2, g3) = (got.clone(), got.clone());
+        let mut locked = 0u64;
+        let mut pressed = None::<u64>;
+        let ran = with_engine(
+            "every_click_starts_the_click_animation",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.game_step(&mut ClickAnim(g2)).await;
+            },
+            move |sys, f| {
+                if g3.get().is_some() {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                if let Some(t) = pressed {
+                    if f == t + 2 {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    return;
+                }
+                locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                if locked == 10 {
+                    button(sys, MouseButton::Left, true);
+                    pressed = Some(f);
+                }
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some(true));
+        }
     }
 
     /// The view's alpha after the warp loop of place 1, with the left

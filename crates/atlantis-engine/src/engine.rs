@@ -1009,6 +1009,10 @@ impl Engine {
                     break;
                 }
             }
+            // FUN_004278a0 starts the cursor's click animation on every
+            // click it gets (0x004968b8 = 1 @ 0x004278df): a zone, nothing,
+            // before a move; the animation plays on in the next warp loop.
+            self.cursor_state.click_anim = true;
             self.script_vue_place = None;
             hooks.zone_click(self, action).await;
             if self.should_abort() {
