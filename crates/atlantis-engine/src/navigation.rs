@@ -1532,11 +1532,11 @@ mod tests {
                 };
                 match f - t {
                     2 => button(sys, MouseButton::Right, false),
-                    // The guest's portrait, raised with the bar.
-                    60 => {
-                        sys.push_input(Input::MouseMove { x: 580, y: 340 });
-                        button(sys, MouseButton::Left, true);
-                    }
+                    // The guest's portrait, raised with the bar: the
+                    // pointer a pass before the press (the bar reads the
+                    // pointer of the pass before, @ 0x0041a2b5).
+                    58 => sys.push_input(Input::MouseMove { x: 580, y: 340 }),
+                    60 => button(sys, MouseButton::Left, true),
                     62 => button(sys, MouseButton::Left, false),
                     _ => {}
                 }
