@@ -906,7 +906,11 @@ impl Scripts {
         // hand. The return at 0x004258b7 skips the followers' save, hide and
         // restore and leaves 0x00496144 (Guests::talk) as it is.
         if e.vars.get("objetenmain") != 0 {
+            // 0x004960c0 = 1 around the scan (@ 0x00425882, 0x004258ad):
+            // the still frames of its voice-only lines have no cursor.
+            e.give_scan = true;
             self.run_con_click(e).await;
+            e.give_scan = false;
             e.vars.set("objetenmain", 0);
             return;
         }
@@ -1651,6 +1655,88 @@ mod tests {
         if ran {
             assert_eq!(*got.borrow(), Some((true, true)));
         }
+    }
+
+    /// A presenter that notes, for each line, whether its still frame
+    /// would carry the warp cursor.
+    struct CursorProbe(Rc<RefCell<Vec<bool>>>);
+
+    impl DialogPresenter for CursorProbe {
+        fn play_line<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _req: &'a LineRequest,
+        ) -> HookFuture<'a, LineOutcome> {
+            self.0.borrow_mut().push(e.still_frame_cursor().is_some());
+            ready(LineOutcome::default())
+        }
+    }
+
+    /// The voice-only line of a /con section that tests only ObjetEnMain,
+    /// with object 257 in hand and a character under the pointer, reached
+    /// by a click on that character (`give`) or on a zone: whether its
+    /// still frame carries the cursor.
+    fn give_line_cursor(give: bool) -> Option<Vec<bool>> {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "no_cursor_on_the_lines_of_a_given_object",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(CursorProbe(g2.clone())));
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                // A place and a view with a character under the pointer.
+                let ids: Vec<u16> = e.wam.places.iter().map(|p| p.id).collect();
+                let mut hit = None;
+                'search: for id in ids {
+                    e.next_place_id = Some(id);
+                    e.do_place_change().await;
+                    if e.npc_rects.is_empty() {
+                        continue;
+                    }
+                    e.pointer.pos = (320, 240);
+                    for ia in 0..315 {
+                        for ib in -4..=4 {
+                            e.set_view(ia as f32 * 0.02, ib as f32 * 0.1);
+                            let (zone, perso) = e.pointer_targets();
+                            if perso >= 0x200 && zone > 0 && zone < 0x200 {
+                                hit = Some((perso, zone));
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+                let (perso, zone) = hit.expect("a character over a zone");
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/con(ObjetEnMain=257)\r\n[Seth,off] Here.\r\n/0\r\n",
+                );
+                e.vars.set("objetenmain", 257);
+                g2.borrow_mut().clear();
+                if give {
+                    s.npc_click(&mut e, perso, zone).await;
+                } else {
+                    e.vars.set("cliczone", zone as i32);
+                    s.zone_click(&mut e, zone).await;
+                }
+            },
+            |_, _| {},
+        );
+        ran.then(|| got.borrow().clone())
+    }
+
+    /// `FUN_00425828` sets 0x004960c0 around the /con click scan of a
+    /// character clicked with an object in hand (@ 0x00425882..
+    /// 0x004258ad), and `FUN_0041afd0` draws no cursor while it is set
+    /// (@ 0x0041afe8): the still frames of that section's voice-only lines
+    /// show none (CHAPI021 /270, CHAPI055 /685). A zone click's scan does
+    /// not set it.
+    #[test]
+    fn no_cursor_on_the_lines_of_a_given_object() {
+        let Some(given) = give_line_cursor(true) else {
+            return;
+        };
+        assert_eq!(given, [false]);
+        assert_eq!(give_line_cursor(false).unwrap(), [true]);
     }
 
     #[test]

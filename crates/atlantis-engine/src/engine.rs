@@ -218,6 +218,10 @@ pub struct Engine {
     /// after a click section or a departure scan that ran it, the place
     /// loop goes on with that value.
     pub(crate) script_vue_place: Option<u16>,
+    /// 0x004960c0: set around the /con click scan of a character clicked
+    /// with an object in hand (`FUN_00425828` @ 0x00425882..0x004258ad);
+    /// `FUN_0041afd0` then draws no cursor (@ 0x0041afe8).
+    pub(crate) give_scan: bool,
     /// A move ended: the place loop polls the input once and clears every
     /// input flag before the next arrival scan ([`Engine::end_of_move_input`]).
     pub move_input_poll: bool,
@@ -444,6 +448,7 @@ impl Engine {
             arrival_scan_pending: false,
             arrival_from_vue: 0,
             script_vue_place: None,
+            give_scan: false,
             move_input_poll: false,
             move_cyclo: None,
             arrival_after_load: false,

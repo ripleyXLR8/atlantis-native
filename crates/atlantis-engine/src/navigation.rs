@@ -227,7 +227,8 @@ impl Engine {
     /// (0x0041afe8..0x0041b050), one step of `FUN_00422fcc` over what is
     /// under the pointer, the sprite to draw at the pointer.
     pub(crate) fn still_frame_cursor(&mut self) -> Option<(usize, (i32, i32))> {
-        if self.bow_mode
+        if self.give_scan
+            || self.bow_mode
             || self.vars.get("gameover") != 0
             || self.bar.request
             || self.escape_request
