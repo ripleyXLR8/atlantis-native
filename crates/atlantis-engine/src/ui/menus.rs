@@ -354,6 +354,7 @@ impl Engine {
             if mi.left_press && self.menu_press_pairs() {
                 st.dbl_flag = true;
             }
+            let mut deleted = false;
             if st.click(
                 mi.left_press,
                 record,
@@ -368,6 +369,7 @@ impl Engine {
                     self.delete_player(row);
                 }
                 st.delete_done(confirmed);
+                deleted = true;
             }
             // FUN_00420f60 draws the field before the name entry
             // (0x0041e20d): what is shown lags the blink by one frame.
@@ -380,9 +382,15 @@ impl Engine {
                 let polls = menu.walk(record, 0, 0, self.menu_table());
                 self.menu_walk_polls(polls);
                 let mut s = bg.clone();
-                self.ui.draw_menu(&mut s, &menu.walk);
+                // The pass that ran ARE YOU SURE: FUN_0041ce8c (@
+                // 0x0041e1de, after FUN_0041e8a8) copies the backdrop over
+                // the menu and rows the pass drew before its click block;
+                // only the name field and the pointer follow.
+                if !deleted {
+                    self.ui.draw_menu(&mut s, &menu.walk);
+                }
                 let sharp_s_as_ss = self.sharp_s_as_ss();
-                for j in 0..self.players.count {
+                for j in (0..self.players.count).filter(|_| !deleted) {
                     let name = spell_sharp_s(self.players.name(j), sharp_s_as_ss).into_owned();
                     self.ui.draw_font_min(
                         &mut s,
@@ -1679,6 +1687,89 @@ mod double_click_tests {
         if ran {
             // The first press set the knob at x - 10; the drag moved none.
             assert_eq!(got.get(), Some(350 - 10));
+        }
+    }
+}
+
+#[cfg(test)]
+mod delete_pass_tests {
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::{button, press_at, record_centre as centre, with_engine};
+    use crate::ui::player_screen::DELETE;
+    use crate::warp::{SCREEN_H, SCREEN_W};
+    use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
+
+    const N: usize = SCREEN_W * SCREEN_H;
+
+    /// The player screen's pass that ran ARE YOU SURE presents the bare
+    /// backdrop with the name field and the pointer (FUN_0041ce8c @
+    /// 0x0041e1de); the next pass draws the menu and the rows again.
+    #[test]
+    fn the_delete_pass_presents_the_bare_backdrop() {
+        let shots = Rc::new(RefCell::new(Vec::new()));
+        let s2 = shots.clone();
+        let at = Rc::new(Cell::new(((0, 0), (0, 0))));
+        let a2 = at.clone();
+        let bg = Rc::new(RefCell::new(Vec::new()));
+        let b2 = bg.clone();
+        let a3 = at.clone();
+        let ran = with_engine(
+            "the_delete_pass_presents_the_bare_backdrop",
+            move |mut e| async move {
+                e.load_interface().await;
+                e.players.create(b"Tester").unwrap();
+                *b2.borrow_mut() = e.load_picture("PREINTRO.TGA").await;
+                let mut sele = e.load_menu("SELEMENU.TXT").await.unwrap();
+                sele.walk(None, 0, 0, None);
+                let mut sure = e.load_menu("SUREMENU.TXT").await.unwrap();
+                sure.walk(None, 0, 0, None);
+                a2.set((
+                    centre(sele.walk.records[DELETE]),
+                    centre(sure.walk.records[4]),
+                ));
+                e.player_screen().await;
+            },
+            move |sys, f| {
+                let (delete, cancel) = a3.get();
+                match f {
+                    10 => press_at(sys, (300, 259)),
+                    11 => button(sys, MouseButton::Left, false),
+                    20 => press_at(sys, delete),
+                    21 => button(sys, MouseButton::Left, false),
+                    40 => press_at(sys, cancel),
+                    42 => button(sys, MouseButton::Left, false),
+                    50 => sys.push_input(Input::Quit),
+                    _ => {}
+                }
+                if f == 41 || f == 45 {
+                    s2.borrow_mut().push(sys.screen.borrow().clone());
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let shots = shots.borrow();
+        let bg = bg.borrow();
+        let (pass, next) = (&shots[0], &shots[1]);
+        assert_ne!(pass, next, "the delete pass shows the menu");
+        // What the delete pass draws over the backdrop (the name field), the
+        // next pass draws too; the pointer (blended with what is under it)
+        // left out.
+        let (_, cancel) = at.get();
+        let off_bg = |s: &[u16]| (0..N).filter(|&p| s[p] != bg[p]).count();
+        assert!(
+            off_bg(pass) * 4 < off_bg(next),
+            "the delete pass is not bare"
+        );
+        for p in 0..N {
+            let (x, y) = ((p % SCREEN_W) as i32, (p / SCREEN_W) as i32);
+            let pointer = (cancel.0 - 8..cancel.0 + 48).contains(&x)
+                && (cancel.1 - 8..cancel.1 + 48).contains(&y);
+            if pass[p] != bg[p] && !pointer {
+                assert_eq!(pass[p], next[p], "pixel ({x}, {y})");
+            }
         }
     }
 }
