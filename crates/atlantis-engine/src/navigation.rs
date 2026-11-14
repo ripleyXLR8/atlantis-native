@@ -491,6 +491,11 @@ impl Engine {
                 if guest != 0 && !self.should_abort() {
                     hooks.talk_to_guest(self, guest).await;
                     moved = self.arrival_scan_pending;
+                    // FUN_0042c098's poll after the bar (0x0042c228) comes
+                    // after the conversation on this path, without GameOver.
+                    if self.vars.get("gameover") == 0 {
+                        self.drop_press_edges();
+                    }
                 }
                 if self.should_abort() || moved {
                     // GAMEOVER after the bar (0x0041c6fe..0x0041c717): the
