@@ -275,7 +275,18 @@ impl TaquinGame {
         self.result = 0;
         loop {
             if self.variant == 7 {
+                // FUN_0044659c polls after the present (0x004467e6); the
+                // top of its pass is FUN_0043318c (0x0044670a), which
+                // makes no poll. A click already taken (the last set-up
+                // frame's poll 0x00446ba9, or the port's entry read)
+                // returned before the pump (0x0041a2b5): FUN_00447048
+                // (0x00446718) and the cursor read that poll's pointer,
+                // not the one this read finds.
+                let taken = self.click.then_some((self.mx, self.my));
                 self.read_boundary(io);
+                if let Some((x, y)) = taken {
+                    (self.mx, self.my) = (x, y);
+                }
             }
             if self.click {
                 self.handle_click(io);
@@ -433,6 +444,70 @@ mod click_pointer_tests {
         |h: &mut Host<'_>| h.start_input(),
         (300, 200)
     );
+}
+
+#[cfg(test)]
+mod setup_click_tests {
+    use super::*;
+
+    /// The last set-up frame's poll takes a click at the previous poll's
+    /// pointer (100, 100); the mouse is at (300, 200) after it.
+    #[derive(Default)]
+    struct Io {
+        frames: usize,
+        presents: usize,
+        cursor: Option<(i32, i32)>,
+    }
+
+    impl TaquinIo for Io {
+        fn start_input(&mut self) -> (i32, i32, bool) {
+            (100, 100, false)
+        }
+        fn boundary(&mut self, _g: &TaquinGame) -> (i32, i32, bool) {
+            (300, 200, false)
+        }
+        fn frame_boundary(&mut self, _g: &TaquinGame) -> (i32, i32, bool) {
+            self.frames += 1;
+            (100, 100, self.frames == 17)
+        }
+        fn draw_background(&mut self) {}
+        fn draw_sprite(&mut self, bank: char, x: i32, y: i32, _frame: i32) {
+            if bank == 'C' && self.presents == 17 {
+                self.cursor = Some((x, y));
+            }
+        }
+        fn draw_standard_cursor(&mut self, x: i32, y: i32) {
+            if self.presents == 17 {
+                self.cursor = Some((x, y));
+            }
+        }
+        async fn present(&mut self, _g: &TaquinGame) {
+            self.presents += 1;
+        }
+        fn play_sound(&mut self, _slot: i32) {}
+        fn aborted(&self) -> bool {
+            self.presents > 17
+        }
+    }
+
+    /// Taquin 7: a click of the last set-up frame (FUN_00446ac8 @
+    /// 0x00446ba9) is handled, and the first pass's cursor drawn, at that
+    /// poll's pointer: FUN_0044659c makes no poll before FUN_00447048
+    /// (0x00446718).
+    #[test]
+    fn taquin7_setup_click_at_the_polls_pointer() {
+        use std::future::Future;
+        use std::task::{Context, Waker};
+        let mut g = TaquinGame::new(7);
+        g.object_in_hand = PIECE_OBJECT;
+        let mut io = Io::default();
+        {
+            let mut run = std::pin::pin!(g.run(&mut io));
+            let mut cx = Context::from_waker(Waker::noop());
+            assert!(run.as_mut().poll(&mut cx).is_ready());
+        }
+        assert_eq!(io.cursor, Some((100, 100)));
+    }
 }
 
 #[cfg(test)]
