@@ -964,8 +964,9 @@ impl MuriaIo for MuriaReplay<'_> {
     fn play_sound(&mut self, slot: i32) {
         self.0.sound(&slot.to_string());
     }
-    async fn script_hook(&mut self, _flag_temp3: i32) {
+    async fn script_hook(&mut self, _flag_temp3: i32) -> Option<(i32, i32)> {
         self.0.sound("script");
+        None
     }
     fn aborted(&self) -> bool {
         self.0.aborted()

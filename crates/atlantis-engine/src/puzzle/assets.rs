@@ -468,6 +468,25 @@ impl<'a> PuzzleHost<'a> {
         self.held_pointer(m)
     }
 
+    /// After a script the puzzle ran (Muria's `FUN_004277c8`): when it
+    /// ran frames, a line's player polled `FUN_0041a298` on each one
+    /// (`FUN_004305e8` @ 0x00430807), so the edge-mode latch `FUN_0042e624`
+    /// has seen the buttons as they are (a press still down is no new
+    /// click, 0x0043f004) and the pumps' WM_MOUSEMOVE (0x00419bfa) have
+    /// moved the pointer 0x004960ec / 0x004960f0. The pointer after the
+    /// script, `None` when it ran no frame (no poll: nothing changes).
+    pub fn after_script(&mut self, frames_before: u64) -> Option<(i32, i32)> {
+        let sys = &self.e.sys;
+        if sys.frames_presented() == frames_before {
+            return None;
+        }
+        let (left, right) = sys.buttons();
+        self.input.prev_left = left;
+        self.input.prev_right = right;
+        self.pointer = sys.mouse();
+        Some(self.pointer)
+    }
+
     fn held_pointer(&mut self, mut m: PuzzleMouse) -> PuzzleMouse {
         if m.click {
             (m.x, m.y) = self.pointer;
