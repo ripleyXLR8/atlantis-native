@@ -623,8 +623,18 @@ impl MilesSampleStatus {
 /// -10000 for p = 0 (helper 0x2000dcd0). The near channel stays full and
 /// the far one gets 10^(cB / 2000); the mixer's far channel is
 /// (127 - |balance|) / 127, so the balance is the nearest step to that.
+///
+/// A byte above 127 (FUN_00432758 hands `trunc(value) & 0xff` to
+/// AIL_set_sample_pan, @ 0x004329fa..0x00432a06, so a value below 0 comes
+/// as 129..255) goes to the helper as 127 - p < 0: 63 / (127 - p) is
+/// negative, `fyl2x` gives a NaN under the game's x87 control word 0x127f
+/// (all exceptions masked, @ 0x004719a5), `ftol` 0x20016458 returns the
+/// low dword of the integer indefinite, 0, and SetPan(0) is the centre.
 pub fn miles_pan_balance(pan: u8) -> i8 {
-    let p = i32::from(pan & 0x7f);
+    if pan > 0x7f {
+        return 0;
+    }
+    let p = i32::from(pan);
     if p == 63 || p == 64 {
         return 0;
     }
@@ -639,9 +649,11 @@ pub fn miles_pan_balance(pan: u8) -> i8 {
 }
 
 /// Miles volume 0..127 for the mixer, which applies MSS32.DLL's law
-/// (0x2000dc60, `audio::miles_gain`).
+/// (0x2000dc60, `audio::miles_gain`). A byte above 127 (a value below 0
+/// truncated `& 0xff` by FUN_00432758 @ 0x00432a30..0x00432a3c) is stored
+/// as 0x7f by the DirectSound back-end (0x2000dc71..0x2000dc86).
 fn mixer_volume(v: u8) -> u8 {
-    v & 0x7f
+    v.min(0x7f)
 }
 
 /// The rate the six samples are set up with: `FUN_00430d20` sets them up
@@ -719,8 +731,10 @@ impl MixerAmbientOutput {
         if let Some(v) = self.voices[slot].take() {
             self.mixer.stop(v);
         }
-        self.pan[slot] = pan & 0x7f;
-        self.volume[slot] = volume & 0x7f;
+        // Kept as given: Miles clamps them when it plays (`mixer_volume`,
+        // `miles_pan_balance`).
+        self.pan[slot] = pan;
+        self.volume[slot] = volume;
         self.miles.started(slot);
         if pcm.samples.is_empty() {
             return;
@@ -799,7 +813,7 @@ impl AmbientSampleOutput for MixerAmbientOutput {
     }
 
     fn set_pan(&mut self, slot: usize, pan: u8) {
-        self.pan[slot] = pan & 0x7f;
+        self.pan[slot] = pan;
         if let Some(v) = self.voices[slot] {
             self.mixer.set_volume(
                 v,
@@ -810,7 +824,7 @@ impl AmbientSampleOutput for MixerAmbientOutput {
     }
 
     fn set_volume(&mut self, slot: usize, volume: u8) {
-        self.volume[slot] = volume & 0x7f;
+        self.volume[slot] = volume;
         if let Some(v) = self.voices[slot] {
             self.mixer.set_volume(
                 v,
@@ -830,6 +844,41 @@ impl AmbientSampleOutput for MixerAmbientOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// FUN_00432758 hands `trunc(value) & 0xff` to Miles, so a glide below
+    /// 0 gives bytes 129..255. MSS32.DLL's DirectSound back-end stores a
+    /// volume above 0x7f as 0x7f (0x2000dc71..0x2000dc86) and a pan above
+    /// 127 ends in SetPan(0) (0x2000dd50, helper 0x2000dcd0 on a negative
+    /// 127 - pan: NaN, ftol 0): full volume at the centre, not the byte
+    /// masked to 7 bits.
+    #[test]
+    fn bytes_above_127_are_clamped_as_miles() {
+        let mixer = Mixer::new();
+        let mut out = MixerAmbientOutput::new(mixer.clone());
+        out.pcm.insert(0, Arc::new(vec![1000i16; 100]));
+        out.start(0, 0, 0, true);
+        let v = out.voices[0].unwrap();
+        for byte in [0x80u8, 0xad, 0xff] {
+            out.set_pan(0, byte);
+            out.set_volume(0, byte);
+            assert_eq!(mixer.voice_volume(v), Some((0x7f, 0)), "byte {byte:#x}");
+        }
+        out.set_pan(0, 0);
+        out.set_volume(0, 0x17);
+        assert_eq!(mixer.voice_volume(v), Some((0x17, -127)));
+        out.start_pcm(
+            1,
+            Pcm {
+                rate: SAMPLE_RATE,
+                channels: 1,
+                samples: Arc::new(vec![1000i16; 100]),
+            },
+            0xc0,
+            0xc0,
+        );
+        let v1 = out.voices[1].unwrap();
+        assert_eq!(mixer.voice_volume(v1), Some((0x7f, 0)));
+    }
 
     /// MSS32.DLL keeps the loop count per sample (+0x38, written only by
     /// AIL_init_sample and AIL_set_sample_loop_count): a sound started on
