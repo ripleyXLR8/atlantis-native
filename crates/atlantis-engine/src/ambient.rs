@@ -146,6 +146,10 @@ pub trait AmbientSampleOutput {
     /// AIL_set_sample_address + loop count + AIL_start_sample: variant k of
     /// object `object` (an index in the WAM's object table).
     fn start(&mut self, slot: usize, object: usize, variant: usize, loop_forever: bool);
+    /// AIL_set_sample_address + AIL_start_sample without a loop count: the
+    /// sample plays with the last one set (the two starts of
+    /// `FUN_00432758` @ 0x00432882 and 0x0043295d).
+    fn restart(&mut self, slot: usize, object: usize, variant: usize);
     /// AIL_set_sample_loop_count(slot, 1) on its own: the record load and
     /// remove pass of `FUN_00431a1c` and `FUN_00431e98` set it before their
     /// AIL_stop_sample. The loop count is a state of the Miles sample
@@ -475,15 +479,16 @@ impl AmbientSounds {
             let status = out.status(i);
             let rec = self.records[i];
             if rec.start != 0 {
-                // The pause, as in FUN_00432178; the sample starts with the
-                // loop count it already has.
+                // The pause, as in FUN_00432178, but the start @ 0x0043295d
+                // sets no loop count (FUN_00432178 sets 1, dc:25982): the
+                // sample plays with the one it already has.
                 if let Some(ro) = ro {
                     if (chapter_time.wrapping_sub(rec.start as i32) as u32) > rec.delay {
                         if let Some(v) = self.pick_some(&objects[ro], usize::from(rec.count)) {
                             self.records[i].current = v as u8;
                             out.stop(i);
                             if let Some(obj) = rec.object {
-                                out.start(i, obj, v, false);
+                                out.restart(i, obj, v);
                             }
                             self.records[i].start = 0;
                         }
@@ -501,12 +506,12 @@ impl AmbientSounds {
                         continue; // no step this frame
                     }
                     Some(v) => {
-                        // A finished sample had a finite loop count (1),
-                        // which no call here changes.
+                        // The start @ 0x00432882 sets no loop count; a
+                        // finished sample had a finite one (1).
                         self.records[i].current = v as u8;
                         out.stop(i);
                         if let Some(obj) = rec.object {
-                            out.start(i, obj, v, false);
+                            out.restart(i, obj, v);
                         }
                     }
                 }
@@ -776,6 +781,11 @@ impl AmbientSampleOutput for MixerAmbientOutput {
         ));
     }
 
+    fn restart(&mut self, slot: usize, object: usize, variant: usize) {
+        let loop_forever = self.loop_forever[slot];
+        self.start(slot, object, variant, loop_forever);
+    }
+
     fn set_loop_once(&mut self, slot: usize) {
         self.loop_forever[slot] = false;
     }
@@ -861,5 +871,27 @@ mod tests {
         out.start_pcm(1, short(), 0, 0x6e);
         mixer.fill(&mut buf, SAMPLE_RATE, 2);
         assert!(!out.active(1));
+    }
+
+    /// `FUN_00432758`'s starts (@ 0x00432882, 0x0043295d) set no loop
+    /// count: after a "loop forever" start and a stop that writes none
+    /// (`FUN_0043d0e0`), the restarted variant loops forever.
+    #[test]
+    fn restart_keeps_the_samples_loop_count() {
+        let mixer = Mixer::new();
+        let mut out = MixerAmbientOutput::new(mixer.clone());
+        out.pcm.insert(0, Arc::new(vec![1000i16; 100]));
+        out.pcm.insert(1, Arc::new(vec![1000i16; 100]));
+        let mut buf = vec![0.0f32; 2 * 1000];
+        out.start(0, 0, 0, true);
+        out.stop(0);
+        out.restart(0, 0, 1);
+        mixer.fill(&mut buf, SAMPLE_RATE, 2);
+        assert!(out.active(0), "the restarted variant loops forever");
+        out.start(0, 0, 0, false);
+        out.stop(0);
+        out.restart(0, 0, 1);
+        mixer.fill(&mut buf, SAMPLE_RATE, 2);
+        assert!(!out.active(0), "the restarted variant plays once");
     }
 }
