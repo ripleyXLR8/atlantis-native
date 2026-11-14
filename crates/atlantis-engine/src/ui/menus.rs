@@ -1273,12 +1273,11 @@ mod release_wait_tests {
                 }
                 e.ingame_menu().await;
             },
-            move |sys, f| match f {
-                20 => {
+            move |sys, f| {
+                if f == 20 {
                     *s2.borrow_mut() = Some(sys.screen.borrow().clone());
                     sys.push_input(crate::sys::Input::Quit);
                 }
-                _ => {}
             },
         );
         if !ran {
