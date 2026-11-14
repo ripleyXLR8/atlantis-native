@@ -651,11 +651,14 @@ mod tests {
         }
     }
 
+    /// ObjetEnMain and bow mode.
+    type HandBow = (i32, bool);
+
     /// The inventory bar (`FUN_0042c098`) with the bow (object 334) in it
     /// and ArcMagique set, a click on the bow; `held`: the object in hand
     /// at the start. The hand and bow mode the timers saw on each frame,
     /// then after the bar.
-    fn bow_from_the_bar(held: i32, game_over: bool) -> Option<(Vec<(i32, bool)>, (i32, bool))> {
+    fn bow_from_the_bar(held: i32, game_over: bool) -> Option<(Vec<HandBow>, HandBow)> {
         let seen = Rc::new(RefCell::new(Vec::new()));
         let got = Rc::new(RefCell::new(None));
         let (s2, g2) = (seen.clone(), got.clone());

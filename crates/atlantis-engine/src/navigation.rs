@@ -1134,8 +1134,11 @@ mod tests {
         to: u16,
         view: (f32, f32),
         fired: Rc<Cell<bool>>,
-        scans: Rc<RefCell<Vec<(&'static str, i32, i32)>>>,
+        scans: Scans,
     }
+
+    /// (scan, place, ArriveeVue) in order.
+    type Scans = Rc<RefCell<Vec<(&'static str, i32, i32)>>>;
 
     impl ScriptHooks for TimerVue {
         fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
