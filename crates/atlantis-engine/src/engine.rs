@@ -228,6 +228,10 @@ pub struct Engine {
     /// with an object in hand (`FUN_00425828` @ 0x00425882..0x004258ad);
     /// `FUN_0041afd0` then draws no cursor (@ 0x0041afe8).
     pub(crate) give_scan: bool,
+    /// 0x00496154: set by `FUN_004240fc` around a puzzle and its /sel scan
+    /// (@ 0x00424166, cleared @ 0x00424242); `FUN_0041afd0` then steps no
+    /// cursor (@ 0x0041b03a).
+    pub(crate) puzzle_scan: bool,
     /// A move ended: the place loop polls the input once and clears every
     /// input flag before the next arrival scan ([`Engine::end_of_move_input`]).
     pub move_input_poll: bool,
@@ -473,6 +477,7 @@ impl Engine {
             arrival_from_vue: 0,
             script_vue_place: None,
             give_scan: false,
+            puzzle_scan: false,
             move_input_poll: false,
             move_cyclo: None,
             arrival_after_load: false,

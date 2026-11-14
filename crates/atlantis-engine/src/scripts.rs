@@ -1032,6 +1032,15 @@ impl Scripts {
     /// it the music goes down by half (0x00495ea4 = 50, 0x00495eac = 2),
     /// then back up with 80 % again.
     async fn run_puzzle_zone(&mut self, e: &mut Engine, n: u32) {
+        // 0x00496154 = 1 (0x00424166) until after the /sel scan
+        // (0x00424242): the still frames of that scan's voice-only lines
+        // step no cursor (FUN_0041afd0 @ 0x0041b03a).
+        e.puzzle_scan = true;
+        self.run_puzzle_zone_flagged(e, n).await;
+        e.puzzle_scan = false;
+    }
+
+    async fn run_puzzle_zone_flagged(&mut self, e: &mut Engine, n: u32) {
         e.stop_ambient();
         e.music.duck(false, Some(50));
         // FinPuzzle = the result (crate::puzzle, FUN_0043a1e0).
@@ -1772,6 +1781,40 @@ mod tests {
             |_, _| {},
         );
         ran.then(|| got.borrow().clone())
+    }
+
+    /// `FUN_004240fc` sets 0x00496154 around a puzzle and its /sel scan
+    /// (@ 0x00424166 .. 0x00424242), and `FUN_0041afd0` does not step the
+    /// cursor while it is set (@ 0x0041b03a): the still frame of the
+    /// scan's voice-only line leaves the animation as it was; after the
+    /// zone it steps again.
+    #[test]
+    fn no_cursor_on_the_lines_of_the_post_puzzle_scan() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "no_cursor_on_the_lines_of_the_post_puzzle_scan",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(CursorProbe(g2.clone())));
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/sel(flagtemp1=1)\r\n[Seth,off] Here.\r\n/0\r\n",
+                );
+                e.vars.set("flagtemp1", 1);
+                e.vars.set("objetenmain", 0);
+                // A StartPuzzle number past the puzzles: refused at once.
+                s.run_puzzle_zone(&mut e, 99).await;
+                let after = e.still_frame_cursor_step();
+                g2.borrow_mut().push(after);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [false, true]);
+        }
     }
 
     /// `FUN_00425828` sets 0x004960c0 around the /con click scan of a

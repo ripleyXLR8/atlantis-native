@@ -386,6 +386,7 @@ impl Engine {
     /// fullscreen (WM_SETCURSOR, `SetCursor(NULL)` @ 0x00419d1a).
     pub(crate) fn still_frame_cursor_step(&mut self) -> bool {
         if self.give_scan
+            || self.puzzle_scan
             || self.bow_mode
             || self.vars.get("gameover") != 0
             || self.bar.request
