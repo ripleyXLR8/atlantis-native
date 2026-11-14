@@ -745,7 +745,12 @@ impl Dialogs {
                     }
                     // The bar request as the right presses left it.
                     escape_poll.bar_request = e.bar.request;
-                    let escape = fi.escape && escape_poll.poll(false, false, true);
+                    // A left press in the same poll returns before the
+                    // Escape test (0x0041a2b5, 0x0041a2be; Escape @
+                    // 0x0041a3c0): the line ends on the click, no skip
+                    // flag, and the Escape edge is gone by the next poll.
+                    let escape =
+                        fi.escape && !fi.left_press && escape_poll.poll(false, false, true);
                     if escape || fi.left_press {
                         // With a talking head Escape also sets the dialog-skip
                         // flag 0x00496134 that FUN_0042844c reads after the
