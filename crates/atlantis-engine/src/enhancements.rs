@@ -93,6 +93,17 @@ pub enum BugFix {
     /// LOAD and QUIT take the same exit without the puzzle (0x00496124 is
     /// 0): the zone-999 scan runs ([`crate::engine::Engine::no_click_exit`]).
     GameOverPuzzle,
+    /// A file is read from whichever disc's archive holds it. Off, as the
+    /// original, from the disc in the drive only: it has one archive open,
+    /// the disc's (`FUN_0041eda8` closes the archive and opens
+    /// `bigcd<N>.big`, N = 0x00772913), then looks in the file system
+    /// (`_GL_FileOpen`); the WAM loader `FUN_00421ebc` shows its error box
+    /// (dialog 0x65, code 0xc, the path @ 0x00421f07..0x00421f30) on a
+    /// file that archive lacks and keeps the WAM in memory. CHAPI079 (disc
+    /// 4) holds `ChangeWam=atlan4.wam`, which only disc 1 has: the box,
+    /// and the player stays in PALAIS3 (with the fix, in the day city).
+    /// The WAM loads only ([`crate::engine::Engine::load_wam`]).
+    AnyDisc,
     /// The hexagon puzzle always places its pieces, as the 2001 entry does
     /// (OBJETENMAIN set to 402 before its test). Off, as the 1997 and the
     /// Chinese builds (atlantis-cd-en-688128 FUN_0043c570), the pieces are
@@ -170,7 +181,7 @@ pub enum BugFix {
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 19] = [
+    pub const ALL: [BugFix; 20] = [
         BugFix::MusicLoop,
         BugFix::CinemaSound,
         BugFix::HeadOverlay,
@@ -181,6 +192,7 @@ impl BugFix {
         BugFix::SnakesFirstWin,
         BugFix::PuzzleEscape,
         BugFix::GameOverPuzzle,
+        BugFix::AnyDisc,
         BugFix::HexagonPieces,
         BugFix::LoadMusik,
         BugFix::SharpS,
@@ -205,6 +217,7 @@ impl BugFix {
             BugFix::SnakesFirstWin => "fix_snakes_first_win",
             BugFix::PuzzleEscape => "fix_puzzle_escape",
             BugFix::GameOverPuzzle => "fix_gameover_puzzle",
+            BugFix::AnyDisc => "fix_any_disc",
             BugFix::HexagonPieces => "fix_hexagon_pieces",
             BugFix::LoadMusik => "fix_loadmusik",
             BugFix::SharpS => "fix_sharp_s",
@@ -495,6 +508,19 @@ pub struct Enhancements {
     /// poll (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba) reads F5..F8 only
     /// and whose picker (`FUN_0041cf78`) reads no key.
     pub arrow_keys: bool,
+    /// The game goes on while its window is not the active one (default
+    /// on, a port convenience as Atlantis II's); off, as the original: its
+    /// input poll `FUN_0041a298` pumps messages while 0x00496128 is 0
+    /// (@ 0x0041a42d), the flag the window procedure writes on
+    /// WM_ACTIVATEAPP (@ 0x00419cbe..0x00419cfa: 1 only when wParam != 0,
+    /// the window is the foreground window and not minimised). Every frame
+    /// loop polls through it, so no frame, film, line or music refill
+    /// (`FUN_0043318c`) runs until the window is active again; the 200 Hz
+    /// timer still runs (the ring's releases, the fades), the sounds
+    /// playing go on, and the clocks (timeGetTime) count the time away
+    /// ([`crate::sys::Runner::hold`]). Read by the desktop front ends (the
+    /// browser holds a hidden page whatever, `atlantis-app`).
+    pub background_run: bool,
 }
 
 impl Default for Enhancements {
@@ -504,6 +530,7 @@ impl Default for Enhancements {
             restored_content: false,
             ui_ux: false,
             arrow_keys: true,
+            background_run: true,
         }
     }
 }
@@ -516,6 +543,7 @@ impl Enhancements {
             restored_content: false,
             ui_ux: false,
             arrow_keys: false,
+            background_run: false,
         }
     }
 
@@ -572,6 +600,11 @@ impl Enhancements {
         );
         x.ui_ux = pick(self.ui_ux, before.ui_ux, after.ui_ux);
         x.arrow_keys = pick(self.arrow_keys, before.arrow_keys, after.arrow_keys);
+        x.background_run = pick(
+            self.background_run,
+            before.background_run,
+            after.background_run,
+        );
         x
     }
 }

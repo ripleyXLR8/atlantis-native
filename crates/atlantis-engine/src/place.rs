@@ -725,6 +725,19 @@ impl Engine {
             if let (Some((_, to)), true) = (places, video.contains('.')) {
                 self.ambient_prepare_glide(to, self.last_film_frames);
             }
+            // The Cinema= handler (`FUN_0042a100`) has stored NEWSOUND = 1
+            // before the open and, FUN_00448c70 returning 1, runs
+            // FUN_0043318c and the poller FUN_00432a64 whatever 0x0049610c
+            // (@ 0x0042a8e1, 0x0042a8e6): a NewSound of another value is
+            // stopped, the film's own APC starts if the disc has it, else
+            // NEWSOUND = 0. Only the player and the close are skipped
+            // (@ 0x0042a8eb..0x0042a8f4); then 0x00496118, 0x0049611c,
+            // 0x00496120, 0x00496138 = 0, 0x00496124 = 1 and 0x004960c4 =
+            // 0 (@ 0x0042a907..0x0042a939).
+            if cinema_sound {
+                self.cinema_new_sound(&name).await;
+                self.input_flags_reset();
+            }
             return;
         };
         // The 0x40-byte header to 0x00896c40: the frame count at + 0x10.
@@ -774,13 +787,7 @@ impl Engine {
         // NewSound entries that the departure sections play, and a start-up
         // film's sound is WinMain's table value (Engine::play_startup_film).
         if cinema_sound {
-            self.apply_new_sound_fade_end();
-            let apc = format!("WAV\\{}", with_ext(&name, "APC"));
-            if self.cinema_sound_fix() && self.music.new_sound_last == 1 {
-                self.music.new_sound_playing = false;
-            }
-            self.vars.set("newsound", 1);
-            self.poll_new_sound_named(Some(apc)).await;
+            self.cinema_new_sound(&name).await;
         }
 
         let start = self.sys.millis();
@@ -1209,6 +1216,19 @@ impl Engine {
         self.play_transition_video(&name, None, CINEMA_FRAME_MS)
             .await;
         self.cinema_captions = None;
+    }
+
+    /// The Cinema= handler's sound of film `name` (`FUN_0042a100` @
+    /// 0x0042a7c0..0x0042a8e6): NEWSOUND = 1 and the poller on the film's
+    /// own APC (see [`Engine::play_film`]).
+    async fn cinema_new_sound(&mut self, name: &str) {
+        self.apply_new_sound_fade_end();
+        let apc = format!("WAV\\{}", with_ext(name, "APC"));
+        if self.cinema_sound_fix() && self.music.new_sound_last == 1 {
+            self.music.new_sound_playing = false;
+        }
+        self.vars.set("newsound", 1);
+        self.poll_new_sound_named(Some(apc)).await;
     }
 
     /// The end of a NewSound fade-out (`FUN_0042f7a8` @ 0x0042f92f):

@@ -825,6 +825,7 @@ impl App {
     /// The desktop's pace: a step when the window's timer says one is due.
     #[cfg(not(target_arch = "wasm32"))]
     fn step_paced(&mut self) -> bool {
+        let held = self.held_by_inactive_window();
         let Some(runner) = &mut self.runner else {
             return true;
         };
@@ -837,6 +838,13 @@ impl App {
             self.next_frame = now + FRAME; // fell behind: do not catch up
         }
         let ms = now.duration_since(self.start).as_millis() as u64;
+        // With `--original` (`Enhancements::background_run` off), the
+        // original's hold while its window is not the active one: no step,
+        // the clock and the 200 Hz timer go on (`Runner::hold`).
+        if held {
+            runner.hold(ms);
+            return true;
+        }
         let alive = runner.step(ms);
         let took = now.elapsed();
         self.tick_play_time(now);
@@ -847,6 +855,15 @@ impl App {
         }
         self.apply_pointer();
         alive
+    }
+
+    /// The game is held because its window is not the active one, as the
+    /// original holds (its input poll `FUN_0041a298` pumps messages while
+    /// the WM_ACTIVATEAPP flag 0x00496128 is 0, @ 0x0041a42d): without the
+    /// focus, with `Enhancements::background_run` off (`--original`).
+    #[cfg(not(target_arch = "wasm32"))]
+    fn held_by_inactive_window(&self) -> bool {
+        !self.focused && !self.sys.enhancements().background_run
     }
 
     /// The browser's pace: it asks for a redraw per screen refresh
@@ -1979,6 +1996,45 @@ mod fullscreen_tests {
         assert!(stored(&store) && app_on(&store).opens_fullscreen());
         app.store_fullscreen(false);
         assert!(!stored(&store) && !app_on(&store).opens_fullscreen());
+    }
+
+    /// Without the focus and with `background_run` off (`--original`),
+    /// the engine is held (`Runner::hold`: the clock goes on, no step);
+    /// with the focus, or the switch on, it steps.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn an_inactive_window_holds_the_game_with_original() {
+        use std::sync::atomic::Ordering;
+        let sys = Sys::new(Mixer::new());
+        let steps = Rc::new(std::cell::Cell::new(0));
+        let (s2, n2) = (sys.clone(), steps.clone());
+        let runner = Runner::new(sys.clone(), async move {
+            loop {
+                n2.set(n2.get() + 1);
+                s2.frame().await;
+            }
+        });
+        let held = sys.mixer.loops_held_flag();
+        let mut app = App::new(sys.clone(), Some(runner));
+        let step = |app: &mut App| {
+            app.next_frame = Instant::now();
+            assert!(app.step_paced());
+        };
+        sys.set_enhancements(Enhancements::original());
+        step(&mut app);
+        assert_eq!(steps.get(), 1);
+        app.focused = false;
+        step(&mut app);
+        assert_eq!(steps.get(), 1, "held");
+        assert!(held.load(Ordering::Relaxed));
+        sys.set_enhancements(Enhancements::default());
+        step(&mut app);
+        assert_eq!(steps.get(), 2, "background_run on: it goes on");
+        assert!(!held.load(Ordering::Relaxed));
+        sys.set_enhancements(Enhancements::original());
+        app.focused = true;
+        step(&mut app);
+        assert_eq!(steps.get(), 3);
     }
 
     /// A full screen change made outside the port's keys (macOS's green

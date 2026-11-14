@@ -629,6 +629,21 @@ impl Engine {
         data
     }
 
+    /// An archive member as the original opens it, from the disc in the
+    /// drive only (`self.disc`: the one archive `FUN_0041eda8` opened, then
+    /// the file system; [`atlantis_data::big::BigArchive::on_disc`]): that
+    /// disc's copy, `None` when that disc lacks it.
+    pub async fn read_from_drive(&self, name: &str) -> Option<Vec<u8>> {
+        if !self.game.big.on_disc(name, self.disc) {
+            log::warn!("{name} not on disc {}", self.disc);
+            return None;
+        }
+        self.game.big.set_disc_copy(Some(self.disc));
+        let data = self.read(name).await;
+        self.game.big.set_disc_copy(None);
+        data
+    }
+
     /// A file of the player's beside the game's files, not an archive
     /// member (their own subtitle font).
     pub async fn read_beside(&self, name: &str) -> Option<Vec<u8>> {
@@ -889,8 +904,26 @@ impl Engine {
     /// `FUN_00421ebc`). The loader writes the fixed place records on every
     /// load, the chapter's WAM included (a new game @ 0x004237b5, a load
     /// @ 0x0042e354): the place table slots.
+    ///
+    /// Without [`BugFix::AnyDisc`], as the original, the file is read from
+    /// the disc in the drive only (`self.disc`, the archive `FUN_0041eda8`
+    /// opened); when it cannot be opened `FUN_00421ebc` shows its error box
+    /// (FUN_0041a1d4, 0x006ce134 = 0xc, DialogBoxParamA 0x65 with the path
+    /// @ 0x00421eed..0x00421f30) and returns 0, the WAM in memory kept.
     pub async fn load_wam(&mut self, name: &str) -> bool {
-        let Some(data) = self.read(&format!("WAM\\{name}")).await else {
+        let path = format!("WAM\\{name}");
+        let any_disc = self.enhancements().fix(BugFix::AnyDisc);
+        let data = if any_disc {
+            self.read(&path).await
+        } else {
+            self.read_from_drive(&path).await
+        };
+        let Some(data) = data else {
+            if !any_disc {
+                let text = wam_open_fail_text(&self.wam_path);
+                let font = crate::subtitles::SubtitleFont::new();
+                crate::dialog::error_box(self, &font, &text).await;
+            }
             return false;
         };
         self.wam = Wam::parse(&data);
@@ -1263,6 +1296,19 @@ impl Engine {
             self.ambient.stop_all(&mut self.ambient_out);
         }
     }
+}
+
+/// The text of the error box of a WAM `FUN_00421ebc` cannot open: the
+/// error code 0xc's "Fichier introuvable : " (0x004bbf18) and the path
+/// buffer 0x006cdce0 up to its NUL ("" + `wam\` + the name as the script
+/// line or the WAM record writes it, [`Engine::set_wam_path`]).
+pub fn wam_open_fail_text(wam_path: &[u8]) -> String {
+    let end = wam_path
+        .iter()
+        .position(|&b| b == 0)
+        .unwrap_or(wam_path.len());
+    let path: String = wam_path[..end].iter().map(|&b| char::from(b)).collect();
+    format!("Fichier introuvable : {path}")
 }
 
 /// The text of the error box of a missing start-up logo film `name`

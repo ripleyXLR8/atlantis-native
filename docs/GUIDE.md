@@ -1049,12 +1049,15 @@ them in each checkpoint and sets them again when one is loaded) and the [enhance
 each: one per bug fix (`fix_music_loop`, `fix_cinema_sound`, `fix_head_overlay`,
 `fix_bar_slide_out`, `fix_pickup_icon`,
 `fix_menu_records`, `fix_fifth_player`, `fix_snakes_first_win`,
-`fix_puzzle_escape`, `fix_gameover_puzzle`,
+`fix_puzzle_escape`, `fix_gameover_puzzle`, `fix_any_disc`,
 `fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
 `fix_disc_revision`, `fix_menu_line_width`, `fix_chinese_rows`,
-`fix_subtitles_toggle`, `fix_dos_letters`, `fix_startup_logos`), `restored_content`, `ui_ux` and `arrow_keys`
+`fix_subtitles_toggle`, `fix_dos_letters`, `fix_startup_logos`), `restored_content`, `ui_ux`, `arrow_keys`
 (the arrow keys turn the view and the LOAD list takes Enter and ↑ ↓,
-`on` by default). SUBTITLES is off at first, as every start of the
+`on` by default) and `background_run` (the game goes on while its
+window is not the active one, `on` by default; off, and with
+`--original`, it stops as the original does, its clocks still counting
+the time away; the desktop builds only). SUBTITLES is off at first, as every start of the
 original; `--original` starts with it off whatever `settings.ini`
 keeps (a `settings.ini` written by an earlier version keeps the `on`
 it was written with), and also with OMNI 3D MODE 1 and the volumes

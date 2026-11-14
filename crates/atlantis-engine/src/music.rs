@@ -451,10 +451,18 @@ impl MusicRing {
 /// The ring as a mixer source: each 5 ms period of the 200 Hz timer plays
 /// its frames, then the timer's release and refill run, whatever the size
 /// of the mixer's reads.
+///
+/// While the game's loops are held ([`crate::audio::Mixer::set_loops_held`],
+/// the original's input poll blocked while its window is not the active
+/// one) only the release runs: the refill `FUN_0043318c` is called by the
+/// frame loops (`FUN_00432178` and the menus', puzzles' and videos' loops),
+/// the release `FUN_00433310` by the 200 Hz timer, so the driver goes on
+/// looping the ring's blocks as they stand.
 pub struct MusicRingSource {
     ring: MusicRing,
     t: u32,
     left: usize,
+    held: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl MusicRingSource {
@@ -463,7 +471,20 @@ impl MusicRingSource {
             ring,
             t: 0,
             left: 0,
+            held: None,
         }
+    }
+
+    /// Its refills skipped while `held` is set.
+    pub fn held_by(mut self, held: Arc<std::sync::atomic::AtomicBool>) -> Self {
+        self.held = Some(held);
+        self
+    }
+
+    fn loops_held(&self) -> bool {
+        self.held
+            .as_ref()
+            .is_some_and(|h| h.load(std::sync::atomic::Ordering::Relaxed))
     }
 }
 
@@ -489,7 +510,11 @@ impl Source for MusicRingSource {
             done += k;
             self.left -= k;
             if self.left == 0 {
-                self.ring.timer();
+                if self.loops_held() {
+                    self.ring.release();
+                } else {
+                    self.ring.timer();
+                }
             }
         }
         frames
@@ -789,8 +814,10 @@ impl Engine {
         // options menu applies from the next track).
         let voice = if self.music_through_ring() {
             let mut ring = MusicRing::wine(Arc::new(data.clone()));
-            ring.start()
-                .then(|| mixer.play_source(Box::new(MusicRingSource::new(ring)), 0, 0))
+            ring.start().then(|| {
+                let source = MusicRingSource::new(ring).held_by(mixer.loops_held_flag());
+                mixer.play_source(Box::new(source), 0, 0)
+            })
         } else {
             None
         };
@@ -1579,6 +1606,41 @@ mod original_sound_tests {
         );
         if ran {
             assert_eq!(*got.borrow(), Some((true, 0, false)));
+        }
+    }
+
+    /// Cinema=N whose film the archive lacks: the handler still stores
+    /// NEWSOUND = 1 and runs the poller (`FUN_0042a100` @ 0x0042a8e1,
+    /// 0x0042a8e6), so a NewSound of another value is stopped and, with no
+    /// CINEMnnn.APC either, NEWSOUND is 0; then the input flags are cleared
+    /// (@ 0x0042a907..0x0042a939): the bar request too.
+    #[test]
+    fn a_missing_cinematic_still_runs_its_sound_and_clears_the_flags() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_missing_cinematic_still_runs_its_sound_and_clears_the_flags",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(!e.game.big.contains("UBB_VUE\\CINEM999.HNM"));
+                assert!(!e.game.big.contains("WAV\\CINEM999.APC"));
+                e.vars.set("newsound", 0x12); // logo15n.apc
+                e.poll_new_sound().await;
+                let started = e.music.new_sound_playing;
+                e.bar.request = true;
+                e.play_cinema(999).await;
+                *g2.borrow_mut() = Some((
+                    started,
+                    e.music.new_sound_playing,
+                    e.vars.get("newsound"),
+                    e.bar.request,
+                ));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, false, 0, false)));
         }
     }
 

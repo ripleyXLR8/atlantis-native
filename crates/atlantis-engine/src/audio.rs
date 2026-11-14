@@ -7,6 +7,7 @@
 //! attenuated linearly (the pan law is `ambient::miles_pan_balance`); rate
 //! conversion by linear interpolation (ScummVM's default converter).
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 /// Decoded PCM: interleaved 16-bit samples.
@@ -92,15 +93,22 @@ struct State {
 }
 
 /// Shared between the engine (control) and the audio thread (`fill`).
+///
+/// The second field: the game's loops are held (the original's input poll
+/// blocked while its window is not the active one, [`crate::sys::Runner::hold`]),
+/// read by the music ring, whose refills those loops run.
 #[derive(Clone)]
-pub struct Mixer(Arc<Mutex<State>>);
+pub struct Mixer(Arc<Mutex<State>>, Arc<AtomicBool>);
 
 impl Default for Mixer {
     fn default() -> Self {
-        Mixer(Arc::new(Mutex::new(State {
-            master: 127,
-            ..State::default()
-        })))
+        Mixer(
+            Arc::new(Mutex::new(State {
+                master: 127,
+                ..State::default()
+            })),
+            Arc::new(AtomicBool::new(false)),
+        )
     }
 }
 
@@ -181,6 +189,20 @@ impl Mixer {
 
     pub fn set_master(&self, master: u8) {
         self.0.lock().unwrap().master = master;
+    }
+
+    /// The game's loops held (`true`) or running: the original's input
+    /// poll blocked while its window is not the active one, so that no
+    /// loop refills the music ring ([`crate::music::MusicRingSource`]);
+    /// the voices play on.
+    pub fn set_loops_held(&self, held: bool) {
+        self.1.store(held, Ordering::Relaxed);
+    }
+
+    /// The flag [`Mixer::set_loops_held`] sets, for a source to read on
+    /// the audio thread.
+    pub fn loops_held_flag(&self) -> Arc<AtomicBool> {
+        self.1.clone()
     }
 
     /// Pauses (silence, nothing advances) or resumes every voice.

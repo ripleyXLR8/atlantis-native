@@ -1569,6 +1569,37 @@ fn music_ring_matches_original() {
     assert!(bad.is_empty(), "{bad:?}");
 }
 
+/// While the game's loops are held (the original's input poll blocked
+/// while its window is not the active one, `Runner::hold`), the ring gets
+/// no refill (`FUN_0043318c` is the loops'), only the 200 Hz timer's
+/// releases: the driver loops the ring's 8 blocks as they stand, the
+/// second pass of the ring the first again; running, the refills go on.
+#[test]
+fn a_held_game_refills_no_music_block() {
+    use atlantis_engine::audio::Source;
+    use atlantis_engine::music::MusicRingSource;
+    let Some(g) = game("a_held_game_refills_no_music_block") else {
+        return;
+    };
+    let name = &g.exe.music_names[0];
+    let data = Arc::new(read(&g, &format!("WAV\\{name}")));
+    const PASS: usize = (MusicRing::RING_SIZE / 4) as usize;
+    let passes = |held: bool| {
+        let mixer = Mixer::new();
+        mixer.set_loops_held(held);
+        let mut ring = MusicRing::wine(data.clone());
+        assert!(ring.start());
+        let mut src = MusicRingSource::new(ring).held_by(mixer.loops_held_flag());
+        let mut out = vec![0i16; 2 * 2 * PASS];
+        for chunk in out.chunks_mut(2 * 1024) {
+            assert_eq!(src.read(chunk), chunk.len() / 2);
+        }
+        out[..2 * PASS] == out[2 * PASS..]
+    };
+    assert!(passes(true), "held: the ring as it stood");
+    assert!(!passes(false), "running: refilled");
+}
+
 /// Every StartMusik / NewSound value of the scripts names an entry of the
 /// executable's tables, and the file is in the archives.
 #[test]
