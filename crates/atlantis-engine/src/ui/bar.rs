@@ -260,8 +260,12 @@ impl Engine {
         self.draw_guests(&mut s, None);
         match at_pointer {
             BarPointer::None => {}
+            // FUN_0042cc98 draws the new record's icon at the pointer
+            // 0x004960ec / 0x004960f0 (0x0042ce7a..0x0042ce98): the
+            // slide-in pumps no message, so its first frame shows it where
+            // the pointer was before the slide.
             BarPointer::HeldIcon => {
-                let (x, y) = self.sys.mouse();
+                let (x, y) = self.pointer.pos;
                 if let Some(spr) = self.held_icon().and_then(|i| self.ui.object(i)) {
                     draw_sprite(&mut s, spr, x, y);
                 }
@@ -851,7 +855,7 @@ impl Engine {
     }
 
     /// ArcMagique=N (`FUN_0042a100` @ 0x0042aa21..0x0042ac2b):
-    /// `SPRITE\2D\ARCANIM.SPR` frames 0..19 at the mouse over the view, the
+    /// `SPRITE\2D\ARCANIM.SPR` frames 0..19 at the pointer over the view, the
     /// place sprites animating; nothing without the file. Each frame is
     /// presented by `FUN_0041afd0` (@ 0x0042ac17), which steps the warp
     /// cursor under its gates ([`Engine::still_frame_cursor_step`]; its
@@ -870,8 +874,9 @@ impl Engine {
         // The steps test the pointer where the section's last pump left
         // it (FUN_00422bb0 / FUN_00422d5c read 0x004960ec / 0x004960f0,
         // @ 0x00422bd5, 0x00422d7a); the loop pumps none itself.
+        // Frame i is drawn at that pointer (0x0042ab02..0x0042ab20).
         self.sync_pointer_mouse();
-        let (mx, my) = self.sys.mouse();
+        let (mx, my) = self.pointer.pos;
         for i in 0..20 {
             if self.should_abort() || !self.warp_loaded {
                 break;

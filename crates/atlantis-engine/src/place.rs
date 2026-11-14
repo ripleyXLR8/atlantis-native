@@ -99,6 +99,7 @@ impl Engine {
         // The move's panorama name is for this entry only (every entry
         // rebuilds 0x006cd288: FUN_00421b4c), even one that fails.
         let move_cyclo = self.move_cyclo.take();
+        let pointer_loaded = std::mem::take(&mut self.move_pointer_loaded);
         let Some(index) = self.wam.places.iter().position(|p| p.id == next) else {
             log::warn!("place {next} not in {}", self.wam_name);
             self.next_place_id = None;
@@ -120,12 +121,16 @@ impl Engine {
             Some((id, name)) if id == next => name,
             _ => self.wam.places[index].cyclo.clone(),
         };
-        if self.load_cyclo(&cyclo).await {
+        if self.load_cyclo_with(&cyclo, !pointer_loaded).await {
             self.composite_npc_sprites().await;
         }
         // FUN_00421b4c calls no SetCursorPos: the Windows cursor stays where
-        // the mouse is (the turn left it at (320, 240) after a move).
-        self.mark_pointer_mouse();
+        // the mouse is (the turn left it at (320, 240) after a move). After
+        // a move's film the mouse moved since the load is the WM_MOUSEMOVE
+        // the film's polls pumped: the next sync takes it.
+        if !pointer_loaded {
+            self.mark_pointer_mouse();
+        }
         self.emit(Event::PlaceEntered {
             wam: self.wam_name.clone(),
             place: next,
@@ -182,6 +187,12 @@ impl Engine {
 
     /// The panorama `CYCLO\<name>` (`loadCycloHNM`, `FUN_0044a424`).
     async fn load_cyclo(&mut self, name: &str) -> bool {
+        self.load_cyclo_with(name, true).await
+    }
+
+    /// [`Engine::load_cyclo`]; without `pointer` the pointer is left as it
+    /// is (a move set it where the original loads, before the film).
+    async fn load_cyclo_with(&mut self, name: &str, pointer: bool) -> bool {
         let mut path = format!("CYCLO\\{name}");
         // Some WAM entries name a .tga; the archive only has the .hnm.
         if !name.to_ascii_lowercase().ends_with(".hnm") && !self.game.big.contains(&path) {
@@ -209,8 +220,10 @@ impl Engine {
         // FUN_0044a424 sets the warp FOV (0x0044a701) and leaves the pointer
         // at (0x140, 0x140) without SetCursorPos (0x0044a70b / 0x0044a715).
         self.warp.set_hfov(WARP_FOV_DEG);
-        self.pointer.panorama_loaded();
-        self.mark_pointer_mouse();
+        if pointer {
+            self.pointer.panorama_loaded();
+            self.mark_pointer_mouse();
+        }
         true
     }
 
@@ -461,6 +474,16 @@ impl Engine {
             // FUN_00423ad8 @ 0x00423ec0: FUN_004212cc turns the view to the
             // transition's source angles before the video.
             self.turn_to_transition(t.src_alpha, t.src_beta).await;
+            // Then FUN_0044a424 loads the destination (@ 0x00423ed4, dc:16884)
+            // before the film (FUN_00448c70, dc:16912): the pointer at
+            // (0x140, 0x140) with no SetCursorPos (0x0044a70b / 0x0044a715),
+            // so a mouse motion during the film, which its polls pump, puts
+            // the pointer on the mouse. The port loads the picture at the
+            // place entry ([`Engine::do_place_change`]), which leaves the
+            // pointer alone.
+            self.pointer.panorama_loaded();
+            self.mark_pointer_mouse();
+            self.move_pointer_loaded = true;
             // FUN_004212cc ends by setting the destination angles
             // (0x00421b01..0x00421b31), before the video, so FUN_0043259c's
             // ambient glide uses them.
@@ -2241,5 +2264,140 @@ mod missing_film_glide_tests {
         }
         let steps = out.borrow().expect("the move did not end");
         assert!(steps.iter().any(|&s| s != 0.0), "{steps:?}");
+    }
+}
+
+#[cfg(test)]
+mod game_pointer_tests {
+    use super::*;
+    use crate::hooks::NoScripts;
+    use crate::puzzle::PuzzleHost;
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::{button, with_engine};
+    use crate::ui::menus::MenuInput;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// ATLAN1 place 1 entered with the interface, then a puzzle's reload
+    /// (`FUN_004240fc` -> `FUN_0044a424`) with the mouse left at `mouse`.
+    async fn after_puzzle(e: &mut Engine, mouse: (i32, i32)) {
+        e.load_interface().await;
+        e.load_cursor_sprites().await;
+        assert!(e.load_wam("ATLAN1.WAM").await);
+        e.next_place_id = Some(1);
+        e.do_place_change().await;
+        e.sys.set_mouse_pos(mouse.0, mouse.1);
+        e.mark_pointer_mouse();
+        e.reload_view_after_puzzle().await;
+    }
+
+    /// After a puzzle's reload with the mouse still, the loops entered
+    /// from the warp loop read the pointer 0x004960ec / 0x004960f0 at
+    /// (0x140, 0x140) (`FUN_0044a424` @ 0x0044a70b / 0x0044a715, no
+    /// SetCursorPos), not the Windows cursor: the bar's pointer
+    /// (`FUN_0042d558` @ 0x0042d5bf / 0x0042d5c8), the menus' hit point
+    /// (`FUN_004210c0`, dc:15546-15551) and a puzzle's pointer, until the
+    /// mouse moves (WM_MOUSEMOVE 0x00419c10..0x00419c29).
+    #[test]
+    fn the_loops_read_the_game_pointer_after_a_puzzle_reload() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_loops_read_the_game_pointer_after_a_puzzle_reload",
+            move |mut e| async move {
+                after_puzzle(&mut e, (600, 450)).await;
+                let mut drawn = vec![0u16; 640 * 480];
+                e.draw_pointer(&mut drawn);
+                let mut want = vec![0u16; 640 * 480];
+                crate::ui::draw_sprite(&mut want, &e.cursor_sprites[6], 320, 320);
+                let bar = drawn == want;
+                let menu = e.menu_pointer(&MenuInput::default());
+                let puzzle = {
+                    let mut hooks = NoScripts;
+                    let mut host = PuzzleHost::new(&mut e, &mut hooks);
+                    let still = host.read_entry();
+                    host.e.sys.push_input(Input::MouseMove { x: 601, y: 450 });
+                    let moved = host.read_input();
+                    ((still.x, still.y), (moved.x, moved.y))
+                };
+                let menu_moved = e.menu_pointer(&MenuInput::default());
+                *g2.borrow_mut() = Some((bar, menu, puzzle, menu_moved));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let (bar, menu, puzzle, menu_moved) = got.borrow_mut().take().unwrap();
+        assert!(bar, "the bar's pointer is not drawn at (320, 320)");
+        assert_eq!(menu, (320, 320));
+        assert_eq!(puzzle, ((320, 320), (601, 450)));
+        assert_eq!(menu_moved, (601, 450));
+    }
+
+    /// The subject menu after a puzzle's reload with the mouse still over
+    /// the grid: `FUN_004211f0` hit-tests the pointer (0x00421218 /
+    /// 0x00421236), (0x140, 0x140), left of the grid, so a click made
+    /// without moving picks nothing.
+    #[test]
+    fn the_subject_menu_tests_the_game_pointer() {
+        use crate::dialog::subject_menu::{menu_draws, menu_hit};
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_subject_menu_tests_the_game_pointer",
+            move |mut e| async move {
+                let ids = [1, 2];
+                let (_, gx, gy) = menu_draws(&ids);
+                let over = (0..640)
+                    .flat_map(|x| (0..480).map(move |y| (x, y)))
+                    .find(|&(x, y)| menu_hit(2, gx, gy, x, y) == 0)
+                    .expect("a point over the first subject");
+                assert!(menu_hit(2, gx, gy, 320, 320) < 0);
+                after_puzzle(&mut e, over).await;
+                use crate::scripts::DialogPresenter;
+                let mut d = crate::dialog::Dialogs::new();
+                let chosen = d.subject_menu(&mut e, 600, &[1, 2]).await;
+                *g2.borrow_mut() = Some(chosen);
+            },
+            |sys, f| match f {
+                20 => button(sys, MouseButton::Left, true),
+                21 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some(None));
+        }
+    }
+
+    /// A move loads the destination after the turn and before the film
+    /// (`FUN_0044a424` @ 0x00423ed4, dc:16884; the film dc:16912): a mouse
+    /// motion after that load, pumped by the film's or the move's last
+    /// poll, puts the pointer on the mouse; the place entry
+    /// (`FUN_00421b4c`) loads nothing that resets it.
+    #[test]
+    fn a_motion_after_the_moves_load_moves_the_pointer() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_motion_after_the_moves_load_moves_the_pointer",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let dest = e.place().unwrap().transitions[0].dst_place;
+                e.execute_transition(dest).await;
+                let loaded = e.pointer.pos;
+                e.sys.push_input(Input::MouseMove { x: 100, y: 60 });
+                e.do_place_change().await;
+                e.sync_pointer_mouse();
+                *g2.borrow_mut() = Some((loaded, e.pointer.pos));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some(((320, 320), (100, 60))));
+        }
     }
 }

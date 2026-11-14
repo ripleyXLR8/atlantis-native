@@ -488,11 +488,14 @@ impl Engine {
     }
 
     /// The pointer of the bar loops, `FUN_0042d558`: CURSEURS.SPR frame 6
-    /// at the mouse (0x0042d5b9..0x0042d5dd), then the object in hand over
-    /// it at the same position when OBJETENMAIN != 0
-    /// (0x0042d600..0x0042d627).
+    /// at the pointer 0x004960ec / 0x004960f0 (0x0042d5b9..0x0042d5dd),
+    /// then the object in hand over it at the same position when
+    /// OBJETENMAIN != 0 (0x0042d600..0x0042d627). The pointer, not the
+    /// Windows cursor: after a panorama load (`FUN_0044a424` @ 0x0044a70b /
+    /// 0x0044a715) it is (0x140, 0x140) until the first WM_MOUSEMOVE. The
+    /// loops move it at their pumping polls ([`Engine::sync_pointer_mouse`]).
     pub(crate) fn draw_pointer(&self, screen: &mut [u16]) {
-        let (x, y) = self.sys.mouse();
+        let (x, y) = self.pointer.pos;
         if let Some(spr) = self.cursor_sprites.get(6) {
             draw_sprite(screen, spr, x, y);
         }

@@ -230,6 +230,7 @@ impl Engine {
         self.abort = None;
         // A move the abort cut short leaves no panorama name behind.
         self.move_cyclo = None;
+        self.move_pointer_loaded = false;
         self.stop_ambient();
         self.bar_first = 0; // 0x0042e2ec
         self.vars.set("objetenmain", 0);
