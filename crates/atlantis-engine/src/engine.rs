@@ -301,7 +301,6 @@ pub struct Engine {
     pub(crate) menu_records: crate::ui::layout::MenuRecordTable,
     /// The captions of the CINEMA video playing (`ExeBuild::cinema_captions`).
     pub(crate) cinema_captions: Option<crate::place::CinemaCaptionState>,
-    pub(crate) channel_test_voice: Option<crate::audio::VoiceId>,
     /// The voices' volume, 0..255.
     pub voice_volume: u8,
     /// The players, and the current one's row (0x00496607).
@@ -469,7 +468,6 @@ impl Engine {
             son_knob_x: [0; 4],
             menu_records,
             cinema_captions: None,
-            channel_test_voice: None,
             voice_volume: crate::persist::mixer_volume(crate::persist::DEFAULT_VOLUMES[3]),
             players: Players::new(b"#New Player"),
             player: 0,
