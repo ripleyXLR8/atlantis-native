@@ -1345,15 +1345,24 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
             }
             Some(Abort::Finished) if e.vars.get("exit") == 86 => break true,
             // Any other Exit value (none is shipped): the main loop ends
-            // the game only for 86 (0x00419775); otherwise Exit = 0 and the
+            // the game only for 86 (0x00419787); here Exit = 0 and the
             // player screen again, then the chosen player's checkpoint as
-            // at boot.
+            // at boot. The original instead runs FUN_00423760 with no
+            // player screen (0x0049614c is never 1 again, its only store
+            // the clear @ 0x0041e88c): on CD 1 the chapter restarts in
+            // place (WAM and LastVue's place reloaded, play counters and
+            // hidden ids zeroed, CON and /INIT run again); on CDs 2..4 EXIT
+            // stays set and, by static reading, the main loop spins. Not
+            // modelled (no data reaches it).
             Some(Abort::Finished) if !e.sys.should_quit() => {
                 log::warn!(
                     "Exit={}: only 86 ends the game; back to the player screen",
                     e.vars.get("exit")
                 );
                 e.vars.set("exit", 0);
+                // The original runs FUN_00423760 there (0x00419734), which
+                // restarts the timers as on the boot pass.
+                e.boot_pass_clocks();
                 match e.player_screen().await {
                     Some(p) => e.player = p,
                     None => break false,
