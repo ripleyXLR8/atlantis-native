@@ -976,6 +976,11 @@ impl Engine {
         }
         let fade = run.finish(frame_ms == CINEMA_FRAME_MS, &mut self.bar);
         self.escape_request = false;
+        // With the other input flags, the double-click flag 0x00496118 = 0
+        // (FUN_0041bc74 @ 0x0041bf5b; Cinema= stores it again after the
+        // film, FUN_0042a100 @ 0x0042a907): a store, no pump, so a
+        // WM_LBUTTONDBLCLK the film's last poll left queued stays.
+        self.sys.double_click().clear();
         if fade {
             self.music.fade_out_new_sound(self.effects_volume());
         }
@@ -1673,6 +1678,62 @@ mod escape_tests {
         if ran {
             assert_eq!(got.get(), Some(true));
         }
+    }
+
+    /// A film ends by storing 0x00496118 = 0 with the other input flags
+    /// (FUN_0041bc74 @ 0x0041bf5b; Cinema= again @ 0x0042a907): a flag set
+    /// before it is gone. A WM_LBUTTONDBLCLK its last poll left queued
+    /// (the press that cut it, 0x0041a2b5) stays for the next pump.
+    fn film_end_flag(cut: bool) -> Option<(bool, bool)> {
+        use crate::test_support::button;
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let start = Rc::new(Cell::new(u64::MAX));
+        let s2 = start.clone();
+        let ran = with_engine(
+            "a_film_end_clears_the_double_click_flag",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.sys.set_mouse_pos(320, 240);
+                let video = e.place().unwrap().transitions[0].video.clone();
+                e.sys.double_click().flag = true;
+                let now = e.sys.millis();
+                e.sys.double_click().first_press(now, 320, 240);
+                e.cursor_state.mode = 0;
+                s2.set(e.sys.frames_presented());
+                e.play_transition_video(&video, None, super::TRANSITION_FRAME_MS)
+                    .await;
+                let after = e.sys.double_click().flag;
+                e.cursor_state.mode = 5;
+                e.sys.frame().await;
+                e.turn_poll();
+                g2.set(Some((after, e.sys.double_click().flag)));
+            },
+            move |sys, _| {
+                let k = sys.frames_presented().saturating_sub(start.get());
+                if cut && start.get() != u64::MAX && k == 3 {
+                    button(sys, MouseButton::Left, true);
+                } else if cut && start.get() != u64::MAX && k == 4 {
+                    button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    #[test]
+    fn a_film_end_clears_the_double_click_flag() {
+        let Some(plain) = film_end_flag(false) else {
+            return;
+        };
+        assert_eq!(plain, (false, false));
+        assert_eq!(film_end_flag(true), Some((false, true)));
     }
 
     /// FUN_004212cc's poll after each frame (0x00421670 / 0x00421a5a)
