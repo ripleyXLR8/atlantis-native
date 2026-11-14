@@ -490,8 +490,11 @@ impl Scripts {
                 // The trigger commands act only for a value other than 0
                 // (the store, then `cmp [var],0 / je`: FUN_0042a100 @
                 // 0x0042ac44..0x0042b1d0): StartMusik, StopMusik, LoadMusik,
-                // ShowPerso and StopSound with 0 do nothing.
-                "startmusik" | "stopmusik" | "loadmusik" | "showperso" | "stopsound"
+                // ShowPerso and StopSound with 0 do nothing, nor do DelMusik
+                // (@ 0x0042acf9), AddGuest (@ 0x0042b107) and SubGuest
+                // (@ 0x0042b177).
+                "startmusik" | "stopmusik" | "loadmusik" | "delmusik" | "showperso"
+                | "stopsound" | "addguest" | "subguest"
                     if value == 0 =>
                 {
                     e.vars.set(key, 0);
@@ -2551,6 +2554,36 @@ mod tests {
         );
         if ran {
             assert_eq!(*got.borrow(), [true, false, true]);
+        }
+    }
+
+    /// AddGuest=0 and SubGuest=0 do nothing (`cmp [var],0 / je` @
+    /// 0x0042b107, 0x0042b177): no record added, a record with id 0 kept.
+    #[test]
+    fn zero_guest_triggers_do_nothing() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "zero_guest_triggers_do_nothing",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                let before = e.guests.count;
+                s.exec_set(&mut e, None, "addguest=0").await;
+                g2.borrow_mut().push(e.guests.count == before);
+                let mut g = e.guests.clone();
+                g.add(0, &e.game.exe.guest_sprite_ids);
+                e.guests = g;
+                let before = e.guests.count;
+                s.exec_set(&mut e, None, "subguest=0").await;
+                g2.borrow_mut().push(e.guests.count == before);
+                s.exec_set(&mut e, None, "delmusik=0").await;
+                g2.borrow_mut().push(e.vars.get("delmusik") == 0);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [true, true, true]);
         }
     }
 
