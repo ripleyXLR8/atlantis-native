@@ -80,3 +80,33 @@ fn init_runs_whole_with_an_abort_pending() {
     assert_eq!(subjects_601, vec![12, 1, 2]);
     assert!(hidden_262);
 }
+
+/// A reload keeps bow mode 0x00496164: only the bar (`FUN_0042d098` @
+/// 0x0042d155) and the lower-bow `FUN_0042d368` (@ 0x0042d51d) write it,
+/// not `FUN_0042de5c` nor `FUN_00423760`.
+#[test]
+fn reload_keeps_bow_mode() {
+    let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+        eprintln!("ATLANTIS_DATA not set: skipped");
+        return;
+    };
+    let g = Game::open(Arc::new(StdDir::new(dir))).unwrap();
+    let sys = Sys::new(Mixer::new());
+    let s2 = sys.clone();
+    let result = Rc::new(RefCell::new(None));
+    let r2 = result.clone();
+    let mut runner = Runner::new(sys.clone(), async move {
+        let mut e = Engine::new(s2, g, Rc::new(DirectLoader));
+        let mut scripts = Scripts::default();
+        e.bow_mode = true;
+        e.abort = Some(Abort::NewGame);
+        e.load_checkpoint(&mut scripts, true).await;
+        *r2.borrow_mut() = Some(e.bow_mode);
+    });
+    for t in 0..100_000u64 {
+        if !runner.step(t * 16) {
+            break;
+        }
+    }
+    assert_eq!(*result.borrow(), Some(true));
+}
