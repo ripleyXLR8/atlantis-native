@@ -935,14 +935,10 @@ impl Engine {
         self.chapter = 1;
         if !in_play {
             // The record FUN_0042c054 sets up before the player menu: object
-            // 257 alone. FUN_00423760 zeroes the timer offsets and restarts
-            // Time1 when a game starts.
+            // 257 alone. The timers were restarted by FUN_00423760 on the
+            // boot pass, before the player screen (`boot_pass_clocks`).
             self.inventory = vec![257];
             self.inventory_icons.clear();
-            let now = self.now();
-            self.clocks.time1_offset = 0;
-            self.clocks.time2_offset = 0;
-            self.clocks.time1_start = now;
         }
         // LastVue = 1 (0x004195fb, 0x0042e285).
         self.last_vue = 1;
@@ -954,6 +950,20 @@ impl Engine {
         // ARRIVEEVUE = LastVue (FUN_00427634 @ 0x0042777d), whatever the
         // /INIT Vue= of chapter 1 did.
         self.arrival_after_load = true;
+    }
+
+    /// The timers of `FUN_00423760`, the main loop's boot pass
+    /// (0x00419734), which runs before the player screen (`FUN_0041dea4` @
+    /// 0x0041974e): TIME1's and TIME2's offsets 0 (0x0042378c, 0x00423796)
+    /// and Time1 restarted (0x006ce088 = now @ 0x004237f0). Neither the
+    /// player screen nor the checkpoint loader `FUN_0042de5c` writes them,
+    /// so the loaded game's TIME1 includes the time spent on the player
+    /// screen.
+    pub fn boot_pass_clocks(&mut self) {
+        let now = self.now();
+        self.clocks.time1_offset = 0;
+        self.clocks.time2_offset = 0;
+        self.clocks.time1_start = now;
     }
 
     /// The first arrival scan after a chapter load: ARRIVEEVUE = LastVue,
@@ -1254,8 +1264,10 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
     e.load_interface().await;
     if start == Start::Boot {
         e.play_startup().await;
-        // The player screen (FUN_0041dea4), then FUN_0042de5c on the
-        // player's resume chapter; the boot pass runs FUN_00423760.
+        // The boot pass FUN_00423760 (0x00419734) restarts the timers, then
+        // the player screen (FUN_0041dea4), then FUN_0042de5c on the
+        // player's resume chapter.
+        e.boot_pass_clocks();
         match e.player_screen().await {
             Some(p) => e.player = p,
             None => {
@@ -1276,6 +1288,7 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
                 return;
             }
         }
+        e.boot_pass_clocks();
         e.new_game(hooks.as_mut(), false).await;
     }
     let finished = loop {
@@ -1567,6 +1580,106 @@ mod exit_and_menu_tests {
             return;
         };
         assert!(t.contains(&Event::Menu("SELEMENU.TXT".into())), "{t:?}");
+    }
+}
+
+#[cfg(test)]
+mod boot_pass_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::hooks::{ready, HookFuture};
+    use crate::sys::{Input, Key, MouseButton, Runner};
+    use std::cell::Cell;
+
+    /// Time1's origin at the first chapter load.
+    struct Time1At(Rc<Cell<Option<u32>>>);
+
+    impl ScriptHooks for Time1At {
+        fn chapter_loaded<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _chapter: u32,
+            _keep_state: bool,
+        ) -> HookFuture<'a, ()> {
+            if self.0.get().is_none() {
+                self.0.set(Some(e.clocks.time1_start));
+            }
+            ready(())
+        }
+    }
+
+    /// Time1 starts at the boot pass FUN_00423760 (0x00419734), before the
+    /// player screen (FUN_0041dea4 @ 0x0041974e), which does not restart
+    /// it: the game's Time1 includes the time spent on the player screen.
+    #[test]
+    fn time1_starts_before_the_player_screen() {
+        let Some(dir) = std::env::var_os("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: time1_starts_before_the_player_screen skipped");
+            return;
+        };
+        let g = Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir))).unwrap();
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        let start = Rc::new(Cell::new(None));
+        let sys = Sys::new(Mixer::new());
+        let opts = Options {
+            trace: Some(trace.clone()),
+            hooks: Box::new(Time1At(start.clone())),
+            start: Start::Boot,
+            ..Options::default()
+        };
+        let mut runner = Runner::new(sys.clone(), run(sys.clone(), g, opts));
+        let mut frame = 0u64;
+        let mut screen_at = None;
+        let press = |down: bool, x: i32, y: i32| {
+            let button = MouseButton::Left;
+            sys.push_input(Input::MouseMove { x, y });
+            sys.push_input(if down {
+                Input::MouseDown { button, x, y }
+            } else {
+                Input::MouseUp { button, x, y }
+            });
+        };
+        let key = |k: Key, down: bool| {
+            sys.push_input(if down {
+                Input::KeyDown(k)
+            } else {
+                Input::KeyUp(k)
+            });
+        };
+        while runner.step(frame * 16) && start.get().is_none() {
+            frame += 1;
+            assert!(frame < 40_000, "player screen at {screen_at:?}");
+            let seen = trace
+                .borrow()
+                .iter()
+                .any(|e| *e == Event::Menu("SELEMENU.TXT".into()));
+            match screen_at {
+                None if seen => screen_at = Some(frame),
+                // The start-up films cut short.
+                None => match frame % 30 {
+                    0 => press(true, 320, 240),
+                    2 => press(false, 320, 240),
+                    _ => {}
+                },
+                // Five seconds on the player screen, then a new player.
+                Some(f) => match frame - f {
+                    300 => press(true, 200, 259),
+                    302 => press(false, 200, 259),
+                    310 => key(Key::Char('T'), true),
+                    312 => key(Key::Char('T'), false),
+                    320 => key(Key::Enter, true),
+                    322 => key(Key::Enter, false),
+                    _ => {}
+                },
+            }
+        }
+        let screen_at = screen_at.expect("no player screen");
+        let t1 = start.get().expect("no chapter load");
+        assert!(
+            u64::from(t1) <= screen_at * 16,
+            "Time1 started at {t1} ms, the player screen came at {} ms",
+            screen_at * 16
+        );
     }
 }
 

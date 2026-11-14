@@ -241,13 +241,8 @@ impl Engine {
             self.new_game_from_load(hooks, in_play).await;
             return;
         };
-        if !in_play {
-            // FUN_00423760 on the boot pass restarts the timers.
-            let now = self.now();
-            self.clocks.time1_offset = 0;
-            self.clocks.time2_offset = 0;
-            self.clocks.time1_start = now;
-        }
+        // The timers are not touched: FUN_00423760 restarted them on the
+        // boot pass, before the player screen (see `boot_pass_clocks`).
         self.disc = cp.disc.max(1);
         // The 25 fields: the hidden persos before the WAM's sprite list.
         self.hidden_persos = cp.hidden.iter().map(|&h| i32::from(h)).collect();
