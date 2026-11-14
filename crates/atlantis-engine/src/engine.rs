@@ -1320,7 +1320,6 @@ impl Engine {
     /// cinema pace, a 200-tick (1 s) wait between them; the Dutch build
     /// plays LOGORP.HNM after the wait.
     pub async fn play_startup(&mut self) {
-        use crate::place::CINEMA_FRAME_MS;
         // The Japanese DVD build: its publishers' logos first, through
         // LOGO15N's player (WinMain @ 0x00419713..0x00419772). The disc has
         // neither film: the player's open fails and it shows its error box
@@ -1331,8 +1330,9 @@ impl Engine {
         for name in self.game.exe.build.startup_logos {
             let path = format!("UBB_VUE\\{name}");
             if self.game.big.contains(&path) {
-                self.play_transition_video(name, None, CINEMA_FRAME_MS)
-                    .await;
+                // NEWSOUND is not written before them (0x00419713..
+                // 0x00419772): 0 at boot, no sound.
+                self.play_startup_film(name, None).await;
             } else if !self.enhancements().fix(BugFix::StartupLogos) {
                 log::warn!("{path}: missing, the original's error box");
                 let text = startup_logo_error_text(self.game.exe.build, name);
@@ -1345,8 +1345,10 @@ impl Engine {
                 return;
             }
         }
-        self.play_transition_video("LOGO15N.HNM", None, CINEMA_FRAME_MS)
-            .await;
+        // NEWSOUND = 0x12 (0x00419653; every build stores it, e.g.
+        // atlantis-cd-en-688128 @ 0x00419535 on its own array):
+        // logo15n.apc from the table.
+        self.play_startup_film("LOGO15N.HNM", Some(0x12)).await;
         // The busy wait (0x00419662..0x0041967c, no call) reads no input but
         // loses none: FUN_0042e624 fills the key table from
         // GetAsyncKeyState, so the next video's first FUN_0041a298 poll sees
@@ -1361,11 +1363,12 @@ impl Engine {
         // player at the cinema pace, its NEWSOUND left as it is (WinMain @
         // 0x0041958d..0x004195bf; the archives hold no LOGORP.APC).
         if self.game.exe.build.startup_logo_rp {
-            self.play_transition_video("LOGORP.HNM", None, CINEMA_FRAME_MS)
-                .await;
+            self.play_startup_film("LOGORP.HNM", None).await;
         }
-        self.play_transition_video("PREINTRO.HNM", None, CINEMA_FRAME_MS)
-            .await;
+        // NEWSOUND = 0x13 (0x004196bd): another value than LOGO15N's, so
+        // the film loop's first poll stops LOGO15N's sound, playing or
+        // fading, and starts preintro.apc (FUN_00432a64, dc:26175..26198).
+        self.play_startup_film("PREINTRO.HNM", Some(0x13)).await;
     }
 
     /// The in-game menu from the warp loop: a reload or a quit ends the
@@ -1624,5 +1627,51 @@ mod end_of_move_tests {
         assert_eq!(moved.0, 0, "a click after the move was handled");
         let not_moved = after_load(false).unwrap();
         assert_eq!(not_moved.0, 1);
+    }
+}
+
+#[cfg(test)]
+mod startup_tests {
+    use super::*;
+    use crate::test_support::with_engine;
+    use std::cell::RefCell;
+
+    /// WinMain stores NEWSOUND = 0x12 before LOGO15N (0x00419653) and 0x13
+    /// before PREINTRO (0x004196bd); each film's first poll of
+    /// `FUN_00432a64` starts that table entry, so PREINTRO has its sound
+    /// also without `BugFix::CinemaSound` (LOGO15N's sound outlasts its
+    /// film).
+    #[test]
+    fn startup_films_play_their_table_sounds() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "startup_films_play_their_table_sounds",
+            move |mut e| async move {
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                e.set_enhancements(crate::enhancements::Enhancements::original());
+                e.play_startup().await;
+                let sounds: Vec<(i32, String)> = trace
+                    .borrow()
+                    .iter()
+                    .filter_map(|ev| match ev {
+                        Event::NewSound(v, n) => Some((*v, n.to_ascii_lowercase())),
+                        _ => None,
+                    })
+                    .collect();
+                *g2.borrow_mut() = sounds;
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(
+                *got.borrow(),
+                [
+                    (0x12, "logo15n.apc".to_string()),
+                    (0x13, "preintro.apc".to_string())
+                ]
+            );
+        }
     }
 }
