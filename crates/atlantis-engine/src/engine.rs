@@ -28,7 +28,7 @@ use crate::look::{WarpMomentum, WarpPointer};
 use crate::music::Music;
 use crate::persist::{MemStore, SaveStore, Settings};
 use crate::scripts::Scripts;
-use crate::sys::Sys;
+use crate::sys::{Input, MouseButton, Sys};
 use crate::ui::menus::MenuOutcome;
 use crate::ui::{BarSession, Guests, UiAssets};
 use crate::warp::Warp;
@@ -1156,7 +1156,20 @@ impl Engine {
         if !std::mem::take(&mut self.move_input_poll) {
             return;
         }
-        while self.sys.poll_event().is_some() {}
+        let mut left = false;
+        while let Some(ev) = self.sys.poll_event() {
+            if let Input::MouseDown {
+                button: MouseButton::Left,
+                ..
+            } = ev
+            {
+                left = true;
+            }
+        }
+        // F5..F8 move the stored angles (0x0041a33c..0x0041a3ba) unless the
+        // poll saw a new left press (0x0041a2b5); nothing writes them
+        // before the warp loop's first frame, which shows them.
+        self.poll_view_keys(left);
         self.turn_double_click.clear();
         self.escape_request = false;
         self.bar.flags_reset();

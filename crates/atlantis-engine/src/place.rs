@@ -1369,6 +1369,40 @@ mod escape_tests {
         }
     }
 
+    /// The end of a move polls once (`FUN_0041a298` @ 0x00424093): a held
+    /// F5 moves the stored angles there.
+    #[test]
+    fn f5_at_the_end_of_move_poll() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "f5_at_the_end_of_move_poll",
+            move |mut e| async move {
+                e.set_view(1.0, 0.0);
+                e.sys.push_input(Input::KeyDown(Key::F(5)));
+                e.move_input_poll = true;
+                e.end_of_move_input();
+                g2.borrow_mut().push(e.stored_view().0);
+                // A left press in that poll returns before the keys.
+                e.set_view(1.0, 0.0);
+                e.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Left,
+                    x: 0,
+                    y: 0,
+                });
+                e.move_input_poll = true;
+                e.end_of_move_input();
+                g2.borrow_mut().push(e.stored_view().0);
+            },
+            |_, _| {},
+        );
+        if ran {
+            let got = got.borrow();
+            assert_eq!(got[0], (1.0f64 + 0.034906) as f32);
+            assert_eq!(got[1], 1.0);
+        }
+    }
+
     /// The turn frame by frame: with 0x00496124 set all along, the frames
     /// of `transition_turn`; cleared after the first frame, phase 1 ends
     /// there and the five frames of phase 2 follow.
