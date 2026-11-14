@@ -58,3 +58,17 @@ pub(crate) fn button(sys: &Sys, button: MouseButton, down: bool) {
         Input::MouseUp { button, x, y }
     });
 }
+
+/// A left press at `(x, y)`.
+pub(crate) fn press_at(sys: &Sys, (x, y): (i32, i32)) {
+    sys.push_input(Input::MouseMove { x, y });
+    button(sys, MouseButton::Left, true);
+}
+
+/// The centre of a menu record.
+pub(crate) fn record_centre(r: crate::ui::layout::MenuRecord) -> (i32, i32) {
+    (
+        i32::from(r.x) + i32::from(r.w) / 2,
+        i32::from(r.y) + i32::from(r.h) / 2,
+    )
+}

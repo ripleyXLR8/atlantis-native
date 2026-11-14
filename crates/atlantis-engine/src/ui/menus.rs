@@ -24,9 +24,7 @@ use super::layout::{
     menu_volume_from_knob, menu_walk_hit, name_key_code, spell_sharp_s, subtitle_toggle_click,
     walk_menu_text_in, FontMin, LoadPickerScroll, MenuRecord, MenuRecordTable, MenuRules, MenuWalk,
 };
-use super::player_screen::{
-    player_screen_exit, MenuDoubleClick, PlayerScreenExit, PlayerScreenState,
-};
+use super::player_screen::{player_screen_exit, PlayerScreenExit, PlayerScreenState};
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
 use crate::music::apc_pcm;
@@ -208,6 +206,38 @@ impl Engine {
         }
     }
 
+    /// The left press a menu pass just read, paired by Windows with the
+    /// last press whatever loop read it ([`crate::turn::TurnDoubleClick::pair`]):
+    /// true when it came as WM_LBUTTONDBLCLK (window procedure @
+    /// 0x00419c79: it sets 0x00496118 while 0x00496138 == 1 and writes
+    /// neither the held flag 0x00496114 nor the latched record 0x006cd844,
+    /// which only WM_LBUTTONDOWN writes @ 0x00419c47..0x00419c56).
+    pub(crate) fn menu_press_pairs(&mut self) -> bool {
+        let (x, y) = self.sys.mouse();
+        let now = self.sys.millis();
+        self.turn_double_click.pair(now, x, y)
+    }
+
+    /// The input queued before a menu loop, which takes none of it as a
+    /// click (its loop clears the press flag 0x0049611c each pass): its
+    /// left presses still pair for Windows; true when one came as
+    /// WM_LBUTTONDBLCLK, which the loop's first walk dispatches.
+    pub(crate) fn drain_menu_input(&mut self) -> bool {
+        let mut double = false;
+        while let Some(ev) = self.sys.poll_event() {
+            if let Input::MouseDown {
+                button: MouseButton::Left,
+                x,
+                y,
+            } = ev
+            {
+                let now = self.sys.millis();
+                double = self.turn_double_click.pair(now, x, y);
+            }
+        }
+        double
+    }
+
     /// `SPRLIST\<name>`, `None` when the archive lacks it. Not walked
     /// yet: each menu walks it before its first hit test, with its toggles.
     pub(crate) async fn load_menu(&self, name: &str) -> Option<Menu> {
@@ -290,12 +320,15 @@ impl Engine {
             FontMin::PlayerList
         };
         let mut st = PlayerScreenState::default();
-        let mut dbl = MenuDoubleClick::default();
         let polls = menu.walk(None, 0, 0, self.menu_table());
         self.menu_walk_polls(polls);
         // FUN_0041dea4 waits for no release; a press made before it is not
-        // a click (its loop clears the flag each pass, 0x0041e036).
-        while self.sys.poll_event().is_some() {}
+        // a click (its loop clears the flag each pass, 0x0041e036). It
+        // clears 0x00496118 before its loop (@ 0x0041e020) with 0x00496138
+        // = 1 (@ 0x0041dec3), and its loop's first walk dispatches the
+        // messages queued since PREINTRO's last poll: the second press of a
+        // double click whose first ended PREINTRO.HNM sets the flag.
+        st.dbl_flag = self.drain_menu_input();
         loop {
             if self.sys.should_quit() {
                 return None;
@@ -317,7 +350,7 @@ impl Engine {
             // WM_LBUTTONDBLCLK sets the flag wherever the press lands; the
             // port arms it before the frame's click block (which of the two
             // the original runs first on the second press is not known).
-            if mi.left_press && dbl.press(self.sys.millis(), (mx, my)) {
+            if mi.left_press && self.menu_press_pairs() {
                 st.dbl_flag = true;
             }
             if st.click(
@@ -416,6 +449,7 @@ impl Engine {
                 .hit(mx, my, self.menu_table().as_deref())
                 .filter(|&r| r == 3 || r == 4);
             if mi.left_press {
+                self.menu_press_pairs();
                 if let Some(r) = hit {
                     return r == 3;
                 }
@@ -440,7 +474,7 @@ impl Engine {
         let polls = menu.walk(None, 0, 0, self.menu_table());
         self.menu_walk_polls(polls);
         // FUN_0041c838 clears the click flag before its loop.
-        while self.sys.poll_event().is_some() {}
+        self.drain_menu_input();
         let mut outcome = MenuOutcome::Resume;
         loop {
             if self.should_abort() {
@@ -450,9 +484,16 @@ impl Engine {
             let (mx, my) = self.sys.mouse();
             let hit = menu.hit(mx, my, self.menu_table().as_deref());
             if mi.left_press {
+                // The press ends the loop at once (its poll does not pump,
+                // 0x0041a2b5): when it is the second of a pair, its
+                // WM_LBUTTONDBLCLK is dispatched by the picker's first walk
+                // with 0x00496138 = 1 (@ 0x0041c9bc), which sets
+                // 0x00496118; FUN_0041c838 clears the flag only at its
+                // entry (@ 0x0041c858) and the picker not before its loop.
+                let double = self.menu_press_pairs();
                 match hit {
                     Some(0) => {
-                        let exit = self.load_picker(&bg).await;
+                        let exit = self.load_picker(&bg, double).await;
                         outcome = ingame_menu_outcome(hit, exit, 0);
                     }
                     Some(1) => self.options_menu(&bg).await,
@@ -513,6 +554,7 @@ impl Engine {
             let under = menu.hit(mx, my, self.menu_table().as_deref());
             let hit = under.filter(|r| [1, 3, 5, 6].contains(r));
             if mi.left_press {
+                self.menu_press_pairs();
                 match hit {
                     Some(1) => {
                         self.sound_menu(bg).await;
@@ -602,7 +644,13 @@ impl Engine {
             let hit = menu.hit(mx, my, self.menu_table().as_deref());
             let down = self.sys.buttons().0;
             if mi.left_press {
-                grabbed = hit;
+                // WM_LBUTTONDOWN latches the record under the pointer and
+                // sets the held flag (@ 0x00419c47..0x00419c56); the second
+                // press of a double click comes as WM_LBUTTONDBLCLK, which
+                // writes neither (@ 0x00419c79), after the first click's
+                // WM_LBUTTONUP cleared the held flag (@ 0x00419c60): no
+                // slider follows it.
+                grabbed = if self.menu_press_pairs() { None } else { hit };
             } else if !down {
                 grabbed = None;
             }
@@ -691,7 +739,9 @@ impl Engine {
     /// file) and 6 OK end it for a reload, 7 Cancel; so does a double click
     /// anywhere once a title is shown, as the record under the pointer.
     /// Returns the record it ended on (255 for a double click off them).
-    pub(crate) async fn load_picker(&mut self, bg: &[u16]) -> u8 {
+    /// `armed`: the press that opened it was the second of a double click
+    /// (its WM_LBUTTONDBLCLK sets the flag in the first walk).
+    pub(crate) async fn load_picker(&mut self, bg: &[u16], armed: bool) -> u8 {
         let Some(mut menu) = self.load_menu("LOADMENU.TXT").await else {
             return 7;
         };
@@ -725,9 +775,8 @@ impl Engine {
         let mut selected: Option<usize> = None;
         // The double-click flag 0x00496118: set by any double click,
         // wherever it lands, and cleared only when the picker ends
-        // (0x0041d50f).
-        let mut dbl = MenuDoubleClick::default();
-        let mut dbl_flag = false;
+        // (0x0041d50f), not before its loop.
+        let mut dbl_flag = armed;
         let mut track_latched = false;
         let player = self.player.min(MAX_PLAYERS - 1);
         let choose = |e: &mut Engine,
@@ -776,10 +825,18 @@ impl Engine {
                 selected = Some(i);
                 choose(self, i, &mut title, &mut title_frame);
             }
+            // A press that is the second of a pair comes as
+            // WM_LBUTTONDBLCLK (@ 0x00419c79): it sets the flag and latches
+            // nothing.
+            let double = mi.left_press && self.menu_press_pairs();
+            if double {
+                dbl_flag = true;
+            }
             if mi.left_press {
                 // WM_LBUTTONDOWN latches the record under the pointer
                 // (0x00419c47): the track when strictly inside it.
-                track_latched = menu.hit(mx, my, self.menu_table().as_deref()) == Some(1);
+                track_latched =
+                    !double && menu.hit(mx, my, self.menu_table().as_deref()) == Some(1);
             }
             if !down {
                 track_latched = false;
@@ -802,9 +859,6 @@ impl Engine {
             let button = menu
                 .hit(mx, my, self.menu_table().as_deref())
                 .filter(|r| [5, 6, 7].contains(r));
-            if mi.left_press && dbl.press(self.sys.millis(), (mx, my)) {
-                dbl_flag = true;
-            }
             if mi.left_press && !track_latched {
                 if let Some(r) = row_hover {
                     selected = Some(r);
@@ -1156,7 +1210,7 @@ mod picker_key_tests {
                 e.load_interface().await;
                 e.set_enhancements(x);
                 let bg = vec![0u16; crate::warp::SCREEN_W * crate::warp::SCREEN_H];
-                g2.set(Some(e.load_picker(&bg).await));
+                g2.set(Some(e.load_picker(&bg, false).await));
             },
             |sys, f| match f {
                 5 => sys.push_input(Input::KeyDown(Key::Enter)),
@@ -1395,5 +1449,212 @@ mod walk_poll_tests {
         let n = got.borrow().expect("the menu did not end");
         // The entry walk, then (poll + walk) per pass before the click.
         assert!(n > 33 + 34 && n % 34 == 33, "{n} polls");
+    }
+}
+
+#[cfg(test)]
+mod double_click_tests {
+    use super::MenuOutcome;
+    use crate::place::CINEMA_FRAME_MS;
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::{button, press_at, record_centre as centre, with_engine};
+    use crate::warp::{SCREEN_H, SCREEN_W};
+    use atlantis_data::saves::epi_episode_name;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    const N: usize = SCREEN_W * SCREEN_H;
+
+    /// A double click whose first press ends PREINTRO.HNM: the player
+    /// screen clears 0x00496118 before its loop (@ 0x0041e020) and its first
+    /// walk dispatches the WM_LBUTTONDBLCLK of the second press with
+    /// 0x00496138 = 1, so the flag is set and the next click on a player's
+    /// row ends the screen (0x0041e4d3).
+    #[test]
+    fn a_double_click_ending_preintro_arms_the_player_screen() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ended = Rc::new(Cell::new(false));
+        let e2 = ended.clone();
+        let row = (300, 259);
+        let ran = with_engine(
+            "a_double_click_ending_preintro_arms_the_player_screen",
+            move |mut e| async move {
+                e.load_interface().await;
+                e.players.create(b"Tester").unwrap();
+                e.play_transition_video("PREINTRO.HNM", None, CINEMA_FRAME_MS)
+                    .await;
+                e2.set(true);
+                g2.set(Some(e.player_screen().await));
+            },
+            {
+                let ended = ended.clone();
+                let mut second = None;
+                move |sys, f| {
+                    match f {
+                        30 => press_at(sys, row),
+                        31 => button(sys, MouseButton::Left, false),
+                        _ => {}
+                    }
+                    // The second press as soon as the video has ended.
+                    if second.is_none() && ended.get() {
+                        second = Some(f);
+                        button(sys, MouseButton::Left, true);
+                    }
+                    if second.is_some_and(|s| f == s + 1) {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    // One click on the player's row, past the double-click
+                    // time.
+                    if second.is_some_and(|s| f == s + 60) {
+                        button(sys, MouseButton::Left, true);
+                    }
+                    if second.is_some_and(|s| f == s + 61) {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    if f == 1000 {
+                        sys.push_input(Input::Quit);
+                    }
+                }
+            },
+        );
+        if ran {
+            assert!(ended.get(), "PREINTRO did not end");
+            assert_eq!(got.get(), Some(Some(0)));
+        }
+    }
+
+    /// The same with the second press made before the player screen's loop
+    /// (during the last frame of PREINTRO or the loads): it is no click,
+    /// but its WM_LBUTTONDBLCLK, still queued, is dispatched by the loop's
+    /// first walk, after the clear @ 0x0041e020.
+    #[test]
+    fn a_double_click_queued_before_the_player_screen_arms_it() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_double_click_queued_before_the_player_screen_arms_it",
+            move |mut e| async move {
+                e.load_interface().await;
+                e.players.create(b"Tester").unwrap();
+                // The press that ended PREINTRO, then the second one.
+                e.sys.push_input(Input::MouseMove { x: 300, y: 259 });
+                let now = e.sys.millis();
+                e.turn_double_click.first_press(now, 300, 259);
+                button(&e.sys, MouseButton::Left, true);
+                button(&e.sys, MouseButton::Left, false);
+                g2.set(Some(e.player_screen().await));
+            },
+            |sys, f| match f {
+                // One click on the player's row.
+                60 => button(sys, MouseButton::Left, true),
+                61 => button(sys, MouseButton::Left, false),
+                200 => sys.push_input(Input::Quit),
+                _ => {}
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some(Some(0)));
+        }
+    }
+
+    /// A LOAD GAME press that is itself the second of a pair: the in-game
+    /// menu's loop ends on its edge without pumping (0x0041a2b5), and the
+    /// picker's first walk dispatches its WM_LBUTTONDBLCLK with 0x00496138
+    /// = 1 (@ 0x0041c9bc): the picker opens armed, and the first click on
+    /// a titled row ends it for a reload.
+    #[test]
+    fn a_load_game_press_completing_a_pair_arms_the_picker() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let at = Rc::new(Cell::new(((0, 0), (0, 0))));
+        let a2 = at.clone();
+        let ran = with_engine(
+            "a_load_game_press_completing_a_pair_arms_the_picker",
+            move |mut e| async move {
+                e.load_interface().await;
+                for c in (2..87)
+                    .filter(|&c| !epi_episode_name(&e.epi_text, c).is_empty())
+                    .take(3)
+                {
+                    e.saves.write(&format!("pa{c}.gam"), b"");
+                }
+                let mut main = e.load_menu("MAINMENU.TXT").await.unwrap();
+                main.walk(None, 0, 0, None);
+                let mut load = e.load_menu("LOADMENU.TXT").await.unwrap();
+                load.walk(None, 0, 0, None);
+                let main_load = centre(main.walk.records[0]);
+                a2.set((main_load, centre(load.walk.records[7])));
+                // The first press of the pair (the click that ended the
+                // warp loop).
+                let now = e.sys.millis();
+                e.turn_double_click
+                    .first_press(now + 160, main_load.0, main_load.1);
+                g2.set(Some(e.ingame_menu().await));
+            },
+            move |sys, f| {
+                let (main_load, cancel) = at.get();
+                match f {
+                    10 => press_at(sys, main_load),
+                    11 => button(sys, MouseButton::Left, false),
+                    // Row 0, once.
+                    60 => press_at(sys, (100, 118)),
+                    61 => button(sys, MouseButton::Left, false),
+                    // Not armed: the picker is still up.
+                    100 => press_at(sys, cancel),
+                    101 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                }
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some(MenuOutcome::Reload));
+        }
+    }
+
+    /// The second press of a double click comes as WM_LBUTTONDBLCLK, which
+    /// writes neither the held flag nor the latched record (@ 0x00419c79):
+    /// a slider grabbed with it does not follow the mouse.
+    #[test]
+    fn the_second_press_of_a_double_click_grabs_no_slider() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let at = Rc::new(Cell::new(((0, 0), (0, 0))));
+        let a2 = at.clone();
+        let ran = with_engine(
+            "the_second_press_of_a_double_click_grabs_no_slider",
+            move |mut e| async move {
+                e.load_interface().await;
+                let mut m = e.load_menu("SONMENU.TXT").await.unwrap();
+                m.walk(None, 0, 0, None);
+                let track = m.walk.records[2];
+                let y = i32::from(track.y) + i32::from(track.h) / 2;
+                a2.set(((350, y), centre(m.walk.records[17])));
+                let bg = vec![0u16; N];
+                e.sound_menu(&bg).await;
+                g2.set(Some(e.son_knob_x[1]));
+            },
+            move |sys, f| {
+                let (track, cancel) = at.get();
+                match f {
+                    10 => press_at(sys, track),
+                    11 => button(sys, MouseButton::Left, false),
+                    13 => button(sys, MouseButton::Left, true),
+                    14..=20 => sys.push_input(Input::MouseMove {
+                        x: track.0 + 10 * (f as i32 - 13),
+                        y: track.1,
+                    }),
+                    21 => button(sys, MouseButton::Left, false),
+                    30 => press_at(sys, cancel),
+                    31 => button(sys, MouseButton::Left, false),
+                    200 => sys.push_input(Input::Quit),
+                    _ => {}
+                }
+            },
+        );
+        if ran {
+            // The first press set the knob at x - 10; the drag moved none.
+            assert_eq!(got.get(), Some(350 - 10));
+        }
     }
 }

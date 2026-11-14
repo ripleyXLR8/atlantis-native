@@ -345,6 +345,19 @@ impl TurnDoubleClick {
         double
     }
 
+    /// A left press read by a loop whose own polls dispatch the message
+    /// (the menu loops `FUN_0041c838`, `FUN_0041d5f4`, `FUN_0041d940`,
+    /// `FUN_0041ec7c`, `FUN_0041cf78`, `FUN_0041dea4`, and the video skip of
+    /// `FUN_0041bc74`): Windows pairs it with the last press whatever loop
+    /// read that one. True when it is the second of a pair
+    /// (WM_LBUTTONDBLCLK, not WM_LBUTTONDOWN); the caller applies the
+    /// message (the flag 0x00496118 is the caller's).
+    pub fn pair(&mut self, ms: u64, x: i32, y: i32) -> bool {
+        let double = self.queue_press(ms, x, y);
+        self.queued = false;
+        double
+    }
+
     /// A poll that pumps the queued WM_LBUTTONDBLCLK: the window procedure
     /// sets the flag when the cursor state 0x004968ac is 5 or the menu
     /// request 0x00496138 is 1.
@@ -355,5 +368,30 @@ impl TurnDoubleClick {
                 self.flag = true;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn menu_presses_pair_as_windows_does() {
+        let mut d = TurnDoubleClick::default();
+        assert!(!d.pair(1000, 10, 10));
+        assert!(d.pair(1400, 12, 8));
+        // The press after a double click starts a new pair.
+        assert!(!d.pair(1500, 12, 8));
+        // Too late, too far.
+        assert!(!d.pair(2000, 12, 8));
+        assert!(!d.pair(2100, 15, 8));
+        assert!(d.pair(2200, 15, 8));
+        // A menu's own walk dispatches the message: nothing stays queued
+        // for a later pump, and the flag is the caller's.
+        d.dispatch(5, true);
+        assert!(!d.flag);
+        // The click that ended the warp loop pairs with a menu press.
+        d.first_press(3000, 100, 100);
+        assert!(d.pair(3100, 101, 99));
     }
 }
