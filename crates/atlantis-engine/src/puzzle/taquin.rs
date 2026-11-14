@@ -34,6 +34,11 @@ pub trait TaquinIo {
     fn start_input(&mut self) -> (i32, i32, bool);
     /// `FUN_0043318c`: a frame boundary, where the input is read.
     fn boundary(&mut self, g: &TaquinGame) -> (i32, i32, bool);
+    /// The boundary of a set-up / win frame (`FUN_00446ac8`), which polls
+    /// once (0x00446ba9) where taquin 14's main loop polls twice.
+    fn frame_boundary(&mut self, g: &TaquinGame) -> (i32, i32, bool) {
+        self.boundary(g)
+    }
     fn draw_background(&mut self);
     /// 'P' PUZTAQn, 'C' CURSEURS.
     fn draw_sprite(&mut self, bank: char, x: i32, y: i32, frame: i32);
@@ -103,7 +108,11 @@ impl TaquinGame {
     }
 
     fn read_boundary(&mut self, io: &mut impl TaquinIo) {
-        let (mx, my, c) = io.boundary(self);
+        let m = io.boundary(self);
+        self.take_input(m);
+    }
+
+    fn take_input(&mut self, (mx, my, c): (i32, i32, bool)) {
         self.mx = mx;
         self.my = my;
         if c {
@@ -150,13 +159,14 @@ impl TaquinGame {
         }
     }
 
-    /// `FUN_00446ac8`.
+    /// `FUN_00446ac8`: one poll after the present (0x00446ba9).
     async fn frame(&mut self, io: &mut impl TaquinIo, extra: i16) {
         self.draw(io, extra);
         io.draw_background();
         io.present(self).await;
         self.click = false;
-        self.read_boundary(io);
+        let m = io.frame_boundary(self);
+        self.take_input(m);
     }
 
     /// `FUN_0044727c`.
@@ -265,7 +275,18 @@ impl TaquinGame {
         self.result = 0;
         loop {
             if self.variant == 7 {
+                // FUN_0044659c polls after the present (0x004467e6); the
+                // top of its pass is FUN_0043318c (0x0044670a), which
+                // makes no poll. A click already taken (the last set-up
+                // frame's poll 0x00446ba9, or the port's entry read)
+                // returned before the pump (0x0041a2b5): FUN_00447048
+                // (0x00446718) and the cursor read that poll's pointer,
+                // not the one this read finds.
+                let taken = self.click.then_some((self.mx, self.my));
                 self.read_boundary(io);
+                if let Some((x, y)) = taken {
+                    (self.mx, self.my) = (x, y);
+                }
             }
             if self.click {
                 self.handle_click(io);
@@ -324,6 +345,16 @@ impl TaquinIo for Host<'_> {
         };
         (m.x, m.y, m.click)
     }
+    /// `FUN_00446ac8`, the set-up and win frames of all three, polls once
+    /// (0x00446ba9): taquin 14 makes no second poll there.
+    fn frame_boundary(&mut self, _g: &TaquinGame) -> (i32, i32, bool) {
+        let m = if self.1 == 14 {
+            self.0.read_input()
+        } else {
+            self.0.read_input_held_pointer()
+        };
+        (m.x, m.y, m.click)
+    }
     fn draw_background(&mut self) {
         self.0.draw_background();
     }
@@ -367,6 +398,11 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, variant: i32) -> 
     let sounds = PuzzleSounds::load(e, &["TAK1", "TAK2", "TAK3", "TAK4"]).await;
     let mut game = TaquinGame::new(variant);
     game.object_in_hand = held;
+    // FUN_00446bbc, before the set-up frames and before any poll, sets
+    // OBJETENMAIN to 0 (0x00446bd4..0x00446be6): the Escape test of
+    // FUN_0041a298 (0x0041a3fc..0x0041a415) sees an empty hand whatever
+    // the player entered with.
+    e.vars.set("objetenmain", 0);
     game.cursor = e.puzzles.cursor;
     let mut host = Host(PuzzleHost::new(e, hooks), variant);
     host.0.screen.pictures = vec![bg];
@@ -375,8 +411,6 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, variant: i32) -> 
     let r = game.run(&mut host).await;
     let e = host.0.e;
     e.puzzles.cursor = game.cursor;
-    // FUN_00446bbc emptied the hand.
-    e.vars.set("objetenmain", 0);
     if e.should_abort() {
         1
     } else {
@@ -413,6 +447,70 @@ mod click_pointer_tests {
 }
 
 #[cfg(test)]
+mod setup_click_tests {
+    use super::*;
+
+    /// The last set-up frame's poll takes a click at the previous poll's
+    /// pointer (100, 100); the mouse is at (300, 200) after it.
+    #[derive(Default)]
+    struct Io {
+        frames: usize,
+        presents: usize,
+        cursor: Option<(i32, i32)>,
+    }
+
+    impl TaquinIo for Io {
+        fn start_input(&mut self) -> (i32, i32, bool) {
+            (100, 100, false)
+        }
+        fn boundary(&mut self, _g: &TaquinGame) -> (i32, i32, bool) {
+            (300, 200, false)
+        }
+        fn frame_boundary(&mut self, _g: &TaquinGame) -> (i32, i32, bool) {
+            self.frames += 1;
+            (100, 100, self.frames == 17)
+        }
+        fn draw_background(&mut self) {}
+        fn draw_sprite(&mut self, bank: char, x: i32, y: i32, _frame: i32) {
+            if bank == 'C' && self.presents == 17 {
+                self.cursor = Some((x, y));
+            }
+        }
+        fn draw_standard_cursor(&mut self, x: i32, y: i32) {
+            if self.presents == 17 {
+                self.cursor = Some((x, y));
+            }
+        }
+        async fn present(&mut self, _g: &TaquinGame) {
+            self.presents += 1;
+        }
+        fn play_sound(&mut self, _slot: i32) {}
+        fn aborted(&self) -> bool {
+            self.presents > 17
+        }
+    }
+
+    /// Taquin 7: a click of the last set-up frame (FUN_00446ac8 @
+    /// 0x00446ba9) is handled, and the first pass's cursor drawn, at that
+    /// poll's pointer: FUN_0044659c makes no poll before FUN_00447048
+    /// (0x00446718).
+    #[test]
+    fn taquin7_setup_click_at_the_polls_pointer() {
+        use std::future::Future;
+        use std::task::{Context, Waker};
+        let mut g = TaquinGame::new(7);
+        g.object_in_hand = PIECE_OBJECT;
+        let mut io = Io::default();
+        {
+            let mut run = std::pin::pin!(g.run(&mut io));
+            let mut cx = Context::from_waker(Waker::noop());
+            assert!(run.as_mut().poll(&mut cx).is_ready());
+        }
+        assert_eq!(io.cursor, Some((100, 100)));
+    }
+}
+
+#[cfg(test)]
 mod poll_count_tests {
     use super::*;
     use crate::puzzle::assets::f5_steps;
@@ -433,7 +531,18 @@ mod poll_count_tests {
                 io.start_input();
                 io.boundary(&TaquinGame::new(v));
             });
-            assert_eq!((entry, pass), (0, Some(per_pass)), "taquin {v}");
+            // A set-up / win frame (FUN_00446ac8) polls once
+            // (0x00446ba9) for all three.
+            let frame = f5_steps("taquin_f5_frame", move |h| {
+                let mut io = Host(h, v);
+                io.start_input();
+                io.frame_boundary(&TaquinGame::new(v));
+            });
+            assert_eq!(
+                (entry, pass, frame),
+                (0, Some(per_pass), Some(1)),
+                "taquin {v}"
+            );
         }
     }
 }

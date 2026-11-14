@@ -238,7 +238,7 @@ impl Engine {
         // (@ 0x0042d51d) write the flag; neither FUN_0042de5c nor
         // FUN_00423760 touches them.
         let Some(cp) = self.player_checkpoint() else {
-            self.new_game(hooks, in_play).await;
+            self.new_game_from_load(hooks, in_play).await;
             return;
         };
         if !in_play {
@@ -259,7 +259,7 @@ impl Engine {
         self.wam_path[..n].copy_from_slice(&cp.wam_path[..n]);
         if !self.load_wam(&wam).await {
             log::error!("checkpoint: {wam} missing, new game");
-            self.new_game(hooks, in_play).await;
+            self.new_game_from_load(hooks, in_play).await;
             return;
         }
         self.last_vue = cp.last_vue.clamp(0, i32::from(u16::MAX)) as u16;
@@ -292,9 +292,11 @@ impl Engine {
         self.apply_volumes();
         // Step 8: the current music volume 0x00495e71 = the music volume.
         self.music.with_fade(|f| f.cur = f.vol);
-        // Step 4: ZOOM = NEWSOUND = 0, the last NewSound 0.
+        // Step 4: ZOOM = NEWSOUND = 0, the last NewSound 0 and its playing
+        // flag 0 (0x0042e2db, 0x0042e2e5).
         self.zoom = false;
         self.music.new_sound_last = 0;
+        self.music.new_sound_playing = false;
         hooks.restore_script_state(
             self,
             &ScriptState {
@@ -318,6 +320,20 @@ impl Engine {
         let player = self.player.min(MAX_PLAYERS - 1);
         let name = self.players.checkpoint_name(player, cp.chapter);
         self.emit(crate::engine::Event::CheckpointLoaded(name));
+    }
+
+    /// `FUN_0042de5c` without a checkpoint: the new game, with the tail
+    /// both branches share (dc:23603..23653): the last NewSound 0x006cd87c
+    /// and its playing flag 0x00772912 cleared (0x0042e2db, 0x0042e2e5)
+    /// before the chapter change, and at the end the music sample set to
+    /// the music volume and the current music volume 0x00495e71 =
+    /// 0x00495e72 (0x0042e494..0x0042e499): a volume the in-game menu
+    /// lowered is back at once.
+    async fn new_game_from_load(&mut self, hooks: &mut dyn ScriptHooks, in_play: bool) {
+        self.music.new_sound_last = 0;
+        self.music.new_sound_playing = false;
+        self.new_game(hooks, in_play).await;
+        self.music.with_fade(|f| f.cur = f.vol);
     }
 
     /// The settings of the store, or those of the options.
@@ -378,6 +394,40 @@ mod tests {
         let got = got.borrow();
         if !got.is_empty() {
             assert_eq!(&got[..], &b"wam\\trone.wam\0am\0\0\0\0"[..]);
+        }
+    }
+
+    /// A reload in play with no checkpoint (a new player in chapter 1, the
+    /// in-game menu's LOAD) runs FUN_0042de5c's common tail too: the music
+    /// back at its volume (0x00495e71 = 0x00495e72 @ 0x0042e499) after the
+    /// menu lowered it, the last NewSound and its flag cleared (0x0042e2db,
+    /// 0x0042e2e5).
+    #[test]
+    fn reload_without_checkpoint_restores_the_music_volume() {
+        let got = Rc::new(std::cell::RefCell::new(None));
+        let g2 = got.clone();
+        with_engine(
+            "reload_without_checkpoint_restores_the_music_volume",
+            move |mut e| async move {
+                e.saves = Rc::new(MemStore::new());
+                let vol = e.music.with_fade(|f| {
+                    f.cur = 22;
+                    f.vol
+                });
+                e.music.new_sound_last = 14;
+                e.music.new_sound_playing = true;
+                e.load_checkpoint(&mut crate::hooks::NoScripts, true).await;
+                *g2.borrow_mut() = Some((
+                    e.music.with_fade(|f| f.cur) == vol,
+                    e.music.new_sound_last,
+                    e.music.new_sound_playing,
+                ));
+            },
+            |_, _| {},
+        );
+        let got = *got.borrow();
+        if let Some(got) = got {
+            assert_eq!(got, (true, 0, false));
         }
     }
 

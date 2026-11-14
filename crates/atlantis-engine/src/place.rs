@@ -261,6 +261,68 @@ impl Engine {
         }
     }
 
+    /// The rows of view `vue` the layer draws (`recomposite_sprite_layer`),
+    /// in list order, with their frames.
+    fn drawn_sprite_rows(&self, vue: u16) -> Vec<(usize, i32)> {
+        self.sprite_list
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| {
+                e.place_id == vue
+                    && e.active
+                    && !(self.sprites_hide_npcs && e.perso_id >= 0x200)
+                    && self.spw_cache.contains_key(&e.spw_file)
+            })
+            .map(|(i, e)| (i, e.frame.max(0)))
+            .collect()
+    }
+
+    /// A type-2 row's cycle ended on this pass. The original draws each
+    /// row with `FUN_00452d39`, which saves the panorama pixels it covers
+    /// in the row's buffer, and after the present `FUN_004255f0` puts them
+    /// back with `FUN_00453037`, in reverse list order, for the rows whose
+    /// active flag is still set only (dc:17688); the cycle end clears the
+    /// flag (@ 0x004255d7) between the two, so the ended row's last frame
+    /// is never restored and stays in the panorama buffer 0x008b9d00 until
+    /// `FUN_0044a424` loads it again. Run on the base `cyclo` (the next
+    /// [`Engine::load_cyclo`] replaces it): `drawn`, the rows drawn on the
+    /// pass at their frames, then the restores of the rows still active.
+    fn keep_ended_sprite_frames(&mut self, drawn: &[(usize, i32)]) {
+        let n = (PANO_W * self.cyclo_h).min(self.cyclo.len());
+        let mut buf = self.cyclo.clone();
+        let mut a = vec![0u16; n];
+        let mut b = vec![0u16; n];
+        let mut saves = Vec::with_capacity(drawn.len());
+        for &(i, frame) in drawn {
+            let Some(spw) = self.spw_cache.get(&self.sprite_list[i].spw_file) else {
+                continue;
+            };
+            // The pixels a frame covers: the same in two decodes over
+            // different backgrounds.
+            a.fill(0);
+            b.fill(0xffff);
+            decode_spw_pixels(spw, &mut a, PANO_W, self.cyclo_h, frame as usize);
+            decode_spw_pixels(spw, &mut b, PANO_W, self.cyclo_h, frame as usize);
+            let mut saved = Vec::new();
+            for p in 0..n {
+                if a[p] == b[p] {
+                    saved.push((p, buf[p]));
+                    buf[p] = a[p];
+                }
+            }
+            saves.push((i, saved));
+        }
+        for (i, saved) in saves.iter().rev() {
+            if self.sprite_list[*i].active {
+                for &(p, v) in saved {
+                    buf[p] = v;
+                }
+            }
+        }
+        self.cyclo = buf;
+        self.sprite_layer_stale = true;
+    }
+
     /// `FUN_00425304` once per frame: the test "more than 13 ticks" of the
     /// 200 Hz counter is run for each tick elapsed since the last call (at
     /// most 2 s, e.g. after a video), as the original, which does not wait
@@ -298,6 +360,13 @@ impl Engine {
         // Wsprframe is in 8..33 or 70..96. It starts from the variable, so
         // a script's write stays until the next step changes it.
         let mut wspr = self.vars.get("wsprframe");
+        // The rows drawn on this pass, and the type-2 rows that may end.
+        let drawn = self.drawn_sprite_rows(vue);
+        let one_shots: Vec<usize> = drawn
+            .iter()
+            .map(|&(i, _)| i)
+            .filter(|&i| self.sprite_list[i].kind == 2)
+            .collect();
         while now.wrapping_sub(t) as i32 >= 0 {
             changed |= animate_place_sprites(
                 &mut self.sprite_list,
@@ -311,6 +380,9 @@ impl Engine {
             t = t.wrapping_add(1);
         }
         self.sprite_anim_tick = now;
+        if one_shots.iter().any(|&i| !self.sprite_list[i].active) {
+            self.keep_ended_sprite_frames(&drawn);
+        }
         self.wspr_frame = wspr;
         self.vars.set("wsprframe", wspr);
         if changed {
@@ -1278,6 +1350,74 @@ mod sprite_draw_order_tests {
             t += 16;
         }
         assert_eq!(*got.borrow(), Some((true, true)));
+    }
+}
+
+#[cfg(test)]
+mod one_shot_residue_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// A type-2 row's last frame stays on the panorama after its cycle
+    /// ends (FUN_004255f0 restores only the rows still active, dc:17688)
+    /// until the panorama is loaded again; a type-1 row leaves nothing.
+    /// The ATLAN5 alley's slave row (view 126, 104 frames), as type 2 and
+    /// as type 1.
+    fn residue(kind: i32) -> Option<(usize, usize)> {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return None;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let got = Rc::new(std::cell::Cell::new(None));
+        let g2 = got.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("ATLAN5.WAM").await);
+            e.next_place_id = Some(126);
+            e.do_place_change().await;
+            let pristine = e.cyclo.clone();
+            let row = e
+                .sprite_list
+                .iter()
+                .position(|r| r.place_id == 126 && r.perso_id == 529)
+                .expect("the slave row");
+            e.sprite_list[row].kind = kind;
+            e.sprite_list[row].frame = e.sprite_list[row].frame_count - 2;
+            let diff = |e: &Engine| {
+                e.cyclo
+                    .iter()
+                    .zip(&pristine)
+                    .filter(|(a, b)| a != b)
+                    .count()
+            };
+            for _ in 0..40 {
+                e.animate_sprites();
+                e.sys.frame().await;
+            }
+            let after_end = diff(&e);
+            e.reload_current_view().await;
+            g2.set(Some((after_end, diff(&e))));
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        got.get()
+    }
+
+    #[test]
+    fn one_shot_last_frame_stays_until_the_panorama_reloads() {
+        let Some((kept, reloaded)) = residue(2) else {
+            return;
+        };
+        assert!(kept > 0, "no residue");
+        assert_eq!(reloaded, 0);
+        assert_eq!(residue(1), Some((0, 0)));
     }
 }
 

@@ -122,6 +122,8 @@ pub struct Sys {
     events: RefCell<VecDeque<Input>>,
     quit: Cell<bool>,
     yielded: Cell<bool>,
+    /// The frames presented so far.
+    frames: Cell<u64>,
     rel: Cell<(i32, i32)>,
     locked: Cell<bool>,
     warp_request: Cell<Option<(i32, i32)>>,
@@ -163,6 +165,7 @@ impl Sys {
             events: RefCell::new(VecDeque::new()),
             quit: Cell::new(false),
             yielded: Cell::new(false),
+            frames: Cell::new(0),
             rel: Cell::new((0, 0)),
             locked: Cell::new(false),
             warp_request: Cell::new(None),
@@ -258,6 +261,12 @@ impl Sys {
     /// already up to date when the frame resumes).
     pub fn poll_event(&self) -> Option<Input> {
         self.events.borrow_mut().pop_front()
+    }
+
+    /// The frames presented so far (a loop can tell whether a call it made
+    /// ran frames, and so read the input).
+    pub fn frames_presented(&self) -> u64 {
+        self.frames.get()
     }
 
     /// Shows `screen` and waits for the next frame: the engine's
@@ -416,6 +425,7 @@ impl Future for FrameFuture<'_> {
         } else {
             self.started = true;
             self.sys.yielded.set(true);
+            self.sys.frames.set(self.sys.frames.get() + 1);
             // The HD layer and a video's mark stand for later frames too
             // while the screen stays the same: a frame presented without a
             // redraw (the click that starts a move, the destination's

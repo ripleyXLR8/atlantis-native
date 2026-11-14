@@ -427,15 +427,24 @@ mod entry_tests {
         ran.then(|| seen.get().expect("the puzzle did not run"))
     }
 
-    /// The hexagon (13) and meta stages 2..4 (10..12) may be entered with
-    /// an object in hand (FUN_0043a1e0 refuses only N < 6, 8, 9, N > 14);
-    /// their set-ups empty the hand before the loop (FUN_004406fc @
-    /// 0x00440883, FUN_004478d4 @ 0x00447951), so FUN_0041a298's Escape
+    /// The hexagon (13), meta stages 2..4 (10..12) and the taquins (6, 7,
+    /// 14) may be entered with an object in hand (FUN_0043a1e0 refuses
+    /// only N < 6, 8, 9, N > 14); their set-ups empty the hand before the
+    /// loop (FUN_004406fc @ 0x00440883, FUN_004478d4 @ 0x00447951,
+    /// FUN_00446bbc @ 0x00446be6), so FUN_0041a298's Escape
     /// test on OBJETENMAIN (0x0041a3fc..0x0041a415) passes and the Escape
     /// latches, as with an empty hand.
     #[test]
     fn hexa_and_meta_escape_with_an_object_in_hand() {
-        for (id, object) in [(13, 402), (10, 318), (11, 319), (12, 320)] {
+        for (id, object) in [
+            (13, 402),
+            (10, 318),
+            (11, 319),
+            (12, 320),
+            (6, 322),
+            (7, 322),
+            (14, 322),
+        ] {
             let Some(empty) = escape_latched(id, 0) else {
                 return;
             };
