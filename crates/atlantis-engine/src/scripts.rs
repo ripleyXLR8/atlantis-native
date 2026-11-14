@@ -1089,6 +1089,24 @@ impl Scripts {
             // loop once the variable goes non-zero); the line after it feeds
             // the game-over screen.
             let mut game_over = None;
+            // A section whose first item is its /go (no item before it, as
+            // the parser ends the items at the /go): the executor runs
+            // FUN_0042831c on the /go (0x00428bf1), which returns the
+            // target's header (FUN_00425c04), then tests GAMEOVER
+            // (0x00428c05) before any item of the target. Set (a walk
+            // started with GAMEOVER left set, BugFix::GameOverPuzzle off),
+            // it calls FUN_00426590 with the text after that position, a
+            // header, so no narrator (0x00428c20..0x00428c3e), and ends.
+            if sec.items.is_empty() && sec.goto_id > 0 && !e.should_abort() {
+                let n = e.vars.get("gameover");
+                if n != 0 {
+                    game_over = Some(GameOverRequest {
+                        section: sec.id,
+                        n,
+                        narrator: None,
+                    });
+                }
+            }
             let mut line_idx = 0usize;
             let mut i = 0;
             while i < sec.items.len() {
@@ -1943,6 +1961,44 @@ mod tests {
         );
         let fixed = tim2_after_a_tim1_game_over(true).unwrap();
         assert_eq!(fixed, (vec![], vec![(3, true)], 0, Some(Abort::NewGame)));
+    }
+
+    /// A /tim2 section whose first item is a /go after a /tim1 game over
+    /// (as CHAPI032 /tim2(time2>700) -> /go418), GAMEOVER left set
+    /// (`--original`): the executor runs FUN_0042831c on the /go
+    /// (0x00428bf1, FUN_00425c04 returns the target's header) and tests
+    /// GAMEOVER at 0x00428c05 before any item of the target, with no
+    /// narrator. No line of /3 and the second picture is GameOver 3's.
+    #[test]
+    fn a_go_first_section_shows_the_game_over_before_its_target() {
+        let got = Rc::new(RefCell::new((Vec::new(), Vec::new())));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_go_first_section_shows_the_game_over_before_its_target",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(LinesAndGameOvers(g2)));
+                e.new_game(&mut s, false).await;
+                e.set_enhancements(crate::enhancements::Enhancements::original());
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/tim1(flagtemp1=1)\r\n/set(GameOver=3)\r\n\
+                      [Narrator,off] Dead.\r\n/0\r\n\
+                      /2\r\n/tim2(flagtemp2=1)\r\n/go3\r\n\
+                      /3\r\n/sel(flagtemp3=1)\r\n[Soldat] Well.\r\n\
+                      /set(GameOver=1)\r\n[Narratrice] Gone.\r\n/0\r\n",
+                );
+                e.vars.set("testtime1", 1);
+                e.vars.set("testtime2", 1);
+                e.vars.set("flagtemp1", 1);
+                e.vars.set("flagtemp2", 1);
+                s.run_con_timers(&mut e, false).await;
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let (lines, overs) = got.borrow().clone();
+        assert_eq!((lines, overs), (vec![], vec![(3, true), (3, false)]));
     }
 
     /// A line's player that leaves the left button down (the press that
