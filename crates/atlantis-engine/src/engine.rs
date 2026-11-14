@@ -239,6 +239,14 @@ pub struct Engine {
     /// 0x006cd288 from the destination's record in the WAM being left; see
     /// [`Engine::execute_transition`]).
     pub move_cyclo: Option<(u16, String)>,
+    /// The panorama path buffer 0x006cd288, as the last writer left it:
+    /// every place load (`FUN_00421b4c` @ 0x00421bf9, the current record's
+    /// name) and the destination lookup of every exit click (`FUN_00421cfc`
+    /// @ 0x00423dc5, the destination's record in the current WAM, before
+    /// the departure scan). An AbortDepart ends the move with no place
+    /// load, so it keeps the destination's name; `FUN_004240fc` reloads it
+    /// after a puzzle (@ 0x004241dd). None before the first place load.
+    pub(crate) cyclo_path: Option<String>,
     /// The first arrival scan after a chapter load reads ArriveeVue =
     /// LastVue.
     pub(crate) arrival_after_load: bool,
@@ -485,6 +493,7 @@ impl Engine {
             puzzle_scan: false,
             move_input_poll: false,
             move_cyclo: None,
+            cyclo_path: None,
             arrival_after_load: false,
             last_vue: 0,
             chapter: 0,
@@ -1106,6 +1115,7 @@ impl Engine {
             };
             let dest = zone as u16;
             self.next_place_id = Some(dest);
+            self.look_up_place_cyclo(dest);
             // LastVue = the place being left (0x00423dcf), before the
             // departure scan.
             self.last_vue = self.current_place_id.unwrap_or(0);
