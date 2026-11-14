@@ -435,12 +435,10 @@ impl Engine {
                 bar = false;
             }
             if bar {
+                // Closing the bar enters bow mode with the bow in hand and
+                // ArcMagique set, before the slide-out (FUN_0042d098 in
+                // `display_bar`).
                 let guest = self.display_bar(hooks).await;
-                // Closing the bar: bow mode with the bow in hand and
-                // ArcMagique set (FUN_0042d098), the bow rising.
-                if !self.should_abort() {
-                    self.enter_bow_mode().await;
-                }
                 // FUN_0042c59c @ 0x0042c844: the timers resume.
                 self.rebase_con_clocks();
                 // A guest's conversation that moved the player (a Vue= or a
