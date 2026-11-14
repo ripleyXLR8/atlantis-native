@@ -318,6 +318,9 @@ pub(crate) fn poll_flags(e: &mut Engine, m: &PuzzleMouse) {
     if m.click {
         return;
     }
+    // F5..F8 move the stored view angles (0x0041a33c..0x0041a3ba); no
+    // puzzle function reads them, the view after the puzzle does.
+    e.poll_view_keys(false);
     if m.right {
         e.bar.right_pressed(e.section_play, e.escape_request);
     }

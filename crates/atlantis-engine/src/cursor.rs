@@ -179,9 +179,57 @@ pub fn warp_cursor_step(st: &mut WarpCursorState, input: &WarpCursorInput) -> Wa
     res
 }
 
+/// One warp frame of a build that calls `FUN_00422fcc` `steps` times per
+/// frame: the reference build (atlantis-cd-en-714240) calls it at step 10
+/// (`FUN_0041bfa0` @ 0x0041c535), before the back buffer `[0x004960d8]` is
+/// copied to the surface (0x0041c5a4), and again through `FUN_0041afd0`
+/// (0x0041c5ed -> 0x0041b050), after the copy, under the same gates; both
+/// draw into `[0x004960d8]`, and the next frame's render (0x0041c403)
+/// overwrites the second sprite before any copy. So the animation advances
+/// `steps` times and the frame shows the first call's sprite (the 1997
+/// builds call it once, atlantis-cd-en-688128 `FUN_0041bbd8`). Nothing
+/// changes the targets between the calls: the same `input` for each.
+pub fn warp_cursor_frame(
+    st: &mut WarpCursorState,
+    input: &WarpCursorInput,
+    steps: u8,
+) -> WarpCursorResult {
+    let shown = warp_cursor_step(st, input);
+    for _ in 1..steps.max(1) {
+        warp_cursor_step(st, input);
+    }
+    shown
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // The sprites the reference build shows: the first of the two
+    // FUN_00422fcc calls of each warp frame (0x0041c535, then 0x0041c5ed
+    // after the copy at 0x0041c5a4). Navigate never shows 10, 12, 14;
+    // object never 19, 21; the click animation 3, 5, 7, 5, 3, 1.
+    #[test]
+    fn two_calls_a_frame_show_every_second_sprite() {
+        let frames = |zone: u32, id: u32, click: bool, steps: u8| -> Vec<i32> {
+            let mut st = WarpCursorState {
+                click_anim: click,
+                ..WarpCursorState::default()
+            };
+            let input = WarpCursorInput {
+                zone,
+                id,
+                ..WarpCursorInput::default()
+            };
+            (0..8)
+                .map(|_| warp_cursor_frame(&mut st, &input, steps).sprite)
+                .collect()
+        };
+        assert_eq!(frames(12, 0, false, 2), [9, 11, 13, 13, 11, 9, 11, 13]);
+        assert_eq!(frames(0, 300, false, 2), [18, 20, 22, 20, 18, 20, 22, 20]);
+        assert_eq!(frames(12, 0, true, 2), [3, 5, 7, 5, 3, 1, 10, 12]);
+        assert_eq!(frames(12, 0, false, 1), [9, 10, 11, 12, 13, 14, 13, 12]);
+    }
 
     // CURSEURS.SPR sprite drawn on 16 consecutive frames, -1 = none.
     // Original: FUN_00422fcc emulated for both look modes (0x004960c8 = 0

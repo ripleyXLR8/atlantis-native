@@ -253,6 +253,24 @@ fn double_click_matches_original() {
     let mut none = TurnDoubleClick::default();
     assert!(!none.press(10, 320, 240, 5, false));
     assert!(!none.flag);
+    // A press of a poll that does not pump (a line's, 0x0041a2b5) queues
+    // the message; the next pump tests the state of its moment; a clear
+    // after a pumping poll drops it.
+    let mut queued = TurnDoubleClick::default();
+    queued.first_press(1000, 320, 240);
+    assert!(queued.queue_press(1100, 320, 240));
+    assert!(!queued.flag);
+    queued.dispatch(5, false);
+    assert!(queued.flag);
+    queued.flag = false; // a talking head's end (0x0042f78c)
+    queued.dispatch(5, false);
+    assert!(!queued.flag);
+    let mut dropped = TurnDoubleClick::default();
+    dropped.first_press(1000, 320, 240);
+    assert!(dropped.queue_press(1100, 320, 240));
+    dropped.clear();
+    dropped.dispatch(5, false);
+    assert!(!dropped.flag);
 }
 
 /// Off-node points of `FUN_0045166f`: at (320, 240) x & 15 = y & 15 = 0,

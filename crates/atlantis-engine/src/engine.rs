@@ -394,6 +394,12 @@ pub struct Engine {
     pub(crate) turn_double_click: crate::turn::TurnDoubleClick,
     pub(crate) cursor_shown: i32,
     pub(crate) cursor_next_ms: u64,
+    /// The view keys F5..F8 held at the polls (`FUN_0041a298`) of the loops
+    /// other than the warp loop's look, one mask per poll
+    /// ([`Engine::poll_view_keys`]): they move the stored view angles
+    /// 0x00bcb59c / 0x00bcb598, which the port's warp holds only once the
+    /// view is set again ([`Engine::stored_view`]).
+    pub(crate) view_key_polls: RefCell<Vec<u8>>,
 
     /// The two IX frame buffers, kept from video to video (malloc(0x12c000)
     /// @ 0x00418f83).
@@ -530,6 +536,7 @@ impl Engine {
             turn_double_click: Default::default(),
             cursor_shown: CURSOR_UNSET,
             cursor_next_ms: 0,
+            view_key_polls: RefCell::new(Vec::new()),
             ix_buffers: Vec::new(),
             ambient,
             ambient_out,
@@ -776,8 +783,11 @@ impl Engine {
         self.vars.set("time2", self.clocks.timer_value(2, now));
     }
 
-    /// Sets the view angles (an /INIT AngleWarpX / AngleWarpY, a test).
+    /// Sets the view angles (an /INIT AngleWarpX / AngleWarpY, a test). It
+    /// writes 0x00bcb59c / 0x00bcb598: the view keys polled before it are
+    /// overwritten.
     pub fn set_view(&mut self, alpha: f32, beta: f32) {
+        self.view_key_polls.borrow_mut().clear();
         self.warp.set_alpha(alpha);
         self.warp.set_beta(beta);
     }
@@ -1135,7 +1145,7 @@ impl Engine {
             return;
         }
         while self.sys.poll_event().is_some() {}
-        self.turn_double_click.flag = false;
+        self.turn_double_click.clear();
         self.escape_request = false;
         self.bar.flags_reset();
     }

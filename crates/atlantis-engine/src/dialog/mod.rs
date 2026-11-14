@@ -71,6 +71,8 @@ const N: usize = SCREEN_W * SCREEN_H;
 #[derive(Default)]
 struct FrameInput {
     left_press: bool,
+    /// Where the first left press was.
+    left_at: Option<(i32, i32)>,
     right_press: bool,
     escape: bool,
     enter: bool,
@@ -82,8 +84,12 @@ fn poll_input(e: &Engine) -> FrameInput {
         match ev {
             Input::MouseDown {
                 button: MouseButton::Left,
-                ..
-            } => fi.left_press = true,
+                x,
+                y,
+            } => {
+                fi.left_press = true;
+                fi.left_at.get_or_insert((x, y));
+            }
             Input::MouseDown {
                 button: MouseButton::Right,
                 ..
@@ -444,6 +450,9 @@ impl Dialogs {
         // from the kept angles without moving them; explicit header angles
         // move them; a voice-only line redraws at them; after the line the
         // view goes back to them.
+        // The stored angles 0x00bcb59c / 0x00bcb598, the view keys of the
+        // earlier polls included.
+        e.apply_view_keys();
         let kept_f = (e.warp.alpha(), e.warp.beta());
         let kept = Angles {
             alpha: f64::from(kept_f.0),
@@ -516,8 +525,16 @@ impl Dialogs {
                 e.warp.set_hfov(saved_fov);
             }
         }
-        // FUN_00451915(0x00bcb59c, 0x00bcb598) after every line (0x00428b5e).
-        set_view(e, view.kept);
+        // FUN_00451915(0x00bcb59c, 0x00bcb598) after every line (0x00428b5e):
+        // the kept angles as the view keys of the line's polls moved them.
+        let after = e.take_view_keys_over((view.kept.alpha as f32, view.kept.beta as f32));
+        set_view(
+            e,
+            Angles {
+                alpha: f64::from(after.0),
+                beta: f64::from(after.1),
+            },
+        );
         e.emit(Event::LinePlayed {
             section: req.section,
             letter: req.letter,
@@ -599,7 +616,6 @@ impl Dialogs {
         let mut player = LinePlayer {
             talking_head,
             voice_off_step: l.voice_off && !talking_head,
-            still_cursor: None,
             kept_screen: l.keep_screen.then(|| e.sys.screen.borrow().clone()),
             kept_hd: l.keep_screen && e.sys.hd_shown(),
             hd: LineHd::default(),
@@ -636,7 +652,11 @@ impl Dialogs {
             section_play: e.section_play,
             ..VideoSkipState::default()
         };
-        drain(e).await;
+        // No wait for the buttons (FUN_0042ee88, FUN_00430258 and
+        // FUN_004305e8 go straight to the voice and the frames): a button
+        // still held from the press that ended the previous line is no
+        // press (FUN_0042e624's latch; the engine's press events are those
+        // edges).
         // FUN_00430258 lowers the music when no fade runs (@ 0x0043027f) and
         // raises it once the voice has played (@ 0x004305a6); without the
         // voice it returns before, leaving the music low.
@@ -669,10 +689,12 @@ impl Dialogs {
                     start_voice(e, &mut voice);
                 }
                 // FUN_00430258 presents its still frame through FUN_0041afd0,
-                // which steps the warp cursor over what is under the pointer
-                // and draws it (off0 / off1 present without it).
+                // which steps the warp cursor over what is under the pointer;
+                // its sprite goes to the back buffer after the copy, so the
+                // frame shows none (Engine::still_frame_cursor_step). off0 /
+                // off1 do not call it.
                 if l.voice_off && !talking_head {
-                    player.still_cursor = e.still_frame_cursor();
+                    e.still_frame_cursor_step();
                 }
                 loop {
                     if e.should_abort() {
@@ -699,6 +721,22 @@ impl Dialogs {
                     e.ambient_frame();
                     e.poll_new_sound().await;
                     let fi = poll_input(e);
+                    // FUN_0041a298's view keys (0x0041a33c..0x0041a3ba).
+                    e.poll_view_keys(fi.left_press);
+                    // A press can be the second of a double click whose
+                    // first ended the warp loop: Windows queues
+                    // WM_LBUTTONDBLCLK, which a later poll pumps (this
+                    // poll returns before its pump, 0x0041a2b5).
+                    let now = e.sys.millis();
+                    match fi.left_at {
+                        Some((x, y)) => {
+                            e.turn_double_click.queue_press(now, x, y);
+                        }
+                        None => {
+                            let (mode, menu) = (e.cursor_state.mode, e.escape_request);
+                            e.turn_double_click.dispatch(mode, menu);
+                        }
+                    }
                     // FUN_0041a298 in both line loops: a right press sets
                     // 0x00496120 and toggles the bar request; a left press
                     // in the same poll returns first (0x0041a2b5).
@@ -708,7 +746,7 @@ impl Dialogs {
                     // The bar request as the right presses left it.
                     escape_poll.bar_request = e.bar.request;
                     let escape = fi.escape && escape_poll.poll(false, false, true);
-                    if escape || fi.left_press || e.sys.buttons().0 {
+                    if escape || fi.left_press {
                         // With a talking head Escape also sets the dialog-skip
                         // flag 0x00496134 that FUN_0042844c reads after the
                         // line.
@@ -739,6 +777,11 @@ impl Dialogs {
             }
         }
         out.frames = player.shown;
+        // The talking head clears the double-click flag at its end
+        // (FUN_0042ee88 @ 0x0042f78c).
+        if talking_head {
+            e.turn_double_click.flag = false;
+        }
         if talking_head {
             e.sprites_hide_npcs = false;
             e.recomposite_sprite_layer();
@@ -844,6 +887,7 @@ impl Dialogs {
             }
             e.sys.frame().await;
             let fi = poll_input(e);
+            e.poll_view_keys(fi.left_press);
             // FUN_0041a298 (0x00426389): Escape clears 0x00496124 and sets
             // the menu request (no talking head, bow mode, bar request or
             // object in hand); the menu goes on until a left click
@@ -923,7 +967,6 @@ impl Dialogs {
         }
         e.sys.screen.borrow_mut().copy_from_slice(&frame);
         e.sys.frame().await;
-        drain(e).await;
 
         // The narrator's voice: wait for it, or hold the image 5 s without
         // it (game_over_wait_ends). FUN_0041a298 polls with the flags of the
@@ -953,6 +996,7 @@ impl Dialogs {
             // (when it would open the menu).
             while !e.should_abort() {
                 let fi = poll_input(e);
+                e.poll_view_keys(fi.left_press);
                 let done = !e.sys.mixer.is_playing(v);
                 if game_over_wait_ends(
                     &mut skip,
@@ -974,6 +1018,7 @@ impl Dialogs {
             let start = e.sys.millis();
             while !e.should_abort() {
                 let fi = poll_input(e);
+                e.poll_view_keys(fi.left_press);
                 let elapsed = e.sys.millis() - start;
                 if game_over_wait_ends(
                     &mut skip,
@@ -1044,9 +1089,6 @@ pub fn off1_screen(ix_buffers: &[u16]) -> Vec<u16> {
 struct LinePlayer {
     talking_head: bool,
     voice_off_step: bool,
-    /// The cursor `FUN_00430258`'s one present (FUN_0041afd0 @ 0x00430550)
-    /// leaves on its still frame: a CURSEURS.SPR sprite and where.
-    still_cursor: Option<(usize, (i32, i32))>,
     /// off0: the screen as it stood, the subtitle's background; off1: the
     /// screen buffer, once the voice has loaded.
     kept_screen: Option<Vec<u16>>,
@@ -1369,12 +1411,6 @@ impl LinePlayer {
         }
         let under = (e.sys.hd_tile().is_some() && !sub_lines.is_empty()).then(|| bg.clone());
         font.draw_subtitles(&mut bg, SCREEN_W, SCREEN_H, sub_lines, 0);
-        if let Some(spr) = self
-            .still_cursor
-            .and_then(|(i, p)| e.cursor_sprites.get(i).map(|s| (s, p)))
-        {
-            spr.0.draw(&mut bg, SCREEN_W, SCREEN_H, spr.1 .0, spr.1 .1);
-        }
         if let Some(under) = under {
             record_subtitles(e, font, &under, &bg, sub_lines, 0, 0);
         }
@@ -1970,7 +2006,7 @@ mod still_cursor_tests {
         let shot = Rc::new(RefCell::new(None));
         let s2 = shot.clone();
         let ran = with_engine(
-            "voice_only_still_frame_carries_the_cursor",
+            "voice_only_still_frame_shows_no_cursor",
             move |mut e| async move {
                 let mut s = Scripts::new();
                 e.new_game(&mut s, false).await;
@@ -2030,16 +2066,108 @@ mod still_cursor_tests {
     }
 
     /// `FUN_00430258` presents its still frame once through `FUN_0041afd0`
-    /// (@ 0x00430550), which draws the warp cursor over what is under the
-    /// pointer (here a navigation zone) unless the bar request (or another
-    /// of its flags) is set.
+    /// (@ 0x00430550), whose `FUN_00422fcc` draws the cursor into the back
+    /// buffer after the copy to the surface (@ 0x004304eb): the frame shows
+    /// no cursor, whether `FUN_0041afd0` steps it (here a navigation zone
+    /// under the pointer) or not (the bar request set).
     #[test]
-    fn voice_only_still_frame_carries_the_cursor() {
-        let Some(with) = off_line_screen(false) else {
+    fn voice_only_still_frame_shows_no_cursor() {
+        let Some(stepped) = off_line_screen(false) else {
             return;
         };
-        let without = off_line_screen(true).unwrap();
-        assert_ne!(with, without);
+        let gated = off_line_screen(true).unwrap();
+        assert!(stepped == gated, "a cursor sprite on the still frame");
+    }
+}
+
+#[cfg(test)]
+mod view_key_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use super::*;
+    use crate::con_script::ConItem;
+    use crate::puzzle::assets::{poll_flags, PuzzleMouse};
+    use crate::scripts::{resolve_speaker_perso, LineRequest, Scripts};
+    use crate::sys::Key;
+    use crate::test_support::with_engine;
+
+    /// FUN_0041a298 adds 0.034906 rad to 0x00bcb59c on every poll with F5
+    /// held and no new left press (0x0041a2b5, 0x0041a33c): in a puzzle's
+    /// poll, where nothing draws the view, and in a voice-only line's
+    /// polls, after which FUN_0042844c sets the view at the moved angles
+    /// (0x00428b5e). The yaw before, after one puzzle poll, after a puzzle
+    /// poll with a click, and after the line CHAPI001 /2 A.
+    #[test]
+    fn f5_turns_the_stored_view_in_every_poll() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "f5_turns_the_stored_view_in_every_poll",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.set_view(1.0, 0.0);
+                e.sys.push_input(Input::KeyDown(Key::F(5)));
+                while e.sys.poll_event().is_some() {}
+                let mouse = |click| PuzzleMouse {
+                    x: 0,
+                    y: 0,
+                    click,
+                    right: false,
+                    escape: false,
+                };
+                g2.borrow_mut().push(e.stored_view().0);
+                poll_flags(&mut e, &mouse(false));
+                g2.borrow_mut().push(e.stored_view().0);
+                poll_flags(&mut e, &mouse(true));
+                g2.borrow_mut().push(e.stored_view().0);
+                let sec = s.script.sections().iter().find(|x| x.id == 2).cloned();
+                let line = sec
+                    .and_then(|x| {
+                        x.items.into_iter().find_map(|i| match i {
+                            ConItem::Line(l) => Some(l),
+                            _ => None,
+                        })
+                    })
+                    .expect("CHAPI001 /2");
+                let req = LineRequest {
+                    section: 2,
+                    letter: 'A',
+                    perso: resolve_speaker_perso(&line.speaker),
+                    line,
+                    interactive: false,
+                    inc_perso: 0,
+                };
+                let mut d = Dialogs::new();
+                let start = e.sys.millis();
+                d.play_line(&mut e, &req).await;
+                let polls = (e.sys.millis() - start) / 16;
+                g2.borrow_mut().push(e.warp.alpha());
+                g2.borrow_mut().push(polls as f32);
+            },
+            |sys, _| {
+                let mut out = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut out, 22050, 2);
+            },
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        let step = 0.034906f32;
+        assert!((got[1] - got[0] - step).abs() < 1e-6, "{got:?}");
+        assert_eq!(got[2], got[1], "a poll with a click");
+        // One step a frame of the line (its polls), from the puzzle's.
+        let turned = got[3] - got[1];
+        assert!(got[4] > 10.0, "{got:?}");
+        assert!(
+            turned > step * (got[4] - 2.0) && turned < step * (got[4] + 2.0),
+            "{got:?}"
+        );
     }
 }
 
@@ -2106,6 +2234,148 @@ mod puzzle_latch_tests {
         } else {
             None
         }
+    }
+
+    /// How long the line CHAPI041 /590 B (`[Chat,off]`) plays, in ms, with
+    /// the left button held down (its press seen before the line) until
+    /// 2 s after the start, or not held.
+    fn held_play_ms(held: bool) -> Option<u64> {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_held_button_does_not_hold_the_line_back",
+            move |mut e| async move {
+                if held {
+                    crate::test_support::button(&e.sys, MouseButton::Left, true);
+                    while e.sys.poll_event().is_some() {}
+                }
+                let line = ConLine {
+                    speaker: "Chat".into(),
+                    params: "off".into(),
+                    text: "...".into(),
+                    ..ConLine::default()
+                };
+                let req = LineRequest {
+                    section: 590,
+                    letter: 'B',
+                    line,
+                    perso: 514,
+                    interactive: false,
+                    inc_perso: 0,
+                };
+                let mut d = Dialogs::new();
+                let t0 = e.sys.millis();
+                d.line(&mut e, &req).await;
+                *g2.borrow_mut() = Some(e.sys.millis() - t0);
+            },
+            move |sys, f| {
+                let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut sound, 22050, 2);
+                if held && f == 125 {
+                    crate::test_support::button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            *got.borrow()
+        } else {
+            None
+        }
+    }
+
+    /// No line player waits for the buttons (FUN_0042ee88, FUN_00430258,
+    /// FUN_004305e8), and a held button is no press (the latch of
+    /// FUN_0042e624): a button held from before the line neither holds the
+    /// line back nor ends it.
+    #[test]
+    fn a_held_button_does_not_hold_the_line_back() {
+        let Some(free) = held_play_ms(false) else {
+            return;
+        };
+        let held = held_play_ms(true).unwrap();
+        assert!(free > 300, "{free} ms");
+        assert!(held.abs_diff(free) <= 50, "{held} ms held, {free} ms not");
+    }
+
+    /// The voice-only line CHAPI041 /590 B played after a warp-loop click
+    /// at (320, 240) on a navigation zone (cursor state 5, which the
+    /// line's still-frame step keeps over the same zone), with a second
+    /// press at the same point `after` frames into it; then one turn poll.
+    /// The double-click flag 0x00496118 after the line and after the poll.
+    fn departure_double_click(after: u64) -> Option<(bool, bool)> {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_double_click_ending_a_departure_line_skips_the_video",
+            move |mut e| async move {
+                // A view of place 1 with a navigation zone at (320, 240).
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.pointer.pos = (320, 240);
+                let view = (0..315)
+                    .flat_map(|ia| (-4..=4).map(move |ib| (ia as f32 * 0.02, ib as f32 * 0.1)))
+                    .find(|&(a, b)| {
+                        e.set_view(a, b);
+                        matches!(e.pointer_targets(), (z, 0) if (1..0x200).contains(&z))
+                    })
+                    .expect("a navigation view in place 1");
+                e.set_view(view.0, view.1);
+                e.sys.set_mouse_pos(320, 240);
+                e.cursor_state.mode = 5;
+                let now = e.sys.millis();
+                e.turn_double_click.first_press(now, 320, 240);
+                let line = ConLine {
+                    speaker: "Chat".into(),
+                    params: "off".into(),
+                    text: "...".into(),
+                    ..ConLine::default()
+                };
+                let req = LineRequest {
+                    section: 590,
+                    letter: 'B',
+                    line,
+                    perso: 514,
+                    interactive: false,
+                    inc_perso: 0,
+                };
+                let mut d = Dialogs::new();
+                d.line(&mut e, &req).await;
+                let in_line = e.turn_double_click.flag;
+                e.turn_poll();
+                *g2.borrow_mut() = Some((in_line, e.turn_double_click.flag));
+            },
+            move |sys, f| {
+                let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut sound, 22050, 2);
+                if f == after {
+                    crate::test_support::button(sys, MouseButton::Left, true);
+                } else if f == after + 2 {
+                    crate::test_support::button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            *got.borrow()
+        } else {
+            None
+        }
+    }
+
+    /// A double click on an exit whose second press ends a departure
+    /// line: the press ends the line, and the poll returns before its
+    /// pump (0x0041a2b5), so WM_LBUTTONDBLCLK waits in the queue until the
+    /// turn's poll pumps it; the window procedure sets 0x00496118 with the
+    /// cursor state still 5 (0x00419c79..0x00419c8b), and the move skips
+    /// its video (0x00423f8a). A second press after the double-click time
+    /// is not one.
+    #[test]
+    fn a_double_click_ending_a_departure_line_skips_the_video() {
+        let Some(quick) = departure_double_click(10) else {
+            return;
+        };
+        assert_eq!(quick, (false, true));
+        assert_eq!(departure_double_click(40), Some((false, false)));
     }
 
     /// The voice-only lines that follow a puzzle in which Escape was

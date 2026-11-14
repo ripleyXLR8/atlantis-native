@@ -580,7 +580,10 @@ fn new_game_to_the_first_dialog() {
     let mut found = None;
     for _ in 0..400 {
         let seen = trace.borrow().len();
-        h.steps(20);
+        h.steps(15);
+        let before = h.sys.screen.borrow().clone();
+        h.steps(5);
+        let moving = *h.sys.screen.borrow() != before;
         let hit = trace.borrow()[seen..].iter().find_map(|e| match e {
             Event::Line {
                 section, letter, ..
@@ -596,7 +599,11 @@ fn new_game_to_the_first_dialog() {
                 }
             }
         }
-        if !h.sys.mouse_locked() {
+        // Clicks skip the films (a moving screen) only: a press in the
+        // pause after one (the StopMusik fade polls nothing, FUN_0042a100
+        // @ 0x0042aed0) is a press edge for the next line's first poll,
+        // which it would end.
+        if !h.sys.mouse_locked() && moving {
             h.click(320, 240);
         }
     }

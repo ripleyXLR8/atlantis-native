@@ -373,7 +373,7 @@ impl Engine {
                 // `hd_show_view_over`).
                 self.sys.hd_video.borrow_mut().t = 1.0;
             }
-            self.turn_double_click.flag = false;
+            self.turn_double_click.clear();
             // FUN_00423ad8 resets the input flags after the video block
             // whether the video played or not (a double click):
             // 0x00496118, 0x0049611c, 0x00496120, 0x00496138 = 0,
@@ -413,6 +413,9 @@ impl Engine {
         if !self.warp_loaded {
             return;
         }
+        // The turn starts from the stored angles (the view keys of the
+        // departure's lines included).
+        self.apply_view_keys();
         let mut turn = TransitionTurn::new(
             Warp::exe_pi(),
             self.warp.alpha(),
@@ -467,7 +470,7 @@ impl Engine {
     }
 
     /// The turn's input poll (`FUN_0041a298` after each turn frame).
-    fn turn_poll(&mut self) {
+    pub(crate) fn turn_poll(&mut self) {
         let (mut left, mut right, mut escape) = (None, false, false);
         while let Some(ev) = self.sys.poll_event() {
             match ev {
@@ -494,6 +497,10 @@ impl Engine {
         if left.is_some() {
             return;
         }
+        // The message pump: a WM_LBUTTONDBLCLK queued during the departure
+        // scan's lines.
+        let (mode, menu) = (self.cursor_state.mode, self.escape_request);
+        self.turn_double_click.dispatch(mode, menu);
         if right {
             self.bar
                 .right_pressed(self.section_play, self.escape_request);
@@ -737,6 +744,7 @@ impl Engine {
                                 _ => {}
                             }
                         }
+                        self.poll_view_keys(left);
                         run.poll(left, right, escape);
                     }
                     Some(Err(e)) => {
@@ -940,7 +948,7 @@ impl Engine {
             self.play_transition_video(&t.video, Some((cur, cur)), TRANSITION_FRAME_MS)
                 .await;
         }
-        self.turn_double_click.flag = false;
+        self.turn_double_click.clear();
         // Then FUN_00421b4c (no load) and FUN_0042431c (@ 0x00424072):
         // the place's sprites again, from frame 0.
         self.composite_npc_sprites().await;

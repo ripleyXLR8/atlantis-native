@@ -189,6 +189,9 @@ impl Engine {
                 _ => {}
             }
         }
+        // FUN_0041a298's view keys (0x0041a33c..0x0041a3ba), in the bar and
+        // menu loops as everywhere.
+        self.poll_view_keys(mi.left_press);
         mi
     }
 

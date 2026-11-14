@@ -24,7 +24,7 @@
 
 use atlantis_data::sprite_list::npc_hit_test;
 
-use crate::cursor::{warp_cursor_step, WarpCursorInput};
+use crate::cursor::{warp_cursor_frame, warp_cursor_step, WarpCursorInput};
 use crate::engine::{Abort, Engine, CURSOR_UNSET, WARP_ABORT};
 use crate::hooks::ScriptHooks;
 use crate::look::warp_look_frame;
@@ -35,17 +35,43 @@ use crate::warp::{SCREEN_H, SCREEN_W};
 /// held (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba).
 const VIEW_KEY_STEP: f64 = 0.034906;
 
-/// The cursor animation's step (the port's pace of `FUN_00422fcc`), for
-/// the reference's two steps per warp frame (`FUN_0041bfa0` draws the
-/// cursor at 0x0041c48e and again at 0x0041c535).
-const CURSOR_STEP_MS: u64 = 80;
+/// The keys of one poll ([`Engine::poll_view_keys`]): F5, F6, F8, F7.
+const VIEW_F5: u8 = 1;
+const VIEW_F6: u8 = 2;
+const VIEW_F8: u8 = 4;
+const VIEW_F7: u8 = 8;
 
-/// The step for a build that advances the animation `steps` times per
-/// warp frame: the 1997 build draws it once (atlantis-cd-en-688128
-/// FUN_0041bbd8), so its animation runs at half the reference's rate.
-fn cursor_step_ms(steps: u8) -> u64 {
-    CURSOR_STEP_MS * 2 / u64::from(steps.clamp(1, 2))
+/// The stored angles after the polls `polls`, in the order of
+/// `FUN_0041a298` (0x0041a33c..0x0041a3ba): alpha + step for F5, - step
+/// for F6, beta + step for F8, - step for F7, each added in double and
+/// stored to the float (no wrap or clamp: `FUN_00451915` does that when
+/// the view is set).
+fn view_keys_over(polls: &[u8], (mut alpha, mut beta): (f32, f32)) -> (f32, f32) {
+    for &k in polls {
+        if k & VIEW_F5 != 0 {
+            alpha = (f64::from(alpha) + VIEW_KEY_STEP) as f32;
+        }
+        if k & VIEW_F6 != 0 {
+            alpha = (f64::from(alpha) - VIEW_KEY_STEP) as f32;
+        }
+        if k & VIEW_F8 != 0 {
+            beta = (f64::from(beta) + VIEW_KEY_STEP) as f32;
+        }
+        if k & VIEW_F7 != 0 {
+            beta = (f64::from(beta) - VIEW_KEY_STEP) as f32;
+        }
+    }
+    (alpha, beta)
 }
+
+/// The port's pace of the cursor (the warp loop is not paced in the
+/// original; atlantis-re decision 0013): one warp frame's cursor calls
+/// every 160 ms.
+/// The reference build calls `FUN_00422fcc` twice a frame (0x0041c535,
+/// then through `FUN_0041afd0` @ 0x0041c5ed) and shows the first
+/// ([`warp_cursor_frame`]), so its animation steps every 80 ms; the 1997
+/// builds call it once (atlantis-cd-en-688128 FUN_0041bbd8), every 160 ms.
+const CURSOR_FRAME_MS: u64 = 160;
 
 /// What the loop read from the events of a frame.
 #[derive(Default)]
@@ -74,6 +100,72 @@ impl Engine {
             }
         }
         fi
+    }
+
+    /// The view keys at a poll of `FUN_0041a298` (0x0041a33c..0x0041a3ba):
+    /// F5 / F6 turn and F8 / F7 tilt the stored view angles 0x00bcb59c /
+    /// 0x00bcb598 by [`VIEW_KEY_STEP`] on every poll they are held (not
+    /// edge keys), unless the poll saw a new left press, which returns
+    /// before (0x0041a2b5). Every polling loop does it: the warp loop, the
+    /// dialog lines, the subject menu, the game-over screen, the puzzles,
+    /// the bar, the menus and the videos. Only `FUN_0041bfa0`,
+    /// `FUN_004212cc`, `FUN_0042844c`, `FUN_0042a100`, `FUN_00430258` and
+    /// `FUN_00451915` read or write the angles otherwise, so outside the
+    /// warp loop nothing turns until the view is set from them again.
+    pub(crate) fn poll_view_keys(&self, left_press: bool) {
+        self.poll_view_keys_with(left_press, false);
+    }
+
+    /// [`Engine::poll_view_keys`]; `arrows` adds the arrow keys
+    /// ([`crate::enhancements::Enhancements::arrow_keys`], the warp loop
+    /// only): left F5, right F6, up F7, down F8.
+    fn poll_view_keys_with(&self, left_press: bool, arrows: bool) {
+        if left_press {
+            return;
+        }
+        let held = |f: u8, arrow: Key| {
+            self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow))
+        };
+        let mut k = 0;
+        for (bit, f, arrow) in [
+            (VIEW_F5, 5, Key::Left),
+            (VIEW_F6, 6, Key::Right),
+            (VIEW_F8, 8, Key::Down),
+            (VIEW_F7, 7, Key::Up),
+        ] {
+            if held(f, arrow) {
+                k |= bit;
+            }
+        }
+        if k != 0 {
+            self.view_key_polls.borrow_mut().push(k);
+        }
+    }
+
+    /// The stored view angles 0x00bcb59c / 0x00bcb598: the warp's, moved
+    /// by the view keys polled since it was last set.
+    pub(crate) fn stored_view(&self) -> (f32, f32) {
+        view_keys_over(
+            &self.view_key_polls.borrow(),
+            (self.warp.alpha(), self.warp.beta()),
+        )
+    }
+
+    /// `angles` moved by the view keys polled since, which are used up: the
+    /// stored angles after a line whose view the port set to its camera.
+    pub(crate) fn take_view_keys_over(&self, angles: (f32, f32)) -> (f32, f32) {
+        view_keys_over(&self.view_key_polls.take(), angles)
+    }
+
+    /// The warp set to the stored view angles (where the original reads
+    /// 0x00bcb59c / 0x00bcb598 to set the view or keep it).
+    pub(crate) fn apply_view_keys(&mut self) {
+        if self.view_key_polls.borrow().is_empty() {
+            return;
+        }
+        let (a, b) = self.take_view_keys_over((self.warp.alpha(), self.warp.beta()));
+        self.warp.set_alpha(a);
+        self.warp.set_beta(b);
     }
 
     /// Waits for the buttons to be released (the loops drain the click
@@ -218,9 +310,11 @@ impl Engine {
             self.draw_guests(&mut s, None);
             *self.sys.screen.borrow_mut() = s;
         }
-        // No cursor in bow mode (0x0041c4b4); its animation state does not
-        // advance.
-        if !self.bow_mode {
+        // No cursor in bow mode (0x0041c4b4) or with the bar request a timer
+        // section of this frame left (0x0041c4ca: 0x004960c4 == 0; the bar
+        // opens at the frame's end, here at the next pass's start); its
+        // animation state does not advance.
+        if !self.bow_mode && !self.bar.request {
             self.step_warp_cursor();
             self.draw_cursor_sprite();
         }
@@ -229,9 +323,10 @@ impl Engine {
     /// `FUN_00422fcc` in the warp frame, after the look, the timers and the
     /// render: its own hit tests (`FUN_00422bb0`, `FUN_00422d5c` at its
     /// entry) at this frame's view and pointer, which the next click acts
-    /// on. The animation advances at the port's pace (one step per
-    /// [`cursor_step_ms`]); a change of mode (nothing, navigate, talk,
-    /// object, click) is shown at once.
+    /// on. One frame of calls ([`warp_cursor_frame`]: the build's
+    /// `warp_cursor_steps`, the first shown) every [`CURSOR_FRAME_MS`]; a
+    /// change of mode (nothing, navigate, talk, object, click), which the
+    /// first call of a frame sees, is shown at once and starts a frame.
     fn step_warp_cursor(&mut self) {
         let (zone, id) = self.pointer_targets();
         let input = WarpCursorInput {
@@ -243,15 +338,15 @@ impl Engine {
             id_rule: self.game.exe.build.cursor_id_rule,
         };
         let now = self.sys.millis();
-        let mut next = self.cursor_state;
-        let sprite = warp_cursor_step(&mut next, &input).sprite;
+        let mut first = self.cursor_state;
+        warp_cursor_step(&mut first, &input);
         if self.cursor_shown == CURSOR_UNSET
             || now >= self.cursor_next_ms
-            || next.mode != self.cursor_state.mode
+            || first.mode != self.cursor_state.mode
         {
-            self.cursor_state = next;
-            self.cursor_shown = sprite;
-            self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
+            let steps = self.game.exe.build.warp_cursor_steps;
+            self.cursor_shown = warp_cursor_frame(&mut self.cursor_state, &input, steps).sprite;
+            self.cursor_next_ms = now + CURSOR_FRAME_MS;
         }
     }
 
@@ -279,20 +374,30 @@ impl Engine {
         (u32::from(place.hit_test(px as i16, py as i16)), perso)
     }
 
-    /// `FUN_0041afd0`'s cursor, for a still frame it presents outside the
-    /// warp loop (the voice-only line, `FUN_00430258` @ 0x00430550): with
-    /// 0x004960c0, GAMEOVER, bow mode, 0x00496188, the bar request, the
-    /// menu request, 0x00496154 and 0x0049616c all 0
-    /// (0x0041afe8..0x0041b050), one step of `FUN_00422fcc` over what is
-    /// under the pointer, the sprite to draw at the pointer.
-    pub(crate) fn still_frame_cursor(&mut self) -> Option<(usize, (i32, i32))> {
+    /// `FUN_0041afd0`'s cursor step, for the still frame of a voice-only
+    /// line (`FUN_00430258` @ 0x00430550): with 0x004960c0, GAMEOVER, bow
+    /// mode, 0x00496188, the bar request, the menu request, 0x00496154 and
+    /// 0x0049616c all 0 (0x0041afe8..0x0041b050), one step of
+    /// `FUN_00422fcc` over what is under the pointer. True when it stepped.
+    ///
+    /// Its sprite is not shown: `FUN_00422fcc` draws into the back buffer
+    /// `[0x004960d8]` (`push dword ptr [0x4960d8]` @ 0x00423394, 0x004234eb,
+    /// 0x004236a6; a heap block of its own, `malloc(0x96000)` stored @
+    /// 0x00418f9c), and `FUN_00430258` has already copied that buffer to
+    /// the surface (`FUN_00410f36` @ 0x004304eb) before it draws the
+    /// subtitle and calls `FUN_0041afd0`, whose present (`FUN_004337d4` @
+    /// 0x0041b055) shows the surface. Its wait loop (0x00430555..0x0043058d)
+    /// only polls. So the still frame shows no cursor, with Flip
+    /// (fullscreen) or Blt (windowed) alike; the system pointer is hidden in
+    /// fullscreen (WM_SETCURSOR, `SetCursor(NULL)` @ 0x00419d1a).
+    pub(crate) fn still_frame_cursor_step(&mut self) -> bool {
         if self.give_scan
             || self.bow_mode
             || self.vars.get("gameover") != 0
             || self.bar.request
             || self.escape_request
         {
-            return None;
+            return false;
         }
         let (zone, perso) = self.pointer_targets();
         let input = WarpCursorInput {
@@ -303,8 +408,8 @@ impl Engine {
             edge_scroll: false,
             id_rule: self.game.exe.build.cursor_id_rule,
         };
-        let sprite = warp_cursor_step(&mut self.cursor_state, &input).sprite;
-        usize::try_from(sprite).ok().map(|s| (s, self.pointer.pos))
+        warp_cursor_step(&mut self.cursor_state, &input);
+        true
     }
 
     /// The warp loop `FUN_0041bfa0`: the view until a click. Returns the
@@ -321,7 +426,7 @@ impl Engine {
         // The entry block clears 0x00496120 and 0x004960c4 (0x0041bff4),
         // and the double-click flag 0x00496118 (0x0041bfc2).
         self.bar.flags_reset();
-        self.turn_double_click.flag = false;
+        self.turn_double_click.clear();
         // No wait at the entry (0x0041bfb8..0x0041c01e; the first frame
         // polls FUN_0041a298 @ 0x0041c5f2). A click is a press edge
         // (FUN_0042e624's latch): a button still down from a press an
@@ -336,6 +441,8 @@ impl Engine {
         self.mark_pointer_mouse();
         self.sys.set_mouse_locked(true);
         self.sys.take_mouse_relative();
+        // The previous point of the look delta (0x0041c003 / 0x0041c00d).
+        self.pointer.loop_entry();
 
         self.cursor_shown = CURSOR_UNSET;
         // The arrow frame starts at 0 on every entry (0x0041c017).
@@ -344,13 +451,18 @@ impl Engine {
         self.ambient_enter_place().await;
 
         let mut left_pressed = false;
+        // The motion of a poll that saw a left press edge: FUN_0041a298
+        // returns before its message pump (0x0041a2b5), so the
+        // WM_MOUSEMOVE waits for the next poll.
+        let mut unpumped = (0, 0);
         while !left_pressed && !exit {
             let fi = self.poll_frame_input();
             // Each frame starts by clearing the double-click flag
             // (0x0041c04a).
-            self.turn_double_click.flag = false;
+            self.turn_double_click.clear();
             // This frame's relative motion (x right, y down).
             let (motion_x, motion_y) = self.sys.take_mouse_relative();
+            unpumped = (unpumped.0 + motion_x, unpumped.1 + motion_y);
             // A press edge (FUN_0042e624): a held button is no click.
             let mut clicked = fi.left_press;
             // Bow mode consumes the click (0x0041c631): no zone or
@@ -426,6 +538,9 @@ impl Engine {
                         .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
                     self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
+                    // The loop entered again (0x0041c003 / 0x0041c00d).
+                    unpumped = (0, 0);
+                    self.pointer.loop_entry();
                     // The original's warp loop returns the clicked character
                     // (0x0041c71e) after this frame's timers (0x0041c369);
                     // the place loop runs the conversation (0x00423c1c) and
@@ -455,6 +570,12 @@ impl Engine {
             }
             self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
 
+            // The poll's WM_MOUSEMOVE (0x00419c14) moves the pointer.
+            if !fi.left_press {
+                let (dx, dy) = std::mem::take(&mut unpumped);
+                self.pointer.follow(dx, dy);
+            }
+
             // A right click opens the inventory bar (FUN_0041a298 toggles
             // 0x004960c4, the loop opens the bar @ 0x0041c6d2), also when a
             // right press during the previous frame's timer section left
@@ -463,8 +584,14 @@ impl Engine {
             // no bow, no request and an empty hand (0x0041c5f7).
             // A right press edge: a held right button does not open the bar
             // again.
+            // The frame's poll (0x0041c5f2) toggles the request a timer
+            // section left on a right press (FUN_0041a298 @ 0x0041a2f2..
+            // 0x0041a337, read only without a left press edge, 0x0041a2b5),
+            // and the inner loop ends only if it is still 1: a right press
+            // right after such a request cancels it.
             let pending = self.bar.warp_frame_start();
-            let mut bar = !exit && (fi.right_press || pending);
+            let toggled = fi.right_press && !fi.left_press;
+            let mut bar = !exit && (pending != toggled);
             if bar && self.bow_mode {
                 // In bow mode the request only lowers the bow
                 // (0x0041c6af..0x0041c6c8: FUN_0042d368).
@@ -497,7 +624,7 @@ impl Engine {
                     // bar closed with the pointer at (320, 240) (FUN_0042c098
                     // @ 0x0042c275).
                     if !moved && self.game_over_left_set() {
-                        self.pointer.recentre();
+                        self.pointer.bar_closed();
                         self.pending_no_click_exit = Some(true);
                     }
                     action = WARP_ABORT;
@@ -505,9 +632,11 @@ impl Engine {
                 } else {
                     self.sys.set_mouse_locked(true);
                     self.sys.take_mouse_relative();
-                    // FUN_0042c098 closes the bar with the pointer at
-                    // (320, 240) (@ 0x0042c275).
-                    self.pointer.recentre();
+                    // FUN_0042c098 closes the bar with the pointer and the
+                    // previous point at (320, 240) (@ 0x0042c275,
+                    // 0x0042c28e): the look delta of the next frame is 0.
+                    unpumped = (0, 0);
+                    self.pointer.bar_closed();
                     self.sys
                         .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
                     self.mark_pointer_mouse();
@@ -554,36 +683,25 @@ impl Engine {
             }
 
             // The view: FUN_0041bfa0 steps 2..5. The stored angles first
-            // take F5 / F6 (turn) and F8 / F7 (tilt) when the poll
-            // (FUN_0041a298 at the end of the previous frame) saw no new left
-            // press (@ 0x0041a2b5: VK_LBUTTON is an edge key, so a held
-            // button does not stop them; only bow mode keeps a press in
-            // the loop); the port
-            // adds the arrow keys (Enhancements::arrow_keys), which the
+            // take F5 / F6 (turn) and F8 / F7 (tilt) of the poll
+            // (FUN_0041a298 at the end of the previous frame) when it saw no
+            // new left press (@ 0x0041a2b5: VK_LBUTTON is an edge key, so a
+            // held button does not stop them; only bow mode keeps a press in
+            // the loop), and of the polls of the loops that ran since; the
+            // port adds the arrow keys (Enhancements::arrow_keys), which the
             // original's view ignores, as the same keys: left F5, right F6,
             // up F7, down F8 (a larger beta looks down).
-            let (mut alpha, mut beta) = (self.warp.alpha(), self.warp.beta());
-            if !fi.left_press {
-                let arrows = self.enhancements().arrow_keys;
-                let held = |f: u8, arrow: Key| {
-                    self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow))
-                };
-                if held(5, Key::Left) {
-                    alpha = (f64::from(alpha) + VIEW_KEY_STEP) as f32;
-                }
-                if held(6, Key::Right) {
-                    alpha = (f64::from(alpha) - VIEW_KEY_STEP) as f32;
-                }
-                if held(8, Key::Down) {
-                    beta = (f64::from(beta) + VIEW_KEY_STEP) as f32;
-                }
-                if held(7, Key::Up) {
-                    beta = (f64::from(beta) - VIEW_KEY_STEP) as f32;
-                }
-            }
-            // OMNI 3D MODE 1, the original's default (0x004960ac == 0),
-            // gives dy = prevY - y; MODE 2 y - prevY.
+            self.poll_view_keys_with(fi.left_press, self.enhancements().arrow_keys);
+            let (mut alpha, mut beta) = self.stored_view();
+            self.view_key_polls.borrow_mut().clear();
+            // The delta is previous point minus pointer (step 3,
+            // 0x0041c1c3..0x0041c20d): the motion since the last step 5, the
+            // loop entry or the bar close, the WM_MOUSEMOVEs of a timer
+            // section's lines or of the in-game menu included. OMNI 3D MODE
+            // 1, the original's default (0x004960ac == 0), gives dy = prevY -
+            // y; MODE 2 y - prevY.
             let mode2 = self.settings.omni3d_mode2;
+            let (motion_x, motion_y) = self.pointer.motion();
             let look = warp_look_frame(
                 &mut self.momentum,
                 &mut alpha,
@@ -601,17 +719,11 @@ impl Engine {
             self.vars.set("anglewarpx", look.angle_warp_x);
             self.vars.set("anglewarpy", look.angle_warp_y);
             self.set_view(alpha, beta);
-            // The pointer follows the mouse, and goes back to the centre when
-            // the new (unclamped) angles differ from the previous frame's
-            // (step 5, @ 0x0041c2bb..0x0041c363).
-            self.pointer.frame(
-                motion_x,
-                motion_y,
-                look.new_alpha,
-                look.new_beta,
-                alpha,
-                beta,
-            );
+            // The pointer goes back to the centre when the new (unclamped)
+            // angles differ from the previous frame's, and the previous
+            // point takes it (step 5, @ 0x0041c2bb..0x0041c363).
+            self.pointer
+                .frame(look.new_alpha, look.new_beta, alpha, beta);
 
             // Timer sections (@ 0x0041c369). A Vue= in the timer section has
             // entered another place; the warp loop does not return for it:
@@ -760,10 +872,47 @@ mod tests {
     use std::cell::{Cell, RefCell};
     use std::rc::Rc;
 
+    /// The cursor sprites the warp loop shows over a navigation zone with
+    /// the reference build: the first of each frame's two `FUN_00422fcc`
+    /// calls (0x0041c535 shown, 0x0041c5ed after the copy), so 9, 11, 13
+    /// and never 10, 12, 14.
     #[test]
-    fn cursor_pace_per_build() {
-        assert_eq!(cursor_step_ms(2), CURSOR_STEP_MS);
-        assert_eq!(cursor_step_ms(1), 2 * CURSOR_STEP_MS);
+    fn the_warp_loop_shows_every_second_cursor_sprite() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_warp_loop_shows_every_second_cursor_sprite",
+            move |mut e| async move {
+                assert_eq!(e.game.exe.build.warp_cursor_steps, 2);
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.pointer.pos = (320, 240);
+                let view = (0..315)
+                    .flat_map(|ia| (-4..=4).map(move |ib| (ia as f32 * 0.02, ib as f32 * 0.1)))
+                    .find(|&(a, b)| {
+                        e.set_view(a, b);
+                        matches!(e.pointer_targets(), (z, 0) if (1..0x200).contains(&z))
+                    })
+                    .expect("a navigation view in place 1");
+                e.set_view(view.0, view.1);
+                e.cursor_shown = CURSOR_UNSET;
+                for _ in 0..200 {
+                    e.step_warp_cursor();
+                    g2.borrow_mut().push(e.cursor_shown);
+                    e.sys.frame().await;
+                }
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        for s in [9, 11, 13] {
+            assert!(got.contains(&s), "{s} never shown: {got:?}");
+        }
+        assert!(got.iter().all(|s| [9, 11, 13].contains(s)), "{got:?}");
     }
 
     /// A timer section that moved the player while the bar was open (as a
@@ -1122,6 +1271,152 @@ mod tests {
             assert!(bar.get(), "the bar did not open");
             assert!(!clicked.get(), "the click was handled");
         }
+    }
+
+    /// A timer section on the first warp frame during whose lines the
+    /// mouse moves 280 px right; the view's yaw then and 40 frames later.
+    struct MouseDuringTimer {
+        calls: u32,
+        alpha: Rc<RefCell<Vec<f32>>>,
+    }
+
+    impl ScriptHooks for MouseDuringTimer {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.calls += 1;
+            if self.calls == 1 {
+                self.alpha.borrow_mut().push(e.warp.alpha());
+                // As Scripts::timer_scan: the mouse at the warp pointer.
+                e.sys.set_mouse_locked(false);
+                e.sys.set_mouse_pos(e.pointer.pos.0, e.pointer.pos.1);
+                e.mark_pointer_mouse();
+                let (x, y) = e.pointer.pos;
+                e.sys.push_input(Input::MouseMove { x: x + 280, y });
+                return ready(true);
+            }
+            if self.calls == 41 {
+                self.alpha.borrow_mut().push(e.warp.alpha());
+            }
+            ready(false)
+        }
+    }
+
+    /// The look delta is previous point minus pointer (0x0041c1c3..
+    /// 0x0041c20d), and a timer section (step 6, after step 5) writes
+    /// neither: the mouse's motion during its lines turns the view on the
+    /// frames after it (280 px to the right: 280 / 600 rad to the left).
+    #[test]
+    fn the_mouse_moved_during_a_timer_section_turns_the_view() {
+        let alpha = Rc::new(RefCell::new(Vec::new()));
+        let (a2, a3) = (alpha.clone(), alpha.clone());
+        let ran = with_engine(
+            "the_mouse_moved_during_a_timer_section_turns_the_view",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                let mut hooks = MouseDuringTimer {
+                    calls: 0,
+                    alpha: a2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _| {
+                if a3.borrow().len() == 2 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let a = alpha.borrow();
+        let turn = f64::from(a[0]) - f64::from(a[1]);
+        let turn = turn.rem_euclid(std::f64::consts::TAU);
+        assert!((0.4..0.47).contains(&turn), "turned by {turn}");
+    }
+
+    /// A timer section that leaves the bar request (a right press during
+    /// its line) and clears the shown cursor; at the bar's first frame,
+    /// the cursor shown then.
+    struct RequestLeft {
+        arm: Rc<Cell<u8>>,
+        bar: Rc<Cell<Option<i32>>>,
+    }
+
+    impl ScriptHooks for RequestLeft {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.arm.get() == 1 {
+                e.bar.request = true;
+                e.cursor_shown = CURSOR_UNSET;
+                self.arm.set(2);
+            }
+            ready(false)
+        }
+
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.bar.get().is_none() {
+                self.bar.set(Some(e.cursor_shown));
+            }
+            ready(false)
+        }
+    }
+
+    /// A bar request left by a timer section, then `right` a right press in
+    /// the next poll; whether the bar opened and the cursor shown then.
+    fn request_left(right: bool) -> Option<Option<i32>> {
+        let arm = Rc::new(Cell::new(0u8));
+        let bar = Rc::new(Cell::new(None));
+        let (a2, b2, a3, b3) = (arm.clone(), bar.clone(), arm.clone(), bar.clone());
+        let mut locked = 0u64;
+        let mut after = 0u64;
+        let ran = with_engine(
+            "a_bar_request_left_by_a_timer",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                let mut hooks = RequestLeft { arm: a2, bar: b2 };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _f| {
+                if b3.get().is_some() || after > 30 {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                if a3.get() == 2 {
+                    if after == 0 && right {
+                        button(sys, MouseButton::Right, true);
+                    }
+                    after += 1;
+                    return;
+                }
+                locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                if locked == 10 && a3.get() == 0 {
+                    a3.set(1);
+                }
+            },
+        );
+        ran.then(|| bar.get())
+    }
+
+    /// Both cursor calls of the warp frame are gated on 0x004960c4 == 0
+    /// (0x0041c4ca, 0x0041b024): the frame in which a timer section leaves
+    /// a bar request steps and shows no cursor; the bar opens at its end.
+    #[test]
+    fn no_cursor_in_the_frame_that_leaves_a_bar_request() {
+        let Some(bar) = request_left(false) else {
+            return;
+        };
+        assert_eq!(bar, Some(CURSOR_UNSET));
+    }
+
+    /// The same frame's poll (0x0041c5f2) toggles that request on a right
+    /// press (FUN_0041a298 l. 11417) and the inner loop ends only on 1
+    /// (l. 12748): the bar does not open.
+    #[test]
+    fn a_right_press_cancels_a_bar_request_left_by_a_timer() {
+        let Some(bar) = request_left(true) else {
+            return;
+        };
+        assert_eq!(bar, None, "the bar opened");
     }
 
     /// A timer section that runs Vue=`to` on the first warp frame (the place
