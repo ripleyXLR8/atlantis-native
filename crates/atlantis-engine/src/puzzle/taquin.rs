@@ -387,6 +387,11 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, variant: i32) -> 
     let sounds = PuzzleSounds::load(e, &["TAK1", "TAK2", "TAK3", "TAK4"]).await;
     let mut game = TaquinGame::new(variant);
     game.object_in_hand = held;
+    // FUN_00446bbc, before the set-up frames and before any poll, sets
+    // OBJETENMAIN to 0 (0x00446bd4..0x00446be6): the Escape test of
+    // FUN_0041a298 (0x0041a3fc..0x0041a415) sees an empty hand whatever
+    // the player entered with.
+    e.vars.set("objetenmain", 0);
     game.cursor = e.puzzles.cursor;
     let mut host = Host(PuzzleHost::new(e, hooks), variant);
     host.0.screen.pictures = vec![bg];
@@ -395,8 +400,6 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, variant: i32) -> 
     let r = game.run(&mut host).await;
     let e = host.0.e;
     e.puzzles.cursor = game.cursor;
-    // FUN_00446bbc emptied the hand.
-    e.vars.set("objetenmain", 0);
     if e.should_abort() {
         1
     } else {
