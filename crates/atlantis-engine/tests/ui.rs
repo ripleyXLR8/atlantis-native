@@ -892,6 +892,57 @@ fn load_picker_edge_row_and_double_click_anywhere() {
     assert_eq!(*out.borrow(), Some((MenuOutcome::Reload, listed[12] as u8)));
 }
 
+/// A double click on LOAD GAME: the first press ends the in-game menu
+/// (FUN_0041c838) and opens the picker; the second, a WM_LBUTTONDBLCLK
+/// dispatched by the picker's polls with 0x00496138 = 1, sets 0x00496118,
+/// which the picker does not clear before its loop, and is a row click:
+/// LOAD GAME lies on grid row 4, so the picker ends at once on that
+/// title (0x0041d484..0x0041d4b4) for a reload of its chapter.
+#[test]
+fn double_click_on_load_game_reloads_the_row_under_it() {
+    let Some(g) = game("double_click_on_load_game_reloads_the_row_under_it") else {
+        return;
+    };
+    let epi = g.big.read("SPRLIST\\EPI.TXT").unwrap();
+    let load = record_centre(&g, "MAINMENU.TXT", 0, 0);
+    let cancel = record_centre(&g, "LOADMENU.TXT", 1, 7);
+    let row = menu_grid_hit(45, 108, 400, 22, 1, 11, true, load.0, load.1)
+        .expect("LOAD GAME is on a row") as usize;
+    let listed: Vec<u32> = (2..87)
+        .filter(|&c| !epi_episode_name(&epi, c).is_empty())
+        .take(8)
+        .collect();
+    let store = Rc::new(MemStore::new());
+    for &c in &listed {
+        store.write(&format!("pa{c}.gam"), b"");
+    }
+    let out = Rc::new(RefCell::new(None));
+    let o = out.clone();
+    with_engine(
+        g,
+        store,
+        move |mut e, _s| {
+            Box::pin(async move {
+                let outcome = e.ingame_menu().await;
+                *o.borrow_mut() = Some((outcome, e.players.chapters[0]));
+            })
+        },
+        move |h, n| match n {
+            30 => {
+                h.click(load.0, load.1);
+                h.click(load.0, load.1);
+            }
+            // Without the double click the picker is still up: Cancel.
+            100 => h.click(cancel.0, cancel.1),
+            _ => {}
+        },
+    );
+    assert_eq!(
+        *out.borrow(),
+        Some((MenuOutcome::Reload, listed[row] as u8))
+    );
+}
+
 /// The player screen as the original reads its input: Escape does
 /// nothing; a click on the new player row gives 16 dots; from the 16th
 /// character on each key replaces the last; Enter commits the name.

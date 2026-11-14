@@ -137,6 +137,8 @@ pub struct Sys {
     /// When a game menu last read the keyboard (its text entry takes every
     /// letter: the front end's letter keys stay off then).
     menu_input_ms: Cell<Option<u64>>,
+    /// When the player screen's name entry last read the keys.
+    text_entry_ms: Cell<Option<u64>>,
 }
 
 impl Sys {
@@ -174,6 +176,7 @@ impl Sys {
             view_renderer: RefCell::new(None),
             view_check: Cell::new(false),
             menu_input_ms: Cell::new(None),
+            text_entry_ms: Cell::new(None),
         })
     }
 
@@ -220,6 +223,33 @@ impl Sys {
         self.menu_input_ms
             .get()
             .is_some_and(|t| self.now_ms.get().saturating_sub(t) <= 250)
+    }
+
+    /// The player screen reads the keys this frame (see
+    /// [`Sys::takes_key_repeat`]).
+    pub fn mark_text_entry(&self) {
+        self.text_entry_ms.set(Some(self.now_ms.get()));
+    }
+
+    /// Whether the front end passes on a key's auto-repeat: the original's
+    /// window procedure stores every WM_CHAR, repeats included, in
+    /// 0x006ce262 while 0x0049614c == 1 (@ 0x00419c9a..0x00419cb4; the
+    /// player screen clears it at its exit, @ 0x0041e88a), and only the
+    /// player screen's name entry reads it (0x0041e212..0x0041e4cc). So
+    /// only the keys that give a WM_CHAR repeat, and only while the player
+    /// screen reads the keys (within the last quarter second); every other
+    /// loop reads key edges (`FUN_0042e624`) or held keys, for which a
+    /// repeat is no new press.
+    pub fn takes_key_repeat(&self, key: Key) -> bool {
+        let entry = self
+            .text_entry_ms
+            .get()
+            .is_some_and(|t| self.now_ms.get().saturating_sub(t) <= 250);
+        entry
+            && matches!(
+                key,
+                Key::Char(_) | Key::Space | Key::Backspace | Key::Enter | Key::Escape
+            )
     }
 
     pub fn key_held(&self, key: Key) -> bool {
@@ -522,5 +552,26 @@ mod tests {
         assert_eq!(sys.screen.borrow()[0], 1);
         assert!(r.step(33));
         assert!(!r.step(50));
+    }
+
+    /// A key's auto-repeat reaches the engine only while the player
+    /// screen's name entry reads the keys, and only for the keys that give
+    /// WM_CHAR (0x00419c9a..0x00419cb4).
+    #[test]
+    fn key_repeats_only_for_the_name_entry() {
+        let sys = Sys::new(Mixer::new());
+        sys.now_ms.set(1000);
+        assert!(!sys.takes_key_repeat(Key::Char('a')));
+        sys.mark_menu_input();
+        assert!(!sys.takes_key_repeat(Key::Char('a')), "any other menu");
+        sys.mark_text_entry();
+        for k in [Key::Char('a'), Key::Space, Key::Backspace, Key::Enter] {
+            assert!(sys.takes_key_repeat(k), "{k:?}");
+        }
+        for k in [Key::Up, Key::Left, Key::F(5), Key::F(10)] {
+            assert!(!sys.takes_key_repeat(k), "{k:?}");
+        }
+        sys.now_ms.set(1300);
+        assert!(!sys.takes_key_repeat(Key::Backspace), "the screen has left");
     }
 }

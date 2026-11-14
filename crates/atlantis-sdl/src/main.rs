@@ -350,6 +350,18 @@ fn main() {
                         actions.push(Action::MenuKey(k));
                     }
                 }
+                // A key's auto-repeat goes to the engine only where the
+                // original gets WM_CHAR repeats (the player screen's name
+                // entry, Sys::takes_key_repeat).
+                Event::KeyDown {
+                    keycode: Some(k),
+                    repeat: true,
+                    ..
+                } => {
+                    if let Some(k) = engine_key(k).filter(|&k| sys.takes_key_repeat(k)) {
+                        sys.push_input(Input::KeyDown(k));
+                    }
+                }
                 Event::KeyDown {
                     keycode: Some(k),
                     repeat: false,

@@ -1657,7 +1657,10 @@ impl ApplicationHandler for App {
                     }
                     return;
                 }
-                if event.repeat {
+                // A key's auto-repeat goes to the engine only where the
+                // original gets WM_CHAR repeats (the player screen's name
+                // entry, Sys::takes_key_repeat).
+                if event.repeat && !key.is_some_and(|k| pressed && self.sys.takes_key_repeat(k)) {
                     return;
                 }
                 // O too, for keyboards without function keys, but not while

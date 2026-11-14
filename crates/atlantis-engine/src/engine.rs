@@ -323,6 +323,11 @@ pub struct Engine {
     pub con_text_reload: bool,
     /// The sound menu's knobs, kept for the session (0 = the file's).
     pub son_knob_x: [i32; 4],
+    /// The LOAD rows' widths 0x00611e80, by chapter - 1 (atoi of the
+    /// checkpoint's name): written only by the rows drawer `FUN_00420b48`
+    /// for the rows it draws, zero at launch, kept for the process; the
+    /// picker's title is centred by it (0x0041d431..0x0041d44d).
+    pub(crate) load_row_widths: [i32; 256],
     /// The menus' record table, one for the session as the original's
     /// (zeroed at start-up; see [`crate::ui::layout::MenuRecordTable`]);
     /// not used with the minor bug fixes ([`Engine::menu_table`]).
@@ -509,6 +514,7 @@ impl Engine {
             subtitle_clicks: 0,
             con_text_reload: false,
             son_knob_x: [0; 4],
+            load_row_widths: [0; 256],
             menu_records,
             cinema_captions: None,
             voice_volume: crate::persist::mixer_volume(crate::persist::DEFAULT_VOLUMES[3]),

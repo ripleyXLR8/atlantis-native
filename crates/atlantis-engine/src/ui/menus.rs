@@ -24,9 +24,7 @@ use super::layout::{
     menu_volume_from_knob, menu_walk_hit, name_key_code, spell_sharp_s, subtitle_toggle_click,
     walk_menu_text_in, FontMin, LoadPickerScroll, MenuRecord, MenuRecordTable, MenuRules, MenuWalk,
 };
-use super::player_screen::{
-    player_screen_exit, MenuDoubleClick, PlayerScreenExit, PlayerScreenState,
-};
+use super::player_screen::{player_screen_exit, PlayerScreenExit, PlayerScreenState};
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
 use crate::music::apc_pcm;
@@ -208,6 +206,38 @@ impl Engine {
         }
     }
 
+    /// The left press a menu pass just read, paired by Windows with the
+    /// last press whatever loop read it ([`crate::turn::TurnDoubleClick::pair`]):
+    /// true when it came as WM_LBUTTONDBLCLK (window procedure @
+    /// 0x00419c79: it sets 0x00496118 while 0x00496138 == 1 and writes
+    /// neither the held flag 0x00496114 nor the latched record 0x006cd844,
+    /// which only WM_LBUTTONDOWN writes @ 0x00419c47..0x00419c56).
+    pub(crate) fn menu_press_pairs(&mut self) -> bool {
+        let (x, y) = self.sys.mouse();
+        let now = self.sys.millis();
+        self.turn_double_click.pair(now, x, y)
+    }
+
+    /// The input queued before a menu loop, which takes none of it as a
+    /// click (its loop clears the press flag 0x0049611c each pass): its
+    /// left presses still pair for Windows; true when one came as
+    /// WM_LBUTTONDBLCLK, which the loop's first walk dispatches.
+    pub(crate) fn drain_menu_input(&mut self) -> bool {
+        let mut double = false;
+        while let Some(ev) = self.sys.poll_event() {
+            if let Input::MouseDown {
+                button: MouseButton::Left,
+                x,
+                y,
+            } = ev
+            {
+                let now = self.sys.millis();
+                double = self.turn_double_click.pair(now, x, y);
+            }
+        }
+        double
+    }
+
     /// `SPRLIST\<name>`, `None` when the archive lacks it. Not walked
     /// yet: each menu walks it before its first hit test, with its toggles.
     pub(crate) async fn load_menu(&self, name: &str) -> Option<Menu> {
@@ -290,17 +320,21 @@ impl Engine {
             FontMin::PlayerList
         };
         let mut st = PlayerScreenState::default();
-        let mut dbl = MenuDoubleClick::default();
         let polls = menu.walk(None, 0, 0, self.menu_table());
         self.menu_walk_polls(polls);
         // FUN_0041dea4 waits for no release; a press made before it is not
-        // a click (its loop clears the flag each pass, 0x0041e036).
-        while self.sys.poll_event().is_some() {}
+        // a click (its loop clears the flag each pass, 0x0041e036). It
+        // clears 0x00496118 before its loop (@ 0x0041e020) with 0x00496138
+        // = 1 (@ 0x0041dec3), and its loop's first walk dispatches the
+        // messages queued since PREINTRO's last poll: the second press of a
+        // double click whose first ended PREINTRO.HNM sets the flag.
+        st.dbl_flag = self.drain_menu_input();
         loop {
             if self.sys.should_quit() {
                 return None;
             }
             let mi = self.poll_menu_input();
+            self.sys.mark_text_entry();
             // The window procedure stores each WM_CHAR in 0x006ce262
             // (@ 0x00419ca6), overwriting the last; the walk's polls
             // dispatch every message queued since the last pass, and the
@@ -317,9 +351,10 @@ impl Engine {
             // WM_LBUTTONDBLCLK sets the flag wherever the press lands; the
             // port arms it before the frame's click block (which of the two
             // the original runs first on the second press is not known).
-            if mi.left_press && dbl.press(self.sys.millis(), (mx, my)) {
+            if mi.left_press && self.menu_press_pairs() {
                 st.dbl_flag = true;
             }
+            let mut deleted = false;
             if st.click(
                 mi.left_press,
                 record,
@@ -334,6 +369,7 @@ impl Engine {
                     self.delete_player(row);
                 }
                 st.delete_done(confirmed);
+                deleted = true;
             }
             // FUN_00420f60 draws the field before the name entry
             // (0x0041e20d): what is shown lags the blink by one frame.
@@ -346,9 +382,15 @@ impl Engine {
                 let polls = menu.walk(record, 0, 0, self.menu_table());
                 self.menu_walk_polls(polls);
                 let mut s = bg.clone();
-                self.ui.draw_menu(&mut s, &menu.walk);
+                // The pass that ran ARE YOU SURE: FUN_0041ce8c (@
+                // 0x0041e1de, after FUN_0041e8a8) copies the backdrop over
+                // the menu and rows the pass drew before its click block;
+                // only the name field and the pointer follow.
+                if !deleted {
+                    self.ui.draw_menu(&mut s, &menu.walk);
+                }
                 let sharp_s_as_ss = self.sharp_s_as_ss();
-                for j in 0..self.players.count {
+                for j in (0..self.players.count).filter(|_| !deleted) {
                     let name = spell_sharp_s(self.players.name(j), sharp_s_as_ss).into_owned();
                     self.ui.draw_font_min(
                         &mut s,
@@ -416,6 +458,7 @@ impl Engine {
                 .hit(mx, my, self.menu_table().as_deref())
                 .filter(|&r| r == 3 || r == 4);
             if mi.left_press {
+                self.menu_press_pairs();
                 if let Some(r) = hit {
                     return r == 3;
                 }
@@ -440,7 +483,7 @@ impl Engine {
         let polls = menu.walk(None, 0, 0, self.menu_table());
         self.menu_walk_polls(polls);
         // FUN_0041c838 clears the click flag before its loop.
-        while self.sys.poll_event().is_some() {}
+        self.drain_menu_input();
         let mut outcome = MenuOutcome::Resume;
         loop {
             if self.should_abort() {
@@ -450,9 +493,16 @@ impl Engine {
             let (mx, my) = self.sys.mouse();
             let hit = menu.hit(mx, my, self.menu_table().as_deref());
             if mi.left_press {
+                // The press ends the loop at once (its poll does not pump,
+                // 0x0041a2b5): when it is the second of a pair, its
+                // WM_LBUTTONDBLCLK is dispatched by the picker's first walk
+                // with 0x00496138 = 1 (@ 0x0041c9bc), which sets
+                // 0x00496118; FUN_0041c838 clears the flag only at its
+                // entry (@ 0x0041c858) and the picker not before its loop.
+                let double = self.menu_press_pairs();
                 match hit {
                     Some(0) => {
-                        let exit = self.load_picker(&bg).await;
+                        let exit = self.load_picker(&bg, double).await;
                         outcome = ingame_menu_outcome(hit, exit, 0);
                     }
                     Some(1) => self.options_menu(&bg).await,
@@ -513,6 +563,7 @@ impl Engine {
             let under = menu.hit(mx, my, self.menu_table().as_deref());
             let hit = under.filter(|r| [1, 3, 5, 6].contains(r));
             if mi.left_press {
+                self.menu_press_pairs();
                 match hit {
                     Some(1) => {
                         self.sound_menu(bg).await;
@@ -602,7 +653,13 @@ impl Engine {
             let hit = menu.hit(mx, my, self.menu_table().as_deref());
             let down = self.sys.buttons().0;
             if mi.left_press {
-                grabbed = hit;
+                // WM_LBUTTONDOWN latches the record under the pointer and
+                // sets the held flag (@ 0x00419c47..0x00419c56); the second
+                // press of a double click comes as WM_LBUTTONDBLCLK, which
+                // writes neither (@ 0x00419c79), after the first click's
+                // WM_LBUTTONUP cleared the held flag (@ 0x00419c60): no
+                // slider follows it.
+                grabbed = if self.menu_press_pairs() { None } else { hit };
             } else if !down {
                 grabbed = None;
             }
@@ -691,7 +748,9 @@ impl Engine {
     /// file) and 6 OK end it for a reload, 7 Cancel; so does a double click
     /// anywhere once a title is shown, as the record under the pointer.
     /// Returns the record it ended on (255 for a double click off them).
-    pub(crate) async fn load_picker(&mut self, bg: &[u16]) -> u8 {
+    /// `armed`: the press that opened it was the second of a double click
+    /// (its WM_LBUTTONDBLCLK sets the flag in the first walk).
+    pub(crate) async fn load_picker(&mut self, bg: &[u16], armed: bool) -> u8 {
         let Some(mut menu) = self.load_menu("LOADMENU.TXT").await else {
             return 7;
         };
@@ -725,13 +784,15 @@ impl Engine {
         let mut selected: Option<usize> = None;
         // The double-click flag 0x00496118: set by any double click,
         // wherever it lands, and cleared only when the picker ends
-        // (0x0041d50f).
-        let mut dbl = MenuDoubleClick::default();
-        let mut dbl_flag = false;
+        // (0x0041d50f), not before its loop.
+        let mut dbl_flag = armed;
         let mut track_latched = false;
         let player = self.player.min(MAX_PLAYERS - 1);
+        // `drawn_width`: the title's x from the rows drawer's width table
+        // (a click); the port's arrow keys centre it by its own width.
         let choose = |e: &mut Engine,
                       i: usize,
+                      drawn_width: bool,
                       title: &mut Option<(Vec<u8>, i32)>,
                       title_frame: &mut Option<(usize, i32)>| {
             if sprite_rows {
@@ -749,7 +810,15 @@ impl Engine {
                 return;
             }
             e.players.chapters[player] = chapters[i];
-            let w = font_min_load_list_width(&names[i], &e.ui.fontmin_advance);
+            // x = (0x280 - width[chapter - 1]) / 2 (0x0041d431..0x0041d44d),
+            // fixed at the click: an entry whose row was never drawn in the
+            // run (the grid's far edge selects entry offset + 11..) has
+            // width 0 and its title starts at x 320.
+            let w = if drawn_width {
+                e.load_row_widths[usize::from(chapters[i]) - 1]
+            } else {
+                font_min_load_list_width(&names[i], &e.ui.fontmin_advance)
+            };
             *title = Some((names[i].clone(), (640 - w) / 2));
         };
         loop {
@@ -774,18 +843,34 @@ impl Engine {
                     Some(i) => (i + 1).min(count - 1),
                 };
                 selected = Some(i);
-                choose(self, i, &mut title, &mut title_frame);
+                choose(self, i, false, &mut title, &mut title_frame);
+            }
+            // A press that is the second of a pair comes as
+            // WM_LBUTTONDBLCLK (@ 0x00419c79): it sets the flag and latches
+            // nothing.
+            let double = mi.left_press && self.menu_press_pairs();
+            if double {
+                dbl_flag = true;
             }
             if mi.left_press {
                 // WM_LBUTTONDOWN latches the record under the pointer
                 // (0x00419c47): the track when strictly inside it.
-                track_latched = menu.hit(mx, my, self.menu_table().as_deref()) == Some(1);
+                track_latched =
+                    !double && menu.hit(mx, my, self.menu_table().as_deref()) == Some(1);
             }
             if !down {
                 track_latched = false;
             }
             sb.frame(track_latched, down, my);
             let scroll = usize::from(sb.offset);
+            // FUN_00420b48 draws the rows (and writes their widths) before
+            // the pass's poll and click block (0x0041d320).
+            if !sprite_rows {
+                for (&c, name) in chapters.iter().zip(&names).skip(scroll).take(11) {
+                    self.load_row_widths[usize::from(c) - 1] =
+                        font_min_load_list_width(name, &self.ui.fontmin_advance);
+                }
+            }
             // A row counts when row + offset < count, the only bound
             // (0x0041d37b; atlantis-cd-fr-687104 FUN_0041c708 @
             // 0x0041cb0b..0x0041cb1b): the grid's inclusive far edges (x
@@ -802,13 +887,10 @@ impl Engine {
             let button = menu
                 .hit(mx, my, self.menu_table().as_deref())
                 .filter(|r| [5, 6, 7].contains(r));
-            if mi.left_press && dbl.press(self.sys.millis(), (mx, my)) {
-                dbl_flag = true;
-            }
             if mi.left_press && !track_latched {
                 if let Some(r) = row_hover {
                     selected = Some(r);
-                    choose(self, r, &mut title, &mut title_frame);
+                    choose(self, r, true, &mut title, &mut title_frame);
                 }
             }
             // 0x0041d4ad: once a title is shown, the double-click flag ends
@@ -861,11 +943,15 @@ impl Engine {
                     row_hover == Some(scroll + i),
                 );
             }
+            // The pointer (FUN_0042d558 @ 0x0041d325) before the poll and
+            // the click block, the title (FUN_00420f60 @ 0x0041d4a8) after
+            // them: the title is drawn over the pointer.
+            self.draw_pointer(&mut s);
             if let Some((t, x)) = &title {
                 self.ui
                     .draw_font_min(&mut s, FontMin::NameField, t, *x, 0x50, true);
             }
-            self.present(&s, true).await;
+            self.present(&s, false).await;
         }
     }
 
@@ -1156,7 +1242,7 @@ mod picker_key_tests {
                 e.load_interface().await;
                 e.set_enhancements(x);
                 let bg = vec![0u16; crate::warp::SCREEN_W * crate::warp::SCREEN_H];
-                g2.set(Some(e.load_picker(&bg).await));
+                g2.set(Some(e.load_picker(&bg, false).await));
             },
             |sys, f| match f {
                 5 => sys.push_input(Input::KeyDown(Key::Enter)),
@@ -1395,5 +1481,399 @@ mod walk_poll_tests {
         let n = got.borrow().expect("the menu did not end");
         // The entry walk, then (poll + walk) per pass before the click.
         assert!(n > 33 + 34 && n % 34 == 33, "{n} polls");
+    }
+}
+
+#[cfg(test)]
+mod double_click_tests {
+    use super::MenuOutcome;
+    use crate::place::CINEMA_FRAME_MS;
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::{button, press_at, record_centre as centre, with_engine};
+    use crate::warp::{SCREEN_H, SCREEN_W};
+    use atlantis_data::saves::epi_episode_name;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    const N: usize = SCREEN_W * SCREEN_H;
+
+    /// A double click whose first press ends PREINTRO.HNM: the player
+    /// screen clears 0x00496118 before its loop (@ 0x0041e020) and its first
+    /// walk dispatches the WM_LBUTTONDBLCLK of the second press with
+    /// 0x00496138 = 1, so the flag is set and the next click on a player's
+    /// row ends the screen (0x0041e4d3).
+    #[test]
+    fn a_double_click_ending_preintro_arms_the_player_screen() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ended = Rc::new(Cell::new(false));
+        let e2 = ended.clone();
+        let row = (300, 259);
+        let ran = with_engine(
+            "a_double_click_ending_preintro_arms_the_player_screen",
+            move |mut e| async move {
+                e.load_interface().await;
+                e.players.create(b"Tester").unwrap();
+                e.play_transition_video("PREINTRO.HNM", None, CINEMA_FRAME_MS)
+                    .await;
+                e2.set(true);
+                g2.set(Some(e.player_screen().await));
+            },
+            {
+                let ended = ended.clone();
+                let mut second = None;
+                move |sys, f| {
+                    match f {
+                        30 => press_at(sys, row),
+                        31 => button(sys, MouseButton::Left, false),
+                        _ => {}
+                    }
+                    // The second press as soon as the video has ended.
+                    if second.is_none() && ended.get() {
+                        second = Some(f);
+                        button(sys, MouseButton::Left, true);
+                    }
+                    if second.is_some_and(|s| f == s + 1) {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    // One click on the player's row, past the double-click
+                    // time.
+                    if second.is_some_and(|s| f == s + 60) {
+                        button(sys, MouseButton::Left, true);
+                    }
+                    if second.is_some_and(|s| f == s + 61) {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    if f == 1000 {
+                        sys.push_input(Input::Quit);
+                    }
+                }
+            },
+        );
+        if ran {
+            assert!(ended.get(), "PREINTRO did not end");
+            assert_eq!(got.get(), Some(Some(0)));
+        }
+    }
+
+    /// The same with the second press made before the player screen's loop
+    /// (during the last frame of PREINTRO or the loads): it is no click,
+    /// but its WM_LBUTTONDBLCLK, still queued, is dispatched by the loop's
+    /// first walk, after the clear @ 0x0041e020.
+    #[test]
+    fn a_double_click_queued_before_the_player_screen_arms_it() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_double_click_queued_before_the_player_screen_arms_it",
+            move |mut e| async move {
+                e.load_interface().await;
+                e.players.create(b"Tester").unwrap();
+                // The press that ended PREINTRO, then the second one.
+                e.sys.push_input(Input::MouseMove { x: 300, y: 259 });
+                let now = e.sys.millis();
+                e.turn_double_click.first_press(now, 300, 259);
+                button(&e.sys, MouseButton::Left, true);
+                button(&e.sys, MouseButton::Left, false);
+                g2.set(Some(e.player_screen().await));
+            },
+            |sys, f| match f {
+                // One click on the player's row.
+                60 => button(sys, MouseButton::Left, true),
+                61 => button(sys, MouseButton::Left, false),
+                200 => sys.push_input(Input::Quit),
+                _ => {}
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some(Some(0)));
+        }
+    }
+
+    /// A LOAD GAME press that is itself the second of a pair: the in-game
+    /// menu's loop ends on its edge without pumping (0x0041a2b5), and the
+    /// picker's first walk dispatches its WM_LBUTTONDBLCLK with 0x00496138
+    /// = 1 (@ 0x0041c9bc): the picker opens armed, and the first click on
+    /// a titled row ends it for a reload.
+    #[test]
+    fn a_load_game_press_completing_a_pair_arms_the_picker() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let at = Rc::new(Cell::new(((0, 0), (0, 0))));
+        let a2 = at.clone();
+        let ran = with_engine(
+            "a_load_game_press_completing_a_pair_arms_the_picker",
+            move |mut e| async move {
+                e.load_interface().await;
+                for c in (2..87)
+                    .filter(|&c| !epi_episode_name(&e.epi_text, c).is_empty())
+                    .take(3)
+                {
+                    e.saves.write(&format!("pa{c}.gam"), b"");
+                }
+                let mut main = e.load_menu("MAINMENU.TXT").await.unwrap();
+                main.walk(None, 0, 0, None);
+                let mut load = e.load_menu("LOADMENU.TXT").await.unwrap();
+                load.walk(None, 0, 0, None);
+                let main_load = centre(main.walk.records[0]);
+                a2.set((main_load, centre(load.walk.records[7])));
+                // The first press of the pair (the click that ended the
+                // warp loop).
+                let now = e.sys.millis();
+                e.turn_double_click
+                    .first_press(now + 160, main_load.0, main_load.1);
+                g2.set(Some(e.ingame_menu().await));
+            },
+            move |sys, f| {
+                let (main_load, cancel) = at.get();
+                match f {
+                    10 => press_at(sys, main_load),
+                    11 => button(sys, MouseButton::Left, false),
+                    // Row 0, once.
+                    60 => press_at(sys, (100, 118)),
+                    61 => button(sys, MouseButton::Left, false),
+                    // Not armed: the picker is still up.
+                    100 => press_at(sys, cancel),
+                    101 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                }
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some(MenuOutcome::Reload));
+        }
+    }
+
+    /// The second press of a double click comes as WM_LBUTTONDBLCLK, which
+    /// writes neither the held flag nor the latched record (@ 0x00419c79):
+    /// a slider grabbed with it does not follow the mouse.
+    #[test]
+    fn the_second_press_of_a_double_click_grabs_no_slider() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let at = Rc::new(Cell::new(((0, 0), (0, 0))));
+        let a2 = at.clone();
+        let ran = with_engine(
+            "the_second_press_of_a_double_click_grabs_no_slider",
+            move |mut e| async move {
+                e.load_interface().await;
+                let mut m = e.load_menu("SONMENU.TXT").await.unwrap();
+                m.walk(None, 0, 0, None);
+                let track = m.walk.records[2];
+                let y = i32::from(track.y) + i32::from(track.h) / 2;
+                a2.set(((350, y), centre(m.walk.records[17])));
+                let bg = vec![0u16; N];
+                e.sound_menu(&bg).await;
+                g2.set(Some(e.son_knob_x[1]));
+            },
+            move |sys, f| {
+                let (track, cancel) = at.get();
+                match f {
+                    10 => press_at(sys, track),
+                    11 => button(sys, MouseButton::Left, false),
+                    13 => button(sys, MouseButton::Left, true),
+                    14..=20 => sys.push_input(Input::MouseMove {
+                        x: track.0 + 10 * (f as i32 - 13),
+                        y: track.1,
+                    }),
+                    21 => button(sys, MouseButton::Left, false),
+                    30 => press_at(sys, cancel),
+                    31 => button(sys, MouseButton::Left, false),
+                    200 => sys.push_input(Input::Quit),
+                    _ => {}
+                }
+            },
+        );
+        if ran {
+            // The first press set the knob at x - 10; the drag moved none.
+            assert_eq!(got.get(), Some(350 - 10));
+        }
+    }
+}
+
+#[cfg(test)]
+mod delete_pass_tests {
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::{button, press_at, record_centre as centre, with_engine};
+    use crate::ui::player_screen::DELETE;
+    use crate::warp::{SCREEN_H, SCREEN_W};
+    use std::cell::{Cell, RefCell};
+    use std::rc::Rc;
+
+    const N: usize = SCREEN_W * SCREEN_H;
+
+    /// The player screen's pass that ran ARE YOU SURE presents the bare
+    /// backdrop with the name field and the pointer (FUN_0041ce8c @
+    /// 0x0041e1de); the next pass draws the menu and the rows again.
+    #[test]
+    fn the_delete_pass_presents_the_bare_backdrop() {
+        let shots = Rc::new(RefCell::new(Vec::new()));
+        let s2 = shots.clone();
+        let at = Rc::new(Cell::new(((0, 0), (0, 0))));
+        let a2 = at.clone();
+        let bg = Rc::new(RefCell::new(Vec::new()));
+        let b2 = bg.clone();
+        let a3 = at.clone();
+        let ran = with_engine(
+            "the_delete_pass_presents_the_bare_backdrop",
+            move |mut e| async move {
+                e.load_interface().await;
+                e.players.create(b"Tester").unwrap();
+                *b2.borrow_mut() = e.load_picture("PREINTRO.TGA").await;
+                let mut sele = e.load_menu("SELEMENU.TXT").await.unwrap();
+                sele.walk(None, 0, 0, None);
+                let mut sure = e.load_menu("SUREMENU.TXT").await.unwrap();
+                sure.walk(None, 0, 0, None);
+                a2.set((
+                    centre(sele.walk.records[DELETE]),
+                    centre(sure.walk.records[4]),
+                ));
+                e.player_screen().await;
+            },
+            move |sys, f| {
+                let (delete, cancel) = a3.get();
+                match f {
+                    10 => press_at(sys, (300, 259)),
+                    11 => button(sys, MouseButton::Left, false),
+                    20 => press_at(sys, delete),
+                    21 => button(sys, MouseButton::Left, false),
+                    40 => press_at(sys, cancel),
+                    42 => button(sys, MouseButton::Left, false),
+                    50 => sys.push_input(Input::Quit),
+                    _ => {}
+                }
+                if f == 41 || f == 45 {
+                    s2.borrow_mut().push(sys.screen.borrow().clone());
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let shots = shots.borrow();
+        let bg = bg.borrow();
+        let (pass, next) = (&shots[0], &shots[1]);
+        assert_ne!(pass, next, "the delete pass shows the menu");
+        // What the delete pass draws over the backdrop (the name field), the
+        // next pass draws too; the pointer (blended with what is under it)
+        // left out.
+        let (_, cancel) = at.get();
+        let off_bg = |s: &[u16]| (0..N).filter(|&p| s[p] != bg[p]).count();
+        assert!(
+            off_bg(pass) * 4 < off_bg(next),
+            "the delete pass is not bare"
+        );
+        for p in 0..N {
+            let (x, y) = ((p % SCREEN_W) as i32, (p / SCREEN_W) as i32);
+            let pointer = (cancel.0 - 8..cancel.0 + 48).contains(&x)
+                && (cancel.1 - 8..cancel.1 + 48).contains(&y);
+            if pass[p] != bg[p] && !pointer {
+                assert_eq!(pass[p], next[p], "pixel ({x}, {y})");
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod load_title_tests {
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::{button, press_at, with_engine};
+    use crate::warp::{SCREEN_H, SCREEN_W};
+    use atlantis_data::saves::epi_episode_name;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    const N: usize = SCREEN_W * SCREEN_H;
+
+    /// Frames of the LOAD picker over 13 checkpoints: the pointer at
+    /// `pointer` before any click, the pointer away from everything before
+    /// and after a click on `click`, the pointer at `pointer` after it.
+    fn picker_frames(test: &str, click: (i32, i32), pointer: (i32, i32)) -> Option<[Vec<u16>; 4]> {
+        let shots = Rc::new(RefCell::new(Vec::new()));
+        let s2 = shots.clone();
+        let away = (630, 470);
+        let ran = with_engine(
+            test,
+            move |mut e| async move {
+                e.load_interface().await;
+                let listed: Vec<u32> = (2..87)
+                    .filter(|&c| !epi_episode_name(&e.epi_text, c).is_empty())
+                    .take(13)
+                    .collect();
+                for c in listed {
+                    e.saves.write(&format!("pa{c}.gam"), b"");
+                }
+                let bg = vec![0u16; N];
+                e.load_picker(&bg, false).await;
+            },
+            move |sys, f| {
+                let to = |(x, y): (i32, i32)| sys.push_input(Input::MouseMove { x, y });
+                match f {
+                    5 | 25 => to(pointer),
+                    16 | 22 => to(away),
+                    20 => press_at(sys, click),
+                    21 => button(sys, MouseButton::Left, false),
+                    40 => sys.push_input(Input::Quit),
+                    _ => {}
+                }
+                if [15, 19, 24, 30].contains(&f) {
+                    s2.borrow_mut().push(sys.screen.borrow().clone());
+                }
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let shots = shots.borrow();
+        Some(std::array::from_fn(|i| shots[i].clone()))
+    }
+
+    /// The pixels of the title band (y < 100) that differ between `a` and
+    /// `b`.
+    fn band_diff(a: &[u16], b: &[u16]) -> Vec<usize> {
+        (0..100 * SCREEN_W).filter(|&p| a[p] != b[p]).collect()
+    }
+
+    /// FUN_0041cf78 draws the pointer (@ 0x0041d325) before the title
+    /// (@ 0x0041d4a8): where they meet, the title's letters are blended
+    /// over the pointer, which does not hide them.
+    #[test]
+    fn the_load_title_is_drawn_over_the_pointer() {
+        const TEST: &str = "the_load_title_is_drawn_over_the_pointer";
+        // A click on row 0; the title's top left corner.
+        let Some([_, before, away, _]) = picker_frames(TEST, (100, 118), (630, 470)) else {
+            return;
+        };
+        let title = band_diff(&before, &away);
+        assert!(!title.is_empty(), "no title");
+        let left = title.iter().map(|&p| p % SCREEN_W).min().unwrap() as i32;
+        let top = title.iter().map(|&p| p / SCREEN_W).min().unwrap() as i32;
+        let [pointer, _, away, over] = picker_frames(TEST, (100, 118), (left, top)).unwrap();
+        // The title pixels the pointer changed.
+        let both: Vec<usize> = band_diff(&away, &over)
+            .into_iter()
+            .filter(|p| title.contains(p))
+            .collect();
+        assert!(!both.is_empty(), "the pointer is not over the title");
+        // None of them shows the pointer alone.
+        assert!(both.iter().all(|&p| over[p] != pointer[p]));
+    }
+
+    /// A click on the grid's far edge (x 445) selects entry offset + 11 +
+    /// row, whose row was never drawn: its width in 0x00611e80 is 0 and
+    /// the title starts at x 320 (0x0041d431..0x0041d44d).
+    #[test]
+    fn an_undrawn_entrys_title_starts_at_x_320() {
+        let Some([_, before, away, _]) = picker_frames(
+            "an_undrawn_entrys_title_starts_at_x_320",
+            (445, 108 + 22 + 5),
+            (630, 470),
+        ) else {
+            return;
+        };
+        let title = band_diff(&before, &away);
+        assert!(!title.is_empty(), "no title");
+        let left = title.iter().map(|&p| p % SCREEN_W).min().unwrap();
+        assert!(left >= 320, "the title starts at x {left}");
     }
 }

@@ -863,8 +863,17 @@ impl Engine {
                             match ev {
                                 Input::MouseDown {
                                     button: MouseButton::Left,
-                                    ..
-                                } => left = true,
+                                    x,
+                                    y,
+                                } => {
+                                    left = true;
+                                    // Windows pairs the next press with
+                                    // this one (a double click whose first
+                                    // press ends PREINTRO.HNM arms the
+                                    // player screen's flag).
+                                    let now = self.sys.millis();
+                                    self.turn_double_click.pair(now, x, y);
+                                }
                                 Input::MouseDown {
                                     button: MouseButton::Right,
                                     ..
