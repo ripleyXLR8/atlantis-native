@@ -131,6 +131,12 @@ pub struct Draw {
 pub trait SnakesIo {
     /// The mouse and a new left click.
     fn read_input(&mut self) -> (i32, i32, bool);
+    /// The port's read before the first pass: `FUN_0043b0f4` polls only
+    /// after each present (0x0043b344, 0x0043b46a), none before the first
+    /// one, so this read steps no F5..F8.
+    fn start_input(&mut self) -> (i32, i32, bool) {
+        self.read_input()
+    }
     fn draw_background(&mut self);
     /// 'S' SERPNEW, 'C' CURSEURS.
     fn draw_sprite(&mut self, bank: char, x: i32, y: i32, frame: i32);
@@ -593,8 +599,14 @@ impl SnakesGame {
     /// and one more present in both loops, then phase 2's poll
     /// (0x0043b46a). 255 solved, 1 left.
     pub async fn run(&mut self, io: &mut impl SnakesIo) -> i32 {
+        let mut first = true;
         while self.result == 0 {
-            let (mx, my, clicked) = io.read_input();
+            let (mx, my, clicked) = if first {
+                first = false;
+                io.start_input()
+            } else {
+                io.read_input()
+            };
             let phase1 = !self.all_placed();
             if clicked {
                 let snd = if phase1 {
@@ -674,6 +686,10 @@ impl SnakesIo for Host<'_> {
         let m = self.0.read_input_held_pointer();
         (m.x, m.y, m.click)
     }
+    fn start_input(&mut self) -> (i32, i32, bool) {
+        let m = self.0.read_entry_held_pointer();
+        (m.x, m.y, m.click)
+    }
     fn draw_background(&mut self) {
         self.0.draw_background();
     }
@@ -735,5 +751,73 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
         1
     } else {
         r
+    }
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+    use std::future::Future;
+    use std::pin::pin;
+    use std::task::{Context, Poll, Waker};
+
+    #[derive(Default)]
+    struct Count {
+        entry: u32,
+        pass: u32,
+        presents: u32,
+    }
+
+    impl SnakesIo for Count {
+        fn read_input(&mut self) -> (i32, i32, bool) {
+            self.pass += 1;
+            (320, 240, false)
+        }
+        fn start_input(&mut self) -> (i32, i32, bool) {
+            self.entry += 1;
+            (320, 240, false)
+        }
+        fn draw_background(&mut self) {}
+        fn draw_sprite(&mut self, _bank: char, _x: i32, _y: i32, _frame: i32) {}
+        async fn present(&mut self, _g: &SnakesGame) {
+            self.presents += 1;
+        }
+        fn play_sound(&mut self, _s: Sound) {}
+        async fn wait_ticks(&mut self, _n: u32) {}
+        fn aborted(&self) -> bool {
+            self.presents == 3
+        }
+    }
+
+    /// FUN_0043b0f4 polls only after each present (0x0043b344,
+    /// 0x0043b46a): the first pass takes the port's entry read, the
+    /// others a pass's read.
+    #[test]
+    fn first_pass_takes_the_entry_read() {
+        let mut g = SnakesGame::new(vec![0; 640 * 480], Default::default());
+        let mut io = Count::default();
+        {
+            let mut f = pin!(g.run(&mut io));
+            let mut cx = Context::from_waker(Waker::noop());
+            assert!(matches!(f.as_mut().poll(&mut cx), Poll::Ready(_)));
+        }
+        assert_eq!((io.entry, io.pass, io.presents), (1, 2, 3));
+    }
+
+    /// The port's entry read steps no F5, a pass's read one.
+    #[test]
+    fn f5_steps_once_a_pass_and_not_at_entry() {
+        let Some(entry) = f5_steps("snakes_f5_entry", |h| {
+            Host(h).start_input();
+        }) else {
+            return;
+        };
+        let pass = f5_steps("snakes_f5_pass", |h| {
+            let mut io = Host(h);
+            io.start_input();
+            io.read_input();
+        });
+        assert_eq!((entry, pass), (0, Some(1)));
     }
 }

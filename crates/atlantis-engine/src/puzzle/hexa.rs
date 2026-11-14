@@ -644,6 +644,73 @@ mod latch_tests {
         assert_eq!(turns(true, true), Some(0));
         assert_eq!(turns(true, false), Some(3));
     }
+
+    /// The turns of a held piece over 20 hexagon reads with the input
+    /// `push` gives at each frame.
+    fn turns_with(test: &str, push: impl FnMut(&Rc<crate::sys::Sys>, u64)) -> Option<i16> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            test,
+            move |mut e| async move {
+                let mut hooks = crate::hooks::NoScripts;
+                let mut host = Host(PuzzleHost::new(&mut e, &mut hooks));
+                let mut g = HexaGame::new(Vec::new(), Vec::new());
+                g.held = 1;
+                for _ in 0..20 {
+                    g.read_boundary(&mut host);
+                    g.right_button(&mut host);
+                    host.0.e.sys.frame().await;
+                }
+                g2.set(Some(g.pieces[0].orient - PIECES[0].orient));
+            },
+            push,
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// FUN_0042e624 tests the whole GetAsyncKeyState word (0x0042e664),
+    /// so a right click pressed and released between two polls is a press
+    /// at the next one (VK_RBUTTON in edge mode, FUN_0042e6dc): the held
+    /// piece turns once.
+    #[test]
+    fn a_right_click_between_two_reads_turns_the_piece() {
+        let got = turns_with("hexa_right_click_between_reads", |sys, frame| {
+            if frame == 5 {
+                button(sys, MouseButton::Right, true);
+                button(sys, MouseButton::Right, false);
+            }
+        });
+        if let Some(t) = got {
+            assert_eq!(t, 1);
+        }
+    }
+
+    /// A right press on the poll a left press edge returns from
+    /// (0x0041a2b5) is lost: that poll set the right latch, and the
+    /// button still held at the next polls is no press.
+    #[test]
+    fn a_right_press_with_a_left_click_turns_nothing() {
+        let got = turns_with(
+            "hexa_right_press_with_left_click",
+            |sys, frame| match frame {
+                5 => {
+                    button(sys, MouseButton::Left, true);
+                    button(sys, MouseButton::Right, true);
+                }
+                7 => button(sys, MouseButton::Left, false),
+                12 => button(sys, MouseButton::Right, false),
+                _ => {}
+            },
+        );
+        if let Some(t) = got {
+            assert_eq!(t, 0);
+        }
+    }
 }
 
 #[cfg(test)]

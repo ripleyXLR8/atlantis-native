@@ -214,7 +214,9 @@ pub struct PuzzleMouse {
     pub y: i32,
     /// The left button went down since the last read.
     pub click: bool,
-    /// The right button went down at this read (see [`right_press`]).
+    /// The right button went down since the last read, as the edge latch
+    /// reports it ([`Sys::poll_event`]), with no left press at this read
+    /// (see [`right_press`]).
     pub right: bool,
     /// Escape went down since the last read, with no left press at this
     /// read: Escape is an edge-mode key (`FUN_0042e6dc`) and
@@ -230,18 +232,18 @@ pub struct PuzzleMouse {
 /// press, lost when the left button goes down on the same poll; a held
 /// button counts once. `down`: the right button at this poll; `prev_down`:
 /// at the previous poll (updated); `left_press`: the left button went down
-/// at this poll.
+/// at this poll. The rule for a button state read at each poll; the engine
+/// takes the edge from [`Sys::poll_event`]'s latch, which also counts a
+/// press made and released between two polls ([`PuzzleInput::read_with`]).
 pub fn right_press(down: bool, prev_down: &mut bool, left_press: bool) -> bool {
     let press = down && !*prev_down && !left_press;
     *prev_down = down;
     press
 }
 
-/// The input of a puzzle: the buttons' state at the last read.
+/// The input of a puzzle (the buttons' edges come from [`Sys`]'s latch).
 #[derive(Clone, Copy, Debug, Default)]
-pub struct PuzzleInput {
-    prev_right: bool,
-}
+pub struct PuzzleInput;
 
 impl PuzzleInput {
     /// Starts with the button state as it is (a button still down from
@@ -249,9 +251,7 @@ impl PuzzleInput {
     /// original have seen it already) and the events dropped.
     pub fn new(sys: &Sys) -> PuzzleInput {
         while sys.poll_event().is_some() {}
-        PuzzleInput {
-            prev_right: sys.buttons().1,
-        }
+        PuzzleInput
     }
 
     /// The events since the last read, then the mouse. A press and its
@@ -265,6 +265,7 @@ impl PuzzleInput {
     /// (false) since the last read passed to `on_left` in order.
     pub fn read_with(&mut self, sys: &Sys, mut on_left: impl FnMut(bool)) -> PuzzleMouse {
         let mut pressed = false;
+        let mut right = false;
         let mut escape = false;
         while let Some(ev) = sys.poll_event() {
             match ev {
@@ -286,21 +287,31 @@ impl PuzzleInput {
                     button: MouseButton::Left,
                     ..
                 } => on_left(false),
+                // VK_RBUTTON is an edge key too (`FUN_0042e6dc`,
+                // 0x006140c2): `FUN_0042e624` tests the whole
+                // GetAsyncKeyState word (`test ax, ax` @ 0x0042e664), so a
+                // right click made and released between two polls is a
+                // press at the next one, as for the left button.
+                Input::MouseDown {
+                    button: MouseButton::Right,
+                    ..
+                } => right = true,
                 _ => {}
             }
         }
-        let right = sys.buttons().1;
         let (x, y) = sys.mouse();
         // The press edge of `FUN_0042e624` (see [`Sys::poll_event`]): a
         // button held since a read that saw it is none, and so is a new
         // press made before any read found the button up.
         let click = pressed;
-        let right = right_press(right, &mut self.prev_right, click);
         PuzzleMouse {
             x,
             y,
             click,
-            right,
+            // `FUN_0041a298` returns on a left press edge before it tests
+            // the right one (0x0041a2b5..0x0041a2e9): that poll set the
+            // right latch, so the press is lost.
+            right: right && !click,
             escape: escape && !click,
         }
     }
@@ -486,7 +497,6 @@ impl<'a> PuzzleHost<'a> {
         if sys.frames_presented() == frames_before {
             return None;
         }
-        self.input.prev_right = sys.buttons().1;
         self.pointer = sys.mouse();
         Some(self.pointer)
     }

@@ -313,14 +313,17 @@ pub struct Engine {
     /// 0x00427ae2, [`crate::ui::bar::pickup_slot_x`]), until the next
     /// slide-in resets the slot table.
     pub bar_pickup_slot: Option<usize>,
-    /// The slots' y (the table 0x00611788) as the last slide left it: the
-    /// slide-in sets 499 and lowers it 7 a frame to 443 (`FUN_0042c2c4`),
-    /// the slide-out raises it 7 a frame (`FUN_0042c59c` @ 0x0042c789).
-    /// The bar loop and the hold loop draw at it (@ 0x0042c97d, 0x0042c9eb;
-    /// 0x0042cdb4, 0x0042ce2c) and the slide-out starts from it (@
-    /// 0x0042c65c, 0x0042c6c9): 443 after a full slide-in, higher after one
-    /// a GameOver or an Exit cut short.
-    pub(crate) bar_slot_y: i32,
+    /// The slots' y, one per visible slot (the table 0x00611788) as the
+    /// last slide left them: the slide-in sets 499 and lowers each 7 a
+    /// frame to 443 (`FUN_0042c2c4` @ 0x0042c31b), the slide-out raises
+    /// each 7 a frame (`FUN_0042c59c` @ 0x0042c789), a pick-up puts its
+    /// slot back to 443 after the slide-in (`FUN_004278a0` @ 0x00427af0).
+    /// The bar loop and the hold loop draw the bar at slot 0's y and each
+    /// icon at its slot's (@ 0x0042c97d, 0x0042c9eb; 0x0042cdb4,
+    /// 0x0042ce2c) and the slide-out starts from them (@ 0x0042c65c,
+    /// 0x0042c6c9): 443 after a full slide-in, higher after one a GameOver
+    /// or an Exit cut short.
+    pub(crate) bar_slot_ys: [i32; crate::ui::bar::BAR_CELLS],
     /// The bar request and the right-press flag.
     pub bar: BarSession,
     /// The guests following the player, and whether they are shown
@@ -432,6 +435,16 @@ pub struct Engine {
     pub(crate) cursor_sprites: Vec<SprSprite>,
     pub(crate) cursor_state: WarpCursorState,
     pub(crate) cursor_shown: i32,
+    /// The sprite the frame of cursor calls drew into the back buffer after
+    /// the copy ([`crate::cursor::warp_cursor_frame_drawn`]), -1 for none.
+    pub(crate) cursor_after_copy: i32,
+    /// The warp frame's back buffer `[0x004960d8]` beyond what it showed:
+    /// that sprite and the pointer it was drawn at, when the frame drew the
+    /// cursor.
+    pub(crate) warp_buffer_cursor: Option<(i32, (i32, i32))>,
+    /// `Sys::frames_presented` after the last warp frame's present: while
+    /// nothing else was presented, the screen holds that frame as composed.
+    pub(crate) warp_frame_presented: Option<u64>,
     pub(crate) cursor_next_ms: u64,
     /// The view keys F5..F8 held at the polls (`FUN_0041a298`) of the loops
     /// other than the warp loop's look, one mask per poll
@@ -530,7 +543,7 @@ impl Engine {
             held_icon: None,
             bar_first: 0,
             bar_pickup_slot: None,
-            bar_slot_y: crate::ui::bar::BAR_HOTSPOT_Y,
+            bar_slot_ys: [crate::ui::bar::BAR_HOTSPOT_Y; crate::ui::bar::BAR_CELLS],
             bar: BarSession::default(),
             guests: Guests::default(),
             guests_shown: true,
@@ -585,6 +598,9 @@ impl Engine {
             cursor_sprites: Vec::new(),
             cursor_state: WarpCursorState::default(),
             cursor_shown: CURSOR_UNSET,
+            cursor_after_copy: -1,
+            warp_buffer_cursor: None,
+            warp_frame_presented: None,
             cursor_next_ms: 0,
             view_key_polls: RefCell::new(Vec::new()),
             ix_buffers: Vec::new(),
