@@ -14,8 +14,6 @@
 //! are found by record number, as the original does, so that the menus of
 //! every language work.
 
-use std::collections::VecDeque;
-
 use atlantis_data::saves::{checkpoint_chapter, epi_episode_name, MAX_PLAYERS};
 use atlantis_data::sprite::read_tga15;
 use atlantis_data::LoadList;
@@ -278,18 +276,21 @@ impl Engine {
         };
         let mut st = PlayerScreenState::default();
         let mut dbl = MenuDoubleClick::default();
-        // The window procedure's WM_CHAR codes, one a frame.
-        let mut keys: VecDeque<u8> = VecDeque::new();
         menu.walk(None, 0, 0, self.menu_table());
-        self.wait_buttons_up().await;
+        // FUN_0041dea4 waits for no release; a press made before it is not
+        // a click (its loop clears the flag each pass, 0x0041e036).
         while self.sys.poll_event().is_some() {}
         loop {
             if self.sys.should_quit() {
                 return None;
             }
             let mi = self.poll_menu_input();
-            keys.extend(&mi.codes);
-            if let Some(k) = keys.pop_front() {
+            // The window procedure stores each WM_CHAR in 0x006ce262
+            // (@ 0x00419ca6), overwriting the last; the walk's polls
+            // dispatch every message queued since the last pass, and the
+            // name entry (0x0041e212..0x0041e4cc) reads one code a pass:
+            // the codes typed within a pass collapse to the last.
+            if let Some(&k) = mi.codes.last() {
                 st.key = k;
             }
             let (mx, my) = self.sys.mouse();
@@ -316,7 +317,6 @@ impl Engine {
                 if confirmed {
                     self.delete_player(row);
                 }
-                self.wait_buttons_up().await;
                 st.delete_done(confirmed);
             }
             // FUN_00420f60 draws the field before the name entry
@@ -388,7 +388,6 @@ impl Engine {
             return true;
         };
         menu.walk(None, 0, 0, self.menu_table());
-        self.wait_buttons_up().await;
         loop {
             if self.should_abort() {
                 return false;
@@ -400,7 +399,6 @@ impl Engine {
                 .filter(|&r| r == 3 || r == 4);
             if mi.left_press {
                 if let Some(r) = hit {
-                    self.wait_buttons_up().await;
                     return r == 3;
                 }
             }
@@ -421,7 +419,7 @@ impl Engine {
             return MenuOutcome::Resume;
         };
         menu.walk(None, 0, 0, self.menu_table());
-        self.wait_buttons_up().await;
+        // FUN_0041c838 clears the click flag before its loop.
         while self.sys.poll_event().is_some() {}
         let mut outcome = MenuOutcome::Resume;
         loop {
@@ -432,7 +430,6 @@ impl Engine {
             let (mx, my) = self.sys.mouse();
             let hit = menu.hit(mx, my, self.menu_table().as_deref());
             if mi.left_press {
-                self.wait_buttons_up().await;
                 match hit {
                     Some(0) => {
                         let exit = self.load_picker(&bg).await;
@@ -494,7 +491,6 @@ impl Engine {
             let under = menu.hit(mx, my, self.menu_table().as_deref());
             let hit = under.filter(|r| [1, 3, 5, 6].contains(r));
             if mi.left_press {
-                self.wait_buttons_up().await;
                 match hit {
                     Some(1) => {
                         self.sound_menu(bg).await;
@@ -608,7 +604,6 @@ impl Engine {
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
         }
-        self.wait_buttons_up().await;
         if commit {
             let volumes = self.son_knob_x.map(menu_volume_from_knob);
             self.commit_sound_volumes(volumes);
@@ -798,7 +793,6 @@ impl Engine {
             let title_shown =
                 title.as_ref().is_some_and(|(t, _)| !t.is_empty()) || title_frame.is_some();
             if dbl_flag && title_shown {
-                self.wait_buttons_up().await;
                 if button == Some(5) && count > 0 {
                     self.players.chapters[player] = self.chapter as u8;
                 }
@@ -806,7 +800,6 @@ impl Engine {
             }
             if mi.left_press && !track_latched {
                 if let Some(b) = button {
-                    self.wait_buttons_up().await;
                     if b == 5 && count > 0 {
                         self.players.chapters[player] = self.chapter as u8;
                     }
@@ -1207,5 +1200,104 @@ mod channel_test_tests {
             return;
         }
         assert_eq!(*got, [SMP_PLAYING, SMP_STOPPED, SMP_PLAYING, SMP_DONE]);
+    }
+}
+
+#[cfg(test)]
+mod player_screen_input_tests {
+    use crate::sys::{Input, Key, MouseButton};
+    use crate::test_support::{button, with_engine};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// The name a new player gets when `a` and `b` are typed within one
+    /// pass of the player screen, then Enter.
+    fn typed_within_one_pass() -> Option<Vec<u8>> {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "player_screen_keys_of_one_pass_collapse",
+            move |mut e| async move {
+                e.load_interface().await;
+                let row = e.player_screen().await;
+                *g2.borrow_mut() = row.map(|r| e.players.name(r).to_vec());
+            },
+            |sys, f| match f {
+                // The new player row (row 0 of an empty list).
+                10 => sys.push_input(Input::MouseMove { x: 300, y: 255 }),
+                11 => button(sys, MouseButton::Left, true),
+                12 => button(sys, MouseButton::Left, false),
+                20 => {
+                    sys.push_input(Input::KeyDown(Key::Char('a')));
+                    sys.push_input(Input::KeyDown(Key::Char('b')));
+                }
+                30 => sys.push_input(Input::KeyDown(Key::Enter)),
+                400 => sys.push_input(Input::Quit),
+                _ => {}
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let name = got.borrow().clone();
+        Some(name.expect("the player screen did not end on Enter"))
+    }
+
+    /// The window procedure keeps only the last WM_CHAR (0x006ce262 @
+    /// 0x00419ca6) and the name entry reads one code a pass: two keys
+    /// typed within one pass give one character, the last.
+    #[test]
+    fn player_screen_keys_of_one_pass_collapse() {
+        let Some(name) = typed_within_one_pass() else {
+            return;
+        };
+        assert_eq!(name.to_ascii_uppercase(), b"B");
+    }
+}
+
+#[cfg(test)]
+mod release_wait_tests {
+    use crate::sys::MouseButton;
+    use crate::test_support::{button, with_engine};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// The screen 20 frames into the in-game menu, entered with the left
+    /// button held (`held`) or not.
+    fn menu_screen(held: bool) -> Option<Vec<u16>> {
+        let shot = Rc::new(RefCell::new(None));
+        let s2 = shot.clone();
+        let ran = with_engine(
+            "the_ingame_menu_is_drawn_while_a_button_is_held",
+            move |mut e| async move {
+                e.load_interface().await;
+                if held {
+                    button(&e.sys, MouseButton::Left, true);
+                }
+                e.ingame_menu().await;
+            },
+            move |sys, f| {
+                if f == 20 {
+                    *s2.borrow_mut() = Some(sys.screen.borrow().clone());
+                    sys.push_input(crate::sys::Input::Quit);
+                }
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let shot = shot.borrow().clone();
+        shot
+    }
+
+    /// `FUN_0041c838` waits for no release (no read of 0x00496114 or of
+    /// GetAsyncKeyState after a press, dc:12880-12920): entered with the
+    /// left button held, MAINMENU is drawn as with the button up.
+    #[test]
+    fn the_ingame_menu_is_drawn_while_a_button_is_held() {
+        let Some(up) = menu_screen(false) else {
+            return;
+        };
+        assert!(menu_screen(true).expect("no frame 20") == up);
     }
 }

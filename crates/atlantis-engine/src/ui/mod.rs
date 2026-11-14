@@ -290,6 +290,51 @@ pub fn object_icon(table: &[i32], id: i32) -> Option<usize> {
 }
 
 impl Engine {
+    /// The icon byte of inventory record `r` (0x006ce138 + 9 r): the
+    /// sprite-list row's icon for a pick-up (`FUN_004278a0` @ 0x00427a88),
+    /// the checkpoint's byte for a loaded record, else the table's index
+    /// of the id (INVENT=, `FUN_0042b328`).
+    pub fn record_icon(&self, r: usize) -> Option<usize> {
+        match self.inventory_icons.get(r) {
+            Some(&Some(k)) => Some(usize::from(k)),
+            _ => object_icon(&self.game.exe.inventory_object_ids, *self.inventory.get(r)?),
+        }
+    }
+
+    /// The icon of the object in hand (0x006cd7ec): the one a pick-up or a
+    /// bar click set for that id (`FUN_004278a0` @ 0x00427a5b,
+    /// `FUN_0042c098` @ 0x0042c18f, `FUN_0042cc98`), else the table's index
+    /// of OBJETENMAIN (Set ObjetEnMain=, dc:21608-21617; the table holds
+    /// each id once, so first and last index agree).
+    pub fn held_icon(&self) -> Option<usize> {
+        let held = self.vars.get("objetenmain");
+        if held == 0 {
+            return None;
+        }
+        match self.held_icon {
+            Some((id, k)) if id == held => Some(usize::from(k)),
+            _ => object_icon(&self.game.exe.inventory_object_ids, held),
+        }
+    }
+
+    /// A record appended (`_DAT_006cd7bc` + 1) with its icon byte.
+    pub(crate) fn inventory_push(&mut self, id: i32, icon: Option<u8>) {
+        self.inventory_icons.resize(self.inventory.len(), None);
+        self.inventory.push(id);
+        self.inventory_icons.push(icon);
+    }
+
+    /// `FUN_0042b3ec`: record `k` removed, the later ones moved down with
+    /// their icon bytes.
+    pub(crate) fn inventory_remove(&mut self, k: usize) {
+        self.inventory.remove(k);
+        if k < self.inventory_icons.len() {
+            self.inventory_icons.remove(k);
+        }
+    }
+}
+
+impl Engine {
     /// What the interface needs before the game: the cursors, the sprite
     /// banks, EPI.TXT, the settings' volumes and the player list.
     pub async fn load_interface(&mut self) {
@@ -451,13 +496,8 @@ impl Engine {
         if let Some(spr) = self.cursor_sprites.get(6) {
             draw_sprite(screen, spr, x, y);
         }
-        let held = self.vars.get("objetenmain");
-        if held != 0 {
-            if let Some(spr) = object_icon(&self.game.exe.inventory_object_ids, held)
-                .and_then(|i| self.ui.object(i))
-            {
-                draw_sprite(screen, spr, x, y);
-            }
+        if let Some(spr) = self.held_icon().and_then(|i| self.ui.object(i)) {
+            draw_sprite(screen, spr, x, y);
         }
     }
 

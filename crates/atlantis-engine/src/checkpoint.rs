@@ -14,7 +14,7 @@ use atlantis_data::saves::{Checkpoint, InventoryRecord, Players, CHECKPOINT_GUES
 use crate::engine::Engine;
 use crate::hooks::ScriptHooks;
 use crate::persist::Settings;
-use crate::ui::{object_icon, Guests};
+use crate::ui::Guests;
 
 /// The player list file.
 pub const PLAYERS_FILE: &str = "players.atl";
@@ -157,7 +157,6 @@ impl Engine {
     pub fn write_checkpoint(&mut self, script: &ScriptState) {
         let player = self.player.min(MAX_PLAYERS - 1);
         let chapter = self.chapter as u8;
-        let table = &self.game.exe.inventory_object_ids;
         let index = self.current_place.unwrap_or(0) as i32;
         let place = i32::from(self.current_place_id.unwrap_or(0));
         let mut guests = [(0, 0); CHECKPOINT_GUESTS];
@@ -177,11 +176,13 @@ impl Engine {
             last_vue: i32::from(self.last_vue),
             requested_vue: place,
             inc_perso: script.inc_perso,
+            // The records as they are, icon bytes included (dc:23472).
             inventory: self
                 .inventory
                 .iter()
-                .map(|&id| InventoryRecord {
-                    sprite: object_icon(table, id).unwrap_or(0) as u8,
+                .enumerate()
+                .map(|(r, &id)| InventoryRecord {
+                    sprite: self.record_icon(r).unwrap_or(0) as u8,
                     id,
                     present: 1,
                 })
@@ -264,7 +265,10 @@ impl Engine {
         self.chapter = u32::from(cp.chapter);
         self.current_place = None;
         self.current_place_id = None;
+        // The records with their icon bytes: the bar draws the file's
+        // bytes.
         self.inventory = cp.inventory.iter().map(|r| r.id).collect();
+        self.inventory_icons = cp.inventory.iter().map(|r| Some(r.sprite)).collect();
         // The follower-talk flag 0x00496144 is not in the checkpoint and the
         // reader leaves it as it was (no reference in `FUN_0042de5c`).
         let mut g = Guests {
