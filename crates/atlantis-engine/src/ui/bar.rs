@@ -302,9 +302,11 @@ impl Engine {
             return 0;
         }
         let mut guest = 0;
+        // FUN_0042c2c4 polls no input (dc FUN_0042c2c4): a press made during
+        // the slide-in is the press edge of the bar loop's first poll
+        // (FUN_0042e624 latches an edge-mode key on the first poll that sees
+        // it down), which closes the bar.
         if !closed {
-            self.wait_buttons_up().await;
-            while self.sys.poll_event().is_some() {}
             guest = self.bar_loop(hooks).await;
         }
         if self.should_abort() {
@@ -340,6 +342,11 @@ impl Engine {
     async fn bar_loop(&mut self, hooks: &mut dyn ScriptHooks) -> i32 {
         let mut next_scroll = 0u64;
         let (mut left, mut game_over, mut section_closed) = (false, false, false);
+        // The pointer 0x004960ec / 0x004960f0 as the message pump of the
+        // last poll left it: the left-press branch of FUN_0041a298 returns
+        // before its pump (0x0041a2b5), so the press pass keeps the
+        // previous pass's pointer.
+        let mut pointer = self.sys.mouse();
         self.bar.opened(); // 0x0042c8c4
         loop {
             if self.should_abort() {
@@ -350,6 +357,7 @@ impl Engine {
                 left = true;
                 break;
             }
+            pointer = self.sys.mouse();
             if mi.right_press {
                 break; // the right button empties the hand below
             }
@@ -375,13 +383,15 @@ impl Engine {
         self.bar.flags_reset();
         // The exit test of FUN_0042c8ac (0x0042cbfe): the portrait under
         // the pointer, other than 592.
-        let (mx, my) = self.sys.mouse();
+        let (mx, my) = pointer;
         let guest = match self.guest_at(mx, my) {
             592 => 0,
             g => g,
         };
-        self.wait_buttons_up().await;
         if game_over || guest != 0 {
+            // The conversation starts once the buttons are up (the port's
+            // release wait before the talk).
+            self.wait_buttons_up().await;
             return guest;
         }
         // Left by a timer section: no item click; the hand is emptied only
@@ -389,7 +399,8 @@ impl Engine {
         if section_closed && !session.right_press {
             return 0;
         }
-        let (mx, my) = self.sys.mouse();
+        // FUN_0042c098 reads the cell at once (0x0042c0f8, 0x0042c117),
+        // from the same pointer, with no wait for the release.
         let held = self.vars.get("objetenmain");
         // FUN_0042c098 compares ids; a cell past the last record reads 0,
         // which empties the hand.
@@ -417,8 +428,8 @@ impl Engine {
         };
         let mut right = false;
         let mut next_scroll = 0u64;
-        // The loop ends on a press edge of either button.
-        while self.sys.poll_event().is_some() {}
+        // The loop ends on a press edge of either button; a press made
+        // during the slide-in (which polls no input) is its first poll's.
         while !self.should_abort() {
             // FUN_0042cc98 animates the place sprites (@ 0x0042cd1c) and
             // draws like the bar loop; it runs no timers.
@@ -513,6 +524,9 @@ impl Engine {
         self.bow_sprites.clear();
     }
 
+    /// One frame of the bow rising or lowering. `FUN_0042d198` /
+    /// `FUN_0042d368` poll no input: a press made meanwhile is the next
+    /// poll's press edge.
     async fn show_bow_at(&mut self, y: i32) {
         self.animate_sprites();
         if !self.warp_loaded {
@@ -524,7 +538,6 @@ impl Engine {
             draw_sprite(&mut s, spr, 0x2e, y);
         }
         self.sys.frame().await;
-        while self.sys.poll_event().is_some() {}
     }
 
     /// ArcMagique=N (`FUN_0042a100` @ 0x0042aa21..0x0042ac2b):
@@ -616,7 +629,7 @@ impl Engine {
 mod tests {
     use super::*;
     use crate::hooks::{ready, HookFuture, NoScripts};
-    use crate::sys::MouseButton;
+    use crate::sys::{Input, MouseButton};
     use crate::test_support::{button, with_engine};
     use crate::warp::SCREEN_W;
     use md5::{Digest, Md5};
@@ -796,6 +809,73 @@ mod tests {
         }
         let got = *got.borrow();
         assert_eq!(got, Some(0));
+    }
+
+    /// `FUN_0042c098` takes the cell under the pointer of the press
+    /// (0x0042c0f8), with no wait for the release: a click that moves to
+    /// another cell before its release takes the first one.
+    #[test]
+    fn bar_item_is_read_at_the_press() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "bar_item_is_read_at_the_press",
+            move |mut e| async move {
+                e.inventory = vec![1001, 1002, 1003];
+                e.vars.set("objetenmain", 0);
+                e.display_bar(&mut NoScripts).await;
+                *g2.borrow_mut() = Some(e.vars.get("objetenmain"));
+            },
+            |sys, f| match f {
+                30 => sys.push_input(Input::MouseMove { x: 35, y: 450 }),
+                40 => button(sys, MouseButton::Left, true),
+                41 => sys.push_input(Input::MouseMove { x: 105, y: 450 }),
+                45 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some(1001));
+        }
+    }
+
+    /// The slide-ins (`FUN_0042c2c4`) poll no input: a press made during
+    /// one is the first poll's press edge, which ends the bar loop
+    /// (`FUN_0042c8ac`) or the pick-up's hold loop (`FUN_0042cc98`) on
+    /// its first pass.
+    #[test]
+    fn press_during_the_slide_in_closes_the_bar() {
+        for pickup in [false, true] {
+            let got = Rc::new(RefCell::new(None));
+            let g2 = got.clone();
+            let ran = with_engine(
+                "press_during_the_slide_in_closes_the_bar",
+                move |mut e| async move {
+                    e.inventory = vec![1001];
+                    e.vars.set("objetenmain", 1001);
+                    if pickup {
+                        e.display_pickup(&mut NoScripts).await;
+                    } else {
+                        e.display_bar(&mut NoScripts).await;
+                    }
+                    *g2.borrow_mut() = Some(e.sys.millis());
+                },
+                |sys, f| match f {
+                    3 => button(sys, MouseButton::Right, true),
+                    4 => button(sys, MouseButton::Right, false),
+                    // Without the press edge the bar stays up until this.
+                    300 => button(sys, MouseButton::Left, true),
+                    301 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                },
+            );
+            if !ran {
+                return;
+            }
+            // 8 slide-in frames, one loop pass, 11 slide-out frames.
+            let ms = got.borrow().expect("the bar did not end");
+            assert!(ms < 40 * 16, "pickup {pickup}: ended at {ms} ms");
+        }
     }
 
     /// The view the goldens' harness renders: u16 pixel i = (i *

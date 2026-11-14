@@ -315,6 +315,18 @@ impl Engine {
     }
 
     /// The settings of the store, or those of the options.
+    /// The original's start values of the options `settings.ini` keeps:
+    /// 0x004960ac = 0 (OMNI 3D MODE 1) and the volumes 0x00495e70.. =
+    /// `7f 6e 6e 6e` are data bytes of the executable, written only by the
+    /// OPTMENU toggle (@ 0x0041d794), the sound menu's OK (@ 0x0041d813..
+    /// 0x0041d926) and the checkpoint reader, so every run starts with
+    /// them. Not written back to `settings.ini`.
+    pub(crate) fn original_start_values(&mut self) {
+        self.settings.omni3d_mode2 = false;
+        self.settings.volumes = crate::persist::DEFAULT_VOLUMES;
+        self.apply_volumes();
+    }
+
     pub(crate) fn load_settings(&mut self, fallback: Settings) {
         let s = Settings::load(self.saves.as_ref()).unwrap_or(fallback);
         self.settings = Settings {
@@ -360,6 +372,52 @@ mod tests {
         let got = got.borrow();
         if !got.is_empty() {
             assert_eq!(&got[..], &b"wam\\trone.wam\0am\0\0\0\0"[..]);
+        }
+    }
+
+    /// `--original` starts at the original's OMNI 3D MODE 1 and volumes
+    /// `7f 6e 6e 6e` (0x004960ac, 0x00495e70.. data bytes) whatever
+    /// `settings.ini` keeps, and leaves the file as it is; the default run
+    /// takes the stored values.
+    #[test]
+    fn original_starts_at_the_original_options() {
+        let got = Rc::new(std::cell::RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        with_engine(
+            "original_starts_at_the_original_options",
+            move |mut e| async move {
+                let store = Rc::new(MemStore::new());
+                let stored = Settings {
+                    omni3d_mode2: true,
+                    volumes: [10, 20, 30, 40],
+                    ..Settings::default()
+                };
+                stored.save(store.as_ref());
+                e.saves = store.clone();
+                for original in [false, true] {
+                    e.load_settings(Settings::default());
+                    if original {
+                        e.original_start_values();
+                    }
+                    g2.borrow_mut().push((
+                        e.settings.omni3d_mode2,
+                        e.settings.volumes,
+                        e.ambient.effects_volume,
+                        Settings::load(store.as_ref()) == Some(stored),
+                    ));
+                }
+            },
+            |_, _| {},
+        );
+        let got = got.borrow();
+        if !got.is_empty() {
+            assert_eq!(
+                *got,
+                [
+                    (true, [10, 20, 30, 40], 30, true),
+                    (false, crate::persist::DEFAULT_VOLUMES, 0x6e, true),
+                ]
+            );
         }
     }
 

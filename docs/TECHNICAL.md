@@ -265,7 +265,13 @@ rules:
 [Atlantis II](#atlantis-ii-in-progress).
 
 `--original` turns every fix and the two other groups off, for the run
-only. Otherwise they are read from
+only. In the first game it also starts the run with the original's
+values of the menu options `settings.ini` keeps: SUBTITLES off
+(0x004960a8), OMNI 3D MODE 1 (0x004960ac = 0) and the volumes `7f 6e 6e
+6e` (0x00495e70..), data bytes that only the menus and the checkpoint
+reader write, so every run of the original starts with them
+(`Options::original_start_values`, not written back; a checkpoint load
+sets its own). Otherwise they are read from
 `settings.ini` (see [Players, checkpoints and settings](GUIDE.md#players-checkpoints-and-settings)),
 which the first start writes with the defaults; the options menu (F10)
 turns them on and off: Fix original bugs (On, Off, or Custom (n/N) over

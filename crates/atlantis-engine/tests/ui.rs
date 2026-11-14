@@ -961,6 +961,13 @@ fn inventory_bar_and_pickup() {
             })
         },
         |h, n| match n {
+            // The pointer moves a pass before each press: the bar reads
+            // the cell at the pointer of the pass before the press
+            // (FUN_0041a298 returns before its message pump on a left
+            // press, 0x0041a2b5).
+            29 => h.sys.push_input(Input::MouseMove { x: 112, y: 440 }),
+            89 => h.sys.push_input(Input::MouseMove { x: 320, y: 440 }),
+            149 | 209 => h.sys.push_input(Input::MouseMove { x: 320, y: 300 }),
             // The slides take 8 and 11 frames.
             30 => h.click(112, 440),
             90 => h.button(MouseButton::Right, 320, 440),

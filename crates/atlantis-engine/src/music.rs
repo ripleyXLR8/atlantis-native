@@ -898,18 +898,37 @@ impl Engine {
         // LOADMUSIK fix; music_load_min_volume is 0 in every other build.
         // The executor's first-value test (0x00429c52) is also LoadMusik's
         // own (0x0041e862..0x0041e891).
-        let copies = if load && self.music.fade().cur < build.music_load_min_volume {
-            Vec::new()
+        let first_listed = list.first().is_some_and(|&i| i < 0x20);
+        let (copies, tail) = if load && self.music.fade().cur < build.music_load_min_volume {
+            (Vec::new(), false)
         } else if load && build.music_load_all_or_nothing && !fixes {
-            con_music_load_all_or_nothing(&list, current, &mut on_disk)
+            // FUN_0041e830 returns before its tail when its first track is
+            // there or open (0x0041e891): only a copy reaches it.
+            let c = con_music_load_all_or_nothing(&list, current, &mut on_disk);
+            let tail = !c.is_empty();
+            (c, tail)
         } else {
-            con_music_apply(load, &list, current, &mut on_disk, rule)
+            // The first-value rule (0x00429b12) skips the call.
+            let skipped = rule && list.first().is_some_and(|&i| i32::from(i) + 1 == current);
+            let c = con_music_apply(load, &list, current, &mut on_disk, rule);
+            (c, load && first_listed && !skipped)
         };
         for idx in copies {
             self.music_copy_through_screen_buffer(idx).await;
         }
         self.music.on_disk = on_disk;
         self.save_music_on_disk(on_disk);
+        // LoadMusik's tail (FUN_0041f1d0 @ 0x0041f347..0x0041f365), run
+        // whenever its first index is below 0x20 (SPRMENU.SPR loads with
+        // the shipped data), copy or not: 0x00496124 = 1, the click flag
+        // 0x0049611c = 0, 0x00496138 = 0, 0x00495ea4 = 0x50. So an Escape
+        // latch (a puzzle's Escape, the in-game menu's LOAD / QUIT before a
+        // zone-999 scan) is cleared, as Cinema= clears it. The 1997 builds
+        // have the same tail (atlantis-cd-en-688128 and -fr-688640 @
+        // 0x0041e998 on their own addresses).
+        if tail {
+            self.escape_request = false;
+        }
     }
 
     /// The tracks on disk written to the settings file when they changed;
@@ -1236,6 +1255,47 @@ mod on_disk_tests {
         if ran {
             let got = *got.borrow();
             assert_eq!(got, Some(((0x14, true), Some(0x14), 0x14, true)));
+        }
+    }
+}
+
+#[cfg(test)]
+mod load_musik_tail_tests {
+    use super::*;
+    use crate::persist::MemStore;
+    use crate::test_support::with_engine;
+
+    /// LoadMusik's tail clears the Escape latch (FUN_0041f1d0 @
+    /// 0x0041f347..0x0041f35b) whether or not a track is copied; a first
+    /// index of 0x20 or more (and DelMusik) leave it.
+    #[test]
+    fn load_musik_clears_the_escape_latch() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        with_engine(
+            "load_musik_clears_the_escape_latch",
+            move |mut e| async move {
+                e.saves = Rc::new(MemStore::new());
+                let mut out = Vec::new();
+                for (load, cmd) in [
+                    (true, &b"/set(loadmusik=3,5)\r\n"[..]),
+                    // Copied already: nothing copied, the tail runs.
+                    (true, &b"/set(loadmusik=3,5)\r\n"[..]),
+                    (true, &b"/set(loadmusik=40,5)\r\n"[..]),
+                    // DelMusik on the same list.
+                    (false, &b"/set(loadmusik=3,5)\r\n"[..]),
+                ] {
+                    e.escape_request = true;
+                    e.music_list_command(load, cmd, 15).await;
+                    out.push(e.escape_request);
+                }
+                *g2.borrow_mut() = out;
+            },
+            |_, _| {},
+        );
+        let got = got.borrow();
+        if !got.is_empty() {
+            assert_eq!(*got, [false, false, true, true]);
         }
     }
 }

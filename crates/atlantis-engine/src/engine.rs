@@ -173,6 +173,11 @@ pub struct Options {
     /// Where the players, the checkpoints and the settings are kept.
     pub saves: Rc<dyn SaveStore>,
     pub start: Start,
+    /// `--original`: OMNI 3D MODE 1 and the volumes `7f 6e 6e 6e` at the
+    /// start, as every run of the original (0x004960ac = 0, 0x00495e70..
+    /// data bytes), whatever `settings.ini` keeps; a checkpoint load still
+    /// sets the ones it holds.
+    pub original_start_values: bool,
 }
 
 impl Default for Options {
@@ -185,6 +190,7 @@ impl Default for Options {
             subtitles: true,
             saves: Rc::new(MemStore::new()),
             start: Start::default(),
+            original_start_values: false,
         }
     }
 }
@@ -310,7 +316,6 @@ pub struct Engine {
     pub(crate) menu_records: crate::ui::layout::MenuRecordTable,
     /// The captions of the CINEMA video playing (`ExeBuild::cinema_captions`).
     pub(crate) cinema_captions: Option<crate::place::CinemaCaptionState>,
-    pub(crate) channel_test_voice: Option<crate::audio::VoiceId>,
     /// The voices' volume, 0..255.
     pub voice_volume: u8,
     /// The players, and the current one's row (0x00496607).
@@ -348,6 +353,10 @@ pub struct Engine {
     pub sprite_anim_current: Vec<usize>,
     pub(crate) sprite_anim_last: [u32; atlantis_data::sprite_anim::SPRITE_ANIM_SLOTS],
     pub(crate) sprite_anim_tick: u32,
+    /// A step of [`Engine::animate_sprites`] changed a frame or an active
+    /// flag that the panorama's sprite layer does not show yet: the next
+    /// call draws it before it steps (`FUN_00425304` draws, then steps).
+    pub(crate) sprite_layer_stale: bool,
     /// WSPRFRAME.
     pub wspr_frame: i32,
     /// F9 during navigation: the diagnostic overlay (port-only).
@@ -480,7 +489,6 @@ impl Engine {
             son_knob_x: [0; 4],
             menu_records,
             cinema_captions: None,
-            channel_test_voice: None,
             voice_volume: crate::persist::mixer_volume(crate::persist::DEFAULT_VOLUMES[3]),
             players: Players::new(b"#New Player"),
             player: 0,
@@ -501,6 +509,7 @@ impl Engine {
             sprite_anim_current: vec![0; 512],
             sprite_anim_last: [0; atlantis_data::sprite_anim::SPRITE_ANIM_SLOTS],
             sprite_anim_tick: 0,
+            sprite_layer_stale: false,
             wspr_frame: 0,
             debug_overlay: std::cell::Cell::new(false),
             debug_font: std::cell::OnceCell::new(),
@@ -1166,6 +1175,7 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
         subtitles,
         saves,
         start,
+        original_start_values,
     } = opts;
     let mut e = Engine::new(sys, game, loader);
     e.trace = trace;
@@ -1181,6 +1191,9 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
         enhancements,
         ..Settings::default()
     });
+    if original_start_values {
+        e.original_start_values();
+    }
     e.load_interface().await;
     if start == Start::Boot {
         e.play_startup().await;

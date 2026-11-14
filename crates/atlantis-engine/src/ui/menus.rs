@@ -617,22 +617,27 @@ impl Engine {
     /// hard left or right at the effects volume; the menu runs on while it
     /// plays (the original's click wait ends at once).
     async fn channel_test(&mut self, right: bool) {
-        if let Some(v) = self.channel_test_voice.take() {
-            self.sys.mixer.stop(v);
-        }
         if let Some(pcm) = self
             .read("WAV\\VAGUE_10.APC")
             .await
             .and_then(|d| apc_pcm(&d))
         {
-            let vol = (u32::from(self.ambient.effects_volume.min(127)) * 255 / 127) as u8;
-            self.channel_test_voice = Some(self.sys.mixer.play(
-                pcm,
-                false,
-                vol,
-                if right { 127 } else { -127 },
-            ));
+            self.start_channel_test(pcm, right);
         }
+    }
+
+    /// The test plays on ambient sample 1 (Miles handle 0x006cc564):
+    /// AIL_stop_sample (@ 0x0041dbdd / 0x0041dd89), pan 0 or 0x7f, the
+    /// effects volume 0x00495e73, AIL_start_sample. The place's second
+    /// ambient sound is cut; once the test is done, `FUN_00432178` finds
+    /// the sample in status 2 and starts a newly drawn variant (and until
+    /// then applies the ambient pan / volume to the test sound).
+    pub(crate) fn start_channel_test(&mut self, pcm: crate::audio::Pcm, right: bool) {
+        use crate::ambient::AmbientSampleOutput;
+        self.ambient_out.stop(1);
+        let vol = self.ambient.effects_volume;
+        self.ambient_out
+            .start_pcm(1, pcm, if right { 0x7f } else { 0 }, vol);
     }
 
     /// The current player's checkpoints, ascending chapters (the picker's
@@ -1153,5 +1158,51 @@ mod picker_key_tests {
         };
         assert_eq!(default, 6);
         assert_eq!(after_enter(Enhancements::original()), Some(7));
+    }
+}
+
+#[cfg(test)]
+mod channel_test_tests {
+    use crate::ambient::{AmbientSampleOutput, SMP_DONE, SMP_PLAYING, SMP_STOPPED};
+    use crate::audio::Pcm;
+    use crate::test_support::with_engine;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use std::sync::Arc;
+
+    /// The sound menu's Left / Right test plays on ambient sample 1 as
+    /// the original's (`FUN_0041db4c` / `FUN_0041dcf8`): a playing ambient
+    /// sound there is stopped and the sample is playing the test, so the
+    /// ambient player restarts it with a new variant once the test is done.
+    #[test]
+    fn channel_test_plays_on_ambient_sample_1() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        with_engine(
+            "channel_test_plays_on_ambient_sample_1",
+            move |mut e| async move {
+                let long = || Pcm {
+                    rate: 22050,
+                    channels: 1,
+                    samples: Arc::new(vec![0i16; 22050 * 60]),
+                };
+                // An ambient sound on sample 1, then its stop: status 8.
+                e.ambient_out.start_pcm(1, long(), 0x40, 0x40);
+                let mut s = vec![e.ambient_out.status(1)];
+                e.ambient_out.stop(1);
+                s.push(e.ambient_out.status(1));
+                e.channel_test(true).await;
+                s.push(e.ambient_out.status(1));
+                // The other samples are not touched.
+                s.push(e.ambient_out.status(0));
+                *g2.borrow_mut() = s;
+            },
+            |_, _| {},
+        );
+        let got = got.borrow();
+        if got.is_empty() {
+            return;
+        }
+        assert_eq!(*got, [SMP_PLAYING, SMP_STOPPED, SMP_PLAYING, SMP_DONE]);
     }
 }

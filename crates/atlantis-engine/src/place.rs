@@ -220,6 +220,7 @@ impl Engine {
         let Some(vue) = self.current_place_id else {
             return;
         };
+        self.sprite_layer_stale = false;
         self.warp_surface.copy_from_slice(&self.cyclo);
         self.hd_surface_changed();
         for e in &self.sprite_list {
@@ -246,6 +247,14 @@ impl Engine {
     /// 200 Hz counter is run for each tick elapsed since the last call (at
     /// most 2 s, e.g. after a video), as the original, which does not wait
     /// for the display, steps every 14 or 15 ticks.
+    ///
+    /// The original draws each row at its current frame (`call 0x00452d39`
+    /// @ 0x00425476) before it steps it (last tick written @ 0x0042552c,
+    /// frame + 1, then the cycle end), and the view is rendered right
+    /// after: a stepped frame is first seen on the next pass, and a type-2
+    /// row is still drawn at its last frame on the pass that ends its
+    /// cycle. So the layer is redrawn here with the previous call's steps,
+    /// and this call's steps are drawn by the next one.
     pub(crate) fn animate_sprites(&mut self) {
         let Some(vue) = self.current_place_id else {
             return;
@@ -260,6 +269,9 @@ impl Engine {
         } else {
             now
         };
+        if self.sprite_layer_stale {
+            self.recomposite_sprite_layer();
+        }
         let mut changed = false;
         let current = self.sprite_anim_current[usize::from(vue)];
         // FUN_00425304 writes the CON variable WSPRFRAME itself (the frame
@@ -284,7 +296,7 @@ impl Engine {
         self.wspr_frame = wspr;
         self.vars.set("wsprframe", wspr);
         if changed {
-            self.recomposite_sprite_layer();
+            self.sprite_layer_stale = true;
         }
     }
 
@@ -1134,6 +1146,63 @@ mod wsprframe_tests {
             &seen[..40]
         );
         assert!(*seen.iter().max().unwrap() > 33);
+    }
+}
+
+#[cfg(test)]
+mod sprite_draw_order_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// `FUN_00425304` draws a row at its frame, then steps it: the frame a
+    /// step makes is on the panorama only from the next pass. The slave
+    /// pacing in the ATLAN5 alley (view 126, type 1, 104 frames).
+    #[test]
+    fn place_sprite_step_is_drawn_on_the_next_pass() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let got = Rc::new(std::cell::RefCell::new(None));
+        let g2 = got.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("ATLAN5.WAM").await);
+            e.next_place_id = Some(126);
+            e.do_place_change().await;
+            let frames = |e: &Engine| -> Vec<i32> {
+                e.sprite_list
+                    .iter()
+                    .filter(|r| r.place_id == 126)
+                    .map(|r| r.frame)
+                    .collect()
+            };
+            for _ in 0..400 {
+                let before = frames(&e);
+                let shown = e.warp_surface.clone();
+                e.animate_sprites();
+                if frames(&e) != before {
+                    // The step's pass shows the frames from before it.
+                    let same_pass = e.warp_surface == shown;
+                    e.sys.frame().await;
+                    e.animate_sprites();
+                    let next_pass = e.warp_surface != shown;
+                    *g2.borrow_mut() = Some((same_pass, next_pass));
+                    return;
+                }
+                e.sys.frame().await;
+            }
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        assert_eq!(*got.borrow(), Some((true, true)));
     }
 }
 

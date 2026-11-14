@@ -1694,7 +1694,8 @@ impl ApplicationHandler for App {
 /// The options of a run with its saves in `saves`: the subtitles and the
 /// enhancements read from the store's `settings.ini` (written with the
 /// defaults when there is none); `original` turns the enhancements and
-/// the subtitles off.
+/// the subtitles off and starts at the original's OMNI 3D mode and
+/// volumes.
 pub fn options_with_settings(
     saves: Rc<dyn SaveStore>,
     original: bool,
@@ -1712,8 +1713,10 @@ pub fn options_with_settings(
             settings.enhancements
         },
         // `--original` starts with SUBTITLES off, as every start of the
-        // original (0x004960a8 = 0), whatever settings.ini keeps.
+        // original (0x004960a8 = 0), whatever settings.ini keeps; OMNI 3D
+        // MODE 1 and the volumes 7f 6e 6e 6e too (0x004960ac, 0x00495e70..).
         subtitles: settings.subtitles && !original,
+        original_start_values: original,
         saves,
         start,
         ..atlantis_engine::Options::default()
@@ -1861,6 +1864,32 @@ pub(crate) fn compose_on_card(
         None => gl.present(window, &[], (0, 0), whole, true, Some((tex, whole))),
     }
     true
+}
+
+#[cfg(test)]
+mod original_options_tests {
+    use super::*;
+    use atlantis_engine::MemStore;
+
+    /// `--original` asks the engine for the original's start values of
+    /// the options (OMNI 3D MODE 1, volumes 7f 6e 6e 6e) and SUBTITLES
+    /// off; the default run keeps `settings.ini`'s.
+    #[test]
+    fn original_run_starts_at_the_original_options() {
+        let store = Rc::new(MemStore::new());
+        Settings {
+            subtitles: true,
+            omni3d_mode2: true,
+            volumes: [10, 20, 30, 40],
+            ..Settings::default()
+        }
+        .save(store.as_ref());
+        let saves: Rc<dyn SaveStore> = store.clone();
+        let o = options_with_settings(saves.clone(), true, Start::Boot);
+        assert!(o.original_start_values && !o.subtitles);
+        let o = options_with_settings(saves, false, Start::Boot);
+        assert!(!o.original_start_values && o.subtitles);
+    }
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
