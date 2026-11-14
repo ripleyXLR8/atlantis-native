@@ -741,10 +741,11 @@ impl Engine {
         }
         // The main loop sets 0x00496124 = 1 before the reload (0x0041975d).
         self.escape_request = false;
-        // The place loop tests the run flag 0x00496124 (LOAD, QUIT) before
-        // GAMEOVER (0x00423ca5, then 0x00423cba): a LOAD or QUIT chosen
-        // during the puzzle or the scan wins over the game over that ended
-        // the warp loop.
+        // An abort raised here wins over the one that ended the warp loop:
+        // the game-over screen sets 0x00496124 = 1 (FUN_00426590 @
+        // 0x00426c41), so a game over raised by the zone-999 scan after a
+        // LOAD or QUIT (CHAPI031 /372 under `--original`) passes the place
+        // loop's run-flag test (0x00423ca5), and its GAMEOVER test reloads.
         if self.abort.is_none() {
             self.abort = abort;
         }
