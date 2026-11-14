@@ -580,6 +580,15 @@ impl Engine {
             // polled.
             self.poll_new_sound().await;
             self.ambient_frame();
+            // Then the pointer 0x004960ec / 0x004960f0 = (320, 240) and
+            // SetCursorPos(320, 240) (0x004960cc is 1), on every frame of
+            // both phases before the frame's poll (0x0042156a..0x00421593,
+            // 0x00421954..0x0042197d): Windows sees the turn's and the
+            // film's presses at the centre, wherever the exit was clicked
+            // (Sys::double_click).
+            self.pointer.recentre();
+            self.sys.set_mouse_pos(320, 240);
+            self.mark_pointer_mouse();
             self.animate_sprites();
             self.render_view();
             if self.guests_shown && self.guests.count != 0 {
@@ -1649,6 +1658,53 @@ mod escape_tests {
             got.get()
         } else {
             None
+        }
+    }
+
+    /// FUN_004212cc puts the pointer and the Windows cursor at (320, 240)
+    /// on every frame before its poll (0x0042156a..0x00421593): a press
+    /// during the turn is at the centre, so it does not pair with a click
+    /// made off-centre (Windows' 4 x 4 rectangle) and the move's film is
+    /// not skipped.
+    #[test]
+    fn the_turn_recentres_the_cursor_for_the_pairing() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let start = Rc::new(Cell::new(u64::MAX));
+        let s2 = start.clone();
+        let ran = with_engine(
+            "the_turn_recentres_the_cursor_for_the_pairing",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.set_view(0.0, 0.0);
+                // The exit clicked at (100, 100).
+                e.sys.set_mouse_pos(100, 100);
+                e.pointer.pos = (100, 100);
+                e.mark_pointer_mouse();
+                let now = e.sys.millis();
+                e.sys.double_click().first_press(now, 100, 100);
+                e.cursor_state.mode = 5;
+                s2.set(e.sys.frames_presented());
+                e.turn_to_transition(0.3, 0.0).await;
+                g2.set(Some((
+                    e.sys.double_click().flag,
+                    e.sys.mouse(),
+                    e.pointer.pos,
+                )));
+            },
+            move |sys, _| {
+                let k = sys.frames_presented().saturating_sub(start.get());
+                if start.get() != u64::MAX && k == 3 {
+                    crate::test_support::button(sys, MouseButton::Left, true);
+                } else if start.get() != u64::MAX && k == 4 {
+                    crate::test_support::button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some((false, (320, 240), (320, 240))));
         }
     }
 
