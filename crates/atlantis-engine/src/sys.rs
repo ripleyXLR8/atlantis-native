@@ -131,8 +131,9 @@ pub struct Sys {
     mouse: Cell<(i32, i32)>,
     buttons: Cell<(bool, bool)>,
     /// The input events, each with the time it came (the message time
-    /// Windows pairs the left presses by).
-    events: RefCell<VecDeque<(Input, u64)>>,
+    /// Windows pairs the left presses by) and, once a read judged it,
+    /// whether a left press came as WM_LBUTTONDBLCLK.
+    events: RefCell<VecDeque<(Input, u64, bool)>>,
     /// Windows' double-click pairing of the left presses and the flag
     /// 0x00496118 the window procedure sets on WM_LBUTTONDBLCLK, see
     /// [`Sys::double_click`].
@@ -369,10 +370,21 @@ impl Sys {
     /// events makes that read, as every polling loop of the original calls
     /// `FUN_0041a298`.
     pub fn poll_event(&self) -> Option<Input> {
+        self.poll_event_paired().map(|(ev, _)| ev)
+    }
+
+    /// [`Sys::poll_event`], with whether a left press (latched or not)
+    /// came as WM_LBUTTONDBLCLK, the second press of a pair
+    /// ([`crate::turn::TurnDoubleClick::queue_press`]), not as
+    /// WM_LBUTTONDOWN.
+    pub fn poll_event_paired(&self) -> Option<(Input, bool)> {
         if self.read_frame.get() != Some(self.frames.get()) || self.unjudged.get() > 0 {
             self.latch_read();
         }
-        self.events.borrow_mut().pop_front().map(|(ev, _)| ev)
+        self.events
+            .borrow_mut()
+            .pop_front()
+            .map(|(ev, _, double)| (ev, double))
     }
 
     /// One read of `FUN_0042e624` for the two buttons.
@@ -392,7 +404,7 @@ impl Sys {
             if edge {
                 continue;
             }
-            for (ev, _) in q.range_mut(start..) {
+            for (ev, _, _) in q.range_mut(start..) {
                 if let Input::MouseDown { button, x, y } = *ev {
                     if button == which {
                         *ev = Input::MouseDownLatched { button, x, y };
@@ -406,8 +418,8 @@ impl Sys {
         let mut dc = self.double_click.borrow_mut();
         dc.poll_started();
         let mut edge = false;
-        for &(ev, ms) in q.range(start..) {
-            let (x, y) = match ev {
+        for (ev, ms, double) in q.range_mut(start..) {
+            let (x, y) = match *ev {
                 Input::MouseDown {
                     button: MouseButton::Left,
                     x,
@@ -428,7 +440,7 @@ impl Sys {
             } else {
                 (x, y)
             };
-            dc.queue_press(ms, x, y);
+            *double = dc.queue_press(*ms, x, y);
         }
         if !edge {
             dc.pump();
@@ -509,7 +521,7 @@ impl Sys {
         }
         self.events
             .borrow_mut()
-            .push_back((input, self.now_ms.get()));
+            .push_back((input, self.now_ms.get(), false));
         self.unjudged.set(self.unjudged.get() + 1);
     }
 

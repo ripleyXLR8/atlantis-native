@@ -19,6 +19,7 @@ use std::collections::VecDeque;
 
 use atlantis_data::sprite::SprSprite;
 
+use super::assets::LeftMessage;
 use super::{load_spr, load_tga, read_puzzle_file, PuzzleHost, PuzzleSounds, SamplePlayer};
 use crate::engine::Engine;
 use crate::hooks::ScriptHooks;
@@ -1676,9 +1677,8 @@ struct Host<'a> {
     rat: Vec<SprSprite>,
     /// The held flag 0x00496114.
     held: bool,
-    /// The left button's WM_LBUTTONDOWN (true) / WM_LBUTTONUP (false) not
-    /// dispatched yet.
-    button_messages: VecDeque<bool>,
+    /// The left button's messages not dispatched yet.
+    button_messages: VecDeque<LeftMessage>,
     mx: i32,
     my: i32,
     /// The end of the pass's busy wait, in ticks.
@@ -1710,11 +1710,17 @@ impl RatIo for Host<'_> {
         let m = self
             .host
             .input
-            .read_with(&self.host.e.sys, |down| queue.push_back(down));
+            .read_with(&self.host.e.sys, |msg| queue.push_back(msg));
         super::assets::poll_flags(self.host.e, &m);
         if !m.click {
-            if let Some(down) = self.button_messages.pop_front() {
-                self.held = down;
+            // WM_LBUTTONDOWN sets the held flag (@ 0x00419c47), WM_LBUTTONUP
+            // clears it (@ 0x00419c6a); WM_LBUTTONDBLCLK (0x00419c79..
+            // 0x00419c95) writes only 0x00496118: the second press of a
+            // pair holds nothing.
+            match self.button_messages.pop_front() {
+                Some(LeftMessage::Down) => self.held = true,
+                Some(LeftMessage::Up) => self.held = false,
+                Some(LeftMessage::DoubleClick) | None => {}
             }
             // The pointer 0x004960ec / 0x004960f0 is written by the pump's
             // WM_MOUSEMOVE only: on the click pass the click and the
@@ -1833,5 +1839,73 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
         }
     } else {
         r
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hooks::NoScripts;
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::with_engine;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// The held flag 0x00496114 the rat's reads leave, one read a frame,
+    /// with the left button pressed at frame 10, released at 12, pressed
+    /// again at 14 (at one point, 64 ms apart: a double click for Windows)
+    /// and held.
+    fn held_per_pass() -> Option<Vec<bool>> {
+        let seen: Rc<RefCell<Vec<bool>>> = Rc::default();
+        let s2 = seen.clone();
+        let ran = with_engine(
+            "rat_double_click_holds_nothing",
+            move |mut e| async move {
+                let mut hooks = NoScripts;
+                let host = PuzzleHost::new(&mut e, &mut hooks);
+                let mut h = Host {
+                    host,
+                    rat: Vec::new(),
+                    held: false,
+                    button_messages: VecDeque::new(),
+                    mx: 0,
+                    my: 0,
+                    deadline: 0,
+                };
+                let g = RatGame::default();
+                for _ in 0..30 {
+                    let (_, _, _, held) = h.read_input(&g);
+                    s2.borrow_mut().push(held);
+                    h.host.e.sys.frame().await;
+                }
+            },
+            |sys, f| {
+                let (x, y) = (200, 200);
+                let button = MouseButton::Left;
+                match f {
+                    10 | 14 => sys.push_input(Input::MouseDown { button, x, y }),
+                    12 => sys.push_input(Input::MouseUp { button, x, y }),
+                    _ => {}
+                }
+            },
+        );
+        ran.then(|| seen.borrow().clone())
+    }
+
+    /// The window class has CS_DBLCLKS (style 0xb, `FUN_0042e4b4`): the
+    /// second press of a pair comes as WM_LBUTTONDBLCLK, whose case in the
+    /// window procedure (0x00419c79..0x00419c95) writes only 0x00496118;
+    /// the held flag is set by WM_LBUTTONDOWN alone (@ 0x00419c47). So the
+    /// levers and the wheel (`FUN_004395f4`, held flag tests) do not move
+    /// on the second press held.
+    #[test]
+    fn rat_double_click_holds_nothing() {
+        let Some(held) = held_per_pass() else {
+            return;
+        };
+        assert!(held.iter().any(|&h| h), "the first press holds: {held:?}");
+        let last_true = held.iter().rposition(|&h| h).unwrap();
+        assert!(last_true < 16, "{held:?}");
+        assert!(held[16..].iter().all(|&h| !h), "{held:?}");
     }
 }
