@@ -146,6 +146,14 @@ pub trait AmbientSampleOutput {
     /// AIL_set_sample_address + loop count + AIL_start_sample: variant k of
     /// object `object` (an index in the WAM's object table).
     fn start(&mut self, slot: usize, object: usize, variant: usize, loop_forever: bool);
+    /// AIL_set_sample_loop_count(slot, 1) on its own: the record load and
+    /// remove pass of `FUN_00431a1c` and `FUN_00431e98` set it before their
+    /// AIL_stop_sample. The loop count is a state of the Miles sample
+    /// (MSS32.DLL sample +0x38, written only by AIL_init_sample @
+    /// 0x2000e104 and AIL_set_sample_loop_count @ 0x2000e3e4): a sound
+    /// started later without setting it (a puzzle's sound, the sound
+    /// menu's channel test) plays with the last one set.
+    fn set_loop_once(&mut self, slot: usize);
     fn stop(&mut self, slot: usize);
     fn set_pan(&mut self, slot: usize, pan: u8);
     fn set_volume(&mut self, slot: usize, volume: u8);
@@ -312,7 +320,8 @@ impl AmbientSounds {
                     return false;
                 }
                 self.records[i].start = 0;
-                out.stop(i); // loop count 1, AIL_stop_sample
+                out.set_loop_once(i);
+                out.stop(i);
             }
             self.active = true;
             self.count += 1;
@@ -330,6 +339,7 @@ impl AmbientSounds {
             }
             out.set_pan(r, 0x40);
             out.set_volume(r, 0);
+            out.set_loop_once(r);
             out.stop(r);
             if let Some(o) = self.records[r].object {
                 out.release(o);
@@ -514,6 +524,7 @@ impl AmbientSounds {
         for i in 0..self.count {
             out.set_pan(i, 0x40);
             out.set_volume(i, self.effects_volume); // [0x00495e73] @ 0x00431eec
+            out.set_loop_once(i);
             out.stop(i);
             if let Some(o) = self.records[i].object {
                 out.release(o);
@@ -650,6 +661,11 @@ pub struct MixerAmbientOutput {
     miles: MilesSampleStatus,
     pan: [u8; SLOTS],
     volume: [u8; SLOTS],
+    /// Each sample's Miles loop count is 0 (forever), set by the last
+    /// [`start`](AmbientSampleOutput::start) or
+    /// [`set_loop_once`](AmbientSampleOutput::set_loop_once); `start_pcm`
+    /// plays with it.
+    loop_forever: [bool; SLOTS],
     /// object * 4 + variant -> 16-bit samples.
     pcm: HashMap<usize, Arc<Vec<i16>>>,
 }
@@ -663,6 +679,8 @@ impl MixerAmbientOutput {
             // FUN_00430d20: pan 0x40, volume 0.
             pan: [0x40; SLOTS],
             volume: [0; SLOTS],
+            // FUN_00430d20: AIL_init_sample, then loop count 1.
+            loop_forever: [false; SLOTS],
             pcm: HashMap::new(),
         }
     }
@@ -686,7 +704,12 @@ impl MixerAmbientOutput {
 
     /// A puzzle's sound on sample `slot` (the players `FUN_0043ca28` and
     /// its siblings): AIL_set_sample_pan / volume, then the start. The
-    /// sound plays at its own rate, as the ScummVM port plays it.
+    /// sound plays at its own rate, as the ScummVM port plays it. Neither
+    /// these players nor the sound menu's channel test (`FUN_0041db4c` /
+    /// `FUN_0041dcf8`: stop, pan, address, volume, start @ 0x0041dbdd,
+    /// 0x0041dc6f..0x0041dcb2) set the loop count: the sound plays with the
+    /// sample's last one, forever after an ambient start with the "loop
+    /// forever" flag 0x00495e8c (`FUN_00432178`, dc:25929..25931).
     pub fn start_pcm(&mut self, slot: usize, pcm: Pcm, pan: u8, volume: u8) {
         if let Some(v) = self.voices[slot].take() {
             self.mixer.stop(v);
@@ -699,7 +722,7 @@ impl MixerAmbientOutput {
         }
         self.voices[slot] = Some(self.mixer.play(
             pcm,
-            false,
+            self.loop_forever[slot],
             mixer_volume(self.volume[slot]),
             miles_pan_balance(self.pan[slot]),
         ));
@@ -731,6 +754,8 @@ impl AmbientSampleOutput for MixerAmbientOutput {
         if let Some(v) = self.voices[slot].take() {
             self.mixer.stop(v);
         }
+        // FUN_00432178 sets the loop count before every start.
+        self.loop_forever[slot] = loop_forever;
         self.miles.started(slot); // without a buffer the slot reads done at once
         let Some(samples) = self.pcm.get(&(object * 4 + variant)) else {
             return;
@@ -749,6 +774,10 @@ impl AmbientSampleOutput for MixerAmbientOutput {
             mixer_volume(self.volume[slot]),
             miles_pan_balance(self.pan[slot]),
         ));
+    }
+
+    fn set_loop_once(&mut self, slot: usize) {
+        self.loop_forever[slot] = false;
     }
 
     fn stop(&mut self, slot: usize) {
@@ -785,5 +814,52 @@ impl AmbientSampleOutput for MixerAmbientOutput {
         for k in 0..4 {
             self.pcm.remove(&(object * 4 + k));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// MSS32.DLL keeps the loop count per sample (+0x38, written only by
+    /// AIL_init_sample and AIL_set_sample_loop_count): a sound started on
+    /// sample 1 without setting it (the channel test, `FUN_0041dcf8`)
+    /// loops forever after an ambient start with the "loop forever" flag,
+    /// and plays once after `FUN_00431e98` / `FUN_00431a1c` set it to 1.
+    #[test]
+    fn start_pcm_keeps_the_samples_loop_count() {
+        let mixer = Mixer::new();
+        let mut out = MixerAmbientOutput::new(mixer.clone());
+        out.pcm.insert(0, Arc::new(vec![1000i16; 100]));
+        let short = || Pcm {
+            rate: SAMPLE_RATE,
+            channels: 1,
+            samples: Arc::new(vec![1000i16; 100]),
+        };
+        let mut buf = vec![0.0f32; 2 * 1000];
+        // Fresh sample (FUN_00430d20: loop count 1): the test plays once.
+        out.start_pcm(1, short(), 0, 0x6e);
+        mixer.fill(&mut buf, SAMPLE_RATE, 2);
+        assert!(!out.active(1));
+        // An ambient start with the flag 0x00495e8c (loop count 0), then
+        // the channel test: AIL_stop_sample, pan, volume, start.
+        out.start(1, 0, 0, true);
+        out.stop(1);
+        out.start_pcm(1, short(), 0, 0x6e);
+        mixer.fill(&mut buf, SAMPLE_RATE, 2);
+        assert!(out.active(1), "the test sound loops forever");
+        // An ambient start without the flag sets 1 again.
+        out.start(1, 0, 0, false);
+        out.start_pcm(1, short(), 0, 0x6e);
+        mixer.fill(&mut buf, SAMPLE_RATE, 2);
+        assert!(!out.active(1));
+        // FUN_00431e98 sets loop count 1 before its stop.
+        out.start(1, 0, 0, true);
+        let mut a = AmbientSounds::new();
+        a.count = 2;
+        a.stop_all(&mut out);
+        out.start_pcm(1, short(), 0, 0x6e);
+        mixer.fill(&mut buf, SAMPLE_RATE, 2);
+        assert!(!out.active(1));
     }
 }
