@@ -1062,10 +1062,48 @@ fn credits_play_headless() {
 
 /// The 1 s wait between LOGO15N and PREINTRO reads no input but loses
 /// none (GetAsyncKeyState): a click during it ends PREINTRO at its first
-/// poll, after its first frame, with one more frame presented.
+/// poll, after its first frame, with one more frame presented. LOGO15N
+/// plays to its end: a click that ended it would leave `FUN_0042e624`'s
+/// latch set (no poll sees the release), and the wait's click would be
+/// none ([`a_click_that_ended_logo15n_loses_the_waits_click`]).
 #[test]
 fn startup_wait_keeps_a_click_for_the_next_video() {
     let Some(g) = game("startup_wait_keeps_a_click_for_the_next_video") else {
+        return;
+    };
+    let sys = Sys::new(Mixer::new());
+    let trace = Rc::new(RefCell::new(Vec::new()));
+    let opts = Options {
+        trace: Some(trace.clone()),
+        saves: Rc::new(MemStore::new()),
+        ..Options::default()
+    };
+    let mut h = Headless::new(sys.clone(), atlantis_engine::run(sys.clone(), g, opts));
+    let videos = |t: &Rc<RefCell<Vec<Event>>>| {
+        t.borrow()
+            .iter()
+            .filter_map(|e| match e {
+                Event::Video { name, frames, .. } => Some((name.clone(), *frames)),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    assert!(h.until(3000, |_| videos(&trace).len() == 1));
+    // In the wait.
+    h.click(320, 240);
+    assert!(h.until(300, |_| videos(&trace).len() == 2));
+    assert_eq!(videos(&trace)[1], ("PREINTRO.HNM".to_string(), 2));
+    sys.push_input(Input::Quit);
+    h.steps(10);
+}
+
+/// A click ends LOGO15N at its poll, which sets `FUN_0042e624`'s latch;
+/// no poll sees the release before PREINTRO's first: a click during the
+/// wait is no press edge there (0x0042e6b2..0x0042e6c8), PREINTRO plays
+/// on.
+#[test]
+fn a_click_that_ended_logo15n_loses_the_waits_click() {
+    let Some(g) = game("a_click_that_ended_logo15n_loses_the_waits_click") else {
         return;
     };
     let sys = Sys::new(Mixer::new());
@@ -1090,8 +1128,8 @@ fn startup_wait_keeps_a_click_for_the_next_video() {
     assert!(h.until(200, |_| videos(&trace).len() == 1));
     // In the wait.
     h.click(320, 240);
-    assert!(h.until(300, |_| videos(&trace).len() == 2));
-    assert_eq!(videos(&trace)[1], ("PREINTRO.HNM".to_string(), 2));
+    assert!(h.until(5000, |_| videos(&trace).len() == 2));
+    assert!(videos(&trace)[1].1 > 2, "{:?}", videos(&trace)[1]);
     sys.push_input(Input::Quit);
     h.steps(10);
 }

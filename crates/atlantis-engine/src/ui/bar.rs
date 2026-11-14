@@ -1104,6 +1104,110 @@ mod tests {
         }
     }
 
+    /// The object click is the warp poll's press edge (0x0041c5f2), which
+    /// sets `FUN_0042e624`'s latch; the slide-in (`FUN_0042c2c4`) and the
+    /// slide-out (`FUN_0042c59c`) poll nothing. A second click during the
+    /// slide-in is no edge at the hold loop's first poll (0x0042cf14): the
+    /// object stays on the pointer until a later click. A click during the
+    /// slide-out after the hold's click is none at the next poll either.
+    #[test]
+    fn clicks_during_the_pickup_slides_are_no_presses() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "clicks_during_the_pickup_slides_are_no_presses",
+            move |mut e| async move {
+                e.inventory = vec![1001];
+                e.vars.set("objetenmain", 1001);
+                // The warp loop's poll that read the object click.
+                button(&e.sys, MouseButton::Left, true);
+                while e.sys.poll_event().is_some() {}
+                e.display_pickup(&mut NoScripts).await;
+                let end = e.sys.millis();
+                // The next poll (the warp loop's).
+                let mut presses = 0;
+                while let Some(ev) = e.sys.poll_event() {
+                    presses += usize::from(matches!(ev, Input::MouseDown { .. }));
+                }
+                *g2.borrow_mut() = Some((end, presses, e.vars.get("objetenmain")));
+            },
+            |sys, f| match f {
+                1 => button(sys, MouseButton::Left, false),
+                // In the slide-in.
+                3 => button(sys, MouseButton::Left, true),
+                4 => button(sys, MouseButton::Left, false),
+                // The click that ends the hold.
+                300 => button(sys, MouseButton::Left, true),
+                301 => button(sys, MouseButton::Left, false),
+                // In the slide-out.
+                304 => button(sys, MouseButton::Left, true),
+                305 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (ms, presses, held) = got.borrow().expect("the pick-up did not end");
+        assert!(ms > 300 * 16, "the hold ended at {ms} ms");
+        assert_eq!((presses, held), (0, 0));
+    }
+
+    /// A line's click (its poll's press edge) sets `FUN_0042e624`'s latch;
+    /// the executor, the /set dispatcher and the portrait's slide
+    /// (`FUN_0042b6c0` / `FUN_0042b480`) poll nothing: a click during the
+    /// slide is no press at the next poll (a film's, 0x0041bdf7).
+    #[test]
+    fn a_click_during_a_guest_slide_is_no_press() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let start = Rc::new(std::cell::Cell::new(None::<u64>));
+        let s2 = start.clone();
+        let done = Rc::new(std::cell::Cell::new(0u64));
+        let ran = with_engine(
+            "a_click_during_a_guest_slide_is_no_press",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                // The line's poll that read its click.
+                button(&e.sys, MouseButton::Left, true);
+                while e.sys.poll_event().is_some() {}
+                let f0 = e.sys.frames_presented();
+                s2.set(Some(f0));
+                e.add_guest(1).await;
+                let mut presses = 0;
+                while let Some(ev) = e.sys.poll_event() {
+                    presses += usize::from(matches!(ev, Input::MouseDown { .. }));
+                }
+                *g2.borrow_mut() = Some((e.sys.frames_presented() - f0, presses));
+            },
+            move |sys, _| {
+                // The line's click released, then a whole click, within
+                // the slide's 10 frames.
+                let Some(f0) = start.get() else {
+                    return;
+                };
+                let k = sys.frames_presented() - f0;
+                if k == done.get() {
+                    return;
+                }
+                done.set(k);
+                match k {
+                    1 | 6 => button(sys, MouseButton::Left, false),
+                    4 => button(sys, MouseButton::Left, true),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (frames, presses) = got.borrow().expect("no result");
+        assert_eq!(frames, 10);
+        assert_eq!(presses, 0);
+    }
+
     /// `FUN_0042c098` polls once after the slide-out (0x0042c228) and
     /// clears the flags: a press made during the slide-out never reaches
     /// the warp loop.

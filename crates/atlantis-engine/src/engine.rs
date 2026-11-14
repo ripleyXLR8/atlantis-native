@@ -1359,8 +1359,9 @@ impl Engine {
         // loses none: FUN_0042e624 fills the key table from
         // GetAsyncKeyState, so the next video's first FUN_0041a298 poll sees
         // a press made during the wait (a left button: 0x0049611c = 1;
-        // Escape: 0x00496124 = 0), unless it was already down at LOGO15N's
-        // last poll. The input events stay queued for that poll.
+        // Escape: 0x00496124 = 0), unless LOGO15N's last poll saw a press
+        // whose release no poll has seen (the latch, Sys::poll_event). The
+        // input events stay queued for that poll.
         let start = self.sys.millis();
         while self.sys.millis() - start < 1000 && !self.sys.should_quit() {
             self.sys.frame().await;

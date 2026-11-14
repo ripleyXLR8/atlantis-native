@@ -47,6 +47,10 @@ pub(crate) struct MenuInput {
     /// window stores, `name_key_code`; 8 Backspace, 0x0d Enter, 0x1b
     /// Escape).
     pub codes: Vec<u8>,
+    /// A left press the edge latch did not report
+    /// ([`crate::sys::Input::MouseDownLatched`]): no click, but Windows
+    /// still pairs it ([`Engine::menu_pair_latched`]).
+    pub latched_left: bool,
 }
 
 /// A loaded menu file and its walk state.
@@ -161,6 +165,10 @@ impl Engine {
                     button: MouseButton::Left,
                     ..
                 } => mi.left_press = true,
+                Input::MouseDownLatched {
+                    button: MouseButton::Left,
+                    ..
+                } => mi.latched_left = true,
                 Input::MouseDown {
                     button: MouseButton::Right,
                     ..
@@ -218,6 +226,17 @@ impl Engine {
         self.turn_double_click.pair(now, x, y)
     }
 
+    /// A left press a menu pass read that the edge latch did not report:
+    /// no click, but Windows pairs it with the last press like any other
+    /// ([`Engine::menu_press_pairs`]). Its WM_LBUTTONDOWN's writes (the
+    /// held flag 0x00496114, the record 0x006cd844, @ 0x00419c47..
+    /// 0x00419c56) are not modelled for it.
+    pub(crate) fn menu_pair_latched(&mut self, mi: &MenuInput) {
+        if mi.latched_left {
+            self.menu_press_pairs();
+        }
+    }
+
     /// The input queued before a menu loop, which takes none of it as a
     /// click (its loop clears the press flag 0x0049611c each pass): its
     /// left presses still pair for Windows; true when one came as
@@ -226,6 +245,11 @@ impl Engine {
         let mut double = false;
         while let Some(ev) = self.sys.poll_event() {
             if let Input::MouseDown {
+                button: MouseButton::Left,
+                x,
+                y,
+            }
+            | Input::MouseDownLatched {
                 button: MouseButton::Left,
                 x,
                 y,
@@ -334,6 +358,7 @@ impl Engine {
                 return None;
             }
             let mi = self.poll_menu_input();
+            self.menu_pair_latched(&mi);
             self.sys.mark_text_entry();
             // The window procedure stores each WM_CHAR in 0x006ce262
             // (@ 0x00419ca6), overwriting the last; the walk's polls
@@ -453,6 +478,7 @@ impl Engine {
                 return false;
             }
             let mi = self.poll_menu_input();
+            self.menu_pair_latched(&mi);
             let (mx, my) = self.sys.mouse();
             let hit = menu
                 .hit(mx, my, self.menu_table().as_deref())
@@ -490,6 +516,7 @@ impl Engine {
                 break;
             }
             let mi = self.poll_menu_input();
+            self.menu_pair_latched(&mi);
             let (mx, my) = self.sys.mouse();
             let hit = menu.hit(mx, my, self.menu_table().as_deref());
             if mi.left_press {
@@ -559,6 +586,7 @@ impl Engine {
                 break;
             }
             let mi = self.poll_menu_input();
+            self.menu_pair_latched(&mi);
             let (mx, my) = self.sys.mouse();
             let under = menu.hit(mx, my, self.menu_table().as_deref());
             let hit = under.filter(|r| [1, 3, 5, 6].contains(r));
@@ -649,6 +677,7 @@ impl Engine {
             }
             set_knobs(self, &mut menu);
             let mi = self.poll_menu_input();
+            self.menu_pair_latched(&mi);
             let (mx, my) = self.sys.mouse();
             let hit = menu.hit(mx, my, self.menu_table().as_deref());
             let down = self.sys.buttons().0;
@@ -826,6 +855,7 @@ impl Engine {
                 return 7;
             }
             let mi = self.poll_menu_input();
+            self.menu_pair_latched(&mi);
             let (mx, my) = self.sys.mouse();
             let down = self.sys.buttons().0;
             // Port keys, with Enhancements::arrow_keys (the original's

@@ -581,6 +581,16 @@ impl Engine {
                     self.turn_double_click.queue_press(now, x, y);
                     left = Some((x, y));
                 }
+                // A press the latch did not report (FUN_0042e624): no
+                // click, but Windows posted it; this poll pumps.
+                Input::MouseDownLatched {
+                    button: MouseButton::Left,
+                    x,
+                    y,
+                } => {
+                    let now = self.sys.millis();
+                    self.turn_double_click.queue_press(now, x, y);
+                }
                 Input::MouseDown {
                     button: MouseButton::Right,
                     ..
@@ -871,6 +881,16 @@ impl Engine {
                                     // this one (a double click whose first
                                     // press ends PREINTRO.HNM arms the
                                     // player screen's flag).
+                                    let now = self.sys.millis();
+                                    self.turn_double_click.pair(now, x, y);
+                                }
+                                // No click (FUN_0042e624's latch), but
+                                // Windows pairs it.
+                                Input::MouseDownLatched {
+                                    button: MouseButton::Left,
+                                    x,
+                                    y,
+                                } => {
                                     let now = self.sys.millis();
                                     self.turn_double_click.pair(now, x, y);
                                 }
