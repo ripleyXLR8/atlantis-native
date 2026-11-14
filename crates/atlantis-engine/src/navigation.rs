@@ -447,7 +447,8 @@ impl Engine {
                 // Chapter=) ends the loop for the arrival scan. A Vue= from
                 // a timer section that ran while the bar was open does not:
                 // the loop runs on in the new place, and the arrival scan
-                // comes after the next click (as for a warp-frame timer).
+                // comes after the next click unless that click moves (as for
+                // a warp-frame timer, `Engine::game_step`).
                 let mut moved = false;
                 if guest != 0 && !self.should_abort() {
                     hooks.talk_to_guest(self, guest).await;
@@ -570,7 +571,7 @@ impl Engine {
             // (FUN_0042844c @ 0x00428d77) and the Vue= branch sets no exit
             // flag (FUN_0042a100 @ 0x0042a630..0x0042a749), so the loop runs
             // on in the new place and the arrival scan comes after the next
-            // click.
+            // click, unless that click moves (`Engine::game_step`).
             let exit_before_timers = exit;
             if !exit && hooks.warp_frame(self).await {
                 self.sync_pointer_mouse();
@@ -721,7 +722,7 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::{ready, HookFuture};
+    use crate::hooks::{ready, Departure, HookFuture};
     use crate::test_support::{button, with_engine};
     use std::cell::{Cell, RefCell};
     use std::rc::Rc;
@@ -1088,6 +1089,162 @@ mod tests {
             assert!(bar.get(), "the bar did not open");
             assert!(!clicked.get(), "the click was handled");
         }
+    }
+
+    /// A timer section that runs Vue=`to` on the first warp frame (the place
+    /// entered, ArriveeVue = the place left, the arrival scan queued, the
+    /// view aimed at an exit), and a departure scan that runs a chapter=
+    /// (an arrival section matched by ArriveeVue, CHAPI059 /010); the scans
+    /// as they come: ("dep", destination, ArriveeVue) and ("arr", place,
+    /// ArriveeVue).
+    struct TimerVue {
+        to: u16,
+        view: (f32, f32),
+        fired: Rc<Cell<bool>>,
+        scans: Rc<RefCell<Vec<(&'static str, i32, i32)>>>,
+    }
+
+    impl ScriptHooks for TimerVue {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            Box::pin(async move {
+                if self.fired.get() {
+                    return false;
+                }
+                self.fired.set(true);
+                let from = e.current_place_id.unwrap_or(0);
+                e.last_vue = from;
+                e.next_place_id = Some(self.to);
+                e.do_place_change().await;
+                e.set_view(self.view.0, self.view.1);
+                e.vars.set("arriveevue", i32::from(from));
+                e.arrival_scan_pending = true;
+                e.arrival_from_vue = from;
+                true
+            })
+        }
+
+        fn arrival_scan<'a>(
+            &'a mut self,
+            _e: &'a mut Engine,
+            vue: u16,
+            arrivee: i32,
+        ) -> HookFuture<'a, ()> {
+            self.scans
+                .borrow_mut()
+                .push(("arr", i32::from(vue), arrivee));
+            ready(())
+        }
+
+        fn departure_scan<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            dest: u16,
+        ) -> HookFuture<'a, Departure> {
+            self.scans
+                .borrow_mut()
+                .push(("dep", i32::from(dest), e.vars.get("arriveevue")));
+            // A chapter= in the section: the arrival scan queued again.
+            e.arrival_scan_pending = true;
+            e.arrival_from_vue = e.last_vue;
+            ready(Departure::Go)
+        }
+    }
+
+    /// After a timer section's Vue= (CHAPI028 /300 `Vue=351`), the first
+    /// click on an exit of the place entered moves at once (FUN_00423ad8
+    /// tests ARRIVEEVUE only at the top of the pass, @ 0x00423b4d): the
+    /// departure scan sees ArriveeVue = the place the Vue= left, a
+    /// chapter= in it does not stop the move, and the timer's pending
+    /// arrival scan never runs: the next one is the destination's, with
+    /// ArriveeVue = the place left by the move (0x00423def).
+    #[test]
+    fn exit_click_after_a_timer_vue_moves_at_once() {
+        let fired = Rc::new(Cell::new(false));
+        let scans = Rc::new(RefCell::new(Vec::new()));
+        let (f2, s2) = (fired.clone(), scans.clone());
+        let (f3, s3) = (fired.clone(), scans.clone());
+        let target = Rc::new(Cell::new(None::<(u16, u16)>));
+        let t2 = target.clone();
+        let mut locked = 0u64;
+        let mut pressed = None::<u64>;
+        let ran = with_engine(
+            "exit_click_after_a_timer_vue_moves_at_once",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                // A place other than 1 and a view with one of its exits under
+                // both pointer positions the loop may use (after a panorama
+                // load, after a recentre).
+                let ids: Vec<u16> = e.wam.places.iter().map(|p| p.id).collect();
+                let mut found = None;
+                'search: for id in ids.into_iter().filter(|&id| id != 1) {
+                    e.next_place_id = Some(id);
+                    e.do_place_change().await;
+                    let Some(place) = e.place().cloned() else {
+                        continue;
+                    };
+                    for ia in 0..315 {
+                        for ib in -4..=4 {
+                            let (a, b) = (ia as f32 * 0.02, ib as f32 * 0.1);
+                            e.set_view(a, b);
+                            let zones: Vec<u16> = [(320, 320), (320, 240)]
+                                .iter()
+                                .map(|&(x, y)| {
+                                    let (px, py) = e.warp.screen_to_panorama(x, y);
+                                    place.hit_test(px as i16, py as i16)
+                                })
+                                .collect();
+                            if zones[0] == zones[1]
+                                && place.transitions.iter().any(|t| t.dst_place == zones[0])
+                            {
+                                found = Some((id, zones[0], (a, b)));
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+                let (to, exit, view) = found.expect("a place with an exit in view");
+                t2.set(Some((to, exit)));
+                e.next_place_id = Some(1);
+                let mut hooks = TimerVue {
+                    to,
+                    view,
+                    fired: f2,
+                    scans: s2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, f| {
+                if let Some(t) = pressed {
+                    if f == t + 2 {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    if s3.borrow().len() >= 3 || f > t + 2000 {
+                        sys.push_input(Input::Quit);
+                    }
+                    return;
+                }
+                locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                if f3.get() && locked >= 10 {
+                    button(sys, MouseButton::Left, true);
+                    pressed = Some(f);
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (to, exit) = target.get().unwrap();
+        let scans = scans.borrow();
+        assert!(scans.len() >= 3, "{scans:?}");
+        assert_eq!((scans[0].0, scans[0].1), ("arr", 1), "{scans:?}");
+        assert_eq!(
+            scans[1..3],
+            [
+                ("dep", i32::from(exit), 1),
+                ("arr", i32::from(exit), i32::from(to)),
+            ],
+            "{scans:?}"
+        );
     }
 
     /// The view's alpha after the warp loop of place 1, with the left

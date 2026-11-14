@@ -668,10 +668,13 @@ impl Scripts {
                 }
             }
         }
-        // ARRIVEEVUE stays = LastVue: only the place loop clears it, right
-        // after its own arrival scan (@ 0x00423be7). A chapter= run anywhere
-        // else in the pass therefore gets a second arrival scan on the next
-        // pass (@ 0x00423b5a..0x00423b78) when LastVue != 0.
+        // ARRIVEEVUE stays = LastVue: only the place loop clears it, before
+        // each warp loop (@ 0x00423be7, after its own arrival scan). A
+        // chapter= run anywhere else in the pass therefore gets a second
+        // arrival scan on the next pass (@ 0x00423b5a..0x00423b78) when
+        // LastVue != 0, unless a move replaces it (0x00423def); until then
+        // the scans read ArriveeVue = LastVue (the departure scan of an exit
+        // click after a timer's chapter=).
         if !self.in_place_arrival_scan
             && !self.init_running
             && e.last_vue != 0
@@ -694,6 +697,8 @@ impl Scripts {
             log::warn!("Vue={value}: not a place");
             return;
         };
+        // The place loop's zone 0x006cd7f4 = N (@ 0x0042a659).
+        e.script_vue_place = Some(place);
         let from = e.current_place_id;
         if let Some(sub) = e
             .wam
@@ -755,8 +760,10 @@ impl Scripts {
     }
 
     /// The arrival scan: ArriveeVue = the place arrived FROM (a negative
-    /// origin is no place yet: the arrived place stands for it), the /sel
-    /// scan, then ArriveeVue = 0. True when a section played.
+    /// origin is no place yet: the arrived place stands for it), then the
+    /// /sel scan (`FUN_004277c8`, which leaves ArriveeVue as it is: the place
+    /// loop clears it before the warp loop, @ 0x00423be7). True when a
+    /// section played.
     async fn run_arrival_sel(&mut self, e: &mut Engine, arrived: i32, from: i32) -> bool {
         self.run_arrival_sel_counted(e, arrived, from, false).await
     }
@@ -770,9 +777,7 @@ impl Scripts {
     ) -> bool {
         e.vars
             .set("arriveevue", if from >= 0 { from } else { arrived });
-        let played = self.run_sel_scan_counted(e, counted).await;
-        e.vars.set("arriveevue", 0);
-        played
+        self.run_sel_scan_counted(e, counted).await
     }
 
     /// The timer scans (`FUN_0042bef4` / `FUN_0042bfa4`): with TESTTIME1 /
