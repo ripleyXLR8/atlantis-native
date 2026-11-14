@@ -76,6 +76,9 @@ pub struct TransitionTurn {
     stall_b: u8, // [EBP-0xc]
     phase: u8,
     n: u8,
+    /// A phase-1 frame whose stop test is still to come (it follows the
+    /// frame's poll: the call @ 0x00421670, the test from 0x00421675).
+    test_pending: bool,
 }
 
 impl TransitionTurn {
@@ -104,12 +107,28 @@ impl TransitionTurn {
             stall_b: 0,
             phase: 1,
             n: 0,
+            test_pending: false,
         }
+    }
+
+    /// The stored angles 0x00bcb59c / 0x00bcb598 as the poll after a frame
+    /// left them: `FUN_00451915` stores the frame's angles wrapped and
+    /// clamped, and `FUN_0041a298` (@ 0x00421670 / 0x00421a5a) adds
+    /// 0.034906 rad per held view key (0x0041a33c..0x0041a3ba). Phase 1's
+    /// stop test after that poll (from 0x00421675) and the next frame's
+    /// step read these. A caller that sets nothing keeps the frame's own
+    /// angles (the emulated golden stubs `FUN_00451915` and the poll).
+    pub fn set_angles(&mut self, alpha: f32, beta: f32) {
+        self.alpha = alpha;
+        self.beta = beta;
     }
 
     /// The next frame, `running` the flag 0x00496124 as the input poll
     /// after the previous frame left it; `None` once the turn is over.
     pub fn next_frame(&mut self, running: bool) -> Option<TurnFrame> {
+        if std::mem::take(&mut self.test_pending) && self.phase1_ends() {
+            self.phase = 2;
+        }
         if self.phase == 1 && !running {
             self.phase = 2;
         }
@@ -138,13 +157,13 @@ impl TransitionTurn {
             fov_set: self.zoom,
             fov: self.fov,
         };
-        if self.phase == 1 && self.phase1_ends() {
-            self.phase = 2;
-        }
+        // The stop test comes after the frame's poll: at the next call,
+        // after [`TransitionTurn::set_angles`].
+        self.test_pending = self.phase == 1;
         Some(frame)
     }
 
-    /// Phase 1's stop tests after a frame.
+    /// Phase 1's stop tests after a frame and its poll.
     fn phase1_ends(&mut self) -> bool {
         let mut da = (f64::from(self.alpha) - f64::from(self.src_alpha)) as f32;
         if 0.0 > da {
@@ -239,11 +258,14 @@ fn step(
 /// WM_LBUTTONDBLCLK (0x00419b49 -> 0x00419c79..0x00419c8b) when the cursor
 /// state 0x004968ac is 5 (`FUN_00422fcc`'s navigate cursor, zone 1..511) or
 /// the menu request 0x00496138 is 1; the window class has CS_DBLCLKS
-/// (style 0xb @ 0x0042e4eb). The turn `FUN_004212cc` pumps the messages on
-/// every frame (`FUN_0041a298` @ 0x00421670 / 0x00421a5a) and does not call
+/// (style 0xb @ 0x0042e4eb). The turn `FUN_004212cc` polls after every
+/// frame (`FUN_0041a298` @ 0x00421670 / 0x00421a5a) and does not call
 /// `FUN_00422fcc` (0x0049616c = 1), so the navigate state of the clicked
 /// zone holds through it: a double click whose second press comes during
-/// the turn skips the video.
+/// the turn skips the video. The poll that reads the second press returns
+/// before its pump (0x0041a2b5), so the next poll of the turn dispatches
+/// it; after the turn's last poll nothing pumps before the test
+/// (0x00423f8a), so a second press read there leaves the flag at 0.
 ///
 /// A double click whose second press ends a dialog line of the departure
 /// scan (`FUN_00427814` @ 0x00423dd4) does the same: the press is a new
@@ -286,8 +308,9 @@ impl TurnDoubleClick {
         self.first = (x, y);
     }
 
-    /// A later left press; `cursor_mode` is 0x004968ac, `menu_request`
-    /// 0x00496138. True when it is a double click (whether or not it sets
+    /// A later left press and a pump at once ([`TurnDoubleClick::queue_press`]
+    /// then [`TurnDoubleClick::dispatch`]); `cursor_mode` is 0x004968ac,
+    /// `menu_request` 0x00496138. True when it is a double click (whether or not it sets
     /// the flag); the press after a double click starts a new pair.
     pub fn press(&mut self, ms: u64, x: i32, y: i32, cursor_mode: u8, menu_request: bool) -> bool {
         let double = self.queue_press(ms, x, y);
