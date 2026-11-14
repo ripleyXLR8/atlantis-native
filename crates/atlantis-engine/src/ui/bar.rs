@@ -744,7 +744,12 @@ impl Engine {
 
     /// ArcMagique=N (`FUN_0042a100` @ 0x0042aa21..0x0042ac2b):
     /// `SPRITE\2D\ARCANIM.SPR` frames 0..19 at the mouse over the view, the
-    /// place sprites animating; nothing without the file.
+    /// place sprites animating; nothing without the file. Each frame is
+    /// presented by `FUN_0041afd0` (@ 0x0042ac17), which steps the warp
+    /// cursor under its gates ([`Engine::still_frame_cursor_step`]; its
+    /// sprite goes to the back buffer after the copy @ 0x0042abd3). The
+    /// loop polls no input (no `FUN_0041a298` from 0x0042aa88 to
+    /// 0x0042ac1c): a press made meanwhile is the next poll's edge.
     pub(crate) async fn play_arc_magique(&mut self) {
         let (w, h) = limits::DEFAULT;
         let anim = match self.read("SPRITE\\2D\\ARCANIM.SPR").await {
@@ -765,13 +770,20 @@ impl Engine {
                 let mut s = self.sys.screen.borrow_mut();
                 draw_sprite(&mut s, spr, mx, my);
             }
+            self.still_frame_cursor_step();
             self.sys.frame().await;
-            while self.sys.poll_event().is_some() {}
         }
     }
 
     /// The guests' portraits sliding in from the right edge (`FUN_0042b480`)
-    /// or out to it (`FUN_0042b6c0`), one redrawn view per 10 px.
+    /// or out to it (`FUN_0042b6c0`), one redrawn view per 10 px. Each
+    /// frame: the place sprites (`FUN_00425304` @ 0x0042b51b / 0x0042b754),
+    /// the view, the moving portrait at the portraits' y (`FUN_00410430` @
+    /// 0x0042b5ab / 0x0042b7d7, whatever 0x0049613c), then `FUN_0042bc58`
+    /// (@ 0x0042b5b3 / 0x0042b7df), the other portraits on top; the present
+    /// `FUN_0041afd0` (@ 0x0042b6a7 / 0x0042b8d3), which steps the warp
+    /// cursor under its gates ([`Engine::still_frame_cursor_step`]; its
+    /// sprite goes to the back buffer after the copy).
     pub(crate) async fn slide_guest(&mut self, sprite: u8, from: i32, to: i32, step: i32) {
         if !self.warp_loaded {
             return;
@@ -781,17 +793,22 @@ impl Engine {
             if self.should_abort() {
                 return;
             }
+            self.animate_sprites();
             self.render_view();
             let mut s = self.sys.screen.borrow().clone();
-            self.draw_guests(&mut s, Some((usize::from(sprite), x)));
+            if let Some(spr) = self.ui.guests.get(usize::from(sprite)) {
+                draw_sprite(&mut s, spr, x, self.guests.portrait_y);
+            }
+            self.draw_guests(&mut s, None);
             *self.sys.screen.borrow_mut() = s;
+            self.still_frame_cursor_step();
             self.sys.frame().await;
             x += step;
         }
     }
 
-    /// AddGuest=N (`FUN_0042b480`): the record, the portrait sliding in,
-    /// then the count grows.
+    /// AddGuest=N (`FUN_0042b480`): the record, the portrait sliding in
+    /// (shown or hidden, 0x0049613c is not tested), then the count grows.
     pub async fn add_guest(&mut self, guest: i32) {
         if self.guests.count >= super::Guests::SLOTS {
             return;
@@ -799,27 +816,23 @@ impl Engine {
         let mut next = self.guests.clone();
         next.add(guest, &self.game.exe.guest_sprite_ids);
         let n = self.guests.count;
-        if self.guests_shown {
-            self.slide_guest(next.sprite[n], 640, 540 - 100 * n as i32, -10)
-                .await;
-        }
+        self.slide_guest(next.sprite[n], 640, 540 - 100 * n as i32, -10)
+            .await;
         let y = self.guests.portrait_y;
         self.guests = next;
         self.guests.portrait_y = y;
     }
 
     /// SubGuest=N (`FUN_0042b6c0`): each matching record hidden, sliding
-    /// out to the right, then the following records move down; after a
-    /// removal the scan goes on at the next index.
+    /// out to the right (shown or hidden), then the following records move
+    /// down; after a removal the scan goes on at the next index.
     pub async fn sub_guest(&mut self, guest: i32) {
         let mut i = 0;
         while i < self.guests.count {
             if self.guests.id[i] == guest {
                 let s = self.guests.sprite[i];
                 self.guests.sprite[i] = super::Guests::HIDDEN;
-                if self.guests_shown {
-                    self.slide_guest(s, 540 - 100 * i as i32, 640, 10).await;
-                }
+                self.slide_guest(s, 540 - 100 * i as i32, 640, 10).await;
                 self.guests.remove_at(i);
             }
             i += 1;
@@ -1244,6 +1257,8 @@ mod tests {
 
     /// The conversations asked for, with the reload request then.
     type Talks = Rc<RefCell<Vec<(i32, Option<Abort>)>>>;
+    /// The frames of each phase.
+    type Shots = Rc<RefCell<Vec<(u8, Vec<u16>)>>>;
 
     /// A game over run by the bar loop's timers on its 4th pass (the
     /// executor's game-over screen sets GAMEOVER and the port's reload);
@@ -1452,6 +1467,150 @@ mod tests {
         if ran {
             assert_eq!(*got.borrow(), Some(vec![1]));
         }
+    }
+
+    /// Pixels where both portraits are opaque and differ: (the still one
+    /// shows, the moving one shows).
+    fn portrait_on_top(
+        s: &[u16],
+        still: &SprSprite,
+        sx: i32,
+        moving: &SprSprite,
+        mx: i32,
+        y: i32,
+    ) -> (usize, usize) {
+        use atlantis_data::sprite_blend::SPR_NO_BLEND;
+        let at = |spr: &SprSprite, x0: i32, px: i32, py: i32| {
+            let (c, r) = (
+                px - (x0 - i32::from(spr.xoff)),
+                py - (y - i32::from(spr.yoff)),
+            );
+            if c < 0 || r < 0 || c >= i32::from(spr.w) || r >= i32::from(spr.h) {
+                return None;
+            }
+            let k = r as usize * usize::from(spr.w) + c as usize;
+            (spr.blend[k] == SPR_NO_BLEND).then(|| spr.pixels[k])
+        };
+        let (mut still_top, mut moving_top) = (0, 0);
+        for py in 0..SCREEN_H as i32 {
+            for px in 0..SCREEN_W as i32 {
+                if let (Some(a), Some(b)) = (at(still, sx, px, py), at(moving, mx, px, py)) {
+                    let d = s[py as usize * SCREEN_W + px as usize];
+                    if a != b && d == a {
+                        still_top += 1;
+                    } else if a != b && d == b {
+                        moving_top += 1;
+                    }
+                }
+            }
+        }
+        (still_top, moving_top)
+    }
+
+    /// The pixels of `spr` drawn at (`x`, `y`) where it is opaque and on
+    /// screen: (equal on `s`, all).
+    fn opaque_shown(s: &[u16], spr: &SprSprite, x: i32, y: i32) -> (usize, usize) {
+        use atlantis_data::sprite_blend::SPR_NO_BLEND;
+        let (bx, by) = (x - i32::from(spr.xoff), y - i32::from(spr.yoff));
+        let (mut same, mut all) = (0, 0);
+        for r in 0..i32::from(spr.h) {
+            for c in 0..i32::from(spr.w) {
+                let (px, py) = (bx + c, by + r);
+                if px < 0 || py < 0 || px >= SCREEN_W as i32 || py >= SCREEN_H as i32 {
+                    continue;
+                }
+                let k = (r * i32::from(spr.w) + c) as usize;
+                if spr.blend[k] != SPR_NO_BLEND {
+                    continue;
+                }
+                all += 1;
+                same += usize::from(s[py as usize * SCREEN_W + px as usize] == spr.pixels[k]);
+            }
+        }
+        (same, all)
+    }
+
+    /// A follower's slide (`FUN_0042b480`): each frame draws the moving
+    /// portrait (`FUN_00410430` @ 0x0042b5ab), then the other followers
+    /// (`FUN_0042bc58` @ 0x0042b5b3) on top of it; it steps the place
+    /// sprites (@ 0x0042b51b) and, through `FUN_0041afd0` (@ 0x0042b6a7),
+    /// the warp cursor. With the portraits hidden the moving one is still
+    /// drawn (`AddGuest=` / `SubGuest=` do not test 0x0049613c).
+    #[test]
+    fn a_follower_slides_behind_the_others() {
+        let phase = Rc::new(std::cell::Cell::new(0u8));
+        let shots: Shots = Rc::default();
+        let got = Rc::new(RefCell::new(None));
+        let (p2, g2) = (phase.clone(), got.clone());
+        let ran = with_engine(
+            "a_follower_slides_behind_the_others",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.current_place = Some(0);
+                e.current_place_id = Some(e.wam.places[0].id);
+                e.reload_current_view().await;
+                e.load_ui_assets().await;
+                e.guests.id[0] = 600;
+                e.guests.sprite[0] = 0;
+                e.guests.count = 1;
+                e.guests_shown = true;
+                e.guests.portrait_y = 350;
+                e.cursor_state.click_anim = true;
+                let (cursor, tick) = (e.cursor_state, e.sprite_anim_tick);
+                p2.set(1);
+                e.slide_guest(1, 640, 440, -10).await;
+                let stepped = (e.cursor_state != cursor, e.sprite_anim_tick != tick);
+                e.guests_shown = false;
+                p2.set(2);
+                e.add_guest(e.game.exe.guest_sprite_ids[1]).await;
+                p2.set(0);
+                let sprites = (e.ui.guests[0].clone(), e.ui.guests[1].clone());
+                *g2.borrow_mut() = Some((stepped, sprites, e.guests.count));
+            },
+            {
+                let shots = shots.clone();
+                move |sys, _| {
+                    if phase.get() != 0 {
+                        shots
+                            .borrow_mut()
+                            .push((phase.get(), sys.screen.borrow().clone()));
+                    }
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (stepped, (still, moving), count) = got.borrow_mut().take().unwrap();
+        assert_eq!(stepped, (true, true), "cursor, place sprites");
+        assert_eq!(count, 2);
+        let shots = shots.borrow();
+        let (mut still_top, mut moving_top) = (0, 0);
+        let mut k = 0;
+        for (p, s) in shots.iter().filter(|(p, _)| *p == 1) {
+            let _ = p;
+            let (a, b) = portrait_on_top(s, &still, 540, &moving, 640 - 10 * k, 350);
+            still_top += a;
+            moving_top += b;
+            k += 1;
+        }
+        assert_eq!(k, 20);
+        assert!(still_top > 0 && moving_top == 0, "{still_top} {moving_top}");
+        // Hidden: the slide of AddGuest's record 1 (640 down to 450), the
+        // moving portrait drawn on every frame.
+        let hidden: Vec<&Vec<u16>> = shots
+            .iter()
+            .filter(|(p, _)| *p == 2)
+            .map(|(_, s)| s)
+            .collect();
+        assert_eq!(hidden.len(), 20);
+        let mut drawn = 0;
+        for (k, s) in hidden.iter().enumerate() {
+            let (same, all) = opaque_shown(s, &moving, 640 - 10 * k as i32, 350);
+            assert_eq!(same, all, "frame {k}");
+            drawn += usize::from(all > 0);
+        }
+        assert!(drawn > 10, "{drawn} frames with the portrait on screen");
     }
 
     /// Counts the timer passes.
