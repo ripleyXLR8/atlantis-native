@@ -1430,6 +1430,63 @@ fn escape_skips_the_rest_of_the_section() {
     assert_eq!(played, vec!['A']);
 }
 
+/// Escape and a left press in the same poll of the guard's talking head:
+/// `FUN_0041a298` tests the left edge first and returns (0x0041a2b5,
+/// 0x0041a2be) before the Escape test that sets the dialog-skip flag
+/// (0x0041a3c0): the line ends, the next ones play.
+#[test]
+fn escape_with_a_click_only_ends_the_line() {
+    let Some(g) = game("escape_with_a_click_only_ends_the_line") else {
+        return;
+    };
+    let (mut clicked, mut escaped) = (0, false);
+    let ev = with_new_game(
+        g,
+        Default::default(),
+        |mut e, mut s| {
+            Box::pin(async move {
+                s.npc_click(&mut e, 600, 0).await;
+            })
+        },
+        |h, ev| {
+            let menu = ev.iter().any(|e| matches!(e, Event::SubjectMenu { .. }));
+            if !menu {
+                clicked += 1;
+                if clicked % 10 == 9 {
+                    h.sys.push_input(Input::MouseMove { x: 475, y: 205 });
+                } else if clicked % 10 == 0 {
+                    h.press(475, 205);
+                }
+            } else if !escaped && ev.contains(&Event::Voice("WAV\\ATA0003A.APC".into())) {
+                for _ in 0..10 {
+                    h.step();
+                }
+                h.sys
+                    .push_input(Input::KeyDown(atlantis_engine::sys::Key::Escape));
+                let (x, y) = h.sys.mouse();
+                h.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Left,
+                    x,
+                    y,
+                });
+                escaped = true;
+            }
+        },
+    );
+    assert!(escaped);
+    let played: Vec<char> = ev
+        .iter()
+        .filter_map(|e| match e {
+            Event::LinePlayed {
+                section: 3, letter, ..
+            } => Some(*letter),
+            _ => None,
+        })
+        .collect();
+    assert!(played.len() > 1, "{played:?}");
+    assert_eq!(played[0], 'A');
+}
+
 /// The game-over screen of CHAPI003's section 45 (GameOver=2): GOVER02.TGA
 /// with the narrator's subtitle, the voice ATA0045C until it ends. The
 /// original then clears the back surface without presenting it

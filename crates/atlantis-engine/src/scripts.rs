@@ -232,6 +232,10 @@ pub struct Scripts {
     in_place_arrival_scan: bool,
     /// A timer section plays (0x00496174).
     timer_play: bool,
+    /// A chapter change runs (0x00496140): set by `FUN_00427634` at its
+    /// entry (0x0042764c), cleared once Chapter='s /sel scan returns
+    /// (0x0042a616) and at the end of `FUN_00423760` / `FUN_0042de5c`.
+    chapter_change_running: bool,
     /// The walks of a chapter's /INIT commands so far (for tests and
     /// tools).
     pub init_walks: u32,
@@ -264,6 +268,7 @@ impl Scripts {
             init_running: false,
             in_place_arrival_scan: false,
             timer_play: false,
+            chapter_change_running: false,
             init_walks: 0,
             game_over_count: HashMap::new(),
         }
@@ -509,12 +514,13 @@ impl Scripts {
                 // to 3). The port reads every disc at once: no prompt, it
                 // only notes the disc, which the checkpoints keep. The
                 // prompt's function also empties the hand (OBJETENMAIN = 0 @
-                // 0x0041ede9) and ends by clearing the input flags, the bar
-                // request among them (0x0041f032..0x0041f064).
+                // 0x0041ede9) and ends by clearing the input flags, the
+                // double click, the Escape latch and the bar request among
+                // them (0x0041f032..0x0041f064).
                 "changecd" => {
                     e.disc = change_cd_disc(value);
                     e.vars.set("objetenmain", 0);
-                    e.bar.flags_reset();
+                    e.input_flags_reset();
                 }
                 // HideGuest / ShowGuest store no variable.
                 "hideguest" | "showguest" => e.guests_shown = key == "showguest",
@@ -622,6 +628,10 @@ impl Scripts {
     /// /sel scan runs with ArriveeVue = LastVue (`FUN_00427634` sets it at
     /// 0x0042777d, `FUN_0042a100` scans at 0x0042a60e).
     async fn change_chapter(&mut self, e: &mut Engine, value: i32) {
+        if self.chapter_change_running {
+            self.change_chapter_nested(e, value).await;
+            return;
+        }
         let left = e.vars.get("chapter");
         e.vars.set("chapter", value);
         if value <= 0 || value as u32 == self.chapter {
@@ -641,6 +651,8 @@ impl Scripts {
             let state = self.script_state(e, left);
             e.write_checkpoint(&state);
         }
+        // FUN_00427634 sets 0x00496140 at its entry (0x0042764c).
+        self.chapter_change_running = true;
         self.load_con_script(e, value as u32).await;
         if let Some(cur) = e.current_place_id {
             let last = i32::from(e.last_vue);
@@ -651,6 +663,9 @@ impl Scripts {
             let played = self
                 .run_arrival_sel_counted(e, i32::from(cur), last, counted)
                 .await;
+            // 0x00496140 = 0 once FUN_004277c8 returns (0x0042a616): a
+            // chapter= of the head walk below is a whole change again.
+            self.chapter_change_running = false;
             // With no /sel entry found FUN_004277c8 returns the start of the
             // new CON text (0x00427800), which the executor takes as its next
             // position (0x00428bf9..0x00428c02): it walks the file's head up
@@ -669,6 +684,8 @@ impl Scripts {
                 }
             }
         }
+        // (With no place, as after it: the flag ends with the change.)
+        self.chapter_change_running = false;
         // ARRIVEEVUE stays = LastVue: only the place loop clears it, before
         // each warp loop (@ 0x00423be7, after its own arrival scan). A
         // chapter= run anywhere else in the pass therefore gets a second
@@ -683,6 +700,49 @@ impl Scripts {
         {
             e.arrival_scan_pending = true;
             e.arrival_from_vue = e.last_vue;
+        }
+    }
+
+    /// Chapter=N while a chapter change runs (0x00496140 set: inside the
+    /// /INIT block or the /sel section `FUN_004277c8` plays): the branch
+    /// 0x0042a59f..0x0042a5fa of `FUN_0042a100`. The chapter bytes
+    /// 0x00772907 / 0x00772909 (0x0042a57d..0x0042a58a), then only the new
+    /// CON text (`FUN_004273d4`), and the executor goes on at the head of
+    /// that text: it walks the commands before the first section header.
+    /// No checkpoint, no variable reset nor CHAPTER store, no ChapterTime /
+    /// Time2 restart, no /INIT run and no /sel scan. No shipped script
+    /// reaches it (no /INIT holds a chapter=, and no /sel section a nested
+    /// change plays can match at the chapter's start).
+    async fn change_chapter_nested(&mut self, e: &mut Engine, value: i32) {
+        if value <= 0 || value as u32 == self.chapter {
+            return;
+        }
+        log::info!("chapter {} -> {value} (nested)", self.chapter);
+        e.prev_chapter = self.chapter as u8;
+        self.chapter = value as u32;
+        e.chapter = value as u32;
+        let name = con_file_name(e, self.chapter);
+        let Some(data) = e.read(&name).await else {
+            // The original shows its error box (code 0xc) and returns
+            // position 0: the walk ends.
+            log::warn!("no CON file {name}");
+            return;
+        };
+        self.script = ConScript::parse(&data);
+        e.emit(Event::ConTextReloaded(name));
+        // From the /INIT block (FUN_00425eb0 walks its own pointer over the
+        // rewritten buffer) the text is only replaced; not modelled further.
+        if self.init_running {
+            return;
+        }
+        self.init_walks += 1;
+        let cmds = self.script.init_cmds().to_vec();
+        for (cmd, offset) in cmds {
+            self.exec_set(e, Some(offset), &cmd).await;
+            if e.should_abort() || e.vars.get("gameover") != 0 {
+                break;
+            }
+            after_item(e).await;
         }
     }
 
@@ -1056,7 +1116,7 @@ impl Scripts {
         // game-over narration of the scan stops at its first poll (with
         // BugFix::PuzzleEscape a puzzle latches no Escape).
         e.bar.request = false;
-        e.reload_current_view().await;
+        e.reload_view_after_puzzle().await;
         e.vars.set("startpuzzle", 0);
         self.run_sel_scan(e).await;
         e.vars.set("finpuzzle", 0);
@@ -1496,10 +1556,15 @@ impl ScriptHooks for Scripts {
             // chapter does not change (the in-play no-checkpoint branch).
             self.chapter = chapter;
             e.chapter = chapter;
+            // FUN_00427634 sets 0x00496140 at its entry (0x0042764c).
+            self.chapter_change_running = true;
             self.load_con_script(e, chapter).await;
             // FUN_0042de5c step 7: CHAPTER = the chapter byte after the
             // /INIT.
             e.vars.set("chapter", self.chapter as i32);
+            // FUN_00423760 / FUN_0042de5c end with 0x00496140 = 0 (dc:16677,
+            // dc:23645).
+            self.chapter_change_running = false;
         })
     }
 
@@ -1814,6 +1879,44 @@ mod tests {
         );
         if ran {
             assert_eq!(*got.borrow(), [false, true]);
+        }
+    }
+
+    /// After a puzzle `FUN_004240fc` reloads the panorama only
+    /// (`FUN_0044a424` @ 0x004241e2), not `FUN_0042431c`: the view's
+    /// sprite rows keep their frames (ATLAN1 view 8, a puzzle zone and a
+    /// looping row).
+    #[test]
+    fn a_puzzle_keeps_the_sprite_frames() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_puzzle_keeps_the_sprite_frames",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(8);
+                e.do_place_change().await;
+                let rows: Vec<usize> = (0..e.sprite_list.len())
+                    .filter(|&i| e.sprite_list[i].place_id == 8 && e.sprite_list[i].frame_count > 1)
+                    .collect();
+                assert!(!rows.is_empty());
+                for &i in &rows {
+                    e.sprite_list[i].frame = 1;
+                }
+                s.script = crate::con_script::ConScript::parse(b"/1\r\n/0\r\n");
+                e.vars.set("objetenmain", 0);
+                // A StartPuzzle number past the puzzles: refused at once.
+                s.run_puzzle_zone(&mut e, 99).await;
+                let frames: Vec<i32> = rows.iter().map(|&i| e.sprite_list[i].frame).collect();
+                *g2.borrow_mut() = Some(frames);
+            },
+            |_, _| {},
+        );
+        if ran {
+            let frames = got.borrow().clone().expect("the puzzle zone did not end");
+            assert!(frames.iter().all(|&f| f == 1), "{frames:?}");
         }
     }
 
@@ -2448,6 +2551,84 @@ mod tests {
         );
         if ran {
             assert_eq!(*got.borrow(), [true, false, true]);
+        }
+    }
+
+    /// ChangeCd (`FUN_0041eda8` @ 0x0041f032..0x0041f064), StartMusik of
+    /// another track and StopMusik with the stream open (`FUN_0042a100` @
+    /// 0x0042add3..0x0042ae05, 0x0042af26..0x0042af58) clear the Escape
+    /// latch (0x00496138 = 0, 0x00496124 = 1) and the double-click flag
+    /// 0x00496118 with the bar's flags.
+    #[test]
+    fn stream_close_and_disc_prompt_clear_the_latches() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "stream_close_and_disc_prompt_clear_the_latches",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                for cmd in ["changecd=2", "startmusik=5", "stopmusik=1"] {
+                    if cmd != "changecd=2" {
+                        e.music.handle_set = true;
+                    }
+                    e.escape_request = true;
+                    e.turn_double_click.flag = true;
+                    e.bar.request = true;
+                    s.exec_set(&mut e, None, cmd).await;
+                    g2.borrow_mut().push((
+                        e.escape_request,
+                        e.turn_double_click.flag,
+                        e.bar.request,
+                    ));
+                }
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [(false, false, false); 3]);
+        }
+    }
+
+    /// Chapter=N while a change runs (0x00496140, the /sel section the
+    /// change's scan plays): only the chapter bytes and the CON text
+    /// (0x0042a59f..0x0042a5fa): no checkpoint, the variables and CHAPTER
+    /// kept, and the flag stays until the outer scan returns. A change
+    /// after it is whole again.
+    #[test]
+    fn nested_chapter_change_only_reloads_the_text() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "nested_chapter_change_only_reloads_the_text",
+            move |mut e| async move {
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(!s.chapter_change_running);
+                e.vars.set("flagtemp1", 5);
+                let chapter_var = e.vars.get("chapter");
+                s.chapter_change_running = true;
+                trace.borrow_mut().clear();
+                s.change_chapter(&mut e, 2).await;
+                let written = trace
+                    .borrow()
+                    .iter()
+                    .any(|ev| matches!(ev, Event::CheckpointWritten(_)));
+                let mut g = g2.borrow_mut();
+                g.push(s.chapter as i32);
+                g.push(i32::from(e.prev_chapter));
+                g.push(e.vars.get("flagtemp1"));
+                g.push(i32::from(e.vars.get("chapter") == chapter_var));
+                g.push(i32::from(written));
+                g.push(i32::from(s.chapter_change_running));
+                g.push(i32::from(!s.script.sections().is_empty()));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [2, 1, 5, 1, 0, 1, 1]);
         }
     }
 

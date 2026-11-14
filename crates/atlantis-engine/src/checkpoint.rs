@@ -233,8 +233,10 @@ impl Engine {
         self.stop_ambient();
         self.bar_first = 0; // 0x0042e2ec
         self.vars.set("objetenmain", 0);
-        self.bow_mode = false;
-        self.bow_sprites.clear();
+        // Bow mode 0x00496164 and its sprite 0x006cd888 are kept: only the
+        // bar's FUN_0042d098 (@ 0x0042d155) and the lower-bow FUN_0042d368
+        // (@ 0x0042d51d) write the flag; neither FUN_0042de5c nor
+        // FUN_00423760 touches them.
         let Some(cp) = self.player_checkpoint() else {
             self.new_game(hooks, in_play).await;
             return;

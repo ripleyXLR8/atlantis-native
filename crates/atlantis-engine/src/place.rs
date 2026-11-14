@@ -119,10 +119,28 @@ impl Engine {
         });
     }
 
-    /// The current place's view loaded again, as `FUN_004240fc` does after
-    /// a puzzle: its panorama (the pointer left at (0x140, 0x140)) and its
-    /// sprites (frame 0, the NPC click areas rebuilt). The place is not
-    /// entered again: no place event, the mouse is not moved.
+    /// The current place's panorama loaded again, as `FUN_004240fc` does
+    /// after a puzzle (`FUN_0044a424` @ 0x004241e2: the panorama, the FOV,
+    /// the pointer left at (0x140, 0x140)). It calls neither `FUN_0042431c`
+    /// nor `FUN_0042488c`: the sprite rows keep their frames, frame counts
+    /// and click areas, and the layer is drawn again at those frames. The
+    /// place is not entered again: no place event, the mouse is not moved.
+    pub(crate) async fn reload_view_after_puzzle(&mut self) {
+        let Some(index) = self.current_place else {
+            return;
+        };
+        let Some(cyclo) = self.wam.places.get(index).map(|p| p.cyclo.clone()) else {
+            return;
+        };
+        if self.load_cyclo(&cyclo).await {
+            self.recomposite_sprite_layer();
+        }
+    }
+
+    /// The current place's view loaded as an entry does: its panorama and
+    /// its sprites (frame 0, the NPC click areas rebuilt), with no place
+    /// event (tests).
+    #[cfg(test)]
     pub(crate) async fn reload_current_view(&mut self) {
         let Some(index) = self.current_place else {
             return;
@@ -537,6 +555,32 @@ impl Engine {
         places: Option<(u16, u16)>,
         frame_ms: u64,
     ) {
+        self.play_film(video, places, frame_ms, places.is_none())
+            .await;
+    }
+
+    /// A start-up film of WinMain (`FUN_00424254`, which plays it through
+    /// `FUN_0041bc74`): its sound is the NewSound value WinMain stores
+    /// before it (`newsound`, e.g. 0x12 for LOGO15N, 0x13 for PREINTRO;
+    /// `None` leaves NEWSOUND as it is), started by the film loop's first
+    /// poll of `FUN_00432a64` (0x0041bdcb) from the table 0x00496224, not
+    /// by a Cinema='s name.
+    pub(crate) async fn play_startup_film(&mut self, video: &str, newsound: Option<i32>) {
+        if let Some(v) = newsound {
+            self.vars.set("newsound", v);
+        }
+        self.play_film(video, None, CINEMA_FRAME_MS, false).await;
+    }
+
+    /// [`Engine::play_transition_video`]; `cinema_sound`: the Cinema=
+    /// handler's sound (NEWSOUND = 1 and the film's own APC name).
+    async fn play_film(
+        &mut self,
+        video: &str,
+        places: Option<(u16, u16)>,
+        frame_ms: u64,
+        cinema_sound: bool,
+    ) {
         // A cinematic is not a move: no panorama beside it (a move's is
         // set up just before its video).
         if places.is_none() {
@@ -591,8 +635,9 @@ impl Engine {
         // (its end, seen by a later poll, clears NEWSOUND), unless
         // BugFix::CinemaSound starts the new one. A move's video
         // (FUN_00423ad8) opens no sound: the transition-named APCs are
-        // NewSound entries that the departure sections play.
-        if places.is_none() {
+        // NewSound entries that the departure sections play, and a start-up
+        // film's sound is WinMain's table value (Engine::play_startup_film).
+        if cinema_sound {
             self.apply_new_sound_fade_end();
             let apc = format!("WAV\\{}", with_ext(&name, "APC"));
             if self.cinema_sound_fix() && self.music.new_sound_last == 1 {
