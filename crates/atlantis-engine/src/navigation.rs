@@ -458,6 +458,11 @@ impl Engine {
         // returns before its message pump (0x0041a2b5), so the
         // WM_MOUSEMOVE waits for the next poll.
         let mut unpumped = (0, 0);
+        // No warp frame presented since the loop was entered: the port's
+        // pass polls first, the original's polls last (0x0041c5f2).
+        let mut entered = true;
+        // An Escape that pass read, for the menu after its frame.
+        let mut menu_after_frame = false;
         while !left_pressed && !exit {
             // Windows sees a press at its cursor (`WarpPointer::cursor`,
             // the loop's pointer once a motion or a SetCursorPos set it):
@@ -465,7 +470,24 @@ impl Engine {
             // (Sys::double_click), the click that ends it, a character
             // click, a bow shot and a press the latch did not report alike.
             self.sys.set_locked_cursor(self.pointer.cursor);
-            let fi = self.poll_frame_input();
+            // The Escape of the first poll: the original reads it at the
+            // end of the loop's first frame (0x0041c5f2), after the
+            // render, the guests' portraits (0x0041c489), the cursor
+            // (0x0041c535), the copy (0x0041c5a4) and the cursor step
+            // after it (0x0041c5ed), then calls FUN_0041c838 (0x0041c618),
+            // which dims that buffer (FUN_0041cc28 @ 0x0041ccd2). That
+            // pass is the port's first; the menu opens in the next one,
+            // which reads no events: after the menu the original goes to
+            // the loop head with no poll.
+            let deferred = std::mem::take(&mut menu_after_frame);
+            let mut fi = if deferred {
+                FrameInput {
+                    escape: true,
+                    ..FrameInput::default()
+                }
+            } else {
+                self.poll_frame_input()
+            };
             // Each frame starts by clearing the double-click flag
             // (0x0041c04a), after the previous frame's poll (0x0041c5f2)
             // pumped the messages, unless it saw a left press edge: a
@@ -553,6 +575,7 @@ impl Engine {
                     // The loop entered again (0x0041c003 / 0x0041c00d).
                     unpumped = (0, 0);
                     self.pointer.loop_entry();
+                    entered = true;
                     // The original's warp loop returns the clicked character
                     // (0x0041c71e) after this frame's timers (0x0041c369);
                     // the place loop runs the conversation (0x00423c1c) and
@@ -604,6 +627,10 @@ impl Engine {
             let pending = self.bar.warp_frame_start();
             let toggled = fi.right_press && !fi.left_press;
             let mut bar = !exit && (pending != toggled);
+            if entered && !bar && !exit && fi.escape {
+                fi.escape = false;
+                menu_after_frame = true;
+            }
             if bar && self.bow_mode {
                 // In bow mode the request only lowers the bow
                 // (0x0041c6af..0x0041c6c8: FUN_0042d368).
@@ -700,7 +727,10 @@ impl Engine {
             // port adds the arrow keys (Enhancements::arrow_keys), which the
             // original's view ignores, as the same keys: left F5, right F6,
             // up F7, down F8 (a larger beta looks down).
-            self.poll_view_keys_with(fi.left_press, self.enhancements().arrow_keys);
+            // (The deferred pass's poll is the previous pass's.)
+            if !deferred {
+                self.poll_view_keys_with(fi.left_press, self.enhancements().arrow_keys);
+            }
             let (mut alpha, mut beta) = self.stored_view();
             self.view_key_polls.borrow_mut().clear();
             // The delta is previous point minus pointer (step 3,
@@ -804,6 +834,7 @@ impl Engine {
             if !exit {
                 self.sys.frame().await;
                 self.warp_frame_presented = Some(self.sys.frames_presented());
+                entered = false;
             }
         }
 
@@ -1031,6 +1062,90 @@ mod tests {
         }
         let (warp, menu) = std::mem::take(&mut *shots.borrow_mut());
         let (mut warp, menu) = (warp.unwrap(), menu.unwrap());
+        crate::ui::dim_screen(&mut warp);
+        let (x0, y0, w, h) = box_.get().unwrap();
+        let (mut same, mut all) = (0, 0);
+        for y in y0.max(0)..(y0 + h).min(SCREEN_H as i32) {
+            for x in x0.max(0)..(x0 + w).min(SCREEN_W as i32) {
+                let k = y as usize * SCREEN_W + x as usize;
+                all += 1;
+                same += usize::from(warp[k] == menu[k]);
+            }
+        }
+        assert!(all > 0 && same == all, "{same}/{all}");
+    }
+
+    /// An Escape the warp loop's first poll reads (pressed while a loop
+    /// that polls nothing ran before it, here before the loop's entry):
+    /// the original reads it at the end of its first frame (0x0041c5f2),
+    /// after that frame's portraits (0x0041c489), cursor (0x0041c535) and
+    /// present (0x0041c5ed), and FUN_0041c838 (0x0041c618) dims that
+    /// buffer: a warp frame is presented before the menu, and the menu's
+    /// backdrop keeps the portraits it drew (round 7, ui F2).
+    #[test]
+    fn an_escape_of_the_first_poll_dims_a_composed_warp_frame() {
+        // (locked, screen) of the loop's first frame and of its 10th.
+        let shots = Rc::new(RefCell::new(Vec::<(bool, Vec<u16>)>::new()));
+        let s2 = shots.clone();
+        let box_ = Rc::new(Cell::new(None));
+        let b2 = box_.clone();
+        // The frames presented before the loop.
+        let start = Rc::new(Cell::new(None::<u64>));
+        let st2 = start.clone();
+        let mut last = 0u64;
+        let ran = with_engine(
+            "an_escape_of_the_first_poll_dims_a_composed_warp_frame",
+            move |mut e| async move {
+                e.load_interface().await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.guests.id[0] = 600;
+                e.guests.sprite[0] = 0;
+                e.guests.count = 1;
+                e.guests_shown = true;
+                e.guests.portrait_y = 350;
+                let spr = &e.ui.guests[0];
+                let (x0, y0) = (540 - i32::from(spr.xoff), 350 - i32::from(spr.yoff));
+                b2.set(Some((x0, y0, i32::from(spr.w), i32::from(spr.h))));
+                e.sys.push_input(Input::KeyDown(Key::Escape));
+                e.sys.push_input(Input::KeyUp(Key::Escape));
+                st2.set(Some(e.sys.frames_presented()));
+                e.handle_warp(&mut crate::hooks::NoScripts).await;
+            },
+            move |sys, _| {
+                let Some(n0) = start.get() else {
+                    return;
+                };
+                let n = sys.frames_presented() - n0;
+                if n == std::mem::replace(&mut last, n) {
+                    return;
+                }
+                match n {
+                    1 | 10 => s2
+                        .borrow_mut()
+                        .push((sys.mouse_locked(), sys.screen.borrow().clone())),
+                    12 => {
+                        sys.push_input(Input::MouseMove { x: 2, y: 2 });
+                        button(sys, MouseButton::Left, true);
+                    }
+                    13 => button(sys, MouseButton::Left, false),
+                    30 => sys.push_input(Input::Quit),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let shots = std::mem::take(&mut *shots.borrow_mut());
+        // The loop's first frame is a warp frame (the mouse still locked),
+        // the 10th the menu.
+        assert_eq!(shots.len(), 2);
+        assert!(shots[0].0, "no warp frame before the menu");
+        assert!(!shots[1].0, "no menu");
+        let mut warp = shots[0].1.clone();
+        let menu = &shots[1].1;
         crate::ui::dim_screen(&mut warp);
         let (x0, y0, w, h) = box_.get().unwrap();
         let (mut same, mut all) = (0, 0);
