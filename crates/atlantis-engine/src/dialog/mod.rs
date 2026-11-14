@@ -444,6 +444,9 @@ impl Dialogs {
         // from the kept angles without moving them; explicit header angles
         // move them; a voice-only line redraws at them; after the line the
         // view goes back to them.
+        // The stored angles 0x00bcb59c / 0x00bcb598, the view keys of the
+        // earlier polls included.
+        e.apply_view_keys();
         let kept_f = (e.warp.alpha(), e.warp.beta());
         let kept = Angles {
             alpha: f64::from(kept_f.0),
@@ -516,8 +519,16 @@ impl Dialogs {
                 e.warp.set_hfov(saved_fov);
             }
         }
-        // FUN_00451915(0x00bcb59c, 0x00bcb598) after every line (0x00428b5e).
-        set_view(e, view.kept);
+        // FUN_00451915(0x00bcb59c, 0x00bcb598) after every line (0x00428b5e):
+        // the kept angles as the view keys of the line's polls moved them.
+        let after = e.take_view_keys_over((view.kept.alpha as f32, view.kept.beta as f32));
+        set_view(
+            e,
+            Angles {
+                alpha: f64::from(after.0),
+                beta: f64::from(after.1),
+            },
+        );
         e.emit(Event::LinePlayed {
             section: req.section,
             letter: req.letter,
@@ -700,6 +711,8 @@ impl Dialogs {
                     e.ambient_frame();
                     e.poll_new_sound().await;
                     let fi = poll_input(e);
+                    // FUN_0041a298's view keys (0x0041a33c..0x0041a3ba).
+                    e.poll_view_keys(fi.left_press);
                     // FUN_0041a298 in both line loops: a right press sets
                     // 0x00496120 and toggles the bar request; a left press
                     // in the same poll returns first (0x0041a2b5).
@@ -845,6 +858,7 @@ impl Dialogs {
             }
             e.sys.frame().await;
             let fi = poll_input(e);
+            e.poll_view_keys(fi.left_press);
             // FUN_0041a298 (0x00426389): Escape clears 0x00496124 and sets
             // the menu request (no talking head, bow mode, bar request or
             // object in hand); the menu goes on until a left click
@@ -954,6 +968,7 @@ impl Dialogs {
             // (when it would open the menu).
             while !e.should_abort() {
                 let fi = poll_input(e);
+                e.poll_view_keys(fi.left_press);
                 let done = !e.sys.mixer.is_playing(v);
                 if game_over_wait_ends(
                     &mut skip,
@@ -975,6 +990,7 @@ impl Dialogs {
             let start = e.sys.millis();
             while !e.should_abort() {
                 let fi = poll_input(e);
+                e.poll_view_keys(fi.left_press);
                 let elapsed = e.sys.millis() - start;
                 if game_over_wait_ends(
                     &mut skip,
@@ -2027,6 +2043,97 @@ mod still_cursor_tests {
         };
         let gated = off_line_screen(true).unwrap();
         assert!(stepped == gated, "a cursor sprite on the still frame");
+    }
+}
+
+#[cfg(test)]
+mod view_key_tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use super::*;
+    use crate::con_script::ConItem;
+    use crate::puzzle::assets::{poll_flags, PuzzleMouse};
+    use crate::scripts::{resolve_speaker_perso, LineRequest, Scripts};
+    use crate::sys::Key;
+    use crate::test_support::with_engine;
+
+    /// FUN_0041a298 adds 0.034906 rad to 0x00bcb59c on every poll with F5
+    /// held and no new left press (0x0041a2b5, 0x0041a33c): in a puzzle's
+    /// poll, where nothing draws the view, and in a voice-only line's
+    /// polls, after which FUN_0042844c sets the view at the moved angles
+    /// (0x00428b5e). The yaw before, after one puzzle poll, after a puzzle
+    /// poll with a click, and after the line CHAPI001 /2 A.
+    #[test]
+    fn f5_turns_the_stored_view_in_every_poll() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "f5_turns_the_stored_view_in_every_poll",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.set_view(1.0, 0.0);
+                e.sys.push_input(Input::KeyDown(Key::F(5)));
+                while e.sys.poll_event().is_some() {}
+                let mouse = |click| PuzzleMouse {
+                    x: 0,
+                    y: 0,
+                    click,
+                    right: false,
+                    escape: false,
+                };
+                g2.borrow_mut().push(e.stored_view().0);
+                poll_flags(&mut e, &mouse(false));
+                g2.borrow_mut().push(e.stored_view().0);
+                poll_flags(&mut e, &mouse(true));
+                g2.borrow_mut().push(e.stored_view().0);
+                let sec = s.script.sections().iter().find(|x| x.id == 2).cloned();
+                let line = sec
+                    .and_then(|x| {
+                        x.items.into_iter().find_map(|i| match i {
+                            ConItem::Line(l) => Some(l),
+                            _ => None,
+                        })
+                    })
+                    .expect("CHAPI001 /2");
+                let req = LineRequest {
+                    section: 2,
+                    letter: 'A',
+                    perso: resolve_speaker_perso(&line.speaker),
+                    line,
+                    interactive: false,
+                    inc_perso: 0,
+                };
+                let mut d = Dialogs::new();
+                let start = e.sys.millis();
+                d.play_line(&mut e, &req).await;
+                let polls = (e.sys.millis() - start) / 16;
+                g2.borrow_mut().push(e.warp.alpha());
+                g2.borrow_mut().push(polls as f32);
+            },
+            |sys, _| {
+                let mut out = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut out, 22050, 2);
+            },
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        let step = 0.034906f32;
+        assert!((got[1] - got[0] - step).abs() < 1e-6, "{got:?}");
+        assert_eq!(got[2], got[1], "a poll with a click");
+        // One step a frame of the line (its polls), from the puzzle's.
+        let turned = got[3] - got[1];
+        assert!(got[4] > 10.0, "{got:?}");
+        assert!(
+            turned > step * (got[4] - 2.0) && turned < step * (got[4] + 2.0),
+            "{got:?}"
+        );
     }
 }
 

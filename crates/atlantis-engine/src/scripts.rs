@@ -602,7 +602,11 @@ impl Scripts {
                 // is clicked (FUN_004240fc).
                 _ => {
                     // AngleWarpX=N / AngleWarpY=N turn the view to N degrees,
-                    // then store the variable (@ 0x0042a995, 0x0042a9cf).
+                    // then store the variable (@ 0x0042a995, 0x0042a9cf); the
+                    // other angle keeps what the view keys made of it.
+                    if key == "anglewarpx" || key == "anglewarpy" {
+                        e.apply_view_keys();
+                    }
                     if key == "anglewarpx" {
                         e.warp.set_alpha(con_angle_radians(value));
                     } else if key == "anglewarpy" {
@@ -1052,6 +1056,7 @@ impl Scripts {
             // (0x00428483 / 0x0042848b) at entry and sets them back at the
             // end (0x00428cb2); in between ClicPerso is cleared after every
             // line (0x00428b39). A /go keeps both.
+            e.apply_view_keys();
             let mut walk = chain.unwrap_or(Walk {
                 entry: (e.warp.alpha(), e.warp.beta()),
                 clic_perso: e.vars.get("clicperso"),
@@ -1373,6 +1378,7 @@ async fn after_item(e: &mut Engine) {
 }
 
 fn restore_entry(e: &mut Engine, walk: &mut Walk) {
+    e.apply_view_keys();
     if e.vars.get("anglewarpx") != 0 {
         walk.entry.0 = e.warp.alpha();
         e.vars.set("anglewarpx", 0);

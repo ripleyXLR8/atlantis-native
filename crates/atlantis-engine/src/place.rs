@@ -413,6 +413,9 @@ impl Engine {
         if !self.warp_loaded {
             return;
         }
+        // The turn starts from the stored angles (the view keys of the
+        // departure's lines included).
+        self.apply_view_keys();
         let mut turn = TransitionTurn::new(
             Warp::exe_pi(),
             self.warp.alpha(),
@@ -737,6 +740,7 @@ impl Engine {
                                 _ => {}
                             }
                         }
+                        self.poll_view_keys(left);
                         run.poll(left, right, escape);
                     }
                     Some(Err(e)) => {

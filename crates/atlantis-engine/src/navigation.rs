@@ -35,6 +35,35 @@ use crate::warp::{SCREEN_H, SCREEN_W};
 /// held (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba).
 const VIEW_KEY_STEP: f64 = 0.034906;
 
+/// The keys of one poll ([`Engine::poll_view_keys`]): F5, F6, F8, F7.
+const VIEW_F5: u8 = 1;
+const VIEW_F6: u8 = 2;
+const VIEW_F8: u8 = 4;
+const VIEW_F7: u8 = 8;
+
+/// The stored angles after the polls `polls`, in the order of
+/// `FUN_0041a298` (0x0041a33c..0x0041a3ba): alpha + step for F5, - step
+/// for F6, beta + step for F8, - step for F7, each added in double and
+/// stored to the float (no wrap or clamp: `FUN_00451915` does that when
+/// the view is set).
+fn view_keys_over(polls: &[u8], (mut alpha, mut beta): (f32, f32)) -> (f32, f32) {
+    for &k in polls {
+        if k & VIEW_F5 != 0 {
+            alpha = (f64::from(alpha) + VIEW_KEY_STEP) as f32;
+        }
+        if k & VIEW_F6 != 0 {
+            alpha = (f64::from(alpha) - VIEW_KEY_STEP) as f32;
+        }
+        if k & VIEW_F8 != 0 {
+            beta = (f64::from(beta) + VIEW_KEY_STEP) as f32;
+        }
+        if k & VIEW_F7 != 0 {
+            beta = (f64::from(beta) - VIEW_KEY_STEP) as f32;
+        }
+    }
+    (alpha, beta)
+}
+
 /// The port's pace of the cursor (the warp loop is not paced in the
 /// original; atlantis-re decision 0013): one warp frame's cursor calls
 /// every 160 ms.
@@ -71,6 +100,71 @@ impl Engine {
             }
         }
         fi
+    }
+
+    /// The view keys at a poll of `FUN_0041a298` (0x0041a33c..0x0041a3ba):
+    /// F5 / F6 turn and F8 / F7 tilt the stored view angles 0x00bcb59c /
+    /// 0x00bcb598 by [`VIEW_KEY_STEP`] on every poll they are held (not
+    /// edge keys), unless the poll saw a new left press, which returns
+    /// before (0x0041a2b5). Every polling loop does it: the warp loop, the
+    /// dialog lines, the subject menu, the game-over screen, the puzzles,
+    /// the bar, the menus and the videos. Only `FUN_0041bfa0`,
+    /// `FUN_004212cc`, `FUN_0042844c`, `FUN_0042a100`, `FUN_00430258` and
+    /// `FUN_00451915` read or write the angles otherwise, so outside the
+    /// warp loop nothing turns until the view is set from them again.
+    pub(crate) fn poll_view_keys(&self, left_press: bool) {
+        self.poll_view_keys_with(left_press, false);
+    }
+
+    /// [`Engine::poll_view_keys`]; `arrows` adds the arrow keys
+    /// ([`crate::enhancements::Enhancements::arrow_keys`], the warp loop
+    /// only): left F5, right F6, up F7, down F8.
+    fn poll_view_keys_with(&self, left_press: bool, arrows: bool) {
+        if left_press {
+            return;
+        }
+        let held =
+            |f: u8, arrow: Key| self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow));
+        let mut k = 0;
+        for (bit, f, arrow) in [
+            (VIEW_F5, 5, Key::Left),
+            (VIEW_F6, 6, Key::Right),
+            (VIEW_F8, 8, Key::Down),
+            (VIEW_F7, 7, Key::Up),
+        ] {
+            if held(f, arrow) {
+                k |= bit;
+            }
+        }
+        if k != 0 {
+            self.view_key_polls.borrow_mut().push(k);
+        }
+    }
+
+    /// The stored view angles 0x00bcb59c / 0x00bcb598: the warp's, moved
+    /// by the view keys polled since it was last set.
+    pub(crate) fn stored_view(&self) -> (f32, f32) {
+        view_keys_over(
+            &self.view_key_polls.borrow(),
+            (self.warp.alpha(), self.warp.beta()),
+        )
+    }
+
+    /// `angles` moved by the view keys polled since, which are used up: the
+    /// stored angles after a line whose view the port set to its camera.
+    pub(crate) fn take_view_keys_over(&self, angles: (f32, f32)) -> (f32, f32) {
+        view_keys_over(&self.view_key_polls.take(), angles)
+    }
+
+    /// The warp set to the stored view angles (where the original reads
+    /// 0x00bcb59c / 0x00bcb598 to set the view or keep it).
+    pub(crate) fn apply_view_keys(&mut self) {
+        if self.view_key_polls.borrow().is_empty() {
+            return;
+        }
+        let (a, b) = self.take_view_keys_over((self.warp.alpha(), self.warp.beta()));
+        self.warp.set_alpha(a);
+        self.warp.set_beta(b);
     }
 
     /// Waits for the buttons to be released (the loops drain the click
@@ -587,33 +681,17 @@ impl Engine {
             }
 
             // The view: FUN_0041bfa0 steps 2..5. The stored angles first
-            // take F5 / F6 (turn) and F8 / F7 (tilt) when the poll
-            // (FUN_0041a298 at the end of the previous frame) saw no new left
-            // press (@ 0x0041a2b5: VK_LBUTTON is an edge key, so a held
-            // button does not stop them; only bow mode keeps a press in
-            // the loop); the port
-            // adds the arrow keys (Enhancements::arrow_keys), which the
+            // take F5 / F6 (turn) and F8 / F7 (tilt) of the poll
+            // (FUN_0041a298 at the end of the previous frame) when it saw no
+            // new left press (@ 0x0041a2b5: VK_LBUTTON is an edge key, so a
+            // held button does not stop them; only bow mode keeps a press in
+            // the loop), and of the polls of the loops that ran since; the
+            // port adds the arrow keys (Enhancements::arrow_keys), which the
             // original's view ignores, as the same keys: left F5, right F6,
             // up F7, down F8 (a larger beta looks down).
-            let (mut alpha, mut beta) = (self.warp.alpha(), self.warp.beta());
-            if !fi.left_press {
-                let arrows = self.enhancements().arrow_keys;
-                let held = |f: u8, arrow: Key| {
-                    self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow))
-                };
-                if held(5, Key::Left) {
-                    alpha = (f64::from(alpha) + VIEW_KEY_STEP) as f32;
-                }
-                if held(6, Key::Right) {
-                    alpha = (f64::from(alpha) - VIEW_KEY_STEP) as f32;
-                }
-                if held(8, Key::Down) {
-                    beta = (f64::from(beta) + VIEW_KEY_STEP) as f32;
-                }
-                if held(7, Key::Up) {
-                    beta = (f64::from(beta) - VIEW_KEY_STEP) as f32;
-                }
-            }
+            self.poll_view_keys_with(fi.left_press, self.enhancements().arrow_keys);
+            let (mut alpha, mut beta) = self.stored_view();
+            self.view_key_polls.borrow_mut().clear();
             // The delta is previous point minus pointer (step 3,
             // 0x0041c1c3..0x0041c20d): the motion since the last step 5, the
             // loop entry or the bar close, the WM_MOUSEMOVEs of a timer
