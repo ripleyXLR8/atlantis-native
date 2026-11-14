@@ -334,6 +334,7 @@ impl Engine {
                 return None;
             }
             let mi = self.poll_menu_input();
+            self.sys.mark_text_entry();
             // The window procedure stores each WM_CHAR in 0x006ce262
             // (@ 0x00419ca6), overwriting the last; the walk's polls
             // dispatch every message queued since the last pass, and the
