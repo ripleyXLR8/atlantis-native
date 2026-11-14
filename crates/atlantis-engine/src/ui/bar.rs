@@ -49,16 +49,27 @@ pub fn scroll_step(x: i32, y: i32, count: usize, first: usize) -> i32 {
     }
 }
 
-/// `FUN_0042c59c` @ 0x0042c643: on a slide-out frame drawn at slot y
-/// `slot_y`, record `record` is drawn when the int32 at 0x00611788 + 4 *
-/// record is below 0x1fa. That is the slot y itself for a record below 9;
-/// for a record from 9 on it lies past the 9-entry slot table, where the
-/// only store is `FUN_004278a0`'s 0x1bb (@ 0x00427af0) and .bss holds 0,
-/// so such a record is drawn on every frame (1..4 rows of its icon at
-/// 506). `fix` (`BugFix::BarSlideOut`) gates every record on the slot y.
-pub fn slide_out_record_drawn(record: usize, slot_y: i32, fix: bool) -> bool {
-    if record < BAR_CELLS || fix {
-        slot_y < SLIDE_OUT_GATE_Y
+/// `FUN_0042c59c` @ 0x0042c643: on a slide-out frame drawn with the slot
+/// y table `slot_ys`, record `record` is drawn when the int32 at
+/// 0x00611788 + 4 * record is below 0x1fa: the y of slot `record` (the
+/// table is indexed by the record, not by its visible slot) for a record
+/// below 9; for a record from 9 on it lies past the 9-entry slot table,
+/// where the only store is `FUN_004278a0`'s 0x1bb (@ 0x00427af0) and .bss
+/// holds 0, so such a record is drawn on every frame (1..4 rows of its
+/// icon at 506). `fix` (`BugFix::BarSlideOut`) gates every record on the
+/// y of its visible slot (`record - first`).
+pub fn slide_out_record_drawn(
+    record: usize,
+    first: usize,
+    slot_ys: &[i32; BAR_CELLS],
+    fix: bool,
+) -> bool {
+    if fix {
+        slot_ys
+            .get(record.saturating_sub(first))
+            .is_none_or(|&y| y < SLIDE_OUT_GATE_Y)
+    } else if record < BAR_CELLS {
+        slot_ys[record] < SLIDE_OUT_GATE_Y
     } else {
         true
     }
@@ -126,10 +137,10 @@ pub struct BarIcon {
     pub y: i32,
 }
 
-/// What a frame of the bar loops draws with the slots at y `slot_y`.
+/// What a frame of the bar loops draws with the slot y table `slot_ys`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct BarFrame {
-    /// OBJETS0 sprite 0 at (0, slot y).
+    /// OBJETS0 sprite 0 at (0, slot 0's y) (@ 0x0042c65c, 0x0042cdb4).
     pub background: bool,
     /// The icons, in drawing order.
     pub icons: Vec<BarIcon>,
@@ -140,14 +151,16 @@ pub struct BarFrame {
 /// `FUN_0042c59c` (each record gated by [`slide_out_record_drawn`], the
 /// background with slot 0 under record first's gate, @ 0x0042c643..
 /// 0x0042c674). A shown record with no entry, or whose id is OBJETENMAIN,
-/// gets no icon (@ 0x0042c682..0x0042c6b1).
-pub fn bar_frame_layout(st: &BarState, slot_y: i32, slide_out: bool) -> BarFrame {
-    let drawn = |r: usize| !slide_out || slide_out_record_drawn(r, slot_y, st.slide_out_fix);
+/// gets no icon (@ 0x0042c682..0x0042c6b1). Each icon is at its slot's y
+/// (@ 0x0042c6c9, 0x0042ce2c).
+pub fn bar_frame_layout(st: &BarState, slot_ys: &[i32; BAR_CELLS], slide_out: bool) -> BarFrame {
+    let drawn =
+        |r: usize| !slide_out || slide_out_record_drawn(r, st.first, slot_ys, st.slide_out_fix);
     let mut f = BarFrame {
         background: drawn(st.first),
         icons: Vec::new(),
     };
-    for slot in 0..BAR_CELLS {
+    for (slot, &y) in slot_ys.iter().enumerate() {
         let record = st.first + slot;
         if !drawn(record) {
             continue;
@@ -162,25 +175,25 @@ pub fn bar_frame_layout(st: &BarState, slot_y: i32, slide_out: bool) -> BarFrame
             record,
             slot,
             x: slot_x(slot, st.pickup_slot, st.pickup_fix),
-            y: slot_y,
+            y,
         });
     }
     f
 }
 
-/// Draws a bar frame: the background (`bar`), then each icon (`icon` gives
-/// a record's OBJETS1 sprite, from its icon byte), with `FUN_00410430`'s
-/// clipping.
+/// Draws a bar frame: the background (`bar`) at y `bar_y` (slot 0's), then
+/// each icon (`icon` gives a record's OBJETS1 sprite, from its icon byte),
+/// with `FUN_00410430`'s clipping.
 pub fn draw_bar_frame<'a>(
     screen: &mut [u16],
     frame: &BarFrame,
-    slot_y: i32,
+    bar_y: i32,
     bar: Option<&SprSprite>,
     icon: impl Fn(usize) -> Option<&'a SprSprite>,
 ) {
     if frame.background {
         if let Some(bar) = bar {
-            draw_sprite_below(screen, bar, 0, slot_y, BAR_TOP);
+            draw_sprite_below(screen, bar, 0, bar_y, BAR_TOP);
         }
     }
     for i in &frame.icons {
@@ -203,21 +216,23 @@ impl Engine {
         }
     }
 
-    /// A frame of the bar loops with the slots at y `slot_y`: the view
+    /// A frame of the bar loops with the slots at their y (`bar_slot_ys`):
+    /// the view
     /// rendered anew (`FUN_00451d8b`), the bar ([`bar_frame_layout`];
     /// `slide_out` for `FUN_0042c59c`), then the guests' portraits
     /// (`FUN_0042bc58`, after the bar: `FUN_0042c2c4` @ 0x0042c4a9,
     /// `FUN_0042c59c` @ 0x0042c702), the pointer on top.
-    fn bar_frame(&mut self, slot_y: i32, slide_out: bool) {
+    fn bar_frame(&mut self, slide_out: bool) {
         if self.warp_loaded {
             self.render_view();
         }
         let mut s = self.sys.screen.borrow().clone();
         let st = self.bar_state();
-        let frame = bar_frame_layout(&st, slot_y, slide_out);
+        let ys = self.bar_slot_ys;
+        let frame = bar_frame_layout(&st, &ys, slide_out);
         // Each record with its own icon byte (@ 0x0042c445, 0x0042c6b9,
         // 0x0042c9db, 0x0042ce1c).
-        draw_bar_frame(&mut s, &frame, slot_y, self.ui.bar.as_ref(), |r| {
+        draw_bar_frame(&mut s, &frame, ys[0], self.ui.bar.as_ref(), |r| {
             self.record_icon(r).and_then(|k| self.ui.object(k))
         });
         self.draw_guests(&mut s, None);
@@ -277,10 +292,10 @@ impl Engine {
         while slot_y >= BAR_HOTSPOT_Y && !self.should_abort() {
             // The table 0x00611788 as drawn (-7 before the frame): a timer
             // that ends the slide leaves it there.
-            self.bar_slot_y = slot_y;
+            self.bar_slot_ys = [slot_y; BAR_CELLS];
             self.slide_guest_portraits(-7);
             self.animate_sprites();
-            self.bar_frame(slot_y, false);
+            self.bar_frame(false);
             self.still_frame_cursor_step();
             self.sys.frame().await;
             if self.bar_tick(hooks, pointer).await.1 {
@@ -308,27 +323,29 @@ impl Engine {
     /// slide after its first frame (0x0042c7e1). Then the click and
     /// right-press flags are cleared (0x0042c826, 0x0042c830) and the
     /// timers resume from their values, ChapterTime from 0 (0x0042c844).
-    /// It starts from the slots' y the last slide left (`bar_slot_y`):
-    /// 443, or higher after a slide-in cut short.
+    /// It starts from the slots' y the last slide left (`bar_slot_ys`):
+    /// 443, or higher after a slide-in cut short (a pick-up's slot back at
+    /// 443); its end test reads slot 0's (@ 0x0042c816).
     async fn bar_slide_out(&mut self, hooks: &mut dyn ScriptHooks, game_over: bool) -> bool {
-        let mut slot_y = self.bar_slot_y;
         let mut pointer = self.sys.mouse();
         let mut closed = false;
-        while slot_y < 0x208 && !self.should_abort() {
+        while self.bar_slot_ys[0] < 0x208 && !self.should_abort() {
             self.animate_sprites();
-            self.bar_frame(slot_y, true);
+            self.bar_frame(true);
             self.still_frame_cursor_step();
             self.sys.frame().await;
             self.slide_guest_portraits(7);
-            // +7 after the frame (@ 0x0042c789), before the timers.
-            self.bar_slot_y = slot_y + 7;
+            // +7 to each slot after the frame (@ 0x0042c789), before the
+            // timers.
+            for y in &mut self.bar_slot_ys {
+                *y += 7;
+            }
             if self.bar_tick(hooks, &mut pointer).await.1 || game_over {
                 self.bar.request = false;
                 closed = true;
                 break;
             }
             self.bar_sounds().await;
-            slot_y += 7;
         }
         self.bar.right_press = false;
         self.rebase_con_clocks();
@@ -546,7 +563,7 @@ impl Engine {
             }
             self.animate_sprites();
             // The slots at the y the slide-in left (@ 0x0042c97d, 0x0042c9eb).
-            self.bar_frame(self.bar_slot_y, false);
+            self.bar_frame(false);
             self.sys.frame().await;
             let mi = self.poll_menu_input();
             // The left-press branch of FUN_0041a298 sets the flag and
@@ -636,13 +653,18 @@ impl Engine {
             Some(Abort::NewGame) => self.abort.take(),
             _ => None,
         };
-        // The new record's slot x = index * 0x46 + 0x23, stored after the
-        // slide-in (@ 0x00427ae2); a record from 9 on lands past the slots.
+        // The new record's slot x = index * 0x46 + 0x23 and slot y = 0x1bb,
+        // stored after the slide-in (@ 0x00427ae2, 0x00427af0): after a
+        // slide-in cut short that slot is back at 443, the others stay at
+        // the cut y. A record from 9 on lands past the slots.
         let held = self.vars.get("objetenmain");
         self.bar_pickup_slot = match self.inventory.len() {
             n if n > 0 && self.inventory[n - 1] == held => pickup_slot(n - 1),
             _ => None,
         };
+        if let Some(slot) = self.bar_pickup_slot {
+            self.bar_slot_ys[slot] = BAR_HOTSPOT_Y;
+        }
         let mut right = false;
         let mut next_scroll = 0u64;
         // The loop ends on a press edge of either button; a press made
@@ -651,8 +673,9 @@ impl Engine {
             // FUN_0042cc98 animates the place sprites (@ 0x0042cd1c) and
             // draws like the bar loop; it runs no timers.
             self.animate_sprites();
-            // The slots at the y the slide-in left (@ 0x0042cdb4, 0x0042ce2c).
-            self.bar_frame(self.bar_slot_y, false);
+            // The bar at slot 0's y, each icon at its slot's (@ 0x0042cdb4,
+            // 0x0042ce2c).
+            self.bar_frame(false);
             self.sys.frame().await;
             let mi = self.poll_menu_input();
             // Its poll (@ 0x0042cf14) toggles the request on a right press:
@@ -1820,9 +1843,11 @@ mod tests {
 
     /// A GameOver set by a slide-in timer of a pick-up (its 3rd frame):
     /// `FUN_004278a0` still runs the hold loop `FUN_0042cc98` (no timers,
-    /// no GameOver test, 0x0042cd05) with the bar at the slot y the cut
-    /// slide-in left (@ 0x0042cdb4) until a press, then one slide-out
-    /// frame (its GameOver exit, 0x0042c7e1); the reload follows.
+    /// no GameOver test, 0x0042cd05) until a press, then one slide-out
+    /// frame (its GameOver exit, 0x0042c7e1); the reload follows. The new
+    /// record is record 0, whose slot y the pick-up puts back to 443 after
+    /// the slide-in (@ 0x00427af0): the hold loop and the slide-out draw
+    /// the bar at slot 0's y (@ 0x0042cdb4, 0x0042c65c), 443.
     #[test]
     fn a_game_over_in_the_pickup_slide_in_still_holds_until_a_click() {
         let shots: Rc<RefCell<Vec<Vec<u16>>>> = Rc::default();
@@ -1860,11 +1885,69 @@ mod tests {
         // 3 slide-in frames, 1 slide-out frame (no timers in the hold).
         assert_eq!(shots.borrow().len(), 4);
         let held = held.borrow();
-        assert!(bar_at(&bar, &held[0], 478), "the hold loop's frame");
+        assert!(bar_at(&bar, &shots.borrow()[2], 478), "the cut slide-in");
+        assert!(bar_at(&bar, &held[0], 443), "the hold loop's frame");
+        assert!(!bar_at(&bar, &held[0], 478));
         assert!(
-            bar_at(&bar, &shots.borrow()[3], 478),
+            bar_at(&bar, &shots.borrow()[3], 443),
             "the slide-out's frame"
         );
+    }
+
+    /// As above with the new record at index 1: the pick-up puts slot 1's
+    /// y back to 443 (@ 0x00427af0), the other slots stay at the cut y
+    /// (478). The hold loop and the slide-out draw the bar at slot 0's y
+    /// and each icon at its slot's (@ 0x0042ce2c, 0x0042c6c9): after the
+    /// left click empties the hand, the slide-out's frame shows the bar at
+    /// 478 and the new icon at 443.
+    #[test]
+    fn a_pickup_after_a_cut_slide_in_puts_its_slot_back_at_443() {
+        let shots: Rc<RefCell<Vec<Vec<u16>>>> = Rc::default();
+        let got = Rc::new(RefCell::new(None));
+        let (s2, g2) = (shots.clone(), got.clone());
+        let ran = with_engine(
+            "a_pickup_after_a_cut_slide_in_puts_its_slot_back_at_443",
+            move |mut e| async move {
+                bar_test_view(&mut e).await;
+                let ids: Vec<i32> = e
+                    .game
+                    .exe
+                    .inventory_object_ids
+                    .iter()
+                    .enumerate()
+                    .filter(|&(k, &id)| id != 0 && e.ui.object(k).is_some())
+                    .map(|(_, &id)| id)
+                    .take(2)
+                    .collect();
+                e.inventory = ids.clone();
+                e.vars.set("objetenmain", ids[1]);
+                let mut hooks = CutSlideIn {
+                    at: 3,
+                    game_over: true,
+                    shots: s2,
+                };
+                e.display_pickup(&mut hooks).await;
+                let icon = e.record_icon(1).and_then(|k| e.ui.object(k)).cloned();
+                let x = slot_x(1, Some(1), e.enhancements().fix(BugFix::PickupIcon));
+                *g2.borrow_mut() = Some((e.ui.bar.clone(), icon, x));
+            },
+            move |sys, f| match f {
+                60 => button(sys, MouseButton::Left, true),
+                62 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (bar, icon, x) = got.borrow_mut().take().unwrap();
+        let (bar, icon) = (bar.expect("the bar sprite"), icon.expect("the icon"));
+        let shots = shots.borrow();
+        assert_eq!(shots.len(), 4);
+        let out = &shots[3];
+        assert!(bar_at(&bar, out, 478), "the bar at slot 0's y");
+        let (same, all) = opaque_shown(out, &icon, x, 443);
+        assert!(all > 0 && same == all, "the new icon at 443: {same}/{all}");
     }
 
     /// Counts the timer passes.
@@ -2061,7 +2144,7 @@ mod tests {
                     slide_out_fix,
                     pickup_fix,
                 };
-                let f = bar_frame_layout(&st, slot_y, true);
+                let f = bar_frame_layout(&st, &[slot_y; BAR_CELLS], true);
                 let mut screen = view.clone();
                 draw_bar_frame(&mut screen, &f, slot_y, bar.first(), |r| {
                     icons.get((records[r] - 1000) as usize)
