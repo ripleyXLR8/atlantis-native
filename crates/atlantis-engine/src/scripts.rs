@@ -783,6 +783,8 @@ impl Scripts {
     /// played.
     pub async fn run_con_timers(&mut self, e: &mut Engine, from_warp: bool) -> bool {
         let mut played = false;
+        // The reload a /tim1 game over asked for, held while /tim2 runs.
+        let mut held_abort = None;
         for timer in 1..=2 {
             let flag = if timer == 1 { "testtime1" } else { "testtime2" };
             if e.vars.get(flag) == 0 {
@@ -814,8 +816,25 @@ impl Scripts {
                 played = true;
             }
             if e.should_abort() {
+                // FUN_0042be3c tests no GAMEOVER between its two scans
+                // (0x0042be94 -> 0x0042bea8): after a /tim1 game over the
+                // /tim2 scan still runs, GAMEOVER still set, and its
+                // section meets the executor's test after its first item
+                // (0x00428c05) and shows the game-over picture again
+                // (FUN_00426590 with the text after that item). With
+                // BugFix::GameOverPuzzle GAMEOVER is cleared at once and
+                // the pass ends, as for the place loop's scans.
+                if timer == 1 && e.game_over_left_set() {
+                    held_abort = e.abort.take();
+                    continue;
+                }
                 break;
             }
+        }
+        // A reload the /tim2 section asked for (its game over) stands;
+        // otherwise the /tim1 game over's.
+        if e.abort.is_none() {
+            e.abort = held_abort;
         }
         played
     }
@@ -1084,8 +1103,9 @@ impl Scripts {
                             // FUN_00428da8: a GAMEOVER left set
                             // (BugFix::GameOverPuzzle off) shows the screen
                             // again, with no narrator, the position being a
-                            // header or the new file's head [INFERRED: no
-                            // `[` there].
+                            // header or the new file's head: no `[Narra`
+                            // there (FUN_00426590 compares the position with
+                            // `[Narra` @ 0x004bc578) [CONFIRMED-STATIC].
                             let n = e.vars.get("gameover");
                             if n != 0 {
                                 game_over = Some(GameOverRequest {
@@ -1821,6 +1841,94 @@ mod tests {
         assert_ne!(got[0].narrator, got[1].narrator);
     }
 
+    /// Notes the lines played and the game overs shown.
+    type LinesAndOvers = (Vec<String>, Vec<(i32, bool)>);
+    struct LinesAndGameOvers(Rc<RefCell<LinesAndOvers>>);
+
+    impl DialogPresenter for LinesAndGameOvers {
+        fn play_line<'a>(
+            &'a mut self,
+            _e: &'a mut Engine,
+            req: &'a LineRequest,
+        ) -> HookFuture<'a, LineOutcome> {
+            self.0.borrow_mut().0.push(req.line.text.clone());
+            ready(LineOutcome::default())
+        }
+        fn game_over<'a>(
+            &'a mut self,
+            _e: &'a mut Engine,
+            req: &'a GameOverRequest,
+        ) -> HookFuture<'a, ()> {
+            self.0.borrow_mut().1.push((req.n, req.narrator.is_some()));
+            ready(())
+        }
+    }
+
+    /// The lines, the game overs, GAMEOVER and the abort after the timer
+    /// scans, a /tim1 game over and a /tim2 entry true on the same frame.
+    type TimerRun = (Vec<String>, Vec<(i32, bool)>, i32, Option<Abort>);
+
+    fn tim2_after_a_tim1_game_over(fixed: bool) -> Option<TimerRun> {
+        let got = Rc::new(RefCell::new((Vec::new(), Vec::new())));
+        let end = Rc::new(RefCell::new(None));
+        let (g2, end2) = (got.clone(), end.clone());
+        let ran = with_engine(
+            "a_tim1_game_over_still_scans_tim2",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(LinesAndGameOvers(g2)));
+                e.new_game(&mut s, false).await;
+                let mut x = crate::enhancements::Enhancements::original();
+                if fixed {
+                    x.fixes
+                        .set(crate::enhancements::BugFix::GameOverPuzzle, true);
+                }
+                e.set_enhancements(x);
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/tim1(flagtemp1=1)\r\n/set(GameOver=3)\r\n\
+                      [Narrator,off] Dead.\r\n/0\r\n\
+                      /2\r\n/tim2(flagtemp2=1)\r\n[Seth,off] Hello.\r\n\
+                      [Seth,off] Bye.\r\n/0\r\n",
+                );
+                e.vars.set("testtime1", 1);
+                e.vars.set("testtime2", 1);
+                e.vars.set("flagtemp1", 1);
+                e.vars.set("flagtemp2", 1);
+                s.run_con_timers(&mut e, false).await;
+                *end2.borrow_mut() = Some((e.vars.get("gameover"), e.abort));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return None;
+        }
+        let (lines, overs) = got.borrow().clone();
+        let (gameover, abort) = end.borrow().expect("the timers did not return");
+        Some((lines, overs, gameover, abort))
+    }
+
+    /// FUN_0042be3c tests no GAMEOVER between its scans (0x0042be94 ->
+    /// 0x0042bea8): after a /tim1 game over, a /tim2 entry true on the same
+    /// frame plays its first item, then the executor's test (0x00428c05)
+    /// shows the game-over picture again, without a narrator here. With
+    /// BugFix::GameOverPuzzle (GAMEOVER cleared at once) the pass ends.
+    #[test]
+    fn a_tim1_game_over_still_scans_tim2() {
+        let Some(original) = tim2_after_a_tim1_game_over(false) else {
+            return;
+        };
+        assert_eq!(
+            original,
+            (
+                vec!["Hello.".to_string()],
+                vec![(3, true), (3, false)],
+                3,
+                Some(Abort::NewGame)
+            )
+        );
+        let fixed = tim2_after_a_tim1_game_over(true).unwrap();
+        assert_eq!(fixed, (vec![], vec![(3, true)], 0, Some(Abort::NewGame)));
+    }
+
     /// The game overs (GAMEOVER, with a narrator), the puzzles' (id,
     /// result), GAMEOVER and the abort as the place loop returns.
     type ThroneRun = (Vec<(i32, bool)>, Vec<(i32, i32)>, i32, Option<Abort>);
@@ -2272,7 +2380,15 @@ mod tests {
             ev.contains(&crate::engine::Event::GameOver(20)),
             "no game over"
         );
-        Some(end.get().unwrap() - voice.get().expect("no narrator voice"))
+        let end = end.get().unwrap();
+        // A narration cut at its first poll presents no frame after the
+        // voice starts (the screen ends on the picture, FUN_00426590 @
+        // 0x00426be6): the voice is seen only once the task has ended.
+        let started = ev
+            .iter()
+            .any(|e| matches!(e, crate::engine::Event::Voice(n) if n.contains("ATA0941B")));
+        let voice = voice.get().or(started.then_some(end));
+        Some(end - voice.expect("no narrator voice"))
     }
 
     /// An Escape inside a puzzle latches 0x00496124 = 0 / 0x00496138 = 1

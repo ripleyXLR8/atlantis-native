@@ -707,7 +707,7 @@ impl Engine {
 
     /// A game over ended the warp loop and GAMEOVER is left set until the
     /// reload ([`crate::enhancements::BugFix::GameOverPuzzle`] off).
-    fn game_over_left_set(&self) -> bool {
+    pub(crate) fn game_over_left_set(&self) -> bool {
         self.abort == Some(Abort::NewGame)
             && !self.sys.should_quit()
             && !self.game_over_cleared_at_once()

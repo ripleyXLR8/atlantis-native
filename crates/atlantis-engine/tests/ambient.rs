@@ -47,6 +47,7 @@ impl AmbientSampleOutput for FakeOut {
         ));
         self.st[slot] = SMP_PLAYING;
     }
+    fn set_loop_once(&mut self, _: usize) {}
     fn stop(&mut self, slot: usize) {
         self.log.push(format!("stop {slot}"));
     }
@@ -83,6 +84,7 @@ impl AmbientSampleOutput for MilesOut {
         self.miles.started(slot);
         self.active[slot] = true;
     }
+    fn set_loop_once(&mut self, _: usize) {}
     fn stop(&mut self, slot: usize) {
         self.miles.stopped(slot, self.active[slot]);
         self.active[slot] = false;

@@ -991,9 +991,15 @@ impl Dialogs {
         }
         e.bar.request = skip.bar_request;
         e.escape_request = false;
-        // @ 0x00426bc2: the screen is cleared to black.
-        e.sys.screen.borrow_mut().fill(0);
-        e.sys.frame().await;
+        // @ 0x00426b9c..0x00426be6: the back surface is cleared (FUN_00450ec0
+        // on all 0x96000 bytes) and not presented; the last present is the
+        // image with its subtitle (0x00426ac9). Nothing on the way back to
+        // the main loop, the reload (FUN_0042de5c) or the arrival scan
+        // presents before the whole screen is drawn again (a `Cinema=`
+        // frame or the warp loop's panorama), so the game-over picture
+        // stays on screen until the reloaded game's first frame. The port's
+        // screen is the one shown (a front end shows it between frames
+        // too), so it keeps the picture rather than the cleared surface.
         drain(e).await;
     }
 }
