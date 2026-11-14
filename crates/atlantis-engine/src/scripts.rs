@@ -1116,7 +1116,7 @@ impl Scripts {
         // game-over narration of the scan stops at its first poll (with
         // BugFix::PuzzleEscape a puzzle latches no Escape).
         e.bar.request = false;
-        e.reload_current_view().await;
+        e.reload_view_after_puzzle().await;
         e.vars.set("startpuzzle", 0);
         self.run_sel_scan(e).await;
         e.vars.set("finpuzzle", 0);
@@ -1879,6 +1879,44 @@ mod tests {
         );
         if ran {
             assert_eq!(*got.borrow(), [false, true]);
+        }
+    }
+
+    /// After a puzzle `FUN_004240fc` reloads the panorama only
+    /// (`FUN_0044a424` @ 0x004241e2), not `FUN_0042431c`: the view's
+    /// sprite rows keep their frames (ATLAN1 view 8, a puzzle zone and a
+    /// looping row).
+    #[test]
+    fn a_puzzle_keeps_the_sprite_frames() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_puzzle_keeps_the_sprite_frames",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(8);
+                e.do_place_change().await;
+                let rows: Vec<usize> = (0..e.sprite_list.len())
+                    .filter(|&i| e.sprite_list[i].place_id == 8 && e.sprite_list[i].frame_count > 1)
+                    .collect();
+                assert!(!rows.is_empty());
+                for &i in &rows {
+                    e.sprite_list[i].frame = 1;
+                }
+                s.script = crate::con_script::ConScript::parse(b"/1\r\n/0\r\n");
+                e.vars.set("objetenmain", 0);
+                // A StartPuzzle number past the puzzles: refused at once.
+                s.run_puzzle_zone(&mut e, 99).await;
+                let frames: Vec<i32> = rows.iter().map(|&i| e.sprite_list[i].frame).collect();
+                *g2.borrow_mut() = Some(frames);
+            },
+            |_, _| {},
+        );
+        if ran {
+            let frames = got.borrow().clone().expect("the puzzle zone did not end");
+            assert!(frames.iter().all(|&f| f == 1), "{frames:?}");
         }
     }
 

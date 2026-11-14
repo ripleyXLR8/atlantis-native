@@ -119,10 +119,28 @@ impl Engine {
         });
     }
 
-    /// The current place's view loaded again, as `FUN_004240fc` does after
-    /// a puzzle: its panorama (the pointer left at (0x140, 0x140)) and its
-    /// sprites (frame 0, the NPC click areas rebuilt). The place is not
-    /// entered again: no place event, the mouse is not moved.
+    /// The current place's panorama loaded again, as `FUN_004240fc` does
+    /// after a puzzle (`FUN_0044a424` @ 0x004241e2: the panorama, the FOV,
+    /// the pointer left at (0x140, 0x140)). It calls neither `FUN_0042431c`
+    /// nor `FUN_0042488c`: the sprite rows keep their frames, frame counts
+    /// and click areas, and the layer is drawn again at those frames. The
+    /// place is not entered again: no place event, the mouse is not moved.
+    pub(crate) async fn reload_view_after_puzzle(&mut self) {
+        let Some(index) = self.current_place else {
+            return;
+        };
+        let Some(cyclo) = self.wam.places.get(index).map(|p| p.cyclo.clone()) else {
+            return;
+        };
+        if self.load_cyclo(&cyclo).await {
+            self.recomposite_sprite_layer();
+        }
+    }
+
+    /// The current place's view loaded as an entry does: its panorama and
+    /// its sprites (frame 0, the NPC click areas rebuilt), with no place
+    /// event (tests).
+    #[cfg(test)]
     pub(crate) async fn reload_current_view(&mut self) {
         let Some(index) = self.current_place else {
             return;
