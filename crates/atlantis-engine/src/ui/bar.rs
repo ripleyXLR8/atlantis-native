@@ -128,6 +128,27 @@ pub struct BarState<'a> {
     pub pickup_fix: bool,
 }
 
+/// What a presented bar frame shows at the pointer. The pointer of the bar
+/// loops, `FUN_0042d558`, draws into the work buffer `[0x004960d8]`
+/// (pushes @ 0x0042d5d1, 0x0042d61b), which reaches the screen only by the
+/// next copy `FUN_00410f36`; each loop renders the whole view into that
+/// buffer again before its next copy (`FUN_00451d8b`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BarPointer {
+    /// The slide-in `FUN_0042c2c4` and the slide-out `FUN_0042c59c` call
+    /// `FUN_0042d558` only after their copy (@ 0x0042c518 after 0x0042c4cf,
+    /// @ 0x0042c7c0 after 0x0042c728): no pointer is presented, and the
+    /// present's warp cursor is off (0x004960c4 set).
+    None,
+    /// The pick-up's hold loop `FUN_0042cc98`: the new record's icon at the
+    /// pointer before the copy (@ 0x0042ce6a..0x0042ce98, copy @
+    /// 0x0042cec1); its `FUN_0042d558` follows the copy (@ 0x0042cf05).
+    HeldIcon,
+    /// The bar loop `FUN_0042c8ac`: `FUN_0042d558` before the copy
+    /// (@ 0x0042ca65, copy @ 0x0042cad4).
+    Pointer,
+}
+
 /// An icon of a bar frame: the record, its visible slot and the hotspot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BarIcon {
@@ -221,8 +242,9 @@ impl Engine {
     /// rendered anew (`FUN_00451d8b`), the bar ([`bar_frame_layout`];
     /// `slide_out` for `FUN_0042c59c`), then the guests' portraits
     /// (`FUN_0042bc58`, after the bar: `FUN_0042c2c4` @ 0x0042c4a9,
-    /// `FUN_0042c59c` @ 0x0042c702), the pointer on top.
-    fn bar_frame(&mut self, slide_out: bool) {
+    /// `FUN_0042c59c` @ 0x0042c702), then what the frame shows at the
+    /// pointer ([`BarPointer`]).
+    fn bar_frame(&mut self, slide_out: bool, at_pointer: BarPointer) {
         if self.warp_loaded {
             self.render_view();
         }
@@ -236,7 +258,16 @@ impl Engine {
             self.record_icon(r).and_then(|k| self.ui.object(k))
         });
         self.draw_guests(&mut s, None);
-        self.draw_pointer(&mut s);
+        match at_pointer {
+            BarPointer::None => {}
+            BarPointer::HeldIcon => {
+                let (x, y) = self.sys.mouse();
+                if let Some(spr) = self.held_icon().and_then(|i| self.ui.object(i)) {
+                    draw_sprite(&mut s, spr, x, y);
+                }
+            }
+            BarPointer::Pointer => self.draw_pointer(&mut s),
+        }
         *self.sys.screen.borrow_mut() = s;
     }
 
@@ -295,7 +326,7 @@ impl Engine {
             self.bar_slot_ys = [slot_y; BAR_CELLS];
             self.slide_guest_portraits(-7);
             self.animate_sprites();
-            self.bar_frame(false);
+            self.bar_frame(false, BarPointer::None);
             self.still_frame_cursor_step();
             self.sys.frame().await;
             if self.bar_tick(hooks, pointer).await.1 {
@@ -331,7 +362,7 @@ impl Engine {
         let mut closed = false;
         while self.bar_slot_ys[0] < 0x208 && !self.should_abort() {
             self.animate_sprites();
-            self.bar_frame(true);
+            self.bar_frame(true, BarPointer::None);
             self.still_frame_cursor_step();
             self.sys.frame().await;
             self.slide_guest_portraits(7);
@@ -563,7 +594,7 @@ impl Engine {
             }
             self.animate_sprites();
             // The slots at the y the slide-in left (@ 0x0042c97d, 0x0042c9eb).
-            self.bar_frame(false);
+            self.bar_frame(false, BarPointer::Pointer);
             self.sys.frame().await;
             let mi = self.poll_menu_input();
             // The left-press branch of FUN_0041a298 sets the flag and
@@ -675,7 +706,7 @@ impl Engine {
             self.animate_sprites();
             // The bar at slot 0's y, each icon at its slot's (@ 0x0042cdb4,
             // 0x0042ce2c).
-            self.bar_frame(false);
+            self.bar_frame(false, BarPointer::HeldIcon);
             self.sys.frame().await;
             let mi = self.poll_menu_input();
             // Its poll (@ 0x0042cf14) toggles the request on a right press:
@@ -1796,6 +1827,144 @@ mod tests {
         e.reload_current_view().await;
         e.load_ui_assets().await;
         e.sys.set_mouse_pos(320, 100);
+    }
+
+    /// For each frame presented by the bar (`pickup`: the pick-up) with
+    /// the mouse at (320, 100): whether CURSEURS frame 6 (its pixels the
+    /// held icon does not cover) and the held icon are at the pointer.
+    fn pointer_per_frame(pickup: bool) -> Option<Vec<(bool, bool)>> {
+        type Sprites = Option<(SprSprite, Option<SprSprite>, u64)>;
+        let sprites: Rc<RefCell<Sprites>> = Rc::default();
+        let seen: Rc<RefCell<Vec<(bool, bool)>>> = Rc::default();
+        let (sp2, sp3, se2) = (sprites.clone(), sprites, seen.clone());
+        let mut last = None;
+        let ran = with_engine(
+            "bar_pointer_per_frame",
+            move |mut e| async move {
+                bar_test_view(&mut e).await;
+                e.load_cursor_sprites().await;
+                let held = if pickup {
+                    let id = e
+                        .game
+                        .exe
+                        .inventory_object_ids
+                        .iter()
+                        .enumerate()
+                        .find(|&(k, &id)| id != 0 && e.ui.object(k).is_some())
+                        .map(|(_, &id)| id)
+                        .unwrap();
+                    e.inventory = vec![id];
+                    id
+                } else {
+                    0
+                };
+                e.vars.set("objetenmain", held);
+                let icon = e.held_icon().and_then(|k| e.ui.object(k)).cloned();
+                *sp2.borrow_mut() =
+                    Some((e.cursor_sprites[6].clone(), icon, e.sys.frames_presented()));
+                if pickup {
+                    e.display_pickup(&mut NoScripts).await;
+                } else {
+                    e.display_bar(&mut NoScripts).await;
+                }
+                *sp2.borrow_mut() = None;
+            },
+            move |sys, _| {
+                let Some((cursor, icon, base)) = sp3.borrow().clone() else {
+                    return;
+                };
+                let now = sys.frames_presented();
+                if *last.get_or_insert(base) == now {
+                    return;
+                }
+                last = Some(now);
+                let s = sys.screen.borrow();
+                let (x, y) = (320, 100);
+                let covered = |px: i32, py: i32| {
+                    icon.as_ref().is_some_and(|i| {
+                        let (c, r) = (px - x + i32::from(i.xoff), py - y + i32::from(i.yoff));
+                        c >= 0
+                            && r >= 0
+                            && c < i32::from(i.w)
+                            && r < i32::from(i.h)
+                            && i.blend[(r * i32::from(i.w) + c) as usize]
+                                == atlantis_data::sprite_blend::SPR_NO_BLEND
+                    })
+                };
+                let (mut same, mut all) = (0, 0);
+                for r in 0..i32::from(cursor.h) {
+                    for c in 0..i32::from(cursor.w) {
+                        let (px, py) = (
+                            x - i32::from(cursor.xoff) + c,
+                            y - i32::from(cursor.yoff) + r,
+                        );
+                        let k = (r * i32::from(cursor.w) + c) as usize;
+                        if cursor.blend[k] != atlantis_data::sprite_blend::SPR_NO_BLEND
+                            || covered(px, py)
+                        {
+                            continue;
+                        }
+                        all += 1;
+                        same += usize::from(
+                            s[py as usize * SCREEN_W + px as usize] == cursor.pixels[k],
+                        );
+                    }
+                }
+                let icon_shown = icon.as_ref().is_some_and(|i| {
+                    let (same, all) = opaque_shown(&s, i, x, y);
+                    all > 0 && same == all
+                });
+                drop(s);
+                let mut seen = se2.borrow_mut();
+                seen.push((all > 0 && same == all, icon_shown));
+                // A left click in the bar loop (on the view: the bar
+                // closes) or the hold loop.
+                match seen.len() {
+                    30 => button(sys, MouseButton::Left, true),
+                    32 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                }
+            },
+        );
+        ran.then(|| seen.borrow().clone())
+    }
+
+    /// The slide-in `FUN_0042c2c4` and the slide-out `FUN_0042c59c` draw
+    /// the pointer `FUN_0042d558` after their copy (@ 0x0042c518,
+    /// 0x0042c7c0): none of their frames shows it. The bar loop draws it
+    /// before its copy (@ 0x0042ca65); the pick-up's hold loop draws the
+    /// new record's icon alone before its copy (@ 0x0042ce98).
+    #[test]
+    fn only_the_bar_loop_shows_the_pointer() {
+        let Some(bar) = pointer_per_frame(false) else {
+            return;
+        };
+        let n = bar.len();
+        assert!(n > 8 + 11 + 1, "{bar:?}");
+        assert!(bar[..8].iter().all(|&f| f == (false, false)), "{bar:?}");
+        assert!(
+            bar[n - 11..].iter().all(|&f| f == (false, false)),
+            "{bar:?}"
+        );
+        assert!(
+            bar[8..n - 11].iter().all(|&f| f == (true, false)),
+            "{bar:?}"
+        );
+        let pickup = pointer_per_frame(true).unwrap();
+        let n = pickup.len();
+        assert!(n > 8 + 11 + 1, "{pickup:?}");
+        assert!(
+            pickup[..8].iter().all(|&f| f == (false, false)),
+            "{pickup:?}"
+        );
+        assert!(
+            pickup[n - 11..].iter().all(|&f| f == (false, false)),
+            "{pickup:?}"
+        );
+        assert!(
+            pickup[8..n - 11].iter().all(|&f| f == (false, true)),
+            "{pickup:?}"
+        );
     }
 
     /// Whether the bar sprite is on `s` with its hotspot at y `y`.
