@@ -277,6 +277,15 @@ pub struct Engine {
     /// The inventory records (0x006ce138): the object id of each, in
     /// order. The object in hand is OBJETENMAIN.
     pub inventory: Vec<i32>,
+    /// The records' icon bytes (0x006ce138 + 9 r), by index: `Some` for an
+    /// icon taken from a sprite-list row or a checkpoint, `None` (or no
+    /// entry) for the table's index of the id (`FUN_0042b328`). See
+    /// [`Engine::record_icon`].
+    pub inventory_icons: Vec<Option<u8>>,
+    /// The icon of the object in hand (0x006cd7ec) with the id it was set
+    /// for: a pick-up's row icon or a bar record's byte. For another id the
+    /// hand shows the table's index of the id. See [`Engine::held_icon`].
+    pub held_icon: Option<(i32, u8)>,
     /// The first record the bar shows (0x00496924).
     pub bar_first: usize,
     /// The visible slot whose x the last pick-up set (`FUN_004278a0` @
@@ -473,6 +482,8 @@ impl Engine {
             pending_no_click_exit: None,
             vue_override: None,
             inventory: Vec::new(),
+            inventory_icons: Vec::new(),
+            held_icon: None,
             bar_first: 0,
             bar_pickup_slot: None,
             bar: BarSession::default(),
@@ -906,6 +917,7 @@ impl Engine {
             // 257 alone. FUN_00423760 zeroes the timer offsets and restarts
             // Time1 when a game starts.
             self.inventory = vec![257];
+            self.inventory_icons.clear();
             let now = self.now();
             self.clocks.time1_offset = 0;
             self.clocks.time2_offset = 0;

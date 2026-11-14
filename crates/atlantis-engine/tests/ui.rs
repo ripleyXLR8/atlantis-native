@@ -26,7 +26,7 @@ use atlantis_data::saves::{epi_episode_name, Checkpoint, Players};
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::checkpoint::PLAYERS_FILE;
-use atlantis_engine::hooks::{DirectLoader, NoScripts};
+use atlantis_engine::hooks::{DirectLoader, NoScripts, ScriptHooks};
 use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
 use atlantis_engine::ui::credits::credits_events;
 use atlantis_engine::ui::layout::{
@@ -1149,4 +1149,150 @@ fn delete_player_twice() {
     assert_eq!(out[0].1, ["pb2.gam", "pc2.gam", "pc5.gam", "players.atl"]);
     assert_eq!(&out[1].0, b"cdeabf");
     assert_eq!(out[1].1, ["pc2.gam", "pc5.gam", "players.atl"]);
+}
+
+/// The ladder put back on the wall (object 281, ATLAN4 views 115 / 116)
+/// is not in the icon table 0x004967b0; its sprite-list rows give icon 30
+/// (the ladder's, table index of 279). A pick-up takes the hand's icon
+/// and the record's icon byte from the row (`FUN_004278a0` @ 0x00427a5b,
+/// 0x00427a88), the checkpoint writes the byte as it is (dc:23472) and
+/// the reader keeps it: the hand, the bar record and the reloaded record
+/// show icon 30.
+#[test]
+fn the_ladder_picked_up_again_has_its_row_icon() {
+    let Some(g) = game("the_ladder_picked_up_again_has_its_row_icon") else {
+        return;
+    };
+    let store = Rc::new(MemStore::new());
+    let out = Rc::new(RefCell::new(Vec::new()));
+    let o = out.clone();
+    with_engine(
+        g,
+        store.clone(),
+        move |mut e, mut s| {
+            Box::pin(async move {
+                assert!(e.load_wam("ATLAN4.WAM").await);
+                e.current_place_id = Some(116);
+                assert!(e
+                    .sprite_list
+                    .iter()
+                    .any(|r| r.place_id == 116 && r.perso_id == 281 && r.icon == 30));
+                s.npc_click(&mut e, 281, 0).await;
+                let r = e.inventory.iter().position(|&id| id == 281).unwrap();
+                o.borrow_mut().push(format!(
+                    "hand {} {:?} record {:?}",
+                    e.vars.get("objetenmain"),
+                    e.held_icon(),
+                    e.record_icon(r)
+                ));
+                s.exec_set(&mut e, None, "chapter=2").await;
+                e.inventory.clear();
+                e.inventory_icons.clear();
+                e.load_checkpoint(&mut s, true).await;
+                let r = e.inventory.iter().position(|&id| id == 281).unwrap();
+                o.borrow_mut()
+                    .push(format!("loaded record {:?}", e.record_icon(r)));
+            })
+        },
+        // A right press ends the pick-up's hold loop with the ladder in
+        // hand.
+        |h, n| {
+            if n % 50 == 49 {
+                let (x, y) = h.sys.mouse();
+                h.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Right,
+                    x,
+                    y,
+                });
+                h.sys.push_input(Input::MouseUp {
+                    button: MouseButton::Right,
+                    x,
+                    y,
+                });
+            }
+        },
+    );
+    let cp = Checkpoint::parse(&store.read("pa2.gam").expect("pa2.gam not written")).unwrap();
+    assert!(cp.inventory.iter().any(|r| (r.sprite, r.id) == (30, 281)));
+    assert_eq!(
+        *out.borrow(),
+        [
+            "hand 281 Some(30) record Some(30)",
+            "loaded record Some(30)"
+        ]
+    );
+}
+
+/// The records' ids and icons after a load.
+type IconRecords = Vec<(i32, Option<usize>)>;
+
+/// The original's checkpoints load with their records' icon bytes, which
+/// are the table's index of each id (FUN_0042b328): every `pa<N>.gam` of
+/// `ATLANTIS_SAVES_PTBR` read by the engine.
+#[test]
+fn original_checkpoints_load_their_icon_bytes() {
+    let Some(dir) = std::env::var_os("ATLANTIS_SAVES_PTBR") else {
+        eprintln!(
+            "ATLANTIS_SAVES_PTBR not set: original_checkpoints_load_their_icon_bytes skipped"
+        );
+        return;
+    };
+    let Some(g) = game("original_checkpoints_load_their_icon_bytes") else {
+        return;
+    };
+    let table = g.exe.inventory_object_ids.clone();
+    drop(g);
+    let mut files: Vec<Vec<u8>> = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| {
+            let n = e.file_name().to_string_lossy().to_ascii_lowercase();
+            n.starts_with("pa") && n.ends_with(".gam")
+        })
+        .filter_map(|e| std::fs::read(e.path()).ok())
+        .collect();
+    files.sort();
+    assert!(!files.is_empty());
+    let mut records = 0;
+    for data in files {
+        let cp = Checkpoint::parse(&data).unwrap();
+        let want: HashMap<i32, usize> = cp
+            .inventory
+            .iter()
+            .map(|r| (r.id, usize::from(r.sprite)))
+            .collect();
+        for r in &cp.inventory {
+            assert_eq!(object_icon(&table, r.id), Some(usize::from(r.sprite)));
+        }
+        records += want.len();
+        let store = Rc::new(MemStore::new());
+        store.write(&format!("pa{}.gam", cp.chapter), &data);
+        let got: Rc<RefCell<IconRecords>> = Rc::default();
+        let g2 = got.clone();
+        let chapter = cp.chapter;
+        let g = game("original_checkpoints_load_their_icon_bytes").unwrap();
+        with_engine(
+            g,
+            store,
+            move |mut e, mut s| {
+                Box::pin(async move {
+                    e.players.chapters[0] = chapter;
+                    e.load_checkpoint(&mut s, true).await;
+                    *g2.borrow_mut() = (0..e.inventory.len())
+                        .map(|r| (e.inventory[r], e.record_icon(r)))
+                        .collect();
+                })
+            },
+            |_, _| {},
+        );
+        // The records the chapter's /INIT left: those of the file with
+        // its bytes, an INVENT= with the table's index.
+        let got = got.borrow();
+        assert!(!got.is_empty());
+        for &(id, icon) in got.iter() {
+            let want = want.get(&id).copied().or(object_icon(&table, id));
+            assert_eq!(icon, want, "chapter {chapter} object {id}");
+        }
+    }
+    assert!(records > 0);
 }

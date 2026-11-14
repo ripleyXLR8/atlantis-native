@@ -10,7 +10,7 @@
 
 use atlantis_data::sprite::{limits, read_spr_file, SprSprite};
 
-use super::{draw_sprite, draw_sprite_below, object_icon};
+use super::{draw_sprite, draw_sprite_below};
 use crate::engine::Engine;
 use crate::enhancements::BugFix;
 use crate::hooks::ScriptHooks;
@@ -159,14 +159,14 @@ pub fn bar_frame_layout(st: &BarState, slot_y: i32, slide_out: bool) -> BarFrame
 }
 
 /// Draws a bar frame: the background (`bar`), then each icon (`icon` gives
-/// a record id's OBJETS1 sprite), with `FUN_00410430`'s clipping.
+/// a record's OBJETS1 sprite, from its icon byte), with `FUN_00410430`'s
+/// clipping.
 pub fn draw_bar_frame<'a>(
     screen: &mut [u16],
     frame: &BarFrame,
-    st: &BarState,
     slot_y: i32,
     bar: Option<&SprSprite>,
-    icon: impl Fn(i32) -> Option<&'a SprSprite>,
+    icon: impl Fn(usize) -> Option<&'a SprSprite>,
 ) {
     if frame.background {
         if let Some(bar) = bar {
@@ -174,7 +174,7 @@ pub fn draw_bar_frame<'a>(
         }
     }
     for i in &frame.icons {
-        if let Some(spr) = st.records.get(i.record).and_then(|&id| icon(id)) {
+        if let Some(spr) = icon(i.record) {
             draw_sprite_below(screen, spr, i.x, i.y, BAR_TOP);
         }
     }
@@ -202,12 +202,13 @@ impl Engine {
         if self.warp_loaded {
             self.render_view();
         }
-        let table = &self.game.exe.inventory_object_ids;
         let mut s = self.sys.screen.borrow().clone();
         let st = self.bar_state();
         let frame = bar_frame_layout(&st, slot_y, slide_out);
-        draw_bar_frame(&mut s, &frame, &st, slot_y, self.ui.bar.as_ref(), |id| {
-            object_icon(table, id).and_then(|k| self.ui.object(k))
+        // Each record with its own icon byte (@ 0x0042c445, 0x0042c6b9,
+        // 0x0042c9db, 0x0042ce1c).
+        draw_bar_frame(&mut s, &frame, slot_y, self.ui.bar.as_ref(), |r| {
+            self.record_icon(r).and_then(|k| self.ui.object(k))
         });
         self.draw_guests(&mut s, None);
         self.draw_pointer(&mut s);
@@ -461,8 +462,13 @@ impl Engine {
         match clicked_record(mx, my, self.bar_first).filter(|_| request) {
             Some(r) => {
                 let id = self.inventory.get(r).copied().unwrap_or(0);
-                self.vars
-                    .set("objetenmain", if id == held { 0 } else { id });
+                if id == held {
+                    self.vars.set("objetenmain", 0);
+                } else {
+                    // The hand's icon is the record's byte (@ 0x0042c18f).
+                    self.vars.set("objetenmain", id);
+                    self.held_icon = self.record_icon(r).map(|k| (id, k as u8));
+                }
             }
             None if left || session.right_press => self.vars.set("objetenmain", 0),
             None => {}
@@ -1203,7 +1209,6 @@ mod tests {
         let icons = spr("OBJETS1.SPR", limits::DEFAULT);
         let view = hash_view();
         let view_only = md5_rows(&view, BAR_TOP..SCREEN_H);
-        let icon = |id: i32| icons.get((id - 1000) as usize);
         let (mut frames, mut slivers, mut pickups) = (0, 0, 0);
         let mut bad = Vec::new();
         for (slide_out_fix, pickup_fix) in
@@ -1250,7 +1255,9 @@ mod tests {
                 };
                 let f = bar_frame_layout(&st, slot_y, true);
                 let mut screen = view.clone();
-                draw_bar_frame(&mut screen, &f, &st, slot_y, bar.first(), icon);
+                draw_bar_frame(&mut screen, &f, slot_y, bar.first(), |r| {
+                    icons.get((records[r] - 1000) as usize)
+                });
                 let got_icons = f
                     .icons
                     .iter()

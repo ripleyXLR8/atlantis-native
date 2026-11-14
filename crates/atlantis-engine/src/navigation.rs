@@ -166,13 +166,7 @@ impl Engine {
     /// The object in hand at the pointer (0x0041c43f..0x0041c481), drawn
     /// before the guests' portraits.
     fn draw_held_icon(&self, screen: &mut [u16]) {
-        let held = self.vars.get("objetenmain");
-        if held == 0 {
-            return;
-        }
-        if let Some(spr) = crate::ui::object_icon(&self.game.exe.inventory_object_ids, held)
-            .and_then(|i| self.ui.object(i))
-        {
+        if let Some(spr) = self.held_icon().and_then(|i| self.ui.object(i)) {
             spr.draw(
                 screen,
                 SCREEN_W,

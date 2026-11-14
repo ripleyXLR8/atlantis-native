@@ -453,10 +453,10 @@ impl Scripts {
                         e.given_object = Some(k);
                     }
                     if e.inventory.len() < INVENTORY_RECORDS {
-                        e.inventory.push(id);
+                        e.inventory_push(id, None);
                     }
                 } else if let Some(k) = e.inventory.iter().position(|&o| o == id) {
-                    e.inventory.remove(k);
+                    e.inventory_remove(k);
                 }
                 return;
             }
@@ -850,7 +850,7 @@ impl Scripts {
             {
                 show_perso(e, held);
                 if let Some(k) = e.inventory.iter().position(|&o| o == held) {
-                    e.inventory.remove(k);
+                    e.inventory_remove(k);
                 }
                 e.vars.set("objetenmain", 0);
             }
@@ -873,11 +873,16 @@ impl Scripts {
             return;
         };
         for r in object_pickup_rows(&e.sprite_list, vue, id) {
-            let obj = e.sprite_list[r].perso_id;
+            let (obj, icon) = (e.sprite_list[r].perso_id, e.sprite_list[r].icon);
             hide_perso(e, obj);
+            // The hand's icon and the new record's icon byte are the row's
+            // (@ 0x00427a5b, 0x00427a88), not the table's index of the id:
+            // the ladder put back on the wall (281, ATLAN4 views 115 / 116)
+            // is not in the table and its rows give icon 30.
             e.vars.set("objetenmain", obj);
+            e.held_icon = Some((obj, icon));
             if e.inventory.len() < INVENTORY_RECORDS {
-                e.inventory.push(obj);
+                e.inventory_push(obj, Some(icon));
             } else {
                 log::warn!("inventory full, object {obj} not added");
             }
