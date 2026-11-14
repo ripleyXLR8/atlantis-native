@@ -163,24 +163,28 @@ impl Engine {
         }
     }
 
-    /// Draws the cursor at the pointer: the object in hand (0x0041c45a),
-    /// then the cursor sprite `FUN_00422fcc` chose over it.
-    fn draw_cursor(&self) {
+    /// The object in hand at the pointer (0x0041c43f..0x0041c481), drawn
+    /// before the guests' portraits.
+    fn draw_held_icon(&self, screen: &mut [u16]) {
         let held = self.vars.get("objetenmain");
-        if held != 0 {
-            if let Some(spr) = crate::ui::object_icon(&self.game.exe.inventory_object_ids, held)
-                .and_then(|i| self.ui.object(i))
-            {
-                let mut screen = self.sys.screen.borrow_mut();
-                spr.draw(
-                    &mut screen,
-                    SCREEN_W,
-                    SCREEN_H,
-                    self.pointer.pos.0,
-                    self.pointer.pos.1,
-                );
-            }
+        if held == 0 {
+            return;
         }
+        if let Some(spr) = crate::ui::object_icon(&self.game.exe.inventory_object_ids, held)
+            .and_then(|i| self.ui.object(i))
+        {
+            spr.draw(
+                screen,
+                SCREEN_W,
+                SCREEN_H,
+                self.pointer.pos.0,
+                self.pointer.pos.1,
+            );
+        }
+    }
+
+    /// The cursor sprite `FUN_00422fcc` chose, at the pointer.
+    fn draw_cursor_sprite(&self) {
         let Ok(i) = usize::try_from(self.cursor_shown) else {
             return;
         };
@@ -193,6 +197,61 @@ impl Engine {
                 self.pointer.pos.0,
                 self.pointer.pos.1,
             );
+        }
+    }
+
+    /// The warp frame over the rendered view (0x0041c40b..0x0041c4b4): the
+    /// bow (ARCWARP.SPR frame arrow_frame at (0x2e, 0x79)) in bow mode,
+    /// otherwise the object in hand; the guests' portraits
+    /// (`FUN_0042bc58` @ 0x0041c489); then, out of bow mode, the cursor
+    /// `FUN_00422fcc`.
+    fn draw_warp_overlays(&mut self) {
+        if self.warp_loaded {
+            let mut s = self.sys.screen.borrow().clone();
+            if self.bow_mode {
+                if let Some(spr) = self.bow_sprites.get(usize::from(self.arrow_frame)) {
+                    crate::ui::draw_sprite(&mut s, spr, 0x2e, 0x79);
+                }
+            } else {
+                self.draw_held_icon(&mut s);
+            }
+            self.draw_guests(&mut s, None);
+            *self.sys.screen.borrow_mut() = s;
+        }
+        // No cursor in bow mode (0x0041c4b4); its animation state does not
+        // advance.
+        if !self.bow_mode {
+            self.step_warp_cursor();
+            self.draw_cursor_sprite();
+        }
+    }
+
+    /// `FUN_00422fcc` in the warp frame, after the look, the timers and the
+    /// render: its own hit tests (`FUN_00422bb0`, `FUN_00422d5c` at its
+    /// entry) at this frame's view and pointer, which the next click acts
+    /// on. The animation advances at the port's pace (one step per
+    /// [`cursor_step_ms`]); a change of mode (nothing, navigate, talk,
+    /// object, click) is shown at once.
+    fn step_warp_cursor(&mut self) {
+        let (zone, id) = self.pointer_targets();
+        let input = WarpCursorInput {
+            zone,
+            id,
+            held: self.vars.get("objetenmain").max(0) as u32,
+            hidden: false,
+            edge_scroll: false,
+            id_rule: self.game.exe.build.cursor_id_rule,
+        };
+        let now = self.sys.millis();
+        let mut next = self.cursor_state;
+        let sprite = warp_cursor_step(&mut next, &input).sprite;
+        if self.cursor_shown == CURSOR_UNSET
+            || now >= self.cursor_next_ms
+            || next.mode != self.cursor_state.mode
+        {
+            self.cursor_state = next;
+            self.cursor_shown = sprite;
+            self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
         }
     }
 
@@ -227,7 +286,8 @@ impl Engine {
     /// (0x0041afe8..0x0041b050), one step of `FUN_00422fcc` over what is
     /// under the pointer, the sprite to draw at the pointer.
     pub(crate) fn still_frame_cursor(&mut self) -> Option<(usize, (i32, i32))> {
-        if self.bow_mode
+        if self.give_scan
+            || self.bow_mode
             || self.vars.get("gameover") != 0
             || self.bar.request
             || self.escape_request
@@ -283,7 +343,6 @@ impl Engine {
         // FUN_00431a1c at 0x0041c012: the place's ambient sounds.
         self.ambient_enter_place().await;
 
-        let id_rule = self.game.exe.build.cursor_id_rule;
         let mut left_pressed = false;
         while !left_pressed && !exit {
             let fi = self.poll_frame_input();
@@ -345,7 +404,7 @@ impl Engine {
                         || self.vars.get("gameover") != 0
                         || self.vars.get("exit") != 0);
                 if !pass_ended {
-                    // FUN_004278a0 starts the click animation (0x004278b5).
+                    // FUN_004278a0 starts the click animation (0x004278df).
                     self.cursor_state.click_anim = true;
                     hooks.npc_click(self, centre_perso, action).await;
                 }
@@ -396,25 +455,6 @@ impl Engine {
             }
             self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
 
-            // The cursor (FUN_00422fcc): talk (NPC) > navigate (zone) >
-            // nothing; with an object in hand, its animation over the icon.
-            // Step 10 of FUN_0041bfa0 (0x0041c4b4) and its helper
-            // FUN_0041afd0 (0x0041b00e) skip it in bow mode (0x00496164):
-            // its animation state does not advance.
-            let now = self.sys.millis();
-            if !self.bow_mode && (self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms) {
-                self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
-                let input = WarpCursorInput {
-                    zone: action,
-                    id: centre_perso,
-                    held: self.vars.get("objetenmain").max(0) as u32,
-                    hidden: false,
-                    edge_scroll: false,
-                    id_rule,
-                };
-                self.cursor_shown = warp_cursor_step(&mut self.cursor_state, &input).sprite;
-            }
-
             // A right click opens the inventory bar (FUN_0041a298 toggles
             // 0x004960c4, the loop opens the bar @ 0x0041c6d2), also when a
             // right press during the previous frame's timer section left
@@ -435,19 +475,18 @@ impl Engine {
                 bar = false;
             }
             if bar {
+                // Closing the bar enters bow mode with the bow in hand and
+                // ArcMagique set, before the slide-out (FUN_0042d098 in
+                // `display_bar`).
                 let guest = self.display_bar(hooks).await;
-                // Closing the bar: bow mode with the bow in hand and
-                // ArcMagique set (FUN_0042d098), the bow rising.
-                if !self.should_abort() {
-                    self.enter_bow_mode().await;
-                }
                 // FUN_0042c59c @ 0x0042c844: the timers resume.
                 self.rebase_con_clocks();
                 // A guest's conversation that moved the player (a Vue= or a
                 // Chapter=) ends the loop for the arrival scan. A Vue= from
                 // a timer section that ran while the bar was open does not:
                 // the loop runs on in the new place, and the arrival scan
-                // comes after the next click (as for a warp-frame timer).
+                // comes after the next click unless that click moves (as for
+                // a warp-frame timer, `Engine::game_step`).
                 let mut moved = false;
                 if guest != 0 && !self.should_abort() {
                     hooks.talk_to_guest(self, guest).await;
@@ -473,6 +512,13 @@ impl Engine {
                         .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
                     self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
+                    // The original opens the bar at the end of its frame
+                    // (0x0041c6d2), a guest's conversation inside it
+                    // (FUN_0042c8ac -> FUN_00425828); the next frame reads
+                    // the clocks (FUN_0041c75c @ 0x0041c086) before its
+                    // timers: a Time1= of the conversation (CHAPI032 /419)
+                    // is seen at once.
+                    self.update_con_clocks();
                 }
             } else if !exit && fi.escape && !self.bow_mode && self.vars.get("objetenmain") == 0 {
                 self.sys.set_mouse_locked(false);
@@ -508,13 +554,16 @@ impl Engine {
             }
 
             // The view: FUN_0041bfa0 steps 2..5. The stored angles first
-            // take F5 / F6 (turn) and F8 / F7 (tilt) with the left button
-            // up (FUN_0041a298 at the end of the previous frame); the port
+            // take F5 / F6 (turn) and F8 / F7 (tilt) when the poll
+            // (FUN_0041a298 at the end of the previous frame) saw no new left
+            // press (@ 0x0041a2b5: VK_LBUTTON is an edge key, so a held
+            // button does not stop them; only bow mode keeps a press in
+            // the loop); the port
             // adds the arrow keys (Enhancements::arrow_keys), which the
             // original's view ignores, as the same keys: left F5, right F6,
             // up F7, down F8 (a larger beta looks down).
             let (mut alpha, mut beta) = (self.warp.alpha(), self.warp.beta());
-            if !self.sys.buttons().0 {
+            if !fi.left_press {
                 let arrows = self.enhancements().arrow_keys;
                 let held = |f: u8, arrow: Key| {
                     self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow))
@@ -570,7 +619,7 @@ impl Engine {
             // (FUN_0042844c @ 0x00428d77) and the Vue= branch sets no exit
             // flag (FUN_0042a100 @ 0x0042a630..0x0042a749), so the loop runs
             // on in the new place and the arrival scan comes after the next
-            // click.
+            // click, unless that click moves (`Engine::game_step`).
             let exit_before_timers = exit;
             if !exit && hooks.warp_frame(self).await {
                 self.sync_pointer_mouse();
@@ -611,23 +660,7 @@ impl Engine {
                 self.animate_sprites();
             }
             self.render_view();
-            // The bow, ARCWARP.SPR frame arrow_frame at (0x2e, 0x79)
-            // (0x0041c40b), then the guests' portraits (0x0041c489 ->
-            // FUN_0042bc58).
-            if self.warp_loaded {
-                let mut s = self.sys.screen.borrow().clone();
-                if self.bow_mode {
-                    if let Some(spr) = self.bow_sprites.get(usize::from(self.arrow_frame)) {
-                        crate::ui::draw_sprite(&mut s, spr, 0x2e, 0x79);
-                    }
-                }
-                self.draw_guests(&mut s, None);
-                *self.sys.screen.borrow_mut() = s;
-            }
-            // No cursor and no icon in bow mode (0x0041c412, 0x0041c4b4).
-            if !self.bow_mode {
-                self.draw_cursor();
-            }
+            self.draw_warp_overlays();
             if self.debug_overlay.get() {
                 self.draw_debug_overlay();
             }
@@ -708,10 +741,11 @@ impl Engine {
         }
         // The main loop sets 0x00496124 = 1 before the reload (0x0041975d).
         self.escape_request = false;
-        // The place loop tests the run flag 0x00496124 (LOAD, QUIT) before
-        // GAMEOVER (0x00423ca5, then 0x00423cba): a LOAD or QUIT chosen
-        // during the puzzle or the scan wins over the game over that ended
-        // the warp loop.
+        // An abort raised here wins over the one that ended the warp loop:
+        // the game-over screen sets 0x00496124 = 1 (FUN_00426590 @
+        // 0x00426c41), so a game over raised by the zone-999 scan after a
+        // LOAD or QUIT (CHAPI031 /372 under `--original`) passes the place
+        // loop's run-flag test (0x00423ca5), and its GAMEOVER test reloads.
         if self.abort.is_none() {
             self.abort = abort;
         }
@@ -721,7 +755,7 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::{ready, HookFuture};
+    use crate::hooks::{ready, Departure, HookFuture};
     use crate::test_support::{button, with_engine};
     use std::cell::{Cell, RefCell};
     use std::rc::Rc;
@@ -1090,6 +1124,432 @@ mod tests {
         }
     }
 
+    /// A timer section that runs Vue=`to` on the first warp frame (the place
+    /// entered, ArriveeVue = the place left, the arrival scan queued, the
+    /// view aimed at an exit), and a departure scan that runs a chapter=
+    /// (an arrival section matched by ArriveeVue, CHAPI059 /010); the scans
+    /// as they come: ("dep", destination, ArriveeVue) and ("arr", place,
+    /// ArriveeVue).
+    struct TimerVue {
+        to: u16,
+        view: (f32, f32),
+        fired: Rc<Cell<bool>>,
+        scans: Scans,
+    }
+
+    /// (scan, place, ArriveeVue) in order.
+    type Scans = Rc<RefCell<Vec<(&'static str, i32, i32)>>>;
+
+    impl ScriptHooks for TimerVue {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            Box::pin(async move {
+                if self.fired.get() {
+                    return false;
+                }
+                self.fired.set(true);
+                let from = e.current_place_id.unwrap_or(0);
+                e.last_vue = from;
+                e.next_place_id = Some(self.to);
+                e.do_place_change().await;
+                e.set_view(self.view.0, self.view.1);
+                e.vars.set("arriveevue", i32::from(from));
+                e.arrival_scan_pending = true;
+                e.arrival_from_vue = from;
+                true
+            })
+        }
+
+        fn arrival_scan<'a>(
+            &'a mut self,
+            _e: &'a mut Engine,
+            vue: u16,
+            arrivee: i32,
+        ) -> HookFuture<'a, ()> {
+            self.scans
+                .borrow_mut()
+                .push(("arr", i32::from(vue), arrivee));
+            ready(())
+        }
+
+        fn departure_scan<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            dest: u16,
+        ) -> HookFuture<'a, Departure> {
+            self.scans
+                .borrow_mut()
+                .push(("dep", i32::from(dest), e.vars.get("arriveevue")));
+            // A chapter= in the section: the arrival scan queued again.
+            e.arrival_scan_pending = true;
+            e.arrival_from_vue = e.last_vue;
+            ready(Departure::Go)
+        }
+    }
+
+    /// After a timer section's Vue= (CHAPI028 /300 `Vue=351`), the first
+    /// click on an exit of the place entered moves at once (FUN_00423ad8
+    /// tests ARRIVEEVUE only at the top of the pass, @ 0x00423b4d): the
+    /// departure scan sees ArriveeVue = the place the Vue= left, a
+    /// chapter= in it does not stop the move, and the timer's pending
+    /// arrival scan never runs: the next one is the destination's, with
+    /// ArriveeVue = the place left by the move (0x00423def).
+    #[test]
+    fn exit_click_after_a_timer_vue_moves_at_once() {
+        let fired = Rc::new(Cell::new(false));
+        let scans = Rc::new(RefCell::new(Vec::new()));
+        let (f2, s2) = (fired.clone(), scans.clone());
+        let (f3, s3) = (fired.clone(), scans.clone());
+        let target = Rc::new(Cell::new(None::<(u16, u16)>));
+        let t2 = target.clone();
+        let mut locked = 0u64;
+        let mut pressed = None::<u64>;
+        let ran = with_engine(
+            "exit_click_after_a_timer_vue_moves_at_once",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                // A place other than 1 and a view with one of its exits under
+                // both pointer positions the loop may use (after a panorama
+                // load, after a recentre).
+                let ids: Vec<u16> = e.wam.places.iter().map(|p| p.id).collect();
+                let mut found = None;
+                'search: for id in ids.into_iter().filter(|&id| id != 1) {
+                    e.next_place_id = Some(id);
+                    e.do_place_change().await;
+                    let Some(place) = e.place().cloned() else {
+                        continue;
+                    };
+                    for ia in 0..315 {
+                        for ib in -4..=4 {
+                            let (a, b) = (ia as f32 * 0.02, ib as f32 * 0.1);
+                            e.set_view(a, b);
+                            let zones: Vec<u16> = [(320, 320), (320, 240)]
+                                .iter()
+                                .map(|&(x, y)| {
+                                    let (px, py) = e.warp.screen_to_panorama(x, y);
+                                    place.hit_test(px as i16, py as i16)
+                                })
+                                .collect();
+                            if zones[0] == zones[1]
+                                && place.transitions.iter().any(|t| t.dst_place == zones[0])
+                            {
+                                found = Some((id, zones[0], (a, b)));
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+                let (to, exit, view) = found.expect("a place with an exit in view");
+                t2.set(Some((to, exit)));
+                e.next_place_id = Some(1);
+                let mut hooks = TimerVue {
+                    to,
+                    view,
+                    fired: f2,
+                    scans: s2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, f| {
+                if let Some(t) = pressed {
+                    if f == t + 2 {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    if s3.borrow().len() >= 3 || f > t + 2000 {
+                        sys.push_input(Input::Quit);
+                    }
+                    return;
+                }
+                locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                if f3.get() && locked >= 10 {
+                    button(sys, MouseButton::Left, true);
+                    pressed = Some(f);
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (to, exit) = target.get().unwrap();
+        let scans = scans.borrow();
+        assert!(scans.len() >= 3, "{scans:?}");
+        assert_eq!((scans[0].0, scans[0].1), ("arr", 1), "{scans:?}");
+        assert_eq!(
+            scans[1..3],
+            [
+                ("dep", i32::from(exit), 1),
+                ("arr", i32::from(exit), i32::from(to)),
+            ],
+            "{scans:?}"
+        );
+    }
+
+    struct ClickAnim(Rc<Cell<Option<bool>>>);
+
+    impl ScriptHooks for ClickAnim {
+        fn zone_click<'a>(&'a mut self, e: &'a mut Engine, _z: u32) -> HookFuture<'a, ()> {
+            self.0.set(Some(e.cursor_state.click_anim));
+            ready(())
+        }
+    }
+
+    /// `FUN_004278a0` starts the cursor's click animation at its entry
+    /// (0x004968b8 = 1 @ 0x004278df), for every click the place loop
+    /// hands it (0x00423d12), not only on a character or an object.
+    #[test]
+    fn every_click_starts_the_click_animation() {
+        let got = Rc::new(Cell::new(None));
+        let (g2, g3) = (got.clone(), got.clone());
+        let mut locked = 0u64;
+        let mut pressed = None::<u64>;
+        let ran = with_engine(
+            "every_click_starts_the_click_animation",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.game_step(&mut ClickAnim(g2)).await;
+            },
+            move |sys, f| {
+                if g3.get().is_some() {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                if let Some(t) = pressed {
+                    if f == t + 2 {
+                        button(sys, MouseButton::Left, false);
+                    }
+                    return;
+                }
+                locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                if locked == 10 {
+                    button(sys, MouseButton::Left, true);
+                    pressed = Some(f);
+                }
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some(true));
+        }
+    }
+
+    /// On its first frame, a timer section turns the view from `start`
+    /// to `to`; on the next one, the cursor shown.
+    struct TurnView {
+        to: (f32, f32),
+        calls: u32,
+        shown: Rc<Cell<Option<i32>>>,
+    }
+
+    impl ScriptHooks for TurnView {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.calls += 1;
+            if self.calls == 1 {
+                e.set_view(self.to.0, self.to.1);
+            } else if self.calls == 2 {
+                self.shown.set(Some(e.cursor_shown));
+            }
+            ready(false)
+        }
+    }
+
+    /// `FUN_00422fcc` runs after the look, the timers and the render
+    /// (0x0041c4b4) and does its own hit tests at its entry: the cursor of
+    /// a frame shows what is under the pointer at that frame's view. A
+    /// timer that turns the view off a navigation zone leaves no
+    /// navigate cursor.
+    #[test]
+    fn the_cursor_shows_the_frames_own_target() {
+        let shown = Rc::new(Cell::new(None));
+        let (s2, s3) = (shown.clone(), shown.clone());
+        let ran = with_engine(
+            "the_cursor_shows_the_frames_own_target",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                // Under both pointer positions the loop may use: a
+                // navigation zone and no character, then nothing at all.
+                let targets = |e: &mut Engine, a: f32, b: f32| {
+                    e.set_view(a, b);
+                    let t: Vec<(u32, u32)> = [(320, 320), (320, 240)]
+                        .iter()
+                        .map(|&p| {
+                            e.pointer.pos = p;
+                            e.pointer_targets()
+                        })
+                        .collect();
+                    (t[0] == t[1]).then_some(t[0])
+                };
+                let views: Vec<(f32, f32)> = (0..315)
+                    .flat_map(|ia| (-4..=4).map(move |ib| (ia as f32 * 0.02, ib as f32 * 0.1)))
+                    .collect();
+                let zone = views.iter().copied().find(|&(a, b)| {
+                    matches!(targets(&mut e, a, b), Some((z, 0)) if (1..0x200).contains(&z))
+                });
+                let none = views
+                    .iter()
+                    .copied()
+                    .find(|&(a, b)| targets(&mut e, a, b) == Some((0, 0)));
+                let (Some(start), Some(to)) = (zone, none) else {
+                    panic!("no navigation view or no empty view in place 1");
+                };
+                e.set_view(start.0, start.1);
+                e.pointer.pos = (320, 240);
+                let mut hooks = TurnView {
+                    to,
+                    calls: 0,
+                    shown: s2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _| {
+                if s3.get().is_some() {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if ran {
+            assert_eq!(shown.get(), Some(-1));
+        }
+    }
+
+    /// The object in hand is drawn before the guests' portraits
+    /// (0x0041c45a, then `FUN_0042bc58` @ 0x0041c489): over a portrait,
+    /// the portrait is drawn over it.
+    #[test]
+    fn the_held_object_is_drawn_under_the_portraits() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_held_object_is_drawn_under_the_portraits",
+            move |mut e| async move {
+                e.load_ui_assets().await;
+                let guest = e.game.exe.guest_sprite_ids[0];
+                let table = e.game.exe.guest_sprite_ids.clone();
+                e.guests.add(guest, &table);
+                e.guests_shown = true;
+                e.warp_loaded = true;
+                // No cursor sprite: the icon and the portraits only.
+                e.cursor_sprites.clear();
+                let object = e
+                    .game
+                    .exe
+                    .inventory_object_ids
+                    .iter()
+                    .copied()
+                    .find(|&id| {
+                        id != 0
+                            && crate::ui::object_icon(&e.game.exe.inventory_object_ids, id)
+                                .and_then(|i| e.ui.object(i))
+                                .is_some()
+                    })
+                    .expect("an object with an icon");
+                e.vars.set("objetenmain", object);
+                // The pointer in the middle of the portrait at (540, 350).
+                e.pointer.pos = (580, 400);
+                e.sys.screen.borrow_mut().fill(0);
+                let blank = e.sys.screen.borrow().clone();
+                // The icon, then the portraits over it.
+                let mut under = blank.clone();
+                e.draw_held_icon(&mut under);
+                e.draw_guests(&mut under, None);
+                // The portraits, then the icon over them.
+                let mut over = blank.clone();
+                e.draw_guests(&mut over, None);
+                e.draw_held_icon(&mut over);
+                e.draw_warp_overlays();
+                let frame = e.sys.screen.borrow().clone();
+                *g2.borrow_mut() = Some((frame == under, under != over));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        // The icon overlaps the portrait, and the frame has it under.
+        assert_eq!(got.borrow().unwrap(), (true, true));
+    }
+
+    /// A guest's conversation from the bar that sets Time1 (CHAPI032
+    /// /419's time1=20000); the time1 the timers see next.
+    struct GuestTimer {
+        talked: Rc<Cell<bool>>,
+        seen: Rc<RefCell<Vec<i32>>>,
+    }
+
+    impl ScriptHooks for GuestTimer {
+        fn talk_to_guest<'a>(&'a mut self, e: &'a mut Engine, _id: i32) -> HookFuture<'a, ()> {
+            let now = e.now();
+            e.clocks.restart(1, 20000, now);
+            self.talked.set(true);
+            ready(())
+        }
+
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.talked.get() && self.seen.borrow().is_empty() {
+                self.seen.borrow_mut().push(e.vars.get("time1"));
+            }
+            ready(false)
+        }
+    }
+
+    /// The timers after a guest's conversation from the bar read the
+    /// clocks again (the original's next frame, FUN_0041c75c @ 0x0041c086):
+    /// a Time1=20000 in it is seen at once.
+    #[test]
+    fn timers_after_a_bar_conversation_read_fresh_clocks() {
+        let talked = Rc::new(Cell::new(false));
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let (t2, s2) = (talked.clone(), seen.clone());
+        let (t3, s3) = (talked.clone(), seen.clone());
+        let mut locked = 0u64;
+        let mut opened = None::<u64>;
+        let ran = with_engine(
+            "timers_after_a_bar_conversation_read_fresh_clocks",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                let table = e.game.exe.guest_sprite_ids.clone();
+                e.guests.add(table[0], &table);
+                e.guests_shown = true;
+                e.next_place_id = Some(1);
+                let mut hooks = GuestTimer {
+                    talked: t2,
+                    seen: s2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, f| {
+                if !s3.borrow().is_empty() || (t3.get() && opened.is_some_and(|t| f > t + 300)) {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                let Some(t) = opened else {
+                    locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                    if locked == 10 {
+                        button(sys, MouseButton::Right, true);
+                        opened = Some(f);
+                    }
+                    return;
+                };
+                match f - t {
+                    2 => button(sys, MouseButton::Right, false),
+                    // The guest's portrait, raised with the bar.
+                    60 => {
+                        sys.push_input(Input::MouseMove { x: 580, y: 340 });
+                        button(sys, MouseButton::Left, true);
+                    }
+                    62 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        assert!(talked.get(), "no conversation");
+        assert_eq!(seen.borrow().len(), 1);
+        assert!(seen.borrow()[0] >= 20000, "time1 = {}", seen.borrow()[0]);
+    }
+
     /// The view's alpha after the warp loop of place 1, with the left
     /// arrow held for 20 frames (`press`), under `x`.
     fn alpha_after_left_arrow(x: crate::enhancements::Enhancements, press: bool) -> Option<f32> {
@@ -1125,6 +1585,59 @@ mod tests {
         } else {
             None
         }
+    }
+
+    /// The view's alpha after the warp loop of place 1 in bow mode, the
+    /// left button pressed and held, with F5 held too (`f5`).
+    fn alpha_with_the_left_button_held(f5: bool) -> Option<f32> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let mut locked = 0u64;
+        let ran = with_engine(
+            "f5_turns_the_view_with_the_left_button_held",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.bow_mode = true;
+                e.next_place_id = Some(1);
+                e.game_step(&mut crate::hooks::NoScripts).await;
+                g2.set(Some(e.warp.alpha()));
+            },
+            move |sys, _| {
+                locked = if sys.mouse_locked() {
+                    locked + 1
+                } else {
+                    locked
+                };
+                if locked == 5 {
+                    button(sys, MouseButton::Left, true);
+                    if f5 {
+                        sys.push_input(Input::KeyDown(Key::F(5)));
+                    }
+                } else if locked == 25 {
+                    sys.push_input(Input::KeyUp(Key::F(5)));
+                    button(sys, MouseButton::Left, false);
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// F5..F8 are read whenever the poll saw no new left press
+    /// (`FUN_0041a298` @ 0x0041a2b5; VK_LBUTTON is an edge
+    /// key): holding the left button (in bow mode, where the press does not
+    /// end the loop) does not stop them.
+    #[test]
+    fn f5_turns_the_view_with_the_left_button_held() {
+        let Some(still) = alpha_with_the_left_button_held(false) else {
+            return;
+        };
+        let turned = alpha_with_the_left_button_held(true).unwrap();
+        assert_ne!(turned, still);
     }
 
     /// The arrow keys turn the view as F5..F8 by default

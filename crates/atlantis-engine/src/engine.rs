@@ -213,6 +213,15 @@ pub struct Engine {
     /// A script Vue= entered a place: the place loop runs its arrival scan.
     pub arrival_scan_pending: bool,
     pub arrival_from_vue: u16,
+    /// The place a script Vue= entered, which the Vue= handler also stores
+    /// as the place loop's zone 0x006cd7f4 (`FUN_0042a100` @ 0x0042a659):
+    /// after a click section or a departure scan that ran it, the place
+    /// loop goes on with that value.
+    pub(crate) script_vue_place: Option<u16>,
+    /// 0x004960c0: set around the /con click scan of a character clicked
+    /// with an object in hand (`FUN_00425828` @ 0x00425882..0x004258ad);
+    /// `FUN_0041afd0` then draws no cursor (@ 0x0041afe8).
+    pub(crate) give_scan: bool,
     /// A move ended: the place loop polls the input once and clears every
     /// input flag before the next arrival scan ([`Engine::end_of_move_input`]).
     pub move_input_poll: bool,
@@ -438,6 +447,8 @@ impl Engine {
             next_place_id: None,
             arrival_scan_pending: false,
             arrival_from_vue: 0,
+            script_vue_place: None,
+            give_scan: false,
             move_input_poll: false,
             move_cyclo: None,
             arrival_after_load: false,
@@ -960,6 +971,9 @@ impl Engine {
             if self.should_abort() {
                 break;
             }
+            // ArriveeVue = 0 before the warp loop (@ 0x00423be7), whatever
+            // set it: a Vue= or a chapter= of the arrival scan.
+            self.vars.set("arriveevue", 0);
             if !self.warp_loaded {
                 // Nowhere to look (a missing panorama): wait for the quit.
                 self.sys.frame().await;
@@ -995,14 +1009,31 @@ impl Engine {
                     break;
                 }
             }
+            // FUN_004278a0 starts the cursor's click animation on every
+            // click it gets (0x004968b8 = 1 @ 0x004278df): a zone, nothing,
+            // before a move; the animation plays on in the next warp loop.
+            self.cursor_state.click_anim = true;
+            self.script_vue_place = None;
             hooks.zone_click(self, action).await;
             if self.should_abort() {
                 break;
             }
             self.vars.set("cliczone", 0);
-            if self.arrival_scan_pending {
-                continue; // a Vue= in a section entered another place
+            // A Vue= of the click section left its place as the zone
+            // (0x006cd7f4 @ 0x0042a659), which the move test below compares
+            // with the destinations of that place (no shipped click section
+            // enters a place with an exit to itself).
+            if let Some(n) = self.script_vue_place.take() {
+                zone = u32::from(n);
             }
+            // No ARRIVEEVUE test here: the place loop tests it only at the
+            // top of the pass (@ 0x00423b4d). An arrival scan queued since
+            // (a Vue= or a chapter= of this click's section, or of a timer
+            // section during the warp loop or the bar, which goes on in the
+            // new place) runs on the next pass only when the click does not
+            // move; a click on an exit of the place now shown moves at once
+            // (0x00423d17..0x00423db5 on the current record 0x006cd7a8), and
+            // the move's ARRIVEEVUE (0x00423def) replaces the pending one.
             // A move needs an empty hand (0x00423d2b)...
             if self.vars.get("objetenmain") != 0 {
                 continue;
@@ -1031,12 +1062,17 @@ impl Engine {
             // arrival preparation, ends the move with ArriveeVue, AbortDepart
             // and DepartVue cleared, so a Vue= of the scan gets no arrival
             // scan (0x00423e2b..0x00423e7e).
+            // The departure scan runs with ArriveeVue as the timer's Vue=
+            // (the place it left) or chapter= (LastVue) left it.
+            self.arrival_scan_pending = false;
+            self.script_vue_place = None;
             let outcome = hooks.departure_scan(self, dest).await;
             let game_over = outcome == Departure::GameOver;
+            let vue_ran = self.script_vue_place.take().is_some();
             if outcome == Departure::Abort {
                 self.arrival_scan_pending = false;
             }
-            if self.arrival_scan_pending {
+            if vue_ran && self.arrival_scan_pending {
                 // A Vue= inside a departure section already entered its
                 // place (CHAPI005 /113, CHAPI062 /864, CHAPI077 /010); the
                 // place loop goes on with the turn and video of entry i of
@@ -1056,6 +1092,11 @@ impl Engine {
                 }
                 continue;
             }
+            // A chapter= of the departure scan (an arrival section such as
+            // CHAPI059 /010 `/sel(arriveeVue>0)&(Vue=26)`, matched after a
+            // timer's Vue=) queued an arrival scan; the move goes on and its
+            // ARRIVEEVUE = the place left (0x00423def) replaces it.
+            self.arrival_scan_pending = false;
             match (outcome, self.next_place_id.take()) {
                 (Departure::Go, Some(dest)) if !self.should_abort() => {
                     // A departure that is not aborted stops timer 1 and

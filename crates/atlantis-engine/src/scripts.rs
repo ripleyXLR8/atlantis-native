@@ -668,10 +668,13 @@ impl Scripts {
                 }
             }
         }
-        // ARRIVEEVUE stays = LastVue: only the place loop clears it, right
-        // after its own arrival scan (@ 0x00423be7). A chapter= run anywhere
-        // else in the pass therefore gets a second arrival scan on the next
-        // pass (@ 0x00423b5a..0x00423b78) when LastVue != 0.
+        // ARRIVEEVUE stays = LastVue: only the place loop clears it, before
+        // each warp loop (@ 0x00423be7, after its own arrival scan). A
+        // chapter= run anywhere else in the pass therefore gets a second
+        // arrival scan on the next pass (@ 0x00423b5a..0x00423b78) when
+        // LastVue != 0, unless a move replaces it (0x00423def); until then
+        // the scans read ArriveeVue = LastVue (the departure scan of an exit
+        // click after a timer's chapter=).
         if !self.in_place_arrival_scan
             && !self.init_running
             && e.last_vue != 0
@@ -694,6 +697,8 @@ impl Scripts {
             log::warn!("Vue={value}: not a place");
             return;
         };
+        // The place loop's zone 0x006cd7f4 = N (@ 0x0042a659).
+        e.script_vue_place = Some(place);
         let from = e.current_place_id;
         if let Some(sub) = e
             .wam
@@ -755,8 +760,10 @@ impl Scripts {
     }
 
     /// The arrival scan: ArriveeVue = the place arrived FROM (a negative
-    /// origin is no place yet: the arrived place stands for it), the /sel
-    /// scan, then ArriveeVue = 0. True when a section played.
+    /// origin is no place yet: the arrived place stands for it), then the
+    /// /sel scan (`FUN_004277c8`, which leaves ArriveeVue as it is: the place
+    /// loop clears it before the warp loop, @ 0x00423be7). True when a
+    /// section played.
     async fn run_arrival_sel(&mut self, e: &mut Engine, arrived: i32, from: i32) -> bool {
         self.run_arrival_sel_counted(e, arrived, from, false).await
     }
@@ -770,9 +777,7 @@ impl Scripts {
     ) -> bool {
         e.vars
             .set("arriveevue", if from >= 0 { from } else { arrived });
-        let played = self.run_sel_scan_counted(e, counted).await;
-        e.vars.set("arriveevue", 0);
-        played
+        self.run_sel_scan_counted(e, counted).await
     }
 
     /// The timer scans (`FUN_0042bef4` / `FUN_0042bfa4`): with TESTTIME1 /
@@ -901,7 +906,11 @@ impl Scripts {
         // hand. The return at 0x004258b7 skips the followers' save, hide and
         // restore and leaves 0x00496144 (Guests::talk) as it is.
         if e.vars.get("objetenmain") != 0 {
+            // 0x004960c0 = 1 around the scan (@ 0x00425882, 0x004258ad):
+            // the still frames of its voice-only lines have no cursor.
+            e.give_scan = true;
             self.run_con_click(e).await;
+            e.give_scan = false;
             e.vars.set("objetenmain", 0);
             return;
         }
@@ -1646,6 +1655,88 @@ mod tests {
         if ran {
             assert_eq!(*got.borrow(), Some((true, true)));
         }
+    }
+
+    /// A presenter that notes, for each line, whether its still frame
+    /// would carry the warp cursor.
+    struct CursorProbe(Rc<RefCell<Vec<bool>>>);
+
+    impl DialogPresenter for CursorProbe {
+        fn play_line<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _req: &'a LineRequest,
+        ) -> HookFuture<'a, LineOutcome> {
+            self.0.borrow_mut().push(e.still_frame_cursor().is_some());
+            ready(LineOutcome::default())
+        }
+    }
+
+    /// The voice-only line of a /con section that tests only ObjetEnMain,
+    /// with object 257 in hand and a character under the pointer, reached
+    /// by a click on that character (`give`) or on a zone: whether its
+    /// still frame carries the cursor.
+    fn give_line_cursor(give: bool) -> Option<Vec<bool>> {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "no_cursor_on_the_lines_of_a_given_object",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(CursorProbe(g2.clone())));
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                // A place and a view with a character under the pointer.
+                let ids: Vec<u16> = e.wam.places.iter().map(|p| p.id).collect();
+                let mut hit = None;
+                'search: for id in ids {
+                    e.next_place_id = Some(id);
+                    e.do_place_change().await;
+                    if e.npc_rects.is_empty() {
+                        continue;
+                    }
+                    e.pointer.pos = (320, 240);
+                    for ia in 0..315 {
+                        for ib in -4..=4 {
+                            e.set_view(ia as f32 * 0.02, ib as f32 * 0.1);
+                            let (zone, perso) = e.pointer_targets();
+                            if perso >= 0x200 && zone > 0 && zone < 0x200 {
+                                hit = Some((perso, zone));
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+                let (perso, zone) = hit.expect("a character over a zone");
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/con(ObjetEnMain=257)\r\n[Seth,off] Here.\r\n/0\r\n",
+                );
+                e.vars.set("objetenmain", 257);
+                g2.borrow_mut().clear();
+                if give {
+                    s.npc_click(&mut e, perso, zone).await;
+                } else {
+                    e.vars.set("cliczone", zone as i32);
+                    s.zone_click(&mut e, zone).await;
+                }
+            },
+            |_, _| {},
+        );
+        ran.then(|| got.borrow().clone())
+    }
+
+    /// `FUN_00425828` sets 0x004960c0 around the /con click scan of a
+    /// character clicked with an object in hand (@ 0x00425882..
+    /// 0x004258ad), and `FUN_0041afd0` draws no cursor while it is set
+    /// (@ 0x0041afe8): the still frames of that section's voice-only lines
+    /// show none (CHAPI021 /270, CHAPI055 /685). A zone click's scan does
+    /// not set it.
+    #[test]
+    fn no_cursor_on_the_lines_of_a_given_object() {
+        let Some(given) = give_line_cursor(true) else {
+            return;
+        };
+        assert_eq!(given, [false]);
+        assert_eq!(give_line_cursor(false).unwrap(), [true]);
     }
 
     #[test]

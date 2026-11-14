@@ -1709,8 +1709,8 @@ fn new_game_plays_the_intro() {
 }
 
 /// Chapter=2 from chapter 1: the next CON loaded and its /INIT run, the
-/// arrival scan with ArriveeVue = LastVue, and the place loop's own arrival
-/// scan queued (LastVue != 0).
+/// arrival scan with ArriveeVue = LastVue, which stays set, and the place
+/// loop's own arrival scan queued (LastVue != 0).
 #[test]
 fn chapter_change_loads_the_next_con() {
     let Some(g) = game("chapter_change_loads_the_next_con") else {
@@ -1733,6 +1733,7 @@ fn chapter_change_loads_the_next_con() {
             scripts.script.sections().len(),
             e.arrival_scan_pending,
             e.arrival_from_vue,
+            e.vars.get("arriveevue"),
         ));
     };
     let mut runner = Runner::new(sys, task);
@@ -1741,11 +1742,15 @@ fn chapter_change_loads_the_next_con() {
         frame += 1;
         assert!(frame < 100_000);
     }
-    let (chapter, var, sections, pending, from) = result.borrow().unwrap();
+    let (chapter, var, sections, pending, from, arrivee) = result.borrow().unwrap();
     assert_eq!((chapter, var), (2, 2));
     assert!(sections > 0);
     assert!(pending);
     assert_eq!(from, 1);
+    // ARRIVEEVUE = LastVue (FUN_00427634 @ 0x00427782) is not cleared by
+    // the chapter's /sel scan: the place loop clears it before the warp
+    // loop (@ 0x00423be7).
+    assert_eq!(arrivee, 1);
     let ev = trace.borrow();
     find(&ev, 0, |e| *e == Event::ChapterLoaded(2));
 }

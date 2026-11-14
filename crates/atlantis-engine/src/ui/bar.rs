@@ -316,8 +316,23 @@ impl Engine {
         // slide-out, except that the bar loop's exit with a guest's
         // portrait under the pointer runs FUN_0042c59c itself (0x0042cbfe,
         // before the conversation).
+        // Then FUN_0042d098 (@ 0x0042c201) enters bow mode with the bow
+        // in hand, before the slide-out: the hand is empty while the bar
+        // slides down, the bow back among the bar's icons. A GameOver set
+        // during the bar skips it (0x0042c0ed -> 0x0042c22d).
+        if self.vars.get("gameover") == 0 {
+            self.take_bow().await;
+        }
         if self.vars.get("gameover") == 0 || guest != 0 {
             self.bar_slide_out(hooks).await;
+        }
+        // FUN_0042d198 (@ 0x0042c25f) on every exit: the bow rises when bow
+        // mode is on.
+        // The cursor's click animation is cancelled (0x004968b8 = 0 @
+        // 0x0042c241).
+        self.cursor_state.click_anim = false;
+        if self.bow_mode {
+            self.raise_bow().await;
         }
         guest
     }
@@ -427,6 +442,9 @@ impl Engine {
             self.vars.set("objetenmain", 0);
         }
         self.bar_slide_out(hooks).await;
+        // FUN_004278a0 cancels the cursor's click animation after the
+        // pick-up's slide-out (0x004968b8 = 0 @ 0x00427b5d).
+        self.cursor_state.click_anim = false;
         // The timers resume from their values, ChapterTime from 0, as after
         // the inventory bar (FUN_0042c59c @ 0x0042c844 ends the slide-out).
         self.rebase_con_clocks();
@@ -453,9 +471,8 @@ impl Engine {
 
     /// `FUN_0042d098`, closing the bar: the bow (object 334) in hand with
     /// ArcMagique set, not yet in bow mode: `SPRITE\2D\ARCWARP.SPR`, bow
-    /// mode, the hand emptied; then the bow rises (`FUN_0042d198`: frame 0
-    /// from y 0x1e1 to 0x83, 10 px a frame).
-    pub(crate) async fn enter_bow_mode(&mut self) {
+    /// mode, the hand emptied.
+    async fn take_bow(&mut self) {
         if self.vars.get("objetenmain") != 0x14e
             || self.vars.get("arcmagique") == 0
             || self.bow_mode
@@ -472,6 +489,11 @@ impl Engine {
         }
         self.bow_mode = true;
         self.vars.set("objetenmain", 0);
+    }
+
+    /// `FUN_0042d198`: the bow rises, frame 0 from y 0x1e1 to 0x83, 10 px
+    /// a frame.
+    async fn raise_bow(&mut self) {
         let mut y = 0x1e1;
         while y != 0x79 && !self.should_abort() {
             self.show_bow_at(y).await;
@@ -593,7 +615,7 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::NoScripts;
+    use crate::hooks::{ready, HookFuture, NoScripts};
     use crate::sys::MouseButton;
     use crate::test_support::{button, with_engine};
     use crate::warp::SCREEN_W;
@@ -608,6 +630,91 @@ mod tests {
             42 => button(sys, MouseButton::Left, false),
             _ => {}
         }
+    }
+
+    /// The hand and bow mode each bar frame's timers see; `game_over`: the
+    /// first timer pass sets GameOver.
+    struct BowProbe {
+        seen: Rc<RefCell<Vec<(i32, bool)>>>,
+        game_over: bool,
+    }
+
+    impl ScriptHooks for BowProbe {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.game_over {
+                e.vars.set("gameover", 1);
+            }
+            self.seen
+                .borrow_mut()
+                .push((e.vars.get("objetenmain"), e.bow_mode));
+            ready(self.game_over)
+        }
+    }
+
+    /// ObjetEnMain and bow mode.
+    type HandBow = (i32, bool);
+
+    /// The inventory bar (`FUN_0042c098`) with the bow (object 334) in it
+    /// and ArcMagique set, a click on the bow; `held`: the object in hand
+    /// at the start. The hand and bow mode the timers saw on each frame,
+    /// then after the bar.
+    fn bow_from_the_bar(held: i32, game_over: bool) -> Option<(Vec<HandBow>, HandBow)> {
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let got = Rc::new(RefCell::new(None));
+        let (s2, g2) = (seen.clone(), got.clone());
+        let ran = with_engine(
+            "bow_mode_starts_before_the_slide_out",
+            move |mut e| async move {
+                e.inventory.push(334);
+                e.vars.set("arcmagique", 1);
+                e.vars.set("objetenmain", held);
+                let mut hooks = BowProbe {
+                    seen: s2,
+                    game_over,
+                };
+                e.display_bar(&mut hooks).await;
+                *g2.borrow_mut() = Some((e.vars.get("objetenmain"), e.bow_mode));
+            },
+            |sys, f| match f {
+                // The bow's cell, record 0.
+                39 => sys.push_input(crate::sys::Input::MouseMove { x: 35, y: 420 }),
+                40 => button(sys, MouseButton::Left, true),
+                42 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let after = got.borrow().unwrap();
+        let seen = seen.borrow().clone();
+        Some((seen, after))
+    }
+
+    /// `FUN_0042c098` enters bow mode (`FUN_0042d098` @ 0x0042c201) before
+    /// the slide-out (`FUN_0042c59c` @ 0x0042c219): the 11 slide-out
+    /// frames run with the hand empty and bow mode on.
+    #[test]
+    fn bow_mode_starts_before_the_slide_out() {
+        let Some((seen, after)) = bow_from_the_bar(0, false) else {
+            return;
+        };
+        assert_eq!(after, (0, true));
+        assert!(seen.len() > 11, "{seen:?}");
+        assert!(
+            seen[seen.len() - 11..].iter().all(|&s| s == (0, true)),
+            "{seen:?}"
+        );
+    }
+
+    /// A GameOver set during the bar skips `FUN_0042d098` (0x0042c0ed ->
+    /// 0x0042c22d): the bow stays in hand, no bow mode.
+    #[test]
+    fn no_bow_mode_after_a_game_over_in_the_bar() {
+        let Some((_, after)) = bow_from_the_bar(334, true) else {
+            return;
+        };
+        assert_eq!(after, (334, false));
     }
 
     /// The pick-up bar ends like the inventory bar: Time1 / Time2 resume
@@ -638,6 +745,33 @@ mod tests {
         }
         let got = *got.borrow();
         assert_eq!(got, Some((7, 9, true, true)));
+    }
+
+    /// Closing the bar (`FUN_0042c098` @ 0x0042c241) and the pick-up
+    /// (`FUN_004278a0` @ 0x00427b5d) cancel the cursor's click animation.
+    #[test]
+    fn the_bars_cancel_the_click_animation() {
+        for pickup in [false, true] {
+            let got = Rc::new(RefCell::new(None));
+            let g2 = got.clone();
+            let ran = with_engine(
+                "the_bars_cancel_the_click_animation",
+                move |mut e| async move {
+                    e.cursor_state.click_anim = true;
+                    if pickup {
+                        e.display_pickup(&mut NoScripts).await;
+                    } else {
+                        e.display_bar(&mut NoScripts).await;
+                    }
+                    *g2.borrow_mut() = Some(e.cursor_state.click_anim);
+                },
+                click_at_40,
+            );
+            if !ran {
+                return;
+            }
+            assert_eq!(*got.borrow(), Some(false), "pickup {pickup}");
+        }
     }
 
     /// Each bar frame polls NewSound (FUN_00432178): a sample that ended
