@@ -622,10 +622,10 @@ pub fn miles_pan_balance(pan: u8) -> i8 {
     (if p < 63 { far - 127 } else { 127 - far }) as i8
 }
 
-/// Miles volume 0..127 onto the mixer's 0..255, linear in amplitude as in
-/// MSS32.DLL (0x2000dc60).
+/// Miles volume 0..127 for the mixer, which applies MSS32.DLL's law
+/// (0x2000dc60, `audio::miles_gain`).
 fn mixer_volume(v: u8) -> u8 {
-    (u32::from(v & 0x7f) * 255 / 127) as u8
+    v & 0x7f
 }
 
 /// The rate the six samples are set up with: `FUN_00430d20` sets them up

@@ -191,9 +191,10 @@ impl Graphics {
 /// sets the voice sample to 0x6e at start-up, @ 0x00430e82).
 pub const DEFAULT_VOLUMES: [u8; 4] = [0x7f, 0x6e, 0x6e, 0x6e];
 
-/// A volume 0..127 of the original on the mixer's 0..255 scale.
+/// A volume 0..127 of the original for the mixer, which takes Miles'
+/// 0..127 values (`audio::miles_gain`).
 pub fn mixer_volume(x: u8) -> u8 {
-    (u32::from(x.min(127)) * 255 / 127) as u8
+    x.min(127)
 }
 
 /// The options of the original's menus, and the port's enhancements.
