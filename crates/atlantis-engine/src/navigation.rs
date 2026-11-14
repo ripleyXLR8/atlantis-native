@@ -24,7 +24,7 @@
 
 use atlantis_data::sprite_list::npc_hit_test;
 
-use crate::cursor::{warp_cursor_step, WarpCursorInput};
+use crate::cursor::{warp_cursor_frame, warp_cursor_step, WarpCursorInput};
 use crate::engine::{Abort, Engine, CURSOR_UNSET, WARP_ABORT};
 use crate::hooks::ScriptHooks;
 use crate::look::warp_look_frame;
@@ -35,17 +35,14 @@ use crate::warp::{SCREEN_H, SCREEN_W};
 /// held (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba).
 const VIEW_KEY_STEP: f64 = 0.034906;
 
-/// The cursor animation's step (the port's pace of `FUN_00422fcc`), for
-/// the reference's two steps per warp frame (`FUN_0041bfa0` draws the
-/// cursor at 0x0041c48e and again at 0x0041c535).
-const CURSOR_STEP_MS: u64 = 80;
-
-/// The step for a build that advances the animation `steps` times per
-/// warp frame: the 1997 build draws it once (atlantis-cd-en-688128
-/// FUN_0041bbd8), so its animation runs at half the reference's rate.
-fn cursor_step_ms(steps: u8) -> u64 {
-    CURSOR_STEP_MS * 2 / u64::from(steps.clamp(1, 2))
-}
+/// The port's pace of the cursor (the warp loop is not paced in the
+/// original; atlantis-re decision 0013): one warp frame's cursor calls
+/// every 160 ms.
+/// The reference build calls `FUN_00422fcc` twice a frame (0x0041c535,
+/// then through `FUN_0041afd0` @ 0x0041c5ed) and shows the first
+/// ([`warp_cursor_frame`]), so its animation steps every 80 ms; the 1997
+/// builds call it once (atlantis-cd-en-688128 FUN_0041bbd8), every 160 ms.
+const CURSOR_FRAME_MS: u64 = 160;
 
 /// What the loop read from the events of a frame.
 #[derive(Default)]
@@ -229,9 +226,10 @@ impl Engine {
     /// `FUN_00422fcc` in the warp frame, after the look, the timers and the
     /// render: its own hit tests (`FUN_00422bb0`, `FUN_00422d5c` at its
     /// entry) at this frame's view and pointer, which the next click acts
-    /// on. The animation advances at the port's pace (one step per
-    /// [`cursor_step_ms`]); a change of mode (nothing, navigate, talk,
-    /// object, click) is shown at once.
+    /// on. One frame of calls ([`warp_cursor_frame`]: the build's
+    /// `warp_cursor_steps`, the first shown) every [`CURSOR_FRAME_MS`]; a
+    /// change of mode (nothing, navigate, talk, object, click), which the
+    /// first call of a frame sees, is shown at once and starts a frame.
     fn step_warp_cursor(&mut self) {
         let (zone, id) = self.pointer_targets();
         let input = WarpCursorInput {
@@ -243,15 +241,15 @@ impl Engine {
             id_rule: self.game.exe.build.cursor_id_rule,
         };
         let now = self.sys.millis();
-        let mut next = self.cursor_state;
-        let sprite = warp_cursor_step(&mut next, &input).sprite;
+        let mut first = self.cursor_state;
+        warp_cursor_step(&mut first, &input);
         if self.cursor_shown == CURSOR_UNSET
             || now >= self.cursor_next_ms
-            || next.mode != self.cursor_state.mode
+            || first.mode != self.cursor_state.mode
         {
-            self.cursor_state = next;
-            self.cursor_shown = sprite;
-            self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
+            let steps = self.game.exe.build.warp_cursor_steps;
+            self.cursor_shown = warp_cursor_frame(&mut self.cursor_state, &input, steps).sprite;
+            self.cursor_next_ms = now + CURSOR_FRAME_MS;
         }
     }
 
@@ -770,10 +768,47 @@ mod tests {
     use std::cell::{Cell, RefCell};
     use std::rc::Rc;
 
+    /// The cursor sprites the warp loop shows over a navigation zone with
+    /// the reference build: the first of each frame's two `FUN_00422fcc`
+    /// calls (0x0041c535 shown, 0x0041c5ed after the copy), so 9, 11, 13
+    /// and never 10, 12, 14.
     #[test]
-    fn cursor_pace_per_build() {
-        assert_eq!(cursor_step_ms(2), CURSOR_STEP_MS);
-        assert_eq!(cursor_step_ms(1), 2 * CURSOR_STEP_MS);
+    fn the_warp_loop_shows_every_second_cursor_sprite() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_warp_loop_shows_every_second_cursor_sprite",
+            move |mut e| async move {
+                assert_eq!(e.game.exe.build.warp_cursor_steps, 2);
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.pointer.pos = (320, 240);
+                let view = (0..315)
+                    .flat_map(|ia| (-4..=4).map(move |ib| (ia as f32 * 0.02, ib as f32 * 0.1)))
+                    .find(|&(a, b)| {
+                        e.set_view(a, b);
+                        matches!(e.pointer_targets(), (z, 0) if (1..0x200).contains(&z))
+                    })
+                    .expect("a navigation view in place 1");
+                e.set_view(view.0, view.1);
+                e.cursor_shown = CURSOR_UNSET;
+                for _ in 0..200 {
+                    e.step_warp_cursor();
+                    g2.borrow_mut().push(e.cursor_shown);
+                    e.sys.frame().await;
+                }
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        for s in [9, 11, 13] {
+            assert!(got.contains(&s), "{s} never shown: {got:?}");
+        }
+        assert!(got.iter().all(|s| [9, 11, 13].contains(s)), "{got:?}");
     }
 
     /// A timer section that moved the player while the bar was open (as a
