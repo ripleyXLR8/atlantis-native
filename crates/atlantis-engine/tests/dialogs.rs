@@ -1290,8 +1290,10 @@ fn escape_skips_the_rest_of_the_section() {
 }
 
 /// The game-over screen of CHAPI003's section 45 (GameOver=2): GOVER02.TGA
-/// with the narrator's subtitle, the voice ATA0045C until it ends, then a
-/// black screen.
+/// with the narrator's subtitle, the voice ATA0045C until it ends. The
+/// original then clears the back surface without presenting it
+/// (`FUN_00426590` @ 0x00426b9c..0x00426be6): the picture stays on screen
+/// until the reloaded game's first frame, never a black frame.
 #[test]
 fn game_over_screen_plays_the_narrator() {
     use atlantis_engine::DialogPresenter;
@@ -1300,6 +1302,8 @@ fn game_over_screen_plays_the_narrator() {
     };
     let (mut image, mut best) = (0, 0);
     let mut last = Vec::new();
+    let mut shown = Vec::new();
+    let mut black = 0;
     let ev = with_new_game(
         g,
         Default::default(),
@@ -1321,6 +1325,10 @@ fn game_over_screen_plays_the_narrator() {
                 best = best.max(subtitle_pixels(&s).0);
                 if image == 10 {
                     dump("dialog_game_over", &s);
+                    shown = s.clone();
+                }
+                if s.iter().all(|&p| p == 0) {
+                    black += 1;
                 }
             }
             last = s.clone();
@@ -1329,7 +1337,11 @@ fn game_over_screen_plays_the_narrator() {
     assert!(ev.contains(&Event::Voice("WAV\\ATA0045C.APC".into())));
     assert!(image > 30, "{image} frames of the image");
     assert!(best > 50, "{best} subtitle pixels");
-    assert!(last.iter().all(|&p| p == 0), "the screen cleared");
+    assert_eq!(black, 0, "black frames after the image");
+    assert!(
+        last == shown,
+        "the picture stays on screen after the narration"
+    );
 }
 
 /// A talking head's UBB frame 0 is built and not presented

@@ -2273,7 +2273,15 @@ mod tests {
             ev.contains(&crate::engine::Event::GameOver(20)),
             "no game over"
         );
-        Some(end.get().unwrap() - voice.get().expect("no narrator voice"))
+        let end = end.get().unwrap();
+        // A narration cut at its first poll presents no frame after the
+        // voice starts (the screen ends on the picture, FUN_00426590 @
+        // 0x00426be6): the voice is seen only once the task has ended.
+        let started = ev
+            .iter()
+            .any(|e| matches!(e, crate::engine::Event::Voice(n) if n.contains("ATA0941B")));
+        let voice = voice.get().or(started.then_some(end));
+        Some(end - voice.expect("no narrator voice"))
     }
 
     /// An Escape inside a puzzle latches 0x00496124 = 0 / 0x00496138 = 1
