@@ -390,7 +390,7 @@ impl Engine {
             || self.bow_mode
             || self.vars.get("gameover") != 0
             || self.bar.request
-            || self.escape_request
+            || self.menu_request()
         {
             return false;
         }
@@ -837,8 +837,15 @@ impl Engine {
         let (zone, id) = self.pointer_targets();
         self.vars.set("cliczone", zone as i32);
         // 0x00496124 = 0 after LOAD or QUIT: the lines of the zone-999
-        // scan stop at their first poll, as after a puzzle's Escape.
+        // scan stop at their first poll, as after a puzzle's Escape. The
+        // menu request 0x00496138 is 0 there (FUN_0041c838's tail @
+        // 0x0041cbff..0x0041cc09), so a right press of the scan's lines
+        // toggles the bar request 0x004960c4, which nothing clears before
+        // the reloaded chapter's warp loop (`FUN_0042de5c` does not):
+        // Escape then latches nothing, the intro film of the loaded
+        // chapter's arrival scan included.
         self.escape_request = !keep_running;
+        self.menu_request_clear = !keep_running;
         if keep_running && (1000..1017).contains(&zone) {
             hooks.puzzle_zone(self, zone - 1000).await;
         }
@@ -847,6 +854,7 @@ impl Engine {
         }
         // The main loop sets 0x00496124 = 1 before the reload (0x0041975d).
         self.escape_request = false;
+        self.menu_request_clear = false;
         // An abort raised here wins over the one that ended the warp loop:
         // the game-over screen sets 0x00496124 = 1 (FUN_00426590 @
         // 0x00426c41), so a game over raised by the zone-999 scan after a

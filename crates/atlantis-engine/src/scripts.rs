@@ -2593,6 +2593,74 @@ mod tests {
         }
     }
 
+    /// The zone-999 scan after the in-game menu's LOAD (CHAPI031 /391,
+    /// `/Sel(DepartVue=999)`, one [Soldat] talking-head line, under
+    /// `--original`; no shipped WAM has a zone 999) runs with 0x00496124 = 0 but the menu request
+    /// 0x00496138 = 0 (`FUN_0041c838`'s tail @ 0x0041cbff..0x0041cc09): a
+    /// right press during the line toggles the bar request 0x004960c4
+    /// (`FUN_0041a298` @ 0x0041a2f2..0x0041a337), which stays set.
+    #[test]
+    fn zone_999_scan_after_load_toggles_the_bar_request() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let armed = Rc::new(std::cell::Cell::new(None::<u64>));
+        let a2 = armed.clone();
+        let ran = with_engine(
+            "zone_999_scan_after_load_toggles_the_bar_request",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(crate::dialog::Dialogs::new()));
+                s.chapter_loaded(&mut e, 31, false).await;
+                assert!(e.load_wam("COMPLEXE.WAM").await);
+                // No WAM shipped has a zone 999 (the zones' actions of
+                // every WAM, run through the original's loader): place 16's
+                // exit to 14 made one.
+                e.next_place_id = Some(16);
+                e.do_place_change().await;
+                let i = e.current_place.unwrap();
+                for z in &mut e.wam.places[i].zones {
+                    if z.action == 14 {
+                        z.action = 999;
+                    }
+                }
+                e.pointer.recentre();
+                let mut found = false;
+                'search: for ia in 0..315 {
+                    for ib in -4..=4 {
+                        e.set_view(ia as f32 * 0.02, ib as f32 * 0.1);
+                        if e.pointer_targets() == (999, 0) {
+                            found = true;
+                            break 'search;
+                        }
+                    }
+                }
+                assert!(found, "no view of the zone");
+                // Past the chapter's start section (/10).
+                e.vars.set("initflag", 1);
+                e.bar.request = false;
+                a2.set(Some(0));
+                e.no_click_exit(&mut s, false).await;
+                *g2.borrow_mut() = Some((e.bar.request, e.escape_request));
+            },
+            move |sys, f| {
+                let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut sound, 22050, 2);
+                match armed.get() {
+                    Some(0) => armed.set(Some(f)),
+                    Some(f0) if f == f0 + 20 => {
+                        crate::test_support::button(sys, crate::sys::MouseButton::Right, true)
+                    }
+                    Some(f0) if f == f0 + 22 => {
+                        crate::test_support::button(sys, crate::sys::MouseButton::Right, false)
+                    }
+                    _ => {}
+                }
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, false)));
+        }
+    }
+
     /// The hidden-perso list takes at most 0x100 ids (`FUN_00427bd0`,
     /// dc:19386): a 257th HidePerso deactivates the sprites but is not
     /// listed.

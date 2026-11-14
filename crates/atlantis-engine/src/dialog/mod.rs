@@ -736,7 +736,7 @@ impl Dialogs {
                             e.turn_double_click.queue_press(now, x, y);
                         }
                         None => {
-                            let (mode, menu) = (e.cursor_state.mode, e.escape_request);
+                            let (mode, menu) = (e.cursor_state.mode, e.menu_request());
                             e.turn_double_click.dispatch(mode, menu);
                         }
                     }
@@ -744,7 +744,7 @@ impl Dialogs {
                     // 0x00496120 and toggles the bar request; a left press
                     // in the same poll returns first (0x0041a2b5).
                     if fi.right_press && !fi.left_press {
-                        e.bar.right_pressed(e.section_play, e.escape_request);
+                        e.bar.right_pressed(e.section_play, e.menu_request());
                     }
                     // The bar request as the right presses left it.
                     escape_poll.bar_request = e.bar.request;
@@ -921,6 +921,7 @@ impl Dialogs {
             // narration or video stops at once.
             if fi.escape && !fi.left_press && e.escape_gate_open() {
                 e.escape_request = true;
+                e.menu_request_clear = false;
             }
             if !fi.left_press {
                 pointer = e.sys.mouse();
@@ -1011,7 +1012,7 @@ impl Dialogs {
             bow_mode: e.bow_mode,
             bar_request: e.bar.request,
             keep_running: !e.escape_request,
-            menu_request: e.escape_request,
+            menu_request: e.menu_request(),
             ..VideoSkipState::default()
         };
         if let Some((pcm, apc)) = voice {

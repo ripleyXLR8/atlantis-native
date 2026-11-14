@@ -512,7 +512,7 @@ impl Engine {
             return;
         }
         let g = &self.guests;
-        let records = if self.escape_request {
+        let records = if self.menu_request() {
             0
         } else {
             g.count.min(Guests::SLOTS)

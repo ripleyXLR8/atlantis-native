@@ -277,6 +277,14 @@ pub struct Engine {
     /// voice-only line, the game-over wait) stops at once and puts both
     /// back; the end of a conversation puts them back too (0x00425be5).
     pub escape_request: bool,
+    /// The menu request 0x00496138 is 0 while `escape_request` stands for
+    /// 0x00496124 = 0: the zone-999 scan after the in-game menu's LOAD or
+    /// QUIT, which leaves 0x00496124 = 0 (0x0041c9fc, 0x0041ca61) and
+    /// clears 0x00496138 in its tail (0x0041cbff..0x0041cc09). See
+    /// [`Engine::menu_request`]. An Escape latch sets 0x00496138 = 1 again
+    /// (of the loops that latch one, only the subject menu can run inside
+    /// that scan).
+    pub(crate) menu_request_clear: bool,
     /// The warp loop ended without a click, as the original's place loop
     /// then still acts on the zone under the pointer
     /// ([`Engine::no_click_exit`], [`BugFix::GameOverPuzzle`] off): `true`
@@ -504,6 +512,7 @@ impl Engine {
             abort: None,
             section_play: false,
             escape_request: false,
+            menu_request_clear: false,
             pending_no_click_exit: None,
             vue_override: None,
             inventory: Vec::new(),
@@ -959,6 +968,16 @@ impl Engine {
         // ARRIVEEVUE = LastVue (FUN_00427634 @ 0x0042777d), whatever the
         // /INIT Vue= of chapter 1 did.
         self.arrival_after_load = true;
+    }
+
+    /// The menu request 0x00496138, which every Escape latch sets with
+    /// 0x00496124 = 0 (`escape_request`), but which the zone-999 scan after
+    /// the in-game menu's LOAD or QUIT runs with cleared
+    /// (`menu_request_clear`): there a right press of the poll toggles the
+    /// bar request (`FUN_0041a298` @ 0x0041a2f2..0x0041a337), the guests
+    /// are drawn and a double click is dispatched.
+    pub(crate) fn menu_request(&self) -> bool {
+        self.escape_request && !self.menu_request_clear
     }
 
     /// The timers of `FUN_00423760`, the main loop's boot pass
