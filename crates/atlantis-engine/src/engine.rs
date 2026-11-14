@@ -1648,6 +1648,42 @@ mod startup_tests {
     use crate::test_support::with_engine;
     use std::cell::RefCell;
 
+    /// FUN_0041bc74's pass decodes the next frame, polls NewSound
+    /// (FUN_00432a64 @ 0x0041bdcb), then presents the frame decoded before
+    /// (FUN_0041b064 @ 0x0041bdec): LOGO15N's sound (NEWSOUND 0x12) starts
+    /// before its first picture is shown, not one film frame later.
+    #[test]
+    fn startup_film_sound_starts_with_its_first_picture() {
+        use std::cell::Cell;
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        let before = Rc::new(Cell::new(None));
+        let seen = Rc::new(Cell::new(None));
+        let (t2, b2) = (trace.clone(), before.clone());
+        let (t3, b3, s3) = (trace.clone(), before.clone(), seen.clone());
+        let ran = with_engine(
+            "startup_film_sound_starts_with_its_first_picture",
+            move |mut e| async move {
+                e.trace = Some(t2);
+                e.set_enhancements(crate::enhancements::Enhancements::original());
+                b2.set(Some(e.sys.frames_presented()));
+                e.play_startup_film("LOGO15N.HNM", Some(0x12)).await;
+            },
+            move |sys, _| {
+                let started = t3
+                    .borrow()
+                    .iter()
+                    .any(|ev| matches!(ev, Event::NewSound(0x12, _)));
+                if started && s3.get().is_none() {
+                    s3.set(Some(sys.frames_presented() - b3.get().unwrap()));
+                }
+            },
+        );
+        if ran {
+            // Seen after the runner's first step: the film's first present.
+            assert_eq!(seen.get(), Some(1));
+        }
+    }
+
     /// WinMain stores NEWSOUND = 0x12 before LOGO15N (0x00419653) and 0x13
     /// before PREINTRO (0x004196bd); each film's first poll of
     /// `FUN_00432a64` starts that table entry, so PREINTRO has its sound

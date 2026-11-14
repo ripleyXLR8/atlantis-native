@@ -846,14 +846,23 @@ impl Engine {
                                 }
                             }
                         }
+                        // The frame after the ending poll (0x0041be2e) or the
+                        // last one: no poll follows it.
+                        let last =
+                            hnm.frame_count() != 0 && hnm.frames_decoded() >= hnm.frame_count();
                         // FUN_0041bc74 decodes the first frame before its
-                        // loop; each pass decodes the next, then runs
-                        // FUN_00432758.
-                        if !first {
+                        // loop; each pass decodes the next, runs
+                        // FUN_00432758 and the NewSound poller FUN_00432a64
+                        // (0x0041bdcb), then presents the frame decoded
+                        // before (FUN_0041b064 @ 0x0041bdec). So both run
+                        // before frames 0 .. N - 2 are shown (a start-up
+                        // film's sound starts with its first picture), and
+                        // not before the frame the loop's exit presents
+                        // (0x0041be4a): the last one or the one after the
+                        // ending poll. A sound that ends during the film
+                        // clears NEWSOUND at such a poll.
+                        if !last && !run.stop_after_frame {
                             self.ambient_video_frame();
-                            // The NewSound poller after the decode
-                            // (0x0041bdcb): a sound that ends during the
-                            // film clears NEWSOUND then.
                             self.poll_new_sound().await;
                         }
                         first = false;
@@ -864,10 +873,6 @@ impl Engine {
                         }
                         // HD: a video's frame is smoothed as a photograph.
                         self.sys.mark_photo();
-                        // The frame after the ending poll (0x0041be2e) or the
-                        // last one: no poll follows it.
-                        let last =
-                            hnm.frame_count() != 0 && hnm.frames_decoded() >= hnm.frame_count();
                         if run.frame_presented(last) {
                             self.sys.frame().await;
                             break;
@@ -1028,7 +1033,8 @@ impl Engine {
             .prepare_glide(&place, &self.wam.ambient_objects, &cam, a, b, frames);
     }
 
-    /// `FUN_00432758`, on each frame of the video loop after the first.
+    /// `FUN_00432758`, on each pass of the video loop (before frames 0 ..
+    /// N - 2 are shown).
     fn ambient_video_frame(&mut self) {
         if !self.ambient.active() {
             return;
