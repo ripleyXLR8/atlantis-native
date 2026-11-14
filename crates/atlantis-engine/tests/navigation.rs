@@ -259,15 +259,19 @@ fn double_click_matches_original() {
     let mut queued = TurnDoubleClick::default();
     queued.first_press(1000, 320, 240);
     assert!(queued.queue_press(1100, 320, 240));
+    queued.dispatch(5, false);
     assert!(!queued.flag);
+    queued.pump();
     queued.dispatch(5, false);
     assert!(queued.flag);
     queued.flag = false; // a talking head's end (0x0042f78c)
+    queued.pump();
     queued.dispatch(5, false);
     assert!(!queued.flag);
     let mut dropped = TurnDoubleClick::default();
     dropped.first_press(1000, 320, 240);
     assert!(dropped.queue_press(1100, 320, 240));
+    dropped.pump();
     dropped.clear();
     dropped.dispatch(5, false);
     assert!(!dropped.flag);

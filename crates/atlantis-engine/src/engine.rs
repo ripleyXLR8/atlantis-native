@@ -431,10 +431,6 @@ pub struct Engine {
     pub(crate) pointer_mouse_mark: (i32, i32),
     pub(crate) cursor_sprites: Vec<SprSprite>,
     pub(crate) cursor_state: WarpCursorState,
-    /// The double-click flag 0x00496118 and the press Windows pairs with
-    /// the next for WM_LBUTTONDBLCLK (set during the turn, tested before a
-    /// move's video @ 0x00423f8a).
-    pub(crate) turn_double_click: crate::turn::TurnDoubleClick,
     pub(crate) cursor_shown: i32,
     pub(crate) cursor_next_ms: u64,
     /// The view keys F5..F8 held at the polls (`FUN_0041a298`) of the loops
@@ -588,7 +584,6 @@ impl Engine {
             pointer_mouse_mark: (0, 0),
             cursor_sprites: Vec::new(),
             cursor_state: WarpCursorState::default(),
-            turn_double_click: Default::default(),
             cursor_shown: CURSOR_UNSET,
             cursor_next_ms: 0,
             view_key_polls: RefCell::new(Vec::new()),
@@ -1235,9 +1230,13 @@ impl Engine {
     /// 0x0042af26..0x0042af58) and at the end of the disc prompt
     /// (`FUN_0041eda8` @ 0x0041f032..0x0041f064): 0x00496118 (the double
     /// click), 0x0049611c, 0x00496120, 0x00496138 = 0, 0x00496124 = 1 (the
-    /// Escape latch) and 0x004960c4 = 0.
+    /// Escape latch) and 0x004960c4 = 0. Stores only: StartMusik and
+    /// StopMusik pump no message (their fade wait calls `FUN_0043318c`
+    /// alone), so a WM_LBUTTONDBLCLK a line's press edge left queued
+    /// stays for the turn's first pumping poll
+    /// ([`crate::turn::TurnDoubleClick::clear`]).
     pub(crate) fn input_flags_reset(&mut self) {
-        self.turn_double_click.clear();
+        self.sys.double_click().clear();
         self.escape_request = false;
         self.bar.flags_reset();
     }

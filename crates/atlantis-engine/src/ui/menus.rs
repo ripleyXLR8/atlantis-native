@@ -215,15 +215,14 @@ impl Engine {
     }
 
     /// The left press a menu pass just read, paired by Windows with the
-    /// last press whatever loop read it ([`crate::turn::TurnDoubleClick::pair`]):
+    /// last press whatever loop read it ([`crate::sys::Sys::double_click`],
+    /// [`crate::turn::TurnDoubleClick::menu_press`]):
     /// true when it came as WM_LBUTTONDBLCLK (window procedure @
     /// 0x00419c79: it sets 0x00496118 while 0x00496138 == 1 and writes
     /// neither the held flag 0x00496114 nor the latched record 0x006cd844,
     /// which only WM_LBUTTONDOWN writes @ 0x00419c47..0x00419c56).
     pub(crate) fn menu_press_pairs(&mut self) -> bool {
-        let (x, y) = self.sys.mouse();
-        let now = self.sys.millis();
-        self.turn_double_click.pair(now, x, y)
+        self.sys.double_click().menu_press()
     }
 
     /// A left press a menu pass read that the edge latch did not report:
@@ -242,24 +241,20 @@ impl Engine {
     /// left presses still pair for Windows; true when one came as
     /// WM_LBUTTONDBLCLK, which the loop's first walk dispatches.
     pub(crate) fn drain_menu_input(&mut self) -> bool {
-        let mut double = false;
+        let mut left = false;
         while let Some(ev) = self.sys.poll_event() {
-            if let Input::MouseDown {
-                button: MouseButton::Left,
-                x,
-                y,
-            }
-            | Input::MouseDownLatched {
-                button: MouseButton::Left,
-                x,
-                y,
-            } = ev
-            {
-                let now = self.sys.millis();
-                double = self.turn_double_click.pair(now, x, y);
-            }
+            left |= matches!(
+                ev,
+                Input::MouseDown {
+                    button: MouseButton::Left,
+                    ..
+                } | Input::MouseDownLatched {
+                    button: MouseButton::Left,
+                    ..
+                }
+            );
         }
-        double
+        left && self.menu_press_pairs()
     }
 
     /// `SPRLIST\<name>`, `None` when the archive lacks it. Not walked
@@ -1602,7 +1597,7 @@ mod double_click_tests {
                 // The press that ended PREINTRO, then the second one.
                 e.sys.push_input(Input::MouseMove { x: 300, y: 259 });
                 let now = e.sys.millis();
-                e.turn_double_click.first_press(now, 300, 259);
+                e.sys.double_click().first_press(now, 300, 259);
                 button(&e.sys, MouseButton::Left, true);
                 button(&e.sys, MouseButton::Left, false);
                 g2.set(Some(e.player_screen().await));
@@ -1650,7 +1645,8 @@ mod double_click_tests {
                 // The first press of the pair (the click that ended the
                 // warp loop).
                 let now = e.sys.millis();
-                e.turn_double_click
+                e.sys
+                    .double_click()
                     .first_press(now + 160, main_load.0, main_load.1);
                 g2.set(Some(e.ingame_menu().await));
             },

@@ -71,11 +71,6 @@ const N: usize = SCREEN_W * SCREEN_H;
 #[derive(Default)]
 struct FrameInput {
     left_press: bool,
-    /// Where the first left press was.
-    left_at: Option<(i32, i32)>,
-    /// Where the first left press the edge latch did not report was
-    /// ([`Input::MouseDownLatched`]): no click, but Windows posted it.
-    latched_at: Option<(i32, i32)>,
     right_press: bool,
     escape: bool,
     enter: bool,
@@ -85,21 +80,12 @@ fn poll_input(e: &Engine) -> FrameInput {
     let mut fi = FrameInput::default();
     while let Some(ev) = e.sys.poll_event() {
         match ev {
+            // A press the latch did not report (Input::MouseDownLatched)
+            // is no click; Windows pairs it all the same (Sys::double_click).
             Input::MouseDown {
                 button: MouseButton::Left,
-                x,
-                y,
-            } => {
-                fi.left_press = true;
-                fi.left_at.get_or_insert((x, y));
-            }
-            Input::MouseDownLatched {
-                button: MouseButton::Left,
-                x,
-                y,
-            } => {
-                fi.latched_at.get_or_insert((x, y));
-            }
+                ..
+            } => fi.left_press = true,
             Input::MouseDown {
                 button: MouseButton::Right,
                 ..
@@ -736,24 +722,12 @@ impl Dialogs {
                     e.poll_view_keys(fi.left_press);
                     // A press can be the second of a double click whose
                     // first ended the warp loop: Windows queues
-                    // WM_LBUTTONDBLCLK, which a later poll pumps (this
-                    // poll returns before its pump, 0x0041a2b5).
-                    let now = e.sys.millis();
-                    match fi.left_at {
-                        Some((x, y)) => {
-                            e.turn_double_click.queue_press(now, x, y);
-                        }
-                        None => {
-                            // A press the latch did not report is no
-                            // click, but Windows still pairs it; this poll
-                            // pumps.
-                            if let Some((x, y)) = fi.latched_at {
-                                e.turn_double_click.queue_press(now, x, y);
-                            }
-                            let (mode, menu) = (e.cursor_state.mode, e.menu_request());
-                            e.turn_double_click.dispatch(mode, menu);
-                        }
-                    }
+                    // WM_LBUTTONDBLCLK (Sys pairs every left press, latched
+                    // or not), which a later poll pumps (this poll returns
+                    // before its pump on a press edge, 0x0041a2b5). A poll
+                    // that pumped dispatches it.
+                    let (mode, menu) = (e.cursor_state.mode, e.menu_request());
+                    e.sys.double_click().dispatch(mode, menu);
                     // FUN_0041a298 in both line loops: a right press sets
                     // 0x00496120 and toggles the bar request; a left press
                     // in the same poll returns first (0x0041a2b5).
@@ -802,7 +776,7 @@ impl Dialogs {
         // The talking head clears the double-click flag at its end
         // (FUN_0042ee88 @ 0x0042f78c).
         if talking_head {
-            e.turn_double_click.flag = false;
+            e.sys.double_click().flag = false;
         }
         if talking_head {
             e.sprites_hide_npcs = false;
@@ -2436,7 +2410,7 @@ mod puzzle_latch_tests {
                 e.sys.set_mouse_pos(320, 240);
                 e.cursor_state.mode = 5;
                 let now = e.sys.millis();
-                e.turn_double_click.first_press(now, 320, 240);
+                e.sys.double_click().first_press(now, 320, 240);
                 let line = ConLine {
                     speaker: "Chat".into(),
                     params: "off".into(),
@@ -2453,9 +2427,11 @@ mod puzzle_latch_tests {
                 };
                 let mut d = Dialogs::new();
                 d.line(&mut e, &req).await;
-                let in_line = e.turn_double_click.flag;
+                let in_line = e.sys.double_click().flag;
+                // The turn's first poll, after its first frame.
+                e.sys.frame().await;
                 e.turn_poll();
-                *g2.borrow_mut() = Some((in_line, e.turn_double_click.flag));
+                *g2.borrow_mut() = Some((in_line, e.sys.double_click().flag));
             },
             move |sys, f| {
                 let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
