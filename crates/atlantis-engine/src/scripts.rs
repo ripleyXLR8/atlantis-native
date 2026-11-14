@@ -1084,8 +1084,9 @@ impl Scripts {
                             // FUN_00428da8: a GAMEOVER left set
                             // (BugFix::GameOverPuzzle off) shows the screen
                             // again, with no narrator, the position being a
-                            // header or the new file's head [INFERRED: no
-                            // `[` there].
+                            // header or the new file's head: no `[Narra`
+                            // there (FUN_00426590 compares the position with
+                            // `[Narra` @ 0x004bc578) [CONFIRMED-STATIC].
                             let n = e.vars.get("gameover");
                             if n != 0 {
                                 game_over = Some(GameOverRequest {
