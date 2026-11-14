@@ -99,9 +99,6 @@ pub trait DialogPresenter {
         ready(subjects.first().map(|&s| i32::from(s)))
     }
 
-    /// A new conversation starts (the previous camera is forgotten).
-    fn new_conversation(&mut self) {}
-
     /// The game-over screen (GereGameOver, `FUN_00426590`).
     fn game_over<'a>(
         &'a mut self,
@@ -907,7 +904,6 @@ impl Scripts {
         }
         // @ 0x004258c4: 0x00496170 = 1 up to its end (0x00425b7a).
         e.section_play = true;
-        self.dialog.new_conversation();
         // 0x004258ce..0x004258fe: the followers' sprites are saved, and
         // restored at the end when 0x00496144 is set (0x00425ba0..0x00425bdb),
         // which clears it.

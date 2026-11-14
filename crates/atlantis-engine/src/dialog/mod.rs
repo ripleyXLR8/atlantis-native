@@ -242,7 +242,9 @@ struct Played {
 pub struct Dialogs {
     /// `DIALOG\INITDIAL.TXT`, read at the first line.
     init: Option<Rc<DialInit>>,
-    /// The camera of the last line (0x0077290a), 0 for none yet.
+    /// The camera of the last line (0x0077290a = 0x00772908 between lines),
+    /// 0 until the first camera of the launch. Only `FUN_0042844c` writes
+    /// it: neither a character click nor the checkpoint resets it.
     last_cam: i32,
     /// SUJETS.SPR: the subject menu's border (frame 0) and icons.
     subject_sprites: Option<Rc<Vec<SprSprite>>>,
@@ -1391,10 +1393,6 @@ impl DialogPresenter for Dialogs {
         subjects: &'a [u8],
     ) -> HookFuture<'a, Option<i32>> {
         Box::pin(self.subject_menu_impl(e, perso, subjects))
-    }
-
-    fn new_conversation(&mut self) {
-        self.last_cam = 0;
     }
 
     fn game_over<'a>(
