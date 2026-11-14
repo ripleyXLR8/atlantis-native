@@ -780,8 +780,11 @@ impl Engine {
         let mut dbl_flag = armed;
         let mut track_latched = false;
         let player = self.player.min(MAX_PLAYERS - 1);
+        // `drawn_width`: the title's x from the rows drawer's width table
+        // (a click); the port's arrow keys centre it by its own width.
         let choose = |e: &mut Engine,
                       i: usize,
+                      drawn_width: bool,
                       title: &mut Option<(Vec<u8>, i32)>,
                       title_frame: &mut Option<(usize, i32)>| {
             if sprite_rows {
@@ -799,7 +802,15 @@ impl Engine {
                 return;
             }
             e.players.chapters[player] = chapters[i];
-            let w = font_min_load_list_width(&names[i], &e.ui.fontmin_advance);
+            // x = (0x280 - width[chapter - 1]) / 2 (0x0041d431..0x0041d44d),
+            // fixed at the click: an entry whose row was never drawn in the
+            // run (the grid's far edge selects entry offset + 11..) has
+            // width 0 and its title starts at x 320.
+            let w = if drawn_width {
+                e.load_row_widths[usize::from(chapters[i]) - 1]
+            } else {
+                font_min_load_list_width(&names[i], &e.ui.fontmin_advance)
+            };
             *title = Some((names[i].clone(), (640 - w) / 2));
         };
         loop {
@@ -824,7 +835,7 @@ impl Engine {
                     Some(i) => (i + 1).min(count - 1),
                 };
                 selected = Some(i);
-                choose(self, i, &mut title, &mut title_frame);
+                choose(self, i, false, &mut title, &mut title_frame);
             }
             // A press that is the second of a pair comes as
             // WM_LBUTTONDBLCLK (@ 0x00419c79): it sets the flag and latches
@@ -844,6 +855,14 @@ impl Engine {
             }
             sb.frame(track_latched, down, my);
             let scroll = usize::from(sb.offset);
+            // FUN_00420b48 draws the rows (and writes their widths) before
+            // the pass's poll and click block (0x0041d320).
+            if !sprite_rows {
+                for (&c, name) in chapters.iter().zip(&names).skip(scroll).take(11) {
+                    self.load_row_widths[usize::from(c) - 1] =
+                        font_min_load_list_width(name, &self.ui.fontmin_advance);
+                }
+            }
             // A row counts when row + offset < count, the only bound
             // (0x0041d37b; atlantis-cd-fr-687104 FUN_0041c708 @
             // 0x0041cb0b..0x0041cb1b): the grid's inclusive far edges (x
@@ -863,7 +882,7 @@ impl Engine {
             if mi.left_press && !track_latched {
                 if let Some(r) = row_hover {
                     selected = Some(r);
-                    choose(self, r, &mut title, &mut title_frame);
+                    choose(self, r, true, &mut title, &mut title_frame);
                 }
             }
             // 0x0041d4ad: once a title is shown, the double-click flag ends
@@ -916,11 +935,15 @@ impl Engine {
                     row_hover == Some(scroll + i),
                 );
             }
+            // The pointer (FUN_0042d558 @ 0x0041d325) before the poll and
+            // the click block, the title (FUN_00420f60 @ 0x0041d4a8) after
+            // them: the title is drawn over the pointer.
+            self.draw_pointer(&mut s);
             if let Some((t, x)) = &title {
                 self.ui
                     .draw_font_min(&mut s, FontMin::NameField, t, *x, 0x50, true);
             }
-            self.present(&s, true).await;
+            self.present(&s, false).await;
         }
     }
 
@@ -1657,5 +1680,109 @@ mod double_click_tests {
             // The first press set the knob at x - 10; the drag moved none.
             assert_eq!(got.get(), Some(350 - 10));
         }
+    }
+}
+
+#[cfg(test)]
+mod load_title_tests {
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::{button, press_at, with_engine};
+    use crate::warp::{SCREEN_H, SCREEN_W};
+    use atlantis_data::saves::epi_episode_name;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    const N: usize = SCREEN_W * SCREEN_H;
+
+    /// Frames of the LOAD picker over 13 checkpoints: the pointer at
+    /// `pointer` before any click, the pointer away from everything before
+    /// and after a click on `click`, the pointer at `pointer` after it.
+    fn picker_frames(test: &str, click: (i32, i32), pointer: (i32, i32)) -> Option<[Vec<u16>; 4]> {
+        let shots = Rc::new(RefCell::new(Vec::new()));
+        let s2 = shots.clone();
+        let away = (630, 470);
+        let ran = with_engine(
+            test,
+            move |mut e| async move {
+                e.load_interface().await;
+                let listed: Vec<u32> = (2..87)
+                    .filter(|&c| !epi_episode_name(&e.epi_text, c).is_empty())
+                    .take(13)
+                    .collect();
+                for c in listed {
+                    e.saves.write(&format!("pa{c}.gam"), b"");
+                }
+                let bg = vec![0u16; N];
+                e.load_picker(&bg, false).await;
+            },
+            move |sys, f| {
+                let to = |(x, y): (i32, i32)| sys.push_input(Input::MouseMove { x, y });
+                match f {
+                    5 | 25 => to(pointer),
+                    16 | 22 => to(away),
+                    20 => press_at(sys, click),
+                    21 => button(sys, MouseButton::Left, false),
+                    40 => sys.push_input(Input::Quit),
+                    _ => {}
+                }
+                if [15, 19, 24, 30].contains(&f) {
+                    s2.borrow_mut().push(sys.screen.borrow().clone());
+                }
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let shots = shots.borrow();
+        Some(std::array::from_fn(|i| shots[i].clone()))
+    }
+
+    /// The pixels of the title band (y < 100) that differ between `a` and
+    /// `b`.
+    fn band_diff(a: &[u16], b: &[u16]) -> Vec<usize> {
+        (0..100 * SCREEN_W).filter(|&p| a[p] != b[p]).collect()
+    }
+
+    /// FUN_0041cf78 draws the pointer (@ 0x0041d325) before the title
+    /// (@ 0x0041d4a8): where they meet, the title's letters are blended
+    /// over the pointer, which does not hide them.
+    #[test]
+    fn the_load_title_is_drawn_over_the_pointer() {
+        const TEST: &str = "the_load_title_is_drawn_over_the_pointer";
+        // A click on row 0; the title's top left corner.
+        let Some([_, before, away, _]) = picker_frames(TEST, (100, 118), (630, 470)) else {
+            return;
+        };
+        let title = band_diff(&before, &away);
+        assert!(!title.is_empty(), "no title");
+        let left = title.iter().map(|&p| p % SCREEN_W).min().unwrap() as i32;
+        let top = title.iter().map(|&p| p / SCREEN_W).min().unwrap() as i32;
+        let [pointer, _, away, over] = picker_frames(TEST, (100, 118), (left, top)).unwrap();
+        // The title pixels the pointer changed.
+        let both: Vec<usize> = band_diff(&away, &over)
+            .into_iter()
+            .filter(|p| title.contains(p))
+            .collect();
+        assert!(!both.is_empty(), "the pointer is not over the title");
+        // None of them shows the pointer alone.
+        assert!(both.iter().all(|&p| over[p] != pointer[p]));
+    }
+
+    /// A click on the grid's far edge (x 445) selects entry offset + 11 +
+    /// row, whose row was never drawn: its width in 0x00611e80 is 0 and
+    /// the title starts at x 320 (0x0041d431..0x0041d44d).
+    #[test]
+    fn an_undrawn_entrys_title_starts_at_x_320() {
+        let Some([_, before, away, _]) = picker_frames(
+            "an_undrawn_entrys_title_starts_at_x_320",
+            (445, 108 + 22 + 5),
+            (630, 470),
+        ) else {
+            return;
+        };
+        let title = band_diff(&before, &away);
+        assert!(!title.is_empty(), "no title");
+        let left = title.iter().map(|&p| p % SCREEN_W).min().unwrap();
+        assert!(left >= 320, "the title starts at x {left}");
     }
 }
