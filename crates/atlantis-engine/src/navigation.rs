@@ -215,9 +215,11 @@ impl Engine {
             self.draw_guests(&mut s, None);
             *self.sys.screen.borrow_mut() = s;
         }
-        // No cursor in bow mode (0x0041c4b4); its animation state does not
-        // advance.
-        if !self.bow_mode {
+        // No cursor in bow mode (0x0041c4b4) or with the bar request a timer
+        // section of this frame left (0x0041c4ca: 0x004960c4 == 0; the bar
+        // opens at the frame's end, here at the next pass's start); its
+        // animation state does not advance.
+        if !self.bow_mode && !self.bar.request {
             self.step_warp_cursor();
             self.draw_cursor_sprite();
         }
@@ -471,8 +473,14 @@ impl Engine {
             // no bow, no request and an empty hand (0x0041c5f7).
             // A right press edge: a held right button does not open the bar
             // again.
+            // The frame's poll (0x0041c5f2) toggles the request a timer
+            // section left on a right press (FUN_0041a298 @ 0x0041a2f2..
+            // 0x0041a337, read only without a left press edge, 0x0041a2b5),
+            // and the inner loop ends only if it is still 1: a right press
+            // right after such a request cancels it.
             let pending = self.bar.warp_frame_start();
-            let mut bar = !exit && (fi.right_press || pending);
+            let toggled = fi.right_press && !fi.left_press;
+            let mut bar = !exit && (pending != toggled);
             if bar && self.bow_mode {
                 // In bow mode the request only lowers the bow
                 // (0x0041c6af..0x0041c6c8: FUN_0042d368).
@@ -1167,6 +1175,91 @@ mod tests {
             assert!(bar.get(), "the bar did not open");
             assert!(!clicked.get(), "the click was handled");
         }
+    }
+
+    /// A timer section that leaves the bar request (a right press during
+    /// its line) and clears the shown cursor; at the bar's first frame,
+    /// the cursor shown then.
+    struct RequestLeft {
+        arm: Rc<Cell<u8>>,
+        bar: Rc<Cell<Option<i32>>>,
+    }
+
+    impl ScriptHooks for RequestLeft {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.arm.get() == 1 {
+                e.bar.request = true;
+                e.cursor_shown = CURSOR_UNSET;
+                self.arm.set(2);
+            }
+            ready(false)
+        }
+
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.bar.get().is_none() {
+                self.bar.set(Some(e.cursor_shown));
+            }
+            ready(false)
+        }
+    }
+
+    /// A bar request left by a timer section, then `right` a right press in
+    /// the next poll; whether the bar opened and the cursor shown then.
+    fn request_left(right: bool) -> Option<Option<i32>> {
+        let arm = Rc::new(Cell::new(0u8));
+        let bar = Rc::new(Cell::new(None));
+        let (a2, b2, a3, b3) = (arm.clone(), bar.clone(), arm.clone(), bar.clone());
+        let mut locked = 0u64;
+        let mut after = 0u64;
+        let ran = with_engine(
+            "a_bar_request_left_by_a_timer",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                let mut hooks = RequestLeft { arm: a2, bar: b2 };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _f| {
+                if b3.get().is_some() || after > 30 {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                if a3.get() == 2 {
+                    if after == 0 && right {
+                        button(sys, MouseButton::Right, true);
+                    }
+                    after += 1;
+                    return;
+                }
+                locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                if locked == 10 && a3.get() == 0 {
+                    a3.set(1);
+                }
+            },
+        );
+        ran.then(|| bar.get())
+    }
+
+    /// Both cursor calls of the warp frame are gated on 0x004960c4 == 0
+    /// (0x0041c4ca, 0x0041b024): the frame in which a timer section leaves
+    /// a bar request steps and shows no cursor; the bar opens at its end.
+    #[test]
+    fn no_cursor_in_the_frame_that_leaves_a_bar_request() {
+        let Some(bar) = request_left(false) else {
+            return;
+        };
+        assert_eq!(bar, Some(CURSOR_UNSET));
+    }
+
+    /// The same frame's poll (0x0041c5f2) toggles that request on a right
+    /// press (FUN_0041a298 l. 11417) and the inner loop ends only on 1
+    /// (l. 12748): the bar does not open.
+    #[test]
+    fn a_right_press_cancels_a_bar_request_left_by_a_timer() {
+        let Some(bar) = request_left(true) else {
+            return;
+        };
+        assert_eq!(bar, None, "the bar opened");
     }
 
     /// A timer section that runs Vue=`to` on the first warp frame (the place
