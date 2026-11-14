@@ -163,24 +163,28 @@ impl Engine {
         }
     }
 
-    /// Draws the cursor at the pointer: the object in hand (0x0041c45a),
-    /// then the cursor sprite `FUN_00422fcc` chose over it.
-    fn draw_cursor(&self) {
+    /// The object in hand at the pointer (0x0041c43f..0x0041c481), drawn
+    /// before the guests' portraits.
+    fn draw_held_icon(&self, screen: &mut [u16]) {
         let held = self.vars.get("objetenmain");
-        if held != 0 {
-            if let Some(spr) = crate::ui::object_icon(&self.game.exe.inventory_object_ids, held)
-                .and_then(|i| self.ui.object(i))
-            {
-                let mut screen = self.sys.screen.borrow_mut();
-                spr.draw(
-                    &mut screen,
-                    SCREEN_W,
-                    SCREEN_H,
-                    self.pointer.pos.0,
-                    self.pointer.pos.1,
-                );
-            }
+        if held == 0 {
+            return;
         }
+        if let Some(spr) = crate::ui::object_icon(&self.game.exe.inventory_object_ids, held)
+            .and_then(|i| self.ui.object(i))
+        {
+            spr.draw(
+                screen,
+                SCREEN_W,
+                SCREEN_H,
+                self.pointer.pos.0,
+                self.pointer.pos.1,
+            );
+        }
+    }
+
+    /// The cursor sprite `FUN_00422fcc` chose, at the pointer.
+    fn draw_cursor_sprite(&self) {
         let Ok(i) = usize::try_from(self.cursor_shown) else {
             return;
         };
@@ -193,6 +197,61 @@ impl Engine {
                 self.pointer.pos.0,
                 self.pointer.pos.1,
             );
+        }
+    }
+
+    /// The warp frame over the rendered view (0x0041c40b..0x0041c4b4): the
+    /// bow (ARCWARP.SPR frame arrow_frame at (0x2e, 0x79)) in bow mode,
+    /// otherwise the object in hand; the guests' portraits
+    /// (`FUN_0042bc58` @ 0x0041c489); then, out of bow mode, the cursor
+    /// `FUN_00422fcc`.
+    fn draw_warp_overlays(&mut self) {
+        if self.warp_loaded {
+            let mut s = self.sys.screen.borrow().clone();
+            if self.bow_mode {
+                if let Some(spr) = self.bow_sprites.get(usize::from(self.arrow_frame)) {
+                    crate::ui::draw_sprite(&mut s, spr, 0x2e, 0x79);
+                }
+            } else {
+                self.draw_held_icon(&mut s);
+            }
+            self.draw_guests(&mut s, None);
+            *self.sys.screen.borrow_mut() = s;
+        }
+        // No cursor in bow mode (0x0041c4b4); its animation state does not
+        // advance.
+        if !self.bow_mode {
+            self.step_warp_cursor();
+            self.draw_cursor_sprite();
+        }
+    }
+
+    /// `FUN_00422fcc` in the warp frame, after the look, the timers and the
+    /// render: its own hit tests (`FUN_00422bb0`, `FUN_00422d5c` at its
+    /// entry) at this frame's view and pointer, which the next click acts
+    /// on. The animation advances at the port's pace (one step per
+    /// [`cursor_step_ms`]); a change of mode (nothing, navigate, talk,
+    /// object, click) is shown at once.
+    fn step_warp_cursor(&mut self) {
+        let (zone, id) = self.pointer_targets();
+        let input = WarpCursorInput {
+            zone,
+            id,
+            held: self.vars.get("objetenmain").max(0) as u32,
+            hidden: false,
+            edge_scroll: false,
+            id_rule: self.game.exe.build.cursor_id_rule,
+        };
+        let now = self.sys.millis();
+        let mut next = self.cursor_state;
+        let sprite = warp_cursor_step(&mut next, &input).sprite;
+        if self.cursor_shown == CURSOR_UNSET
+            || now >= self.cursor_next_ms
+            || next.mode != self.cursor_state.mode
+        {
+            self.cursor_state = next;
+            self.cursor_shown = sprite;
+            self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
         }
     }
 
@@ -284,7 +343,6 @@ impl Engine {
         // FUN_00431a1c at 0x0041c012: the place's ambient sounds.
         self.ambient_enter_place().await;
 
-        let id_rule = self.game.exe.build.cursor_id_rule;
         let mut left_pressed = false;
         while !left_pressed && !exit {
             let fi = self.poll_frame_input();
@@ -396,25 +454,6 @@ impl Engine {
                 break;
             }
             self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
-
-            // The cursor (FUN_00422fcc): talk (NPC) > navigate (zone) >
-            // nothing; with an object in hand, its animation over the icon.
-            // Step 10 of FUN_0041bfa0 (0x0041c4b4) and its helper
-            // FUN_0041afd0 (0x0041b00e) skip it in bow mode (0x00496164):
-            // its animation state does not advance.
-            let now = self.sys.millis();
-            if !self.bow_mode && (self.cursor_shown == CURSOR_UNSET || now >= self.cursor_next_ms) {
-                self.cursor_next_ms = now + cursor_step_ms(self.game.exe.build.warp_cursor_steps);
-                let input = WarpCursorInput {
-                    zone: action,
-                    id: centre_perso,
-                    held: self.vars.get("objetenmain").max(0) as u32,
-                    hidden: false,
-                    edge_scroll: false,
-                    id_rule,
-                };
-                self.cursor_shown = warp_cursor_step(&mut self.cursor_state, &input).sprite;
-            }
 
             // A right click opens the inventory bar (FUN_0041a298 toggles
             // 0x004960c4, the loop opens the bar @ 0x0041c6d2), also when a
@@ -611,23 +650,7 @@ impl Engine {
                 self.animate_sprites();
             }
             self.render_view();
-            // The bow, ARCWARP.SPR frame arrow_frame at (0x2e, 0x79)
-            // (0x0041c40b), then the guests' portraits (0x0041c489 ->
-            // FUN_0042bc58).
-            if self.warp_loaded {
-                let mut s = self.sys.screen.borrow().clone();
-                if self.bow_mode {
-                    if let Some(spr) = self.bow_sprites.get(usize::from(self.arrow_frame)) {
-                        crate::ui::draw_sprite(&mut s, spr, 0x2e, 0x79);
-                    }
-                }
-                self.draw_guests(&mut s, None);
-                *self.sys.screen.borrow_mut() = s;
-            }
-            // No cursor and no icon in bow mode (0x0041c412, 0x0041c4b4).
-            if !self.bow_mode {
-                self.draw_cursor();
-            }
+            self.draw_warp_overlays();
             if self.debug_overlay.get() {
                 self.draw_debug_overlay();
             }
@@ -1292,6 +1315,144 @@ mod tests {
         if ran {
             assert_eq!(got.get(), Some(true));
         }
+    }
+
+    /// On its first frame, a timer section turns the view from `start`
+    /// to `to`; on the next one, the cursor shown.
+    struct TurnView {
+        to: (f32, f32),
+        calls: u32,
+        shown: Rc<Cell<Option<i32>>>,
+    }
+
+    impl ScriptHooks for TurnView {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.calls += 1;
+            if self.calls == 1 {
+                e.set_view(self.to.0, self.to.1);
+            } else if self.calls == 2 {
+                self.shown.set(Some(e.cursor_shown));
+            }
+            ready(false)
+        }
+    }
+
+    /// `FUN_00422fcc` runs after the look, the timers and the render
+    /// (0x0041c4b4) and does its own hit tests at its entry: the cursor of
+    /// a frame shows what is under the pointer at that frame's view. A
+    /// timer that turns the view off a navigation zone leaves no
+    /// navigate cursor.
+    #[test]
+    fn the_cursor_shows_the_frames_own_target() {
+        let shown = Rc::new(Cell::new(None));
+        let (s2, s3) = (shown.clone(), shown.clone());
+        let ran = with_engine(
+            "the_cursor_shows_the_frames_own_target",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                // Under both pointer positions the loop may use: a
+                // navigation zone and no character, then nothing at all.
+                let targets = |e: &mut Engine, a: f32, b: f32| {
+                    e.set_view(a, b);
+                    let t: Vec<(u32, u32)> = [(320, 320), (320, 240)]
+                        .iter()
+                        .map(|&p| {
+                            e.pointer.pos = p;
+                            e.pointer_targets()
+                        })
+                        .collect();
+                    (t[0] == t[1]).then_some(t[0])
+                };
+                let views: Vec<(f32, f32)> = (0..315)
+                    .flat_map(|ia| (-4..=4).map(move |ib| (ia as f32 * 0.02, ib as f32 * 0.1)))
+                    .collect();
+                let zone = views.iter().copied().find(|&(a, b)| {
+                    matches!(targets(&mut e, a, b), Some((z, 0)) if (1..0x200).contains(&z))
+                });
+                let none = views
+                    .iter()
+                    .copied()
+                    .find(|&(a, b)| targets(&mut e, a, b) == Some((0, 0)));
+                let (Some(start), Some(to)) = (zone, none) else {
+                    panic!("no navigation view or no empty view in place 1");
+                };
+                e.set_view(start.0, start.1);
+                e.pointer.pos = (320, 240);
+                let mut hooks = TurnView {
+                    to,
+                    calls: 0,
+                    shown: s2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _| {
+                if s3.get().is_some() {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if ran {
+            assert_eq!(shown.get(), Some(-1));
+        }
+    }
+
+    /// The object in hand is drawn before the guests' portraits
+    /// (0x0041c45a, then `FUN_0042bc58` @ 0x0041c489): over a portrait,
+    /// the portrait is drawn over it.
+    #[test]
+    fn the_held_object_is_drawn_under_the_portraits() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_held_object_is_drawn_under_the_portraits",
+            move |mut e| async move {
+                e.load_ui_assets().await;
+                let guest = e.game.exe.guest_sprite_ids[0];
+                let table = e.game.exe.guest_sprite_ids.clone();
+                e.guests.add(guest, &table);
+                e.guests_shown = true;
+                e.warp_loaded = true;
+                // No cursor sprite: the icon and the portraits only.
+                e.cursor_sprites.clear();
+                let object = e
+                    .game
+                    .exe
+                    .inventory_object_ids
+                    .iter()
+                    .copied()
+                    .find(|&id| {
+                        id != 0
+                            && crate::ui::object_icon(&e.game.exe.inventory_object_ids, id)
+                                .and_then(|i| e.ui.object(i))
+                                .is_some()
+                    })
+                    .expect("an object with an icon");
+                e.vars.set("objetenmain", object);
+                // The pointer in the middle of the portrait at (540, 350).
+                e.pointer.pos = (580, 400);
+                e.sys.screen.borrow_mut().fill(0);
+                let blank = e.sys.screen.borrow().clone();
+                // The icon, then the portraits over it.
+                let mut under = blank.clone();
+                e.draw_held_icon(&mut under);
+                e.draw_guests(&mut under, None);
+                // The portraits, then the icon over them.
+                let mut over = blank.clone();
+                e.draw_guests(&mut over, None);
+                e.draw_held_icon(&mut over);
+                e.draw_warp_overlays();
+                let frame = e.sys.screen.borrow().clone();
+                *g2.borrow_mut() = Some((frame == under, under != over));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        // The icon overlaps the portrait, and the frame has it under.
+        assert_eq!(got.borrow().unwrap(), (true, true));
     }
 
     /// The view's alpha after the warp loop of place 1, with the left
