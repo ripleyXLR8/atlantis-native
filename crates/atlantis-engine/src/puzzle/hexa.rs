@@ -485,6 +485,11 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     game.force_held_402 = e.hexa_forces_402();
     game.object_in_hand = e.vars.get("objetenmain");
     game.flag_temp6 = e.vars.get("flagtemp6");
+    // FUN_004406fc, before the loop and before any poll, sets OBJETENMAIN
+    // to 0x192 (0x0044076e) and then to 0 (0x00440883): the Escape test of
+    // FUN_0041a298 (0x0041a3fc..0x0041a415) sees an empty hand whatever
+    // the player entered with.
+    e.vars.set("objetenmain", 0);
     let mut host = Host(PuzzleHost::new(e, hooks));
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;
@@ -492,9 +497,8 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let r = game.run(&mut host).await;
     let e = host.0.e;
     e.puzzles.cursor = game.cursor;
-    // FUN_004406fc set OBJETENMAIN to 0 and FlagTemp6 to 1 (the 1997
-    // build: to 1 when 402 was in hand, else left).
-    e.vars.set("objetenmain", 0);
+    // FUN_004406fc set FlagTemp6 to 1 (the 1997 build: to 1 when 402 was
+    // in hand, else left).
     e.vars.set("flagtemp6", game.flag_temp6);
     if e.should_abort() {
         1

@@ -401,4 +401,50 @@ mod entry_tests {
             }
         }
     }
+
+    /// Whether an Escape inside puzzle `id`, entered holding `object`,
+    /// latches 0x00496124 = 0 / 0x00496138 = 1 under `--original`
+    /// ([`crate::enhancements::BugFix::PuzzleEscape`] off).
+    fn escape_latched(id: i32, object: i32) -> Option<bool> {
+        let seen = Rc::new(Cell::new(None));
+        let s2 = seen.clone();
+        let ran = with_engine(
+            "hexa_and_meta_escape_with_an_object_in_hand",
+            move |mut e| async move {
+                use crate::enhancements::{BugFix, Enhancements};
+                e.set_enhancements(Enhancements::all_but_fix(BugFix::PuzzleEscape));
+                e.vars.set("objetenmain", object);
+                play_puzzle(&mut e, &mut NoScripts, id).await;
+                s2.set(Some(e.escape_request));
+            },
+            |sys, f| match f {
+                10 => sys.push_input(Input::KeyDown(crate::sys::Key::Escape)),
+                11 => sys.push_input(Input::KeyUp(crate::sys::Key::Escape)),
+                20 => sys.push_input(Input::Quit),
+                _ => {}
+            },
+        );
+        ran.then(|| seen.get().expect("the puzzle did not run"))
+    }
+
+    /// The hexagon (13) and meta stages 2..4 (10..12) may be entered with
+    /// an object in hand (FUN_0043a1e0 refuses only N < 6, 8, 9, N > 14);
+    /// their set-ups empty the hand before the loop (FUN_004406fc @
+    /// 0x00440883, FUN_004478d4 @ 0x00447951), so FUN_0041a298's Escape
+    /// test on OBJETENMAIN (0x0041a3fc..0x0041a415) passes and the Escape
+    /// latches, as with an empty hand.
+    #[test]
+    fn hexa_and_meta_escape_with_an_object_in_hand() {
+        for (id, object) in [(13, 402), (10, 318), (11, 319), (12, 320)] {
+            let Some(empty) = escape_latched(id, 0) else {
+                return;
+            };
+            assert!(empty, "puzzle {id}, empty hand");
+            assert_eq!(
+                escape_latched(id, object),
+                Some(true),
+                "puzzle {id}, {object} in hand"
+            );
+        }
+    }
 }
