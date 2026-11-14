@@ -239,6 +239,14 @@ pub struct Engine {
     /// 0x006cd288 from the destination's record in the WAM being left; see
     /// [`Engine::execute_transition`]).
     pub move_cyclo: Option<(u16, String)>,
+    /// The panorama path buffer 0x006cd288, as the last writer left it:
+    /// every place load (`FUN_00421b4c` @ 0x00421bf9, the current record's
+    /// name) and the destination lookup of every exit click (`FUN_00421cfc`
+    /// @ 0x00423dc5, the destination's record in the current WAM, before
+    /// the departure scan). An AbortDepart ends the move with no place
+    /// load, so it keeps the destination's name; `FUN_004240fc` reloads it
+    /// after a puzzle (@ 0x004241dd). None before the first place load.
+    pub(crate) cyclo_path: Option<String>,
     /// The first arrival scan after a chapter load reads ArriveeVue =
     /// LastVue.
     pub(crate) arrival_after_load: bool,
@@ -269,6 +277,14 @@ pub struct Engine {
     /// voice-only line, the game-over wait) stops at once and puts both
     /// back; the end of a conversation puts them back too (0x00425be5).
     pub escape_request: bool,
+    /// The menu request 0x00496138 is 0 while `escape_request` stands for
+    /// 0x00496124 = 0: the zone-999 scan after the in-game menu's LOAD or
+    /// QUIT, which leaves 0x00496124 = 0 (0x0041c9fc, 0x0041ca61) and
+    /// clears 0x00496138 in its tail (0x0041cbff..0x0041cc09). See
+    /// [`Engine::menu_request`]. An Escape latch sets 0x00496138 = 1 again
+    /// (of the loops that latch one, only the subject menu can run inside
+    /// that scan).
+    pub(crate) menu_request_clear: bool,
     /// The warp loop ended without a click, as the original's place loop
     /// then still acts on the zone under the pointer
     /// ([`Engine::no_click_exit`], [`BugFix::GameOverPuzzle`] off): `true`
@@ -296,6 +312,14 @@ pub struct Engine {
     /// 0x00427ae2, [`crate::ui::bar::pickup_slot_x`]), until the next
     /// slide-in resets the slot table.
     pub bar_pickup_slot: Option<usize>,
+    /// The slots' y (the table 0x00611788) as the last slide left it: the
+    /// slide-in sets 499 and lowers it 7 a frame to 443 (`FUN_0042c2c4`),
+    /// the slide-out raises it 7 a frame (`FUN_0042c59c` @ 0x0042c789).
+    /// The bar loop and the hold loop draw at it (@ 0x0042c97d, 0x0042c9eb;
+    /// 0x0042cdb4, 0x0042ce2c) and the slide-out starts from it (@
+    /// 0x0042c65c, 0x0042c6c9): 443 after a full slide-in, higher after one
+    /// a GameOver or an Exit cut short.
+    pub(crate) bar_slot_y: i32,
     /// The bar request and the right-press flag.
     pub bar: BarSession,
     /// The guests following the player, and whether they are shown
@@ -490,6 +514,7 @@ impl Engine {
             puzzle_scan: false,
             move_input_poll: false,
             move_cyclo: None,
+            cyclo_path: None,
             arrival_after_load: false,
             last_vue: 0,
             chapter: 0,
@@ -500,6 +525,7 @@ impl Engine {
             abort: None,
             section_play: false,
             escape_request: false,
+            menu_request_clear: false,
             pending_no_click_exit: None,
             vue_override: None,
             inventory: Vec::new(),
@@ -507,6 +533,7 @@ impl Engine {
             held_icon: None,
             bar_first: 0,
             bar_pickup_slot: None,
+            bar_slot_y: crate::ui::bar::BAR_HOTSPOT_Y,
             bar: BarSession::default(),
             guests: Guests::default(),
             guests_shown: true,
@@ -941,14 +968,10 @@ impl Engine {
         self.chapter = 1;
         if !in_play {
             // The record FUN_0042c054 sets up before the player menu: object
-            // 257 alone. FUN_00423760 zeroes the timer offsets and restarts
-            // Time1 when a game starts.
+            // 257 alone. The timers were restarted by FUN_00423760 on the
+            // boot pass, before the player screen (`boot_pass_clocks`).
             self.inventory = vec![257];
             self.inventory_icons.clear();
-            let now = self.now();
-            self.clocks.time1_offset = 0;
-            self.clocks.time2_offset = 0;
-            self.clocks.time1_start = now;
         }
         // LastVue = 1 (0x004195fb, 0x0042e285).
         self.last_vue = 1;
@@ -960,6 +983,30 @@ impl Engine {
         // ARRIVEEVUE = LastVue (FUN_00427634 @ 0x0042777d), whatever the
         // /INIT Vue= of chapter 1 did.
         self.arrival_after_load = true;
+    }
+
+    /// The menu request 0x00496138, which every Escape latch sets with
+    /// 0x00496124 = 0 (`escape_request`), but which the zone-999 scan after
+    /// the in-game menu's LOAD or QUIT runs with cleared
+    /// (`menu_request_clear`): there a right press of the poll toggles the
+    /// bar request (`FUN_0041a298` @ 0x0041a2f2..0x0041a337), the guests
+    /// are drawn and a double click is dispatched.
+    pub(crate) fn menu_request(&self) -> bool {
+        self.escape_request && !self.menu_request_clear
+    }
+
+    /// The timers of `FUN_00423760`, the main loop's boot pass
+    /// (0x00419734), which runs before the player screen (`FUN_0041dea4` @
+    /// 0x0041974e): TIME1's and TIME2's offsets 0 (0x0042378c, 0x00423796)
+    /// and Time1 restarted (0x006ce088 = now @ 0x004237f0). Neither the
+    /// player screen nor the checkpoint loader `FUN_0042de5c` writes them,
+    /// so the loaded game's TIME1 includes the time spent on the player
+    /// screen.
+    pub fn boot_pass_clocks(&mut self) {
+        let now = self.now();
+        self.clocks.time1_offset = 0;
+        self.clocks.time2_offset = 0;
+        self.clocks.time1_start = now;
     }
 
     /// The first arrival scan after a chapter load: ARRIVEEVUE = LastVue,
@@ -1102,6 +1149,7 @@ impl Engine {
             };
             let dest = zone as u16;
             self.next_place_id = Some(dest);
+            self.look_up_place_cyclo(dest);
             // LastVue = the place being left (0x00423dcf), before the
             // departure scan.
             self.last_vue = self.current_place_id.unwrap_or(0);
@@ -1260,8 +1308,10 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
     e.load_interface().await;
     if start == Start::Boot {
         e.play_startup().await;
-        // The player screen (FUN_0041dea4), then FUN_0042de5c on the
-        // player's resume chapter; the boot pass runs FUN_00423760.
+        // The boot pass FUN_00423760 (0x00419734) restarts the timers, then
+        // the player screen (FUN_0041dea4), then FUN_0042de5c on the
+        // player's resume chapter.
+        e.boot_pass_clocks();
         match e.player_screen().await {
             Some(p) => e.player = p,
             None => {
@@ -1282,6 +1332,7 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
                 return;
             }
         }
+        e.boot_pass_clocks();
         e.new_game(hooks.as_mut(), false).await;
     }
     let finished = loop {
@@ -1300,15 +1351,24 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
             }
             Some(Abort::Finished) if e.vars.get("exit") == 86 => break true,
             // Any other Exit value (none is shipped): the main loop ends
-            // the game only for 86 (0x00419775); otherwise Exit = 0 and the
+            // the game only for 86 (0x00419787); here Exit = 0 and the
             // player screen again, then the chosen player's checkpoint as
-            // at boot.
+            // at boot. The original instead runs FUN_00423760 with no
+            // player screen (0x0049614c is never 1 again, its only store
+            // the clear @ 0x0041e88c): on CD 1 the chapter restarts in
+            // place (WAM and LastVue's place reloaded, play counters and
+            // hidden ids zeroed, CON and /INIT run again); on CDs 2..4 EXIT
+            // stays set and, by static reading, the main loop spins. Not
+            // modelled (no data reaches it).
             Some(Abort::Finished) if !e.sys.should_quit() => {
                 log::warn!(
                     "Exit={}: only 86 ends the game; back to the player screen",
                     e.vars.get("exit")
                 );
                 e.vars.set("exit", 0);
+                // The original runs FUN_00423760 there (0x00419734), which
+                // restarts the timers as on the boot pass.
+                e.boot_pass_clocks();
                 match e.player_screen().await {
                     Some(p) => e.player = p,
                     None => break false,
@@ -1573,6 +1633,106 @@ mod exit_and_menu_tests {
             return;
         };
         assert!(t.contains(&Event::Menu("SELEMENU.TXT".into())), "{t:?}");
+    }
+}
+
+#[cfg(test)]
+mod boot_pass_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::hooks::{ready, HookFuture};
+    use crate::sys::{Input, Key, MouseButton, Runner};
+    use std::cell::Cell;
+
+    /// Time1's origin at the first chapter load.
+    struct Time1At(Rc<Cell<Option<u32>>>);
+
+    impl ScriptHooks for Time1At {
+        fn chapter_loaded<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _chapter: u32,
+            _keep_state: bool,
+        ) -> HookFuture<'a, ()> {
+            if self.0.get().is_none() {
+                self.0.set(Some(e.clocks.time1_start));
+            }
+            ready(())
+        }
+    }
+
+    /// Time1 starts at the boot pass FUN_00423760 (0x00419734), before the
+    /// player screen (FUN_0041dea4 @ 0x0041974e), which does not restart
+    /// it: the game's Time1 includes the time spent on the player screen.
+    #[test]
+    fn time1_starts_before_the_player_screen() {
+        let Some(dir) = std::env::var_os("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: time1_starts_before_the_player_screen skipped");
+            return;
+        };
+        let g = Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir))).unwrap();
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        let start = Rc::new(Cell::new(None));
+        let sys = Sys::new(Mixer::new());
+        let opts = Options {
+            trace: Some(trace.clone()),
+            hooks: Box::new(Time1At(start.clone())),
+            start: Start::Boot,
+            ..Options::default()
+        };
+        let mut runner = Runner::new(sys.clone(), run(sys.clone(), g, opts));
+        let mut frame = 0u64;
+        let mut screen_at = None;
+        let press = |down: bool, x: i32, y: i32| {
+            let button = MouseButton::Left;
+            sys.push_input(Input::MouseMove { x, y });
+            sys.push_input(if down {
+                Input::MouseDown { button, x, y }
+            } else {
+                Input::MouseUp { button, x, y }
+            });
+        };
+        let key = |k: Key, down: bool| {
+            sys.push_input(if down {
+                Input::KeyDown(k)
+            } else {
+                Input::KeyUp(k)
+            });
+        };
+        while runner.step(frame * 16) && start.get().is_none() {
+            frame += 1;
+            assert!(frame < 40_000, "player screen at {screen_at:?}");
+            let seen = trace
+                .borrow()
+                .iter()
+                .any(|e| *e == Event::Menu("SELEMENU.TXT".into()));
+            match screen_at {
+                None if seen => screen_at = Some(frame),
+                // The start-up films cut short.
+                None => match frame % 30 {
+                    0 => press(true, 320, 240),
+                    2 => press(false, 320, 240),
+                    _ => {}
+                },
+                // Five seconds on the player screen, then a new player.
+                Some(f) => match frame - f {
+                    300 => press(true, 200, 259),
+                    302 => press(false, 200, 259),
+                    310 => key(Key::Char('T'), true),
+                    312 => key(Key::Char('T'), false),
+                    320 => key(Key::Enter, true),
+                    322 => key(Key::Enter, false),
+                    _ => {}
+                },
+            }
+        }
+        let screen_at = screen_at.expect("no player screen");
+        let t1 = start.get().expect("no chapter load");
+        assert!(
+            u64::from(t1) <= screen_at * 16,
+            "Time1 started at {t1} ms, the player screen came at {} ms",
+            screen_at * 16
+        );
     }
 }
 

@@ -104,6 +104,9 @@ impl Engine {
         self.current_place = Some(index);
         self.current_place_id = Some(next);
         self.next_place_id = None;
+        // FUN_00421b4c rebuilds the path buffer 0x006cd288 from the
+        // record (@ 0x00421bf9), whichever panorama the move loads.
+        self.cyclo_path = Some(self.wam.places[index].cyclo.clone());
         self.vue_override = None; // `Vue` follows the place again
 
         // A move loads the panorama its click named in the WAM it left
@@ -125,17 +128,31 @@ impl Engine {
         });
     }
 
-    /// The current place's panorama loaded again, as `FUN_004240fc` does
-    /// after a puzzle (`FUN_0044a424` @ 0x004241e2: the panorama, the FOV,
-    /// the pointer left at (0x140, 0x140)). It calls neither `FUN_0042431c`
-    /// nor `FUN_0042488c`: the sprite rows keep their frames, frame counts
-    /// and click areas, and the layer is drawn again at those frames. The
-    /// place is not entered again: no place event, the mouse is not moved.
+    /// `FUN_00421cfc`, the place lookup of an exit click (@ 0x00423dc5):
+    /// the path buffer 0x006cd288 named from the destination's record in
+    /// the current WAM (@ 0x00421dc4..0x00421e04).
+    pub(crate) fn look_up_place_cyclo(&mut self, dest: u16) {
+        if let Some(p) = self.wam.places.iter().find(|p| p.id == dest) {
+            self.cyclo_path = Some(p.cyclo.clone());
+        }
+    }
+
+    /// The panorama loaded again, as `FUN_004240fc` does after a puzzle
+    /// (`FUN_0044a424` @ 0x004241e2: the panorama, the FOV, the pointer
+    /// left at (0x140, 0x140)). It loads the path buffer 0x006cd288 as it
+    /// stands (`mov eax,0x6cd288` @ 0x004241dd): the current place's, or
+    /// after an exit click that a departure section aborted, the
+    /// destination's, which stays until the next place load. It calls
+    /// neither `FUN_0042431c` nor `FUN_0042488c`: the sprite rows keep their
+    /// frames, frame counts and click areas, and the layer is drawn again
+    /// at those frames. The place is not entered again: no place event,
+    /// the mouse is not moved.
     pub(crate) async fn reload_view_after_puzzle(&mut self) {
         let Some(index) = self.current_place else {
             return;
         };
-        let Some(cyclo) = self.wam.places.get(index).map(|p| p.cyclo.clone()) else {
+        let record = self.wam.places.get(index).map(|p| p.cyclo.clone());
+        let Some(cyclo) = self.cyclo_path.clone().or(record) else {
             return;
         };
         if self.load_cyclo(&cyclo).await {
@@ -1854,6 +1871,42 @@ mod move_panorama_tests {
         );
         if ran {
             assert_eq!(*got.borrow(), Some((true, false)));
+        }
+    }
+
+    /// After an exit click whose move a departure section aborted, a
+    /// puzzle's reload (`FUN_004240fc` @ 0x004241dd) loads the path buffer
+    /// 0x006cd288 that the click's lookup `FUN_00421cfc` named: the
+    /// destination's panorama, until the next place load.
+    #[test]
+    fn puzzle_reload_after_an_aborted_move_loads_the_destination() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "puzzle_reload_after_an_aborted_move_loads_the_destination",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let here = e.wam.places[e.current_place.unwrap()].cyclo.clone();
+                let dest = e.place().unwrap().transitions[0].dst_place;
+                let there = e.wam.places.iter().find(|p| p.id == dest).unwrap();
+                let there = there.cyclo.clone();
+                assert_ne!(here, there);
+                e.look_up_place_cyclo(dest);
+                e.reload_view_after_puzzle().await;
+                let after_abort = e.cyclo == pano(&e, &there).await;
+                // The next place load names the record's again.
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.reload_view_after_puzzle().await;
+                let after_load = e.cyclo == pano(&e, &here).await;
+                *g2.borrow_mut() = Some((after_abort, after_load));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, true)));
         }
     }
 
