@@ -141,6 +141,9 @@ pub enum Abort {
     /// Exit was set: the end of the game for 86 (CHAPI085's, the only
     /// value shipped), the player screen again for any other value.
     Finished,
+    /// A command the original ends in a crash ([`Engine::original_fault`]):
+    /// the player screen again.
+    Fault,
 }
 
 /// How [`run`] starts.
@@ -838,6 +841,17 @@ impl Engine {
         }
     }
 
+    /// A fault the original cannot survive (an access violation, which
+    /// ends its process): the port shows `text` in the error box, then the
+    /// game ends there and the player screen comes back
+    /// ([`Abort::Fault`]).
+    pub(crate) async fn original_fault(&mut self, text: &str) {
+        log::error!("{text}: the original ends here; back to the player screen");
+        let font = crate::subtitles::SubtitleFont::new();
+        crate::dialog::error_box(self, &font, text).await;
+        self.abort = Some(Abort::Fault);
+    }
+
     pub fn should_abort(&self) -> bool {
         self.sys.should_quit() || self.abort.is_some()
     }
@@ -1311,6 +1325,12 @@ pub fn wam_open_fail_text(wam_path: &[u8]) -> String {
     format!("Fichier introuvable : {path}")
 }
 
+/// The box [`Engine::original_fault`] shows for a `Vue=N` whose place the
+/// WAM in memory lacks: the original crashes at 0x0044a453.
+pub fn vue_fault_text(place: u16) -> String {
+    format!("Atlantis crashes here (0x0044a453): no view {place}")
+}
+
 /// The text of the error box of a missing start-up logo film `name`
 /// (`ExeBuild::startup_logos`): the error code 0xc's "Fichier
 /// introuvable : " (atlantis-dvd-ja-696832 0x004abfe8, its dialog procedure
@@ -1412,11 +1432,13 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
             // hidden ids zeroed, CON and /INIT run again); on CDs 2..4 EXIT
             // stays set and, by static reading, the main loop spins. Not
             // modelled (no data reaches it).
-            Some(Abort::Finished) if !e.sys.should_quit() => {
-                log::warn!(
-                    "Exit={}: only 86 ends the game; back to the player screen",
-                    e.vars.get("exit")
-                );
+            Some(abort @ (Abort::Finished | Abort::Fault)) if !e.sys.should_quit() => {
+                if abort == Abort::Finished {
+                    log::warn!(
+                        "Exit={}: only 86 ends the game; back to the player screen",
+                        e.vars.get("exit")
+                    );
+                }
                 e.vars.set("exit", 0);
                 // The original runs FUN_00423760 there (0x00419734), which
                 // restarts the timers as on the boot pass.

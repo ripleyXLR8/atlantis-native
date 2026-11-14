@@ -457,12 +457,13 @@ impl MusicRing {
 /// one) only the release runs: the refill `FUN_0043318c` is called by the
 /// frame loops (`FUN_00432178` and the menus', puzzles' and videos' loops),
 /// the release `FUN_00433310` by the 200 Hz timer, so the driver goes on
-/// looping the ring's blocks as they stand.
+/// looping the ring's blocks as they stand. The same while a sequence that
+/// makes no refill call plays ([`crate::audio::Mixer::set_refill_held`]).
 pub struct MusicRingSource {
     ring: MusicRing,
     t: u32,
     left: usize,
-    held: Option<Arc<std::sync::atomic::AtomicBool>>,
+    held: Vec<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl MusicRingSource {
@@ -471,20 +472,20 @@ impl MusicRingSource {
             ring,
             t: 0,
             left: 0,
-            held: None,
+            held: Vec::new(),
         }
     }
 
-    /// Its refills skipped while `held` is set.
+    /// Its refills skipped while `held` is set (each flag given).
     pub fn held_by(mut self, held: Arc<std::sync::atomic::AtomicBool>) -> Self {
-        self.held = Some(held);
+        self.held.push(held);
         self
     }
 
     fn loops_held(&self) -> bool {
         self.held
-            .as_ref()
-            .is_some_and(|h| h.load(std::sync::atomic::Ordering::Relaxed))
+            .iter()
+            .any(|h| h.load(std::sync::atomic::Ordering::Relaxed))
     }
 }
 
@@ -815,7 +816,9 @@ impl Engine {
         let voice = if self.music_through_ring() {
             let mut ring = MusicRing::wine(Arc::new(data.clone()));
             ring.start().then(|| {
-                let source = MusicRingSource::new(ring).held_by(mixer.loops_held_flag());
+                let source = MusicRingSource::new(ring)
+                    .held_by(mixer.loops_held_flag())
+                    .held_by(mixer.refill_held_flag());
                 mixer.play_source(Box::new(source), 0, 0)
             })
         } else {

@@ -23,6 +23,7 @@ use crate::con_script::{
     ConSection, ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
 };
 use crate::engine::{Abort, Engine, Event};
+use crate::enhancements::BugFix;
 use crate::hooks::{ready, Departure, HookFuture, ScriptHooks};
 use atlantis_data::sprite_anim::{
     set_perso_active, start_place_sprite_anim, stop_place_sprite_anim,
@@ -436,7 +437,10 @@ impl Scripts {
             // the player; until then no place is entered. The load's result
             // is not tested (@ 0x0042a285): a WAM that cannot be opened
             // (its error box, Engine::load_wam) leaves the one in memory,
-            // whose first record becomes the place.
+            // whose first record becomes the place. The only such load
+            // (CHAPI079's atlan4.wam on disc 4, BugFix::AnyDisc off) is
+            // followed by Vue=119, which PALAIS3 lacks: the original crashes
+            // there (0x0044a453, Scripts::enter_place_from_script).
             if let Some(wam) = set.wam_name {
                 e.set_wam_path(&latin1_bytes(&wam));
                 e.load_wam(&wam).await;
@@ -782,6 +786,26 @@ impl Scripts {
             e.set_wam_path(&latin1_bytes(&sub.wam));
             e.load_wam(&sub.wam).await;
             e.current_place = None;
+        }
+        // FUN_00421cfc (@ 0x0042a66d) looks N up in the place table; with
+        // no record N it leaves its index at the WAM's record count
+        // (0x00421d1b..0x00421d65) and names the panorama from that record
+        // (0x006cd288 = "" + "cyclo\" + its name, 0x00421dbf..0x00421e04).
+        // A record no load of this run reached is all zero: the path
+        // "cyclo\" has no dot, and FUN_0044a424 (@ 0x0042a698) writes
+        // through strrchr(path, '.') = NULL (`mov byte ptr [eax],0` @
+        // 0x0044a453): an access violation that ends the original. Only
+        // CHAPI079's Vue=119 after its failed ChangeWam reaches it
+        // (BugFix::AnyDisc off; PALAIS3's 84 records are the most of any
+        // WAM). A stale record of a larger WAM would load that record's
+        // panorama instead: no data reaches it, not modelled.
+        if !e.enhancements().fix(BugFix::AnyDisc)
+            && !e.wam.places.iter().any(|p| p.id == place)
+            && e.place_table_slots.len() <= e.wam.places.len()
+        {
+            e.original_fault(&crate::engine::vue_fault_text(place))
+                .await;
+            return;
         }
         // LastVue = the place being left, unless loading (0x0042a6a7..
         // 0x0042a6b5).
@@ -2006,8 +2030,12 @@ mod tests {
     /// a WAM only disc 1's archive holds. As the original
     /// ([`BugFix::AnyDisc`] off), the WAM loader `FUN_00421ebc` shows its
     /// error box with the path and keeps PALAIS3, and the handler makes
-    /// its first record (180) the place (@ 0x0042a28a, 0x0042a2b6); with
-    /// the fix, the day city's WAM is read from disc 1.
+    /// its first record (180) the place (@ 0x0042a28a, 0x0042a2b6) until
+    /// the next command, `Vue=119`: PALAIS3 has no place 119 and its
+    /// record past the last was never written, so the original crashes
+    /// (0x0044a453, [`Scripts::enter_place_from_script`]); the port shows
+    /// why and ends the game there ([`Abort::Fault`]). With the fix, the
+    /// day city's WAM is read from disc 1 and the player enters view 119.
     #[test]
     fn change_wam_reads_the_disc_in_the_drive_only() {
         use crate::enhancements::{BugFix, Enhancements};
@@ -2028,6 +2056,9 @@ mod tests {
                     let trace = Rc::new(RefCell::new(Vec::new()));
                     e.trace = Some(trace.clone());
                     s.exec_set(&mut e, None, "changewam=atlan4.wam").await;
+                    let place = e.current_place_id;
+                    e.abort = None;
+                    s.exec_set(&mut e, None, "vue=119").await;
                     let boxes: Vec<String> = trace
                         .borrow()
                         .iter()
@@ -2040,6 +2071,8 @@ mod tests {
                         enh.fix(BugFix::AnyDisc),
                         boxes,
                         e.wam_name.clone(),
+                        place,
+                        e.abort.take(),
                         e.current_place_id,
                     ));
                 }
@@ -2054,13 +2087,19 @@ mod tests {
             got[0],
             (
                 false,
-                vec!["Fichier introuvable : wam\\atlan4.wam".to_string()],
+                vec![
+                    "Fichier introuvable : wam\\atlan4.wam".to_string(),
+                    "Atlantis crashes here (0x0044a453): no view 119".to_string()
+                ],
                 "PALAIS3.WAM".to_string(),
+                Some(180),
+                Some(Abort::Fault),
                 Some(180)
             )
         );
         assert_eq!((got[1].0, got[1].1.len()), (true, 0));
         assert_eq!(got[1].2, "ATLAN4.WAM");
+        assert_eq!((got[1].4, got[1].5), (None, Some(119)));
     }
 
     /// ChangeCd outside 1..=4 asks for disc 4 (it was ignored).

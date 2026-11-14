@@ -241,6 +241,18 @@ pub fn right_press(down: bool, prev_down: &mut bool, left_press: bool) -> bool {
     press
 }
 
+/// The window message of a left button event ([`PuzzleInput::read_with`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LeftMessage {
+    /// WM_LBUTTONDOWN.
+    Down,
+    /// WM_LBUTTONDBLCLK: the second press of a pair (the window class has
+    /// CS_DBLCLKS, style 0xb @ `FUN_0042e4b4`).
+    DoubleClick,
+    /// WM_LBUTTONUP.
+    Up,
+}
+
 /// The input of a puzzle (the buttons' edges come from [`Sys`]'s latch).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PuzzleInput;
@@ -261,13 +273,22 @@ impl PuzzleInput {
         self.read_with(sys, |_| {})
     }
 
-    /// [`PuzzleInput::read`], with each left press (true) and release
-    /// (false) since the last read passed to `on_left` in order.
-    pub fn read_with(&mut self, sys: &Sys, mut on_left: impl FnMut(bool)) -> PuzzleMouse {
+    /// [`PuzzleInput::read`], with the window message of each left press
+    /// and release since the last read passed to `on_left` in order.
+    pub fn read_with(&mut self, sys: &Sys, mut on_left: impl FnMut(LeftMessage)) -> PuzzleMouse {
         let mut pressed = false;
         let mut right = false;
         let mut escape = false;
-        while let Some(ev) = sys.poll_event() {
+        // Windows' message for a left press: WM_LBUTTONDBLCLK for the
+        // second of a pair (Sys's pairing), else WM_LBUTTONDOWN.
+        let press = |double: bool| {
+            if double {
+                LeftMessage::DoubleClick
+            } else {
+                LeftMessage::Down
+            }
+        };
+        while let Some((ev, double)) = sys.poll_event_paired() {
             match ev {
                 Input::KeyDown(Key::Escape) => escape = true,
                 Input::MouseDown {
@@ -275,18 +296,18 @@ impl PuzzleInput {
                     ..
                 } => {
                     pressed = true;
-                    on_left(true);
+                    on_left(press(double));
                 }
                 // No click (`FUN_0042e624`'s latch), but Windows posted
                 // its WM_LBUTTONDOWN.
                 Input::MouseDownLatched {
                     button: MouseButton::Left,
                     ..
-                } => on_left(true),
+                } => on_left(press(double)),
                 Input::MouseUp {
                     button: MouseButton::Left,
                     ..
-                } => on_left(false),
+                } => on_left(LeftMessage::Up),
                 // VK_RBUTTON is an edge key too (`FUN_0042e6dc`,
                 // 0x006140c2): `FUN_0042e624` tests the whole
                 // GetAsyncKeyState word (`test ax, ax` @ 0x0042e664), so a

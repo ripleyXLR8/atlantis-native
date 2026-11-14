@@ -1598,6 +1598,20 @@ fn a_held_game_refills_no_music_block() {
     };
     assert!(passes(true), "held: the ring as it stood");
     assert!(!passes(false), "running: refilled");
+    // A sequence that makes no refill call (the snakes' win animation,
+    // `Mixer::set_refill_held`) holds it the same way.
+    let mixer = Mixer::new();
+    mixer.set_refill_held(true);
+    let mut ring = MusicRing::wine(data.clone());
+    assert!(ring.start());
+    let mut src = MusicRingSource::new(ring)
+        .held_by(mixer.loops_held_flag())
+        .held_by(mixer.refill_held_flag());
+    let mut out = vec![0i16; 2 * 2 * PASS];
+    for chunk in out.chunks_mut(2 * 1024) {
+        assert_eq!(src.read(chunk), chunk.len() / 2);
+    }
+    assert!(out[..2 * PASS] == out[2 * PASS..], "refill held");
 }
 
 /// Every StartMusik / NewSound value of the scripts names an entry of the
