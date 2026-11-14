@@ -109,8 +109,14 @@ const COMMENTS: [&str; 26] = [
 pub trait CrabIo {
     /// The input when the puzzle starts: the mouse and a new click.
     fn start_input(&mut self) -> (i32, i32, bool);
-    /// `FUN_0043318c`: a frame boundary.
-    fn boundary(&mut self, g: &CrabGame) -> (i32, i32, bool);
+    /// `FUN_0041a298`: the poll, the mouse and a new click it writes
+    /// (0x004960ec / 0x004960f0, 0x0049611c); `None` when it writes none.
+    fn poll(&mut self) -> Option<(i32, i32, bool)>;
+    /// `FUN_0043318c`: a frame boundary; the input it writes, if any (a
+    /// harness that feeds the input there).
+    fn boundary(&mut self, _g: &CrabGame) -> Option<(i32, i32, bool)> {
+        None
+    }
     /// `FUN_00447478`: one of [`PICTURES`].
     fn load_picture(&mut self, name: &str);
     /// `FUN_00410f36`.
@@ -209,11 +215,30 @@ impl CrabGame {
         puzzle_lcg_next(&mut self.lcg_seed, n)
     }
 
+    fn take_input(&mut self, input: Option<(i32, i32, bool)>) {
+        if let Some((mx, my, c)) = input {
+            self.mx = mx;
+            self.my = my;
+            self.click = c;
+        }
+    }
+
+    /// `FUN_0041a298`.
+    fn poll(&mut self, io: &mut impl CrabIo) {
+        let input = io.poll();
+        self.take_input(input);
+    }
+
+    /// `FUN_0043318c`.
+    fn boundary(&mut self, io: &mut impl CrabIo) {
+        let input = io.boundary(self);
+        self.take_input(input);
+    }
+
+    /// `FUN_0041a298` then `FUN_0043318c`, as the wait loops call them.
     fn read_boundary(&mut self, io: &mut impl CrabIo) {
-        let (mx, my, c) = io.boundary(self);
-        self.mx = mx;
-        self.my = my;
-        self.click = c;
+        self.poll(io);
+        self.boundary(io);
     }
 
     /// `FUN_0043d494`.
@@ -684,11 +709,17 @@ impl CrabGame {
                 if self.state > 1 {
                     self.race_tick(io);
                 }
+                // The pass's order (0x0043d3b9..0x0043d3dc): present,
+                // 0x0049611c = 0, the poll FUN_0041a298 (0x0043d3c8), then
+                // FUN_0043e7d0, whose introduction passes draw the cursor
+                // and the held crab at the pointer that poll's WM_MOUSEMOVE
+                // left, FUN_0043d91c and the boundary FUN_0043318c.
                 self.pass(io).await;
                 self.click = false;
+                self.poll(io);
                 self.finish_and_start(io).await;
                 self.race_comment(io);
-                self.read_boundary(io);
+                self.boundary(io);
                 if self.result != 0 || io.aborted() {
                     break;
                 }
@@ -734,9 +765,9 @@ impl CrabIo for Host<'_> {
         let m = self.host.read_entry_held_pointer();
         (m.x, m.y, m.click)
     }
-    fn boundary(&mut self, _g: &CrabGame) -> (i32, i32, bool) {
+    fn poll(&mut self) -> Option<(i32, i32, bool)> {
         let m = self.host.read_input_held_pointer();
-        (m.x, m.y, m.click)
+        Some((m.x, m.y, m.click))
     }
     fn load_picture(&mut self, name: &str) {
         if let Some(i) = PICTURES.iter().position(|p| p.eq_ignore_ascii_case(name)) {
@@ -864,8 +895,82 @@ mod poll_count_tests {
         let pass = f5_steps("crab_f5_pass", |h| {
             let mut io = Host { host: h };
             io.start_input();
-            io.boundary(&CrabGame::default());
+            io.poll();
         });
         assert_eq!((entry, pass), (0, Some(1)));
+    }
+}
+
+#[cfg(test)]
+mod intro_pointer_tests {
+    use super::*;
+
+    /// Polls give `moves` in turn (then the last), the comment sample
+    /// reads busy for the first `busy` tests; the cursor draws recorded.
+    struct Script {
+        moves: Vec<(i32, i32, bool)>,
+        polls: usize,
+        busy: u32,
+        cursors: Vec<(i32, i32)>,
+    }
+
+    impl CrabIo for Script {
+        fn start_input(&mut self) -> (i32, i32, bool) {
+            self.moves[0]
+        }
+        fn poll(&mut self) -> Option<(i32, i32, bool)> {
+            self.polls += 1;
+            Some(self.moves[self.polls.min(self.moves.len() - 1)])
+        }
+        fn load_picture(&mut self, _name: &str) {}
+        fn draw_background(&mut self) {}
+        fn draw_sprite(&mut self, bank: char, x: i32, y: i32, _frame: i32) {
+            if bank == 'C' {
+                self.cursors.push((x, y));
+            }
+        }
+        async fn present(&mut self, _g: &CrabGame) {}
+        fn play_sound(&mut self, _slot: i32) {}
+        fn play_comment(&mut self, _n: i32) {}
+        fn comment_busy(&mut self) -> bool {
+            self.busy = self.busy.saturating_sub(1);
+            self.busy > 0
+        }
+        fn rand32767(&mut self) -> i32 {
+            0
+        }
+        fn aborted(&self) -> bool {
+            self.polls > 4
+        }
+    }
+
+    /// `FUN_0043d28c` polls (0x0043d3c8) before `FUN_0043e7d0`: the first
+    /// introduction pass after the choosing click draws the cursor at the
+    /// pointer that poll left, not at the click's (round 7, puzzles-1).
+    #[test]
+    fn the_introduction_draws_at_the_pointer_of_the_poll_before_it() {
+        let box0 = (BOXES[0].x as i32 + 50, BOXES[0].y as i32 + 50);
+        let mut io = Script {
+            moves: vec![(box0.0, box0.1, true), (300, 300, false)],
+            polls: 0,
+            busy: 3,
+            cursors: Vec::new(),
+        };
+        let mut g = CrabGame::default();
+        block_on(g.run(&mut io));
+        // The choosing pass at the click, then the first introduction pass.
+        assert_eq!(io.cursors[0], box0);
+        assert_eq!(io.cursors[1], (300, 300));
+    }
+
+    fn block_on<F: std::future::Future>(f: F) -> F::Output {
+        let mut f = std::pin::pin!(f);
+        let waker = std::task::Waker::noop();
+        let mut cx = std::task::Context::from_waker(waker);
+        loop {
+            if let std::task::Poll::Ready(v) = f.as_mut().poll(&mut cx) {
+                return v;
+            }
+        }
     }
 }
