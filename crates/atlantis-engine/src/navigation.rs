@@ -346,6 +346,8 @@ impl Engine {
         self.mark_pointer_mouse();
         self.sys.set_mouse_locked(true);
         self.sys.take_mouse_relative();
+        // The previous point of the look delta (0x0041c003 / 0x0041c00d).
+        self.pointer.loop_entry();
 
         self.cursor_shown = CURSOR_UNSET;
         // The arrow frame starts at 0 on every entry (0x0041c017).
@@ -354,6 +356,10 @@ impl Engine {
         self.ambient_enter_place().await;
 
         let mut left_pressed = false;
+        // The motion of a poll that saw a left press edge: FUN_0041a298
+        // returns before its message pump (0x0041a2b5), so the
+        // WM_MOUSEMOVE waits for the next poll.
+        let mut unpumped = (0, 0);
         while !left_pressed && !exit {
             let fi = self.poll_frame_input();
             // Each frame starts by clearing the double-click flag
@@ -361,6 +367,7 @@ impl Engine {
             self.turn_double_click.flag = false;
             // This frame's relative motion (x right, y down).
             let (motion_x, motion_y) = self.sys.take_mouse_relative();
+            unpumped = (unpumped.0 + motion_x, unpumped.1 + motion_y);
             // A press edge (FUN_0042e624): a held button is no click.
             let mut clicked = fi.left_press;
             // Bow mode consumes the click (0x0041c631): no zone or
@@ -436,6 +443,9 @@ impl Engine {
                         .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
                     self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
+                    // The loop entered again (0x0041c003 / 0x0041c00d).
+                    unpumped = (0, 0);
+                    self.pointer.loop_entry();
                     // The original's warp loop returns the clicked character
                     // (0x0041c71e) after this frame's timers (0x0041c369);
                     // the place loop runs the conversation (0x00423c1c) and
@@ -464,6 +474,11 @@ impl Engine {
                 break;
             }
             self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
+            // The poll's WM_MOUSEMOVE (0x00419c14) moves the pointer.
+            if !fi.left_press {
+                let (dx, dy) = std::mem::take(&mut unpumped);
+                self.pointer.follow(dx, dy);
+            }
 
             // A right click opens the inventory bar (FUN_0041a298 toggles
             // 0x004960c4, the loop opens the bar @ 0x0041c6d2), also when a
@@ -513,7 +528,7 @@ impl Engine {
                     // bar closed with the pointer at (320, 240) (FUN_0042c098
                     // @ 0x0042c275).
                     if !moved && self.game_over_left_set() {
-                        self.pointer.recentre();
+                        self.pointer.bar_closed();
                         self.pending_no_click_exit = Some(true);
                     }
                     action = WARP_ABORT;
@@ -521,9 +536,11 @@ impl Engine {
                 } else {
                     self.sys.set_mouse_locked(true);
                     self.sys.take_mouse_relative();
-                    // FUN_0042c098 closes the bar with the pointer at
-                    // (320, 240) (@ 0x0042c275).
-                    self.pointer.recentre();
+                    // FUN_0042c098 closes the bar with the pointer and the
+                    // previous point at (320, 240) (@ 0x0042c275,
+                    // 0x0042c28e): the look delta of the next frame is 0.
+                    unpumped = (0, 0);
+                    self.pointer.bar_closed();
                     self.sys
                         .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
                     self.mark_pointer_mouse();
@@ -597,9 +614,14 @@ impl Engine {
                     beta = (f64::from(beta) - VIEW_KEY_STEP) as f32;
                 }
             }
-            // OMNI 3D MODE 1, the original's default (0x004960ac == 0),
-            // gives dy = prevY - y; MODE 2 y - prevY.
+            // The delta is previous point minus pointer (step 3,
+            // 0x0041c1c3..0x0041c20d): the motion since the last step 5, the
+            // loop entry or the bar close, the WM_MOUSEMOVEs of a timer
+            // section's lines or of the in-game menu included. OMNI 3D MODE
+            // 1, the original's default (0x004960ac == 0), gives dy = prevY -
+            // y; MODE 2 y - prevY.
             let mode2 = self.settings.omni3d_mode2;
+            let (motion_x, motion_y) = self.pointer.motion();
             let look = warp_look_frame(
                 &mut self.momentum,
                 &mut alpha,
@@ -617,17 +639,11 @@ impl Engine {
             self.vars.set("anglewarpx", look.angle_warp_x);
             self.vars.set("anglewarpy", look.angle_warp_y);
             self.set_view(alpha, beta);
-            // The pointer follows the mouse, and goes back to the centre when
-            // the new (unclamped) angles differ from the previous frame's
-            // (step 5, @ 0x0041c2bb..0x0041c363).
-            self.pointer.frame(
-                motion_x,
-                motion_y,
-                look.new_alpha,
-                look.new_beta,
-                alpha,
-                beta,
-            );
+            // The pointer goes back to the centre when the new (unclamped)
+            // angles differ from the previous frame's, and the previous
+            // point takes it (step 5, @ 0x0041c2bb..0x0041c363).
+            self.pointer
+                .frame(look.new_alpha, look.new_beta, alpha, beta);
 
             // Timer sections (@ 0x0041c369). A Vue= in the timer section has
             // entered another place; the warp loop does not return for it:
@@ -1175,6 +1191,67 @@ mod tests {
             assert!(bar.get(), "the bar did not open");
             assert!(!clicked.get(), "the click was handled");
         }
+    }
+
+    /// A timer section on the first warp frame during whose lines the
+    /// mouse moves 280 px right; the view's yaw then and 40 frames later.
+    struct MouseDuringTimer {
+        calls: u32,
+        alpha: Rc<RefCell<Vec<f32>>>,
+    }
+
+    impl ScriptHooks for MouseDuringTimer {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.calls += 1;
+            if self.calls == 1 {
+                self.alpha.borrow_mut().push(e.warp.alpha());
+                // As Scripts::timer_scan: the mouse at the warp pointer.
+                e.sys.set_mouse_locked(false);
+                e.sys.set_mouse_pos(e.pointer.pos.0, e.pointer.pos.1);
+                e.mark_pointer_mouse();
+                let (x, y) = e.pointer.pos;
+                e.sys.push_input(Input::MouseMove { x: x + 280, y });
+                return ready(true);
+            }
+            if self.calls == 41 {
+                self.alpha.borrow_mut().push(e.warp.alpha());
+            }
+            ready(false)
+        }
+    }
+
+    /// The look delta is previous point minus pointer (0x0041c1c3..
+    /// 0x0041c20d), and a timer section (step 6, after step 5) writes
+    /// neither: the mouse's motion during its lines turns the view on the
+    /// frames after it (280 px to the right: 280 / 600 rad to the left).
+    #[test]
+    fn the_mouse_moved_during_a_timer_section_turns_the_view() {
+        let alpha = Rc::new(RefCell::new(Vec::new()));
+        let (a2, a3) = (alpha.clone(), alpha.clone());
+        let ran = with_engine(
+            "the_mouse_moved_during_a_timer_section_turns_the_view",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                let mut hooks = MouseDuringTimer {
+                    calls: 0,
+                    alpha: a2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, _| {
+                if a3.borrow().len() == 2 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let a = alpha.borrow();
+        let turn = f64::from(a[0]) - f64::from(a[1]);
+        let turn = turn.rem_euclid(std::f64::consts::TAU);
+        assert!((0.4..0.47).contains(&turn), "turned by {turn}");
     }
 
     /// A timer section that leaves the bar request (a right press during
