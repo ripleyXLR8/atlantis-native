@@ -274,6 +274,12 @@ pub struct PuzzleState {
     /// The rat's run state (static data at 0x004969c0, partly reset by
     /// each run).
     pub rat: Option<rat::RatRules>,
+    /// The ogre's path cells, origin, elbow, destination, x then y
+    /// (0x00773870, in .bss: 0 at launch). Only `FUN_00443f94` writes them
+    /// (0x0044415a..0x004441b9); the entry `FUN_0044203c` clears the
+    /// occupancy only (0x00442077..0x00442083), so a play starts with the
+    /// cells the previous play of the launch left.
+    pub ogre_path: ([i32; 3], [i32; 3]),
 }
 
 impl Default for PuzzleState {
@@ -288,6 +294,7 @@ impl Default for PuzzleState {
             snakes: None,
             hen_marks: None,
             rat: None,
+            ogre_path: ([0; 3], [0; 3]),
         }
     }
 }
@@ -392,6 +399,52 @@ mod entry_tests {
             if let Some(m) = mouse_after_entry(id) {
                 assert_eq!(m, (10, 10), "puzzle {id}");
             }
+        }
+    }
+
+    /// Whether an Escape inside puzzle `id`, entered holding `object`,
+    /// latches 0x00496124 = 0 / 0x00496138 = 1 under `--original`
+    /// ([`crate::enhancements::BugFix::PuzzleEscape`] off).
+    fn escape_latched(id: i32, object: i32) -> Option<bool> {
+        let seen = Rc::new(Cell::new(None));
+        let s2 = seen.clone();
+        let ran = with_engine(
+            "hexa_and_meta_escape_with_an_object_in_hand",
+            move |mut e| async move {
+                use crate::enhancements::{BugFix, Enhancements};
+                e.set_enhancements(Enhancements::all_but_fix(BugFix::PuzzleEscape));
+                e.vars.set("objetenmain", object);
+                play_puzzle(&mut e, &mut NoScripts, id).await;
+                s2.set(Some(e.escape_request));
+            },
+            |sys, f| match f {
+                10 => sys.push_input(Input::KeyDown(crate::sys::Key::Escape)),
+                11 => sys.push_input(Input::KeyUp(crate::sys::Key::Escape)),
+                20 => sys.push_input(Input::Quit),
+                _ => {}
+            },
+        );
+        ran.then(|| seen.get().expect("the puzzle did not run"))
+    }
+
+    /// The hexagon (13) and meta stages 2..4 (10..12) may be entered with
+    /// an object in hand (FUN_0043a1e0 refuses only N < 6, 8, 9, N > 14);
+    /// their set-ups empty the hand before the loop (FUN_004406fc @
+    /// 0x00440883, FUN_004478d4 @ 0x00447951), so FUN_0041a298's Escape
+    /// test on OBJETENMAIN (0x0041a3fc..0x0041a415) passes and the Escape
+    /// latches, as with an empty hand.
+    #[test]
+    fn hexa_and_meta_escape_with_an_object_in_hand() {
+        for (id, object) in [(13, 402), (10, 318), (11, 319), (12, 320)] {
+            let Some(empty) = escape_latched(id, 0) else {
+                return;
+            };
+            assert!(empty, "puzzle {id}, empty hand");
+            assert_eq!(
+                escape_latched(id, object),
+                Some(true),
+                "puzzle {id}, {object} in hand"
+            );
         }
     }
 }

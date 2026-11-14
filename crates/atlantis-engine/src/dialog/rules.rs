@@ -152,7 +152,7 @@ impl LineHeader {
 /// - "camN" at the end of the header: N, used even when that camera's
 ///   INITDIAL UBB is "none";
 /// - an off / off0 / off1 line draws nothing: the camera stays the last
-///   one (0x0077290a);
+///   one (0x0077290a), 0 before the first camera of the launch;
 /// - otherwise draw (clock & 3) + 2 until the camera differs from the last
 ///   one and its UBB is not "none" (0x004287f6), then draw a second time
 ///   against the first draw (0x00428896; a Seth line after the 0x230 check,
@@ -195,11 +195,12 @@ pub fn pick_dial_cam(
         }
         cam
     };
-    let mut cam = if (2..=5).contains(&last_cam) {
-        last_cam
-    } else {
-        2
-    };
+    // The current camera 0x0077290a equals the last one 0x00772908 at the
+    // start of every line (each path of FUN_0042844c ends with both equal,
+    // 0x00428867 / 0x0042891f / 0x00428942 / 0x004289ea) and only that
+    // function writes them: an off line keeps it, 0 (.bss) until the first
+    // camera of the launch.
+    let mut cam = last_cam;
     let drawn = header.explicit_cam == 0 && !header.off;
     if header.explicit_cam != 0 {
         cam = if (2..=5).contains(&header.explicit_cam) {
@@ -570,6 +571,30 @@ mod tests {
         assert_eq!(
             pick_dial_cam(&t, 560, &header(0, false, true), 4, false, &mut clock),
             4
+        );
+        // Before the first camera of the launch (0x00772908 in .bss).
+        assert_eq!(
+            pick_dial_cam(&t, 524, &header(0, false, true), 0, true, &mut clock),
+            0
+        );
+    }
+
+    /// The first draw after an off line at launch: the original compares
+    /// with 0x00772908 = 0 (0x004287fb), so every usable camera can come,
+    /// camera 2 included.
+    #[test]
+    fn first_draw_after_an_off_line_at_launch() {
+        let t = table(524, ["pecan2c2", "pecan2c3", "pecan2c4", "pecan2c5"]);
+        let mut clock = 3;
+        let last = pick_dial_cam(&t, 524, &header(0, false, true), 0, true, &mut clock);
+        assert_eq!(last, 0);
+        // Clock 0: the first draw keeps camera 2 (it differs from 0), the
+        // second (0x00428896) moves off it to 3. Against a last camera of
+        // 2, the first draw would already move to 3 and the second to 4.
+        let mut clock = 0;
+        assert_eq!(
+            pick_dial_cam(&t, 524, &header(0, false, false), last, true, &mut clock),
+            3
         );
     }
 

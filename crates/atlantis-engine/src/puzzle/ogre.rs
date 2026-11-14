@@ -764,6 +764,9 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     // FUN_0043a1e0 seeded the puzzle LCG from the clock.
     let mut game = OgreGame::new(&mut e.puzzles.lcg_seed);
     game.reveal = e.game.exe.build.queen_reveal;
+    // The path cells are not reset: the previous play's (see
+    // `PuzzleState::ogre_path`).
+    (game.rules.path_x, game.rules.path_y) = e.puzzles.ogre_path;
     // The mouse unlocked. No SetCursorPos before the loop (the import slot
     // 0x00c302f8 has no reader in FUN_004240fc, FUN_0043a1e0, FUN_00448ad0
     // or FUN_0044203c; FUN_004439c4's is the held-piece clamp): the puzzle
@@ -776,9 +779,73 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     host.0.screen.frames = frames;
     host.0.sounds = sounds;
     let r = game.run(&mut host).await;
+    host.0.e.puzzles.ogre_path = (game.rules.path_x, game.rules.path_y);
     if host.0.e.should_abort() {
         1
     } else {
         r
+    }
+}
+
+#[cfg(test)]
+mod replay_tests {
+    use super::*;
+    use crate::hooks::NoScripts;
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::{button, with_engine};
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// A play whose first move puts the hero back on his own cell (a drop
+    /// on the origin is legal: FUN_00443f94 always sets its mask cell),
+    /// with the queen at (4, 6) (seed 1) and the path cells `path` left by
+    /// an earlier play: the result, or `None` without the game.
+    fn put_back(path: ([i32; 3], [i32; 3])) -> Option<i32> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "ogre_replay_keeps_the_path_cells",
+            move |mut e| async move {
+                e.puzzles.lcg_seed = 1;
+                e.puzzles.ogre_path = path;
+                let mut hooks = NoScripts;
+                let r = play(&mut e, &mut hooks).await;
+                // The cells of this play stay for the next one.
+                assert_eq!((e.puzzles.ogre_path.0[0], e.puzzles.ogre_path.1[0]), (0, 0));
+                g2.set(Some(r));
+            },
+            |sys, frame| {
+                let (hx, hy) = (piece_x(0) + 20, piece_y(0) + 20);
+                match frame {
+                    1 => sys.push_input(Input::MouseMove { x: hx, y: hy }),
+                    4 | 10 => button(sys, MouseButton::Left, true),
+                    6 | 12 => button(sys, MouseButton::Left, false),
+                    // Not won: leave.
+                    900 => sys.push_input(Input::Quit),
+                    _ => {}
+                }
+            },
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// FUN_00443c3c compares the queen with the three path cells after a
+    /// drop (decompile l. 37192-37198). On a replay the elbow and the
+    /// destination are still the previous play's last legal hover: over
+    /// the queen's hidden cell, putting the hero back wins at once
+    /// (emulated: audit/native-a1-review-2026-11-14
+    /// harness/puzzles-b_ogre_stale_path.py). At launch the cells are 0,
+    /// the hero's own start cell: no win.
+    #[test]
+    fn ogre_replay_keeps_the_path_cells() {
+        let Some(stale) = put_back(([0, 3, 4], [0, 6, 6])) else {
+            return;
+        };
+        assert_eq!(stale, 255);
+        assert_eq!(put_back(([0; 3], [0; 3])), Some(1));
     }
 }

@@ -423,8 +423,14 @@ impl HexaGame {
 struct Host<'a>(PuzzleHost<'a>);
 
 impl HexaIo for Host<'_> {
+    /// FUN_004404fc polls once a pass (0x004406a7); FUN_00441390 then
+    /// reads the pointer for the drop, the pick and the grab offsets
+    /// (0x004413be..0x004414a1) and the cursor FUN_00440cb8 draws there,
+    /// with no pump in between: a click is at the previous pass's pointer
+    /// ([`PuzzleHost::read_input_held_pointer`]), so a dropped piece lands
+    /// where the last frame showed it.
     fn start_input(&mut self) -> (i32, i32, bool, bool) {
-        let m = self.0.read_input();
+        let m = self.0.read_input_held_pointer();
         // The handler reads the bar request the poll toggled.
         (m.x, m.y, m.click, self.0.e.bar.request)
     }
@@ -479,6 +485,11 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     game.force_held_402 = e.hexa_forces_402();
     game.object_in_hand = e.vars.get("objetenmain");
     game.flag_temp6 = e.vars.get("flagtemp6");
+    // FUN_004406fc, before the loop and before any poll, sets OBJETENMAIN
+    // to 0x192 (0x0044076e) and then to 0 (0x00440883): the Escape test of
+    // FUN_0041a298 (0x0041a3fc..0x0041a415) sees an empty hand whatever
+    // the player entered with.
+    e.vars.set("objetenmain", 0);
     let mut host = Host(PuzzleHost::new(e, hooks));
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;
@@ -486,9 +497,8 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let r = game.run(&mut host).await;
     let e = host.0.e;
     e.puzzles.cursor = game.cursor;
-    // FUN_004406fc set OBJETENMAIN to 0 and FlagTemp6 to 1 (the 1997
-    // build: to 1 when 402 was in hand, else left).
-    e.vars.set("objetenmain", 0);
+    // FUN_004406fc set FlagTemp6 to 1 (the 1997 build: to 1 when 402 was
+    // in hand, else left).
     e.vars.set("flagtemp6", game.flag_temp6);
     if e.should_abort() {
         1
@@ -595,4 +605,21 @@ mod latch_tests {
         assert_eq!(turns(true, true), Some(0));
         assert_eq!(turns(true, false), Some(3));
     }
+}
+
+#[cfg(test)]
+mod click_pointer_tests {
+    use super::*;
+
+    // FUN_00441390 reads the pointer the pass's poll (0x004406a7) left
+    // unpumped on a press.
+    crate::puzzle::assets::click_pointer_test!(
+        hexa_click_at_the_previous_pointer,
+        Host,
+        |h: &mut Host<'_>| {
+            let (x, y, click, _) = h.start_input();
+            (x, y, click)
+        },
+        (100, 100)
+    );
 }

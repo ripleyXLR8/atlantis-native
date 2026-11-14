@@ -669,6 +669,11 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, stage: i32) -> i3
         game.restore(m);
     }
     game.object_in_hand = e.vars.get("objetenmain");
+    // FUN_004478d4, before the loop and before any poll, sets OBJETENMAIN
+    // to 0 (0x00447951): the Escape test of FUN_0041a298
+    // (0x0041a3fc..0x0041a415) sees an empty hand whatever stage piece the
+    // player entered with.
+    e.vars.set("objetenmain", 0);
     game.cursor = e.puzzles.cursor;
     let mut host = Host {
         host: PuzzleHost::new(e, hooks),
@@ -680,8 +685,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, stage: i32) -> i3
     let e = host.host.e;
     e.puzzles.cursor = game.cursor;
     e.puzzles.meta = Some(game.memory());
-    // FUN_004478d4 emptied the hand and may have set FlagTemp6.
-    e.vars.set("objetenmain", 0);
+    // FUN_004478d4 may have set FlagTemp6.
     if game.brought_flag != 0 {
         e.vars.set("flagtemp6", 1);
     }
