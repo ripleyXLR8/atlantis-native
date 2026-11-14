@@ -1145,7 +1145,7 @@ impl Engine {
             return;
         }
         while self.sys.poll_event().is_some() {}
-        self.turn_double_click.flag = false;
+        self.turn_double_click.clear();
         self.escape_request = false;
         self.bar.flags_reset();
     }

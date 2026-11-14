@@ -71,6 +71,8 @@ const N: usize = SCREEN_W * SCREEN_H;
 #[derive(Default)]
 struct FrameInput {
     left_press: bool,
+    /// Where the first left press was.
+    left_at: Option<(i32, i32)>,
     right_press: bool,
     escape: bool,
     enter: bool,
@@ -82,8 +84,12 @@ fn poll_input(e: &Engine) -> FrameInput {
         match ev {
             Input::MouseDown {
                 button: MouseButton::Left,
-                ..
-            } => fi.left_press = true,
+                x,
+                y,
+            } => {
+                fi.left_press = true;
+                fi.left_at.get_or_insert((x, y));
+            }
             Input::MouseDown {
                 button: MouseButton::Right,
                 ..
@@ -717,6 +723,20 @@ impl Dialogs {
                     let fi = poll_input(e);
                     // FUN_0041a298's view keys (0x0041a33c..0x0041a3ba).
                     e.poll_view_keys(fi.left_press);
+                    // A press can be the second of a double click whose
+                    // first ended the warp loop: Windows queues
+                    // WM_LBUTTONDBLCLK, which a later poll pumps (this
+                    // poll returns before its pump, 0x0041a2b5).
+                    let now = e.sys.millis();
+                    match fi.left_at {
+                        Some((x, y)) => {
+                            e.turn_double_click.queue_press(now, x, y);
+                        }
+                        None => {
+                            let (mode, menu) = (e.cursor_state.mode, e.escape_request);
+                            e.turn_double_click.dispatch(mode, menu);
+                        }
+                    }
                     // FUN_0041a298 in both line loops: a right press sets
                     // 0x00496120 and toggles the bar request; a left press
                     // in the same poll returns first (0x0041a2b5).
@@ -757,6 +777,11 @@ impl Dialogs {
             }
         }
         out.frames = player.shown;
+        // The talking head clears the double-click flag at its end
+        // (FUN_0042ee88 @ 0x0042f78c).
+        if talking_head {
+            e.turn_double_click.flag = false;
+        }
         if talking_head {
             e.sprites_hide_npcs = false;
             e.recomposite_sprite_layer();
@@ -2264,6 +2289,87 @@ mod puzzle_latch_tests {
         let held = held_play_ms(true).unwrap();
         assert!(free > 300, "{free} ms");
         assert!(held.abs_diff(free) <= 50, "{held} ms held, {free} ms not");
+    }
+
+    /// The voice-only line CHAPI041 /590 B played after a warp-loop click
+    /// at (320, 240) on a navigation zone (cursor state 5, which the
+    /// line's still-frame step keeps over the same zone), with a second
+    /// press at the same point `after` frames into it; then one turn poll.
+    /// The double-click flag 0x00496118 after the line and after the poll.
+    fn departure_double_click(after: u64) -> Option<(bool, bool)> {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_double_click_ending_a_departure_line_skips_the_video",
+            move |mut e| async move {
+                // A view of place 1 with a navigation zone at (320, 240).
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.pointer.pos = (320, 240);
+                let view = (0..315)
+                    .flat_map(|ia| (-4..=4).map(move |ib| (ia as f32 * 0.02, ib as f32 * 0.1)))
+                    .find(|&(a, b)| {
+                        e.set_view(a, b);
+                        matches!(e.pointer_targets(), (z, 0) if (1..0x200).contains(&z))
+                    })
+                    .expect("a navigation view in place 1");
+                e.set_view(view.0, view.1);
+                e.sys.set_mouse_pos(320, 240);
+                e.cursor_state.mode = 5;
+                let now = e.sys.millis();
+                e.turn_double_click.first_press(now, 320, 240);
+                let line = ConLine {
+                    speaker: "Chat".into(),
+                    params: "off".into(),
+                    text: "...".into(),
+                    ..ConLine::default()
+                };
+                let req = LineRequest {
+                    section: 590,
+                    letter: 'B',
+                    line,
+                    perso: 514,
+                    interactive: false,
+                    inc_perso: 0,
+                };
+                let mut d = Dialogs::new();
+                d.line(&mut e, &req).await;
+                let in_line = e.turn_double_click.flag;
+                e.turn_poll();
+                *g2.borrow_mut() = Some((in_line, e.turn_double_click.flag));
+            },
+            move |sys, f| {
+                let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut sound, 22050, 2);
+                if f == after {
+                    crate::test_support::button(sys, MouseButton::Left, true);
+                } else if f == after + 2 {
+                    crate::test_support::button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            *got.borrow()
+        } else {
+            None
+        }
+    }
+
+    /// A double click on an exit whose second press ends a departure
+    /// line: the press ends the line, and the poll returns before its
+    /// pump (0x0041a2b5), so WM_LBUTTONDBLCLK waits in the queue until the
+    /// turn's poll pumps it; the window procedure sets 0x00496118 with the
+    /// cursor state still 5 (0x00419c79..0x00419c8b), and the move skips
+    /// its video (0x00423f8a). A second press after the double-click time
+    /// is not one.
+    #[test]
+    fn a_double_click_ending_a_departure_line_skips_the_video() {
+        let Some(quick) = departure_double_click(10) else {
+            return;
+        };
+        assert_eq!(quick, (false, true));
+        assert_eq!(departure_double_click(40), Some((false, false)));
     }
 
     /// The voice-only lines that follow a puzzle in which Escape was

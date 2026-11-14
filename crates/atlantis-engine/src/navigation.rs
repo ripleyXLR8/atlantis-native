@@ -425,7 +425,7 @@ impl Engine {
         // The entry block clears 0x00496120 and 0x004960c4 (0x0041bff4),
         // and the double-click flag 0x00496118 (0x0041bfc2).
         self.bar.flags_reset();
-        self.turn_double_click.flag = false;
+        self.turn_double_click.clear();
         // No wait at the entry (0x0041bfb8..0x0041c01e; the first frame
         // polls FUN_0041a298 @ 0x0041c5f2). A click is a press edge
         // (FUN_0042e624's latch): a button still down from a press an
@@ -458,7 +458,7 @@ impl Engine {
             let fi = self.poll_frame_input();
             // Each frame starts by clearing the double-click flag
             // (0x0041c04a).
-            self.turn_double_click.flag = false;
+            self.turn_double_click.clear();
             // This frame's relative motion (x right, y down).
             let (motion_x, motion_y) = self.sys.take_mouse_relative();
             unpumped = (unpumped.0 + motion_x, unpumped.1 + motion_y);

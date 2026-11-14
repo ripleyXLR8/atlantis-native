@@ -245,6 +245,16 @@ fn step(
 /// zone holds through it: a double click whose second press comes during
 /// the turn skips the video.
 ///
+/// A double click whose second press ends a dialog line of the departure
+/// scan (`FUN_00427814` @ 0x00423dd4) does the same: the press is a new
+/// edge that ends the line, and `FUN_0041a298` returns at once without
+/// pumping (0x0041a2b5), so the WM_LBUTTONDBLCLK stays queued until a
+/// later poll pumps it: a following line's, or the turn's. The window
+/// procedure then tests the cursor state of that moment; a talking-head
+/// line clears the flag at its end (`FUN_0042ee88` @ 0x0042f78c), before
+/// the next pump ([`TurnDoubleClick::queue_press`],
+/// [`TurnDoubleClick::dispatch`]).
+///
 /// When Windows sends WM_LBUTTONDBLCLK is the system's rule, not the
 /// binary's: a second press within the double-click time of the first,
 /// inside a rectangle centred on it (GetDoubleClickTime, SM_CXDOUBLECLK /
@@ -256,6 +266,8 @@ pub struct TurnDoubleClick {
     pub flag: bool,
     /// A first press is kept.
     armed: bool,
+    /// A WM_LBUTTONDBLCLK is queued, not yet dispatched.
+    queued: bool,
     first_ms: u64,
     first: (i32, i32),
 }
@@ -278,6 +290,23 @@ impl TurnDoubleClick {
     /// 0x00496138. True when it is a double click (whether or not it sets
     /// the flag); the press after a double click starts a new pair.
     pub fn press(&mut self, ms: u64, x: i32, y: i32, cursor_mode: u8, menu_request: bool) -> bool {
+        let double = self.queue_press(ms, x, y);
+        self.dispatch(cursor_mode, menu_request);
+        double
+    }
+
+    /// The flag cleared where the original clears 0x00496118 after a poll
+    /// that pumped the messages (the warp loop's frames, the end of a
+    /// move): a queued WM_LBUTTONDBLCLK went with them.
+    pub fn clear(&mut self) {
+        self.flag = false;
+        self.queued = false;
+    }
+
+    /// A later left press seen by a poll that does not pump (a dialog
+    /// line's press edge, 0x0041a2b5): Windows queues WM_LBUTTONDBLCLK when
+    /// it is the second of a pair. True when it is.
+    pub fn queue_press(&mut self, ms: u64, x: i32, y: i32) -> bool {
         let (dx, dy) = (x - self.first.0, y - self.first.1);
         let half = Self::RECT_SIZE / 2;
         let double = self.armed
@@ -286,13 +315,22 @@ impl TurnDoubleClick {
             && (-half..=half).contains(&dy);
         if double {
             self.armed = false;
-            // 0x00419c79: CMP byte [0x004968ac],5 / CMP [0x00496138],1
-            if cursor_mode == 5 || menu_request {
-                self.flag = true;
-            }
+            self.queued = true;
         } else {
             self.first_press(ms, x, y);
         }
         double
+    }
+
+    /// A poll that pumps the queued WM_LBUTTONDBLCLK: the window procedure
+    /// sets the flag when the cursor state 0x004968ac is 5 or the menu
+    /// request 0x00496138 is 1.
+    pub fn dispatch(&mut self, cursor_mode: u8, menu_request: bool) {
+        if std::mem::take(&mut self.queued) {
+            // 0x00419c79: CMP byte [0x004968ac],5 / CMP [0x00496138],1
+            if cursor_mode == 5 || menu_request {
+                self.flag = true;
+            }
+        }
     }
 }
