@@ -123,7 +123,7 @@ fn the_fixes_of_each_game() {
         .into_iter()
         .filter(|f| f.of_every_build())
         .collect();
-    assert_eq!(every.len(), 10);
+    assert_eq!(every.len(), 11);
     for (var, build, own) in SETS {
         let Some(g) = game(var) else { continue };
         assert_eq!(g.exe.build.name, build, "{var}");

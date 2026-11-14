@@ -433,7 +433,10 @@ impl Scripts {
             // ChangeWam=name: load "wam\name" and make its first place the
             // current one (@ 0x0042a1f8..0x0042a2b6). Every ChangeWam of the
             // game is followed by a Vue= in the same section, which moves
-            // the player; until then no place is entered.
+            // the player; until then no place is entered. The load's result
+            // is not tested (@ 0x0042a285): a WAM that cannot be opened
+            // (its error box, Engine::load_wam) leaves the one in memory,
+            // whose first record becomes the place.
             if let Some(wam) = set.wam_name {
                 e.set_wam_path(&latin1_bytes(&wam));
                 e.load_wam(&wam).await;
@@ -1993,6 +1996,67 @@ mod tests {
             .map(|&v| change_cd_disc(v))
             .collect();
         assert_eq!(got, [1, 2, 3, 4, 4, 4, 4, 4, 1]);
+    }
+
+    /// CHAPI079 l. 113..116 (disc 4, PALAIS3): `ChangeWam=atlan4.wam`,
+    /// a WAM only disc 1's archive holds. As the original
+    /// ([`BugFix::AnyDisc`] off), the WAM loader `FUN_00421ebc` shows its
+    /// error box with the path and keeps PALAIS3, and the handler makes
+    /// its first record (180) the place (@ 0x0042a28a, 0x0042a2b6); with
+    /// the fix, the day city's WAM is read from disc 1.
+    #[test]
+    fn change_wam_reads_the_disc_in_the_drive_only() {
+        use crate::enhancements::{BugFix, Enhancements};
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "change_wam_reads_the_disc_in_the_drive_only",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                s.exec_set(&mut e, None, "changecd=4").await;
+                assert!(!e.game.big.on_disc("WAM\\ATLAN4.WAM", 4));
+                assert!(e.game.big.on_disc("WAM\\ATLAN4.WAM", 1));
+                for enh in [Enhancements::original(), Enhancements::default()] {
+                    e.set_enhancements(enh);
+                    e.set_wam_path(b"PALAIS3.WAM");
+                    assert!(e.load_wam("PALAIS3.WAM").await);
+                    let trace = Rc::new(RefCell::new(Vec::new()));
+                    e.trace = Some(trace.clone());
+                    s.exec_set(&mut e, None, "changewam=atlan4.wam").await;
+                    let boxes: Vec<String> = trace
+                        .borrow()
+                        .iter()
+                        .filter_map(|ev| match ev {
+                            Event::ErrorBox(t) => Some(t.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                    g2.borrow_mut().push((
+                        enh.fix(BugFix::AnyDisc),
+                        boxes,
+                        e.wam_name.clone(),
+                        e.current_place_id,
+                    ));
+                }
+            },
+            |sys, _| sys.push_input(crate::sys::Input::KeyDown(crate::sys::Key::Enter)),
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        assert_eq!(
+            got[0],
+            (
+                false,
+                vec!["Fichier introuvable : wam\\atlan4.wam".to_string()],
+                "PALAIS3.WAM".to_string(),
+                Some(180)
+            )
+        );
+        assert_eq!((got[1].0, got[1].1.len()), (true, 0));
+        assert_eq!(got[1].2, "ATLAN4.WAM");
     }
 
     /// ChangeCd outside 1..=4 asks for disc 4 (it was ignored).

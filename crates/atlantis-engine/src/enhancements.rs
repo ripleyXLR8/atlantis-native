@@ -93,6 +93,17 @@ pub enum BugFix {
     /// LOAD and QUIT take the same exit without the puzzle (0x00496124 is
     /// 0): the zone-999 scan runs ([`crate::engine::Engine::no_click_exit`]).
     GameOverPuzzle,
+    /// A file is read from whichever disc's archive holds it. Off, as the
+    /// original, from the disc in the drive only: it has one archive open,
+    /// the disc's (`FUN_0041eda8` closes the archive and opens
+    /// `bigcd<N>.big`, N = 0x00772913), then looks in the file system
+    /// (`_GL_FileOpen`); the WAM loader `FUN_00421ebc` shows its error box
+    /// (dialog 0x65, code 0xc, the path @ 0x00421f07..0x00421f30) on a
+    /// file that archive lacks and keeps the WAM in memory. CHAPI079 (disc
+    /// 4) holds `ChangeWam=atlan4.wam`, which only disc 1 has: the box,
+    /// and the player stays in PALAIS3 (with the fix, in the day city).
+    /// The WAM loads only ([`crate::engine::Engine::load_wam`]).
+    AnyDisc,
     /// The hexagon puzzle always places its pieces, as the 2001 entry does
     /// (OBJETENMAIN set to 402 before its test). Off, as the 1997 and the
     /// Chinese builds (atlantis-cd-en-688128 FUN_0043c570), the pieces are
@@ -170,7 +181,7 @@ pub enum BugFix {
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 19] = [
+    pub const ALL: [BugFix; 20] = [
         BugFix::MusicLoop,
         BugFix::CinemaSound,
         BugFix::HeadOverlay,
@@ -181,6 +192,7 @@ impl BugFix {
         BugFix::SnakesFirstWin,
         BugFix::PuzzleEscape,
         BugFix::GameOverPuzzle,
+        BugFix::AnyDisc,
         BugFix::HexagonPieces,
         BugFix::LoadMusik,
         BugFix::SharpS,
@@ -205,6 +217,7 @@ impl BugFix {
             BugFix::SnakesFirstWin => "fix_snakes_first_win",
             BugFix::PuzzleEscape => "fix_puzzle_escape",
             BugFix::GameOverPuzzle => "fix_gameover_puzzle",
+            BugFix::AnyDisc => "fix_any_disc",
             BugFix::HexagonPieces => "fix_hexagon_pieces",
             BugFix::LoadMusik => "fix_loadmusik",
             BugFix::SharpS => "fix_sharp_s",

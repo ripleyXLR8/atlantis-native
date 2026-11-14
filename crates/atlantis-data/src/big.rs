@@ -174,6 +174,25 @@ impl BigArchive {
         Some(copy.unwrap_or(first))
     }
 
+    /// Whether the original, with disc `disc`'s archive open
+    /// (BIGCD<disc>.BIG, the only one it opens: `FUN_0041eda8`), can open
+    /// `name`: that archive holds it, or the game directory does with
+    /// loose files (`_GL_FileOpen` looks in the open archive, then in the
+    /// file system). Without that disc's archive, whether any source holds
+    /// it ([`BigArchive::contains`]).
+    pub fn on_disc(&self, name: &str, disc: u8) -> bool {
+        let Some(archive) = self.archive_of_disc(disc) else {
+            return self.contains(name);
+        };
+        let k = key(name);
+        let in_archive = self.entries.get(&k).is_some_and(|e| e.disc == archive)
+            || self
+                .copies
+                .get(&k)
+                .is_some_and(|list| list.iter().any(|e| e.disc == archive));
+        in_archive || (self.loose && self.src.size(&k).is_some())
+    }
+
     /// The discs (1..4) that carry a member, in mount order.
     pub fn discs_of(&self, name: &str) -> Vec<u8> {
         let k = key(name);
@@ -291,5 +310,25 @@ mod tests {
         assert_eq!((file.as_str(), size), ("BIGCD2.BIG", 3));
         big.set_disc_copy(None);
         assert_eq!(big.read("A.TXT").unwrap(), b"one");
+    }
+
+    /// What the original opens with one disc's archive: that archive's
+    /// members, and with loose files the game directory's; a disc without
+    /// an archive here falls back to every source.
+    #[test]
+    fn what_one_disc_holds() {
+        let big = archive();
+        assert!(big.on_disc("a.txt", 1) && big.on_disc("A.TXT", 2));
+        assert!(big.on_disc("B.TXT", 1) && !big.on_disc("B.TXT", 2));
+        assert!(!big.on_disc("C.TXT", 1) && big.on_disc("C.TXT", 3));
+        assert!(big.on_disc("C.TXT", 4) && !big.on_disc("D.TXT", 4));
+        let mut files = MemFiles::new();
+        files.insert("BIGCD1.BIG", bigfile(&[("A.TXT", b"one")]));
+        files.insert("BIGCD2.BIG", bigfile(&[("B.TXT", b"b")]));
+        files.insert("WAM\\X.WAM", b"x".to_vec());
+        let mut loose = BigArchive::new(Arc::new(files));
+        assert!(loose.mount("BIGCD1.BIG") && loose.mount("BIGCD2.BIG"));
+        loose.set_loose(true);
+        assert!(loose.on_disc("WAM\\X.WAM", 2) && !loose.on_disc("A.TXT", 2));
     }
 }
