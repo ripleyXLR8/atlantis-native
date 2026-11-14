@@ -300,8 +300,7 @@ impl TurnDoubleClick {
     /// SM_CXDOUBLECLK / SM_CYDOUBLECLK's default.
     pub const RECT_SIZE: i32 = 4;
 
-    /// A left press that is not the second of a pair (the click that ends
-    /// the warp loop).
+    /// A left press that starts a pair (not the second of one).
     pub fn first_press(&mut self, ms: u64, x: i32, y: i32) {
         self.armed = true;
         self.first_ms = ms;
@@ -347,8 +346,7 @@ impl TurnDoubleClick {
 
     /// A left press read by a loop whose own polls dispatch the message
     /// (the menu loops `FUN_0041c838`, `FUN_0041d5f4`, `FUN_0041d940`,
-    /// `FUN_0041ec7c`, `FUN_0041cf78`, `FUN_0041dea4`, and the video skip of
-    /// `FUN_0041bc74`): Windows pairs it with the last press whatever loop
+    /// `FUN_0041ec7c`, `FUN_0041cf78`, `FUN_0041dea4`): Windows pairs it with the last press whatever loop
     /// read that one. True when it is the second of a pair
     /// (WM_LBUTTONDBLCLK, not WM_LBUTTONDOWN); the caller applies the
     /// message (the flag 0x00496118 is the caller's).

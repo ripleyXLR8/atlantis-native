@@ -880,9 +880,12 @@ impl Engine {
                                     // Windows pairs the next press with
                                     // this one (a double click whose first
                                     // press ends PREINTRO.HNM arms the
-                                    // player screen's flag).
+                                    // player screen's flag); as the second
+                                    // of a pair it queues WM_LBUTTONDBLCLK,
+                                    // which this poll does not pump
+                                    // (0x0041a2b5): a later poll does.
                                     let now = self.sys.millis();
-                                    self.turn_double_click.pair(now, x, y);
+                                    self.turn_double_click.queue_press(now, x, y);
                                 }
                                 // No click (FUN_0042e624's latch), but
                                 // Windows pairs it.
@@ -892,7 +895,7 @@ impl Engine {
                                     y,
                                 } => {
                                     let now = self.sys.millis();
-                                    self.turn_double_click.pair(now, x, y);
+                                    self.turn_double_click.queue_press(now, x, y);
                                 }
                                 Input::MouseDown {
                                     button: MouseButton::Right,
@@ -903,6 +906,13 @@ impl Engine {
                             }
                         }
                         self.poll_view_keys(left);
+                        // Without a left press edge the poll pumps
+                        // (0x0041a2be): a queued WM_LBUTTONDBLCLK is
+                        // dispatched (window procedure @ 0x00419c79).
+                        if !left {
+                            let (mode, menu) = (self.cursor_state.mode, self.escape_request);
+                            self.turn_double_click.dispatch(mode, menu);
+                        }
                         run.poll(left, right, escape);
                     }
                     Some(Err(e)) => {
@@ -1562,6 +1572,68 @@ mod escape_tests {
         let (turned, n_turned) = turn_with_f5("f5_moves_the_turn_frames", true).unwrap();
         assert_ne!(turned, still);
         assert_eq!((n_still, n_turned), (11, 9));
+    }
+
+    /// The press that cuts a move's film and the click that ends the next
+    /// warp loop, within the double-click time at the same point: Windows
+    /// sends the second as WM_LBUTTONDBLCLK whatever loops read them; the
+    /// warp loop's last poll does not pump it (0x0041a2b5), the turn's
+    /// first poll does with the cursor state 5 (0x00419c79), and the
+    /// move's film is skipped (0x00423f8a). With `film` false the warp
+    /// click follows no press: no flag.
+    fn film_press_then_warp_click(film: bool) -> Option<bool> {
+        use crate::test_support::button;
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let phase = Rc::new(Cell::new((0u8, 0u64)));
+        let p2 = phase.clone();
+        let ran = with_engine(
+            "a_warp_click_pairs_with_the_film_press",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                // The turn before a move's film leaves the cursor at the
+                // centre (0x140, 0xf0); the film does not move it.
+                e.sys.set_mouse_pos(320, 240);
+                if film {
+                    let video = e.place().unwrap().transitions[0].video.clone();
+                    p2.set((1, e.sys.frames_presented()));
+                    e.play_transition_video(&video, None, super::TRANSITION_FRAME_MS)
+                        .await;
+                    e.input_flags_reset();
+                }
+                p2.set((2, e.sys.frames_presented()));
+                e.handle_warp(&mut crate::hooks::NoScripts).await;
+                p2.set((0, 0));
+                e.cursor_state.mode = 5;
+                e.turn_poll();
+                *g2.borrow_mut() = Some(e.turn_double_click.flag);
+            },
+            move |sys, _| {
+                let (p, f0) = phase.get();
+                let k = sys.frames_presented().saturating_sub(f0);
+                match (p, k) {
+                    (1, 3) | (2, 4) => button(sys, MouseButton::Left, true),
+                    (1, 4) | (2, 5) => button(sys, MouseButton::Left, false),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let flag = got.borrow().expect("no result");
+        Some(flag)
+    }
+
+    #[test]
+    fn a_warp_click_pairs_with_the_film_press() {
+        let Some(paired) = film_press_then_warp_click(true) else {
+            return;
+        };
+        assert!(paired);
+        assert_eq!(film_press_then_warp_click(false), Some(false));
     }
 
     /// A second press of a double click read by a poll of the turn: the
