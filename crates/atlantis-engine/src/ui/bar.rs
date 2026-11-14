@@ -288,7 +288,8 @@ impl Engine {
         let t0 = self.sys.millis();
         let ran = hooks.bar_timers(self).await;
         if self.sys.millis() != t0 {
-            *pointer = self.sys.mouse();
+            self.sync_pointer_mouse();
+            *pointer = self.pointer.pos;
         }
         let close =
             self.should_abort() || self.vars.get("gameover") != 0 || self.vars.get("exit") != 0;
@@ -358,7 +359,7 @@ impl Engine {
     /// 443, or higher after a slide-in cut short (a pick-up's slot back at
     /// 443); its end test reads slot 0's (@ 0x0042c816).
     async fn bar_slide_out(&mut self, hooks: &mut dyn ScriptHooks, game_over: bool) -> bool {
-        let mut pointer = self.sys.mouse();
+        let mut pointer = self.pointer.pos;
         let mut closed = false;
         while self.bar_slot_ys[0] < 0x208 && !self.should_abort() {
             self.animate_sprites();
@@ -412,7 +413,11 @@ impl Engine {
         if mi.left_press {
             return;
         }
-        *pointer = self.sys.mouse();
+        // The pump's WM_MOUSEMOVE (0x00419c10..0x00419c29), if the mouse
+        // moved: 0x004960ec / 0x004960f0, which the slides' cursor steps
+        // read too (FUN_00422bb0 @ 0x00422bd5, FUN_00422d5c @ 0x00422d7a).
+        self.sync_pointer_mouse();
+        *pointer = self.pointer.pos;
         if mi.right_press {
             self.bar
                 .right_pressed(self.section_play, self.menu_request());
@@ -420,6 +425,26 @@ impl Engine {
         if mi.escape && self.escape_gate_open() {
             self.latch_escape();
         }
+    }
+
+    /// The pointer a bar starts from: 0x004960ec / 0x004960f0 (the bar
+    /// session's item test reads it, dc:22515, and FUN_0042c8ac's scroll,
+    /// dc:22949), not the Windows cursor, which a panorama load leaves
+    /// apart from it (`FUN_0044a424` @ 0x0044a70b / 0x0044a715, no
+    /// SetCursorPos). From the warp loop (the mouse locked) the mouse goes
+    /// to the Windows cursor, as at the loop's other exits; elsewhere (a
+    /// pick-up after a dialog) a motion since the last mark is the
+    /// WM_MOUSEMOVE that set the pointer (0x00419c10..0x00419c29).
+    fn bar_entry_pointer(&mut self) -> (i32, i32) {
+        if self.sys.mouse_locked() {
+            self.sys.set_mouse_locked(false);
+            self.sys
+                .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
+            self.mark_pointer_mouse();
+        } else {
+            self.sync_pointer_mouse();
+        }
+        self.pointer.pos
     }
 
     /// A bar session (`FUN_0042c098`): the slide-in, the bar loop
@@ -430,7 +455,6 @@ impl Engine {
     /// slide-out. Returns the guest talked to (other than 592), 0 for
     /// none.
     pub async fn display_bar(&mut self, hooks: &mut dyn ScriptHooks) -> i32 {
-        self.sys.set_mouse_locked(false);
         // The warp loop opens the bar on 0x004960c4 = 1 (0x0041c6d2), and
         // FUN_0042c2c4 clears it only when GameOver or Exit ends the slide
         // (0x0042c55d): the slide-in's timer sections run their lines and
@@ -439,7 +463,7 @@ impl Engine {
         self.bar.request = true;
         // The pointer 0x004960ec / 0x004960f0 as the warp loop's last pump
         // left it: the slide-in pumps no message.
-        let mut pointer = self.sys.mouse();
+        let mut pointer = self.bar_entry_pointer();
         self.bar_slide_in(hooks, &mut pointer).await;
         if self.should_abort() {
             self.bar_end();
@@ -666,11 +690,10 @@ impl Engine {
     /// shows the new object in hand until a left or a right press, the bar
     /// slides out. True for a right press (the object stays in hand).
     pub async fn display_pickup(&mut self, hooks: &mut dyn ScriptHooks) -> bool {
-        self.sys.set_mouse_locked(false);
         // 0x004960c4 = 1 (@ 0x004279e8) for the slides and the hold loop,
         // cleared after the slide-out (@ 0x00427b53).
         self.bar.request = true;
-        let mut pointer = self.sys.mouse();
+        let mut pointer = self.bar_entry_pointer();
         self.bar_slide_in(hooks, &mut pointer).await;
         // FUN_004278a0 goes from the slide-in to the hold loop with no
         // GameOver test (dc:19317-19326), and the hold loop runs no timers
@@ -713,7 +736,7 @@ impl Engine {
             // the slide-out then runs with it off.
             self.bar_poll_flags(&mi, &mut pointer);
             match self
-                .hold_pass(mi.left_press, mi.right_press, &mut next_scroll)
+                .hold_pass(mi.left_press, mi.right_press, pointer, &mut next_scroll)
                 .await
             {
                 0 => {}
@@ -744,13 +767,20 @@ impl Engine {
 
     /// One pass of the hold loop `FUN_0042cc98` after its frame, with the
     /// press edges the input `FUN_0041a298` read (@ 0x0042cf14):
-    /// `FUN_00432178` (@ 0x0042cf19), the edge scroll (@ 0x0042cf1e..
-    /// 0x0042cf8f, at the port's pace), then the loop test on the edges
+    /// `FUN_00432178` (@ 0x0042cf19), the edge scroll at the pointer
+    /// 0x004960ec / 0x004960f0 (@ 0x0042cf1e..0x0042cf8f, at the port's
+    /// pace), then the loop test on the edges
     /// (@ 0x0042cd05): 1 for a left press, 2 for a right one, else 0. The
     /// pass that reads the click runs the sounds and the scroll too.
-    async fn hold_pass(&mut self, left: bool, right: bool, next_scroll: &mut u64) -> i32 {
+    async fn hold_pass(
+        &mut self,
+        left: bool,
+        right: bool,
+        pointer: (i32, i32),
+        next_scroll: &mut u64,
+    ) -> i32 {
         self.bar_sounds().await;
-        self.bar_scroll(self.sys.mouse(), next_scroll);
+        self.bar_scroll(pointer, next_scroll);
         if left {
             1
         } else if right {
@@ -837,6 +867,10 @@ impl Engine {
         if anim.is_empty() {
             return;
         }
+        // The steps test the pointer where the section's last pump left
+        // it (FUN_00422bb0 / FUN_00422d5c read 0x004960ec / 0x004960f0,
+        // @ 0x00422bd5, 0x00422d7a); the loop pumps none itself.
+        self.sync_pointer_mouse();
         let (mx, my) = self.sys.mouse();
         for i in 0..20 {
             if self.should_abort() || !self.warp_loaded {
@@ -866,6 +900,10 @@ impl Engine {
         if !self.warp_loaded {
             return;
         }
+        // The steps test the pointer where the section's last pump left
+        // it (0x004960ec / 0x004960f0, @ 0x00422bd5, 0x00422d7a); the slide
+        // pumps none itself.
+        self.sync_pointer_mouse();
         let mut x = from;
         while if step < 0 { x > to } else { x < to } {
             if self.should_abort() {
@@ -1502,6 +1540,110 @@ mod tests {
         }
         assert_eq!(*talks.borrow(), [(600, None)]);
         assert_eq!(*got.borrow(), Some((600, Some(Abort::NewGame))));
+    }
+
+    /// The conversations a bar asks for.
+    struct TalkProbe(Rc<RefCell<Vec<i32>>>);
+
+    impl ScriptHooks for TalkProbe {
+        fn talk_to_guest<'a>(&'a mut self, _e: &'a mut Engine, id: i32) -> HookFuture<'a, ()> {
+            self.0.borrow_mut().push(id);
+            ready(())
+        }
+    }
+
+    /// The bar opened from the warp loop starts from the pointer
+    /// 0x004960ec / 0x004960f0 (its tests read it, dc:22515, dc:22949),
+    /// not the Windows cursor: after a panorama load (`FUN_0044a424` @
+    /// 0x0044a70b / 0x0044a715, no SetCursorPos) the two differ until the
+    /// mouse moves. Here the pointer is on a follower's portrait, the
+    /// cursor away from it, and the mouse does not move: the bar's click
+    /// talks to the follower (round 7, cu's leftover).
+    #[test]
+    fn the_bar_starts_from_the_game_pointer() {
+        let talks = Rc::new(RefCell::new(Vec::new()));
+        let t2 = talks.clone();
+        let ran = with_engine(
+            "the_bar_starts_from_the_game_pointer",
+            move |mut e| async move {
+                e.guests.id[0] = 600;
+                e.guests.sprite[0] = 0;
+                e.guests.count = 1;
+                e.guests_shown = true;
+                // The warp loop's state: the mouse locked, the pointer on
+                // the portrait (x 540.., y 294..), the cursor elsewhere.
+                e.sys.set_mouse_pos(100, 100);
+                e.sys.set_mouse_locked(true);
+                e.pointer.pos = (560, 320);
+                e.pointer.cursor = (100, 100);
+                e.display_bar(&mut TalkProbe(t2)).await;
+            },
+            click_at_40,
+        );
+        if ran {
+            assert_eq!(*talks.borrow(), [600]);
+        }
+    }
+
+    /// The cursor state 0x004968ac after a follower's portrait slid in
+    /// (`FUN_0042b480`), the pointer over a navigation zone of place 1
+    /// before it, the mouse moved off every zone when `moved`.
+    fn guest_slide_cursor_mode(moved: bool) -> Option<u8> {
+        let got = Rc::new(std::cell::Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_guest_slide_steps_the_cursor_at_the_mouse",
+            move |mut e| async move {
+                e.load_interface().await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let points: Vec<(i32, i32)> = (0..48)
+                    .flat_map(|j| (0..64).map(move |i| (i * 10, j * 10)))
+                    .collect();
+                let mut find = |want: &dyn Fn((u32, u32)) -> bool| {
+                    points.iter().copied().find(|&p| {
+                        e.pointer.pos = p;
+                        want(e.pointer_targets())
+                    })
+                };
+                let at = find(&|(z, _)| (1..0x200).contains(&z)).expect("a navigation zone");
+                let off = find(&|t| t == (0, 0)).expect("a point over nothing");
+                e.sys.set_mouse_pos(at.0, at.1);
+                e.pointer.mouse_moved(at);
+                e.mark_pointer_mouse();
+                if moved {
+                    // A motion an earlier line's poll pumped.
+                    e.sys.push_input(Input::MouseMove { x: off.0, y: off.1 });
+                }
+                e.load_cursor_sprites().await;
+                e.cursor_state = Default::default();
+                e.add_guest(600).await;
+                g2.set(Some(e.cursor_state.mode));
+            },
+            |_, _| {},
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// The guests' slides present through `FUN_0041afd0` (@ 0x0042b6a7 /
+    /// 0x0042b8d3), whose step `FUN_00422fcc` hit-tests the pointer
+    /// 0x004960ec / 0x004960f0 (`FUN_00422bb0` @ 0x00422bd5,
+    /// `FUN_00422d5c` @ 0x00422d7a) that every WM_MOUSEMOVE sets
+    /// (0x00419c10..0x00419c29): with the mouse moved off the zone, the
+    /// step finds no zone (state 0), not the zone of the old pointer
+    /// (state 5) (round 7, cu's leftover).
+    #[test]
+    fn a_guest_slide_steps_the_cursor_at_the_mouse() {
+        let Some(still) = guest_slide_cursor_mode(false) else {
+            return;
+        };
+        assert_eq!(still, 5);
+        assert_eq!(guest_slide_cursor_mode(true), Some(0));
     }
 
     /// The bar request each timer pass sees.
@@ -2614,11 +2756,12 @@ mod tests {
                                 break;
                             }
                             let (x, y) = field(&r, "mouse").split_once(',').unwrap();
-                            e.sys.set_mouse_pos(x.parse().unwrap(), y.parse().unwrap());
+                            let p = (x.parse().unwrap(), y.parse().unwrap());
+                            e.sys.set_mouse_pos(p.0, p.1);
                             let edge = field(&r, "edge");
                             AmbientProbe::arm(&mut e);
                             let end = e
-                                .hold_pass(edge == "left", edge == "right", &mut next_scroll)
+                                .hold_pass(edge == "left", edge == "right", p, &mut next_scroll)
                                 .await;
                             passes += 1;
                             let edge = ["-", "left", "right"][end as usize];
