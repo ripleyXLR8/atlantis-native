@@ -134,7 +134,10 @@ pub(crate) async fn error_box(e: &Engine, font: &SubtitleFont, text: &str) {
             }
         }
     };
-    drain(e).await;
+    // FUN_0042ee88 opens the box at once (FUN_0041a1d4, then
+    // DialogBoxParamA @ 0x0042f048): no wait for the buttons. A press
+    // queued before it is the game window's, not the OK button's.
+    while e.sys.poll_event().is_some() {}
     loop {
         if e.sys.should_quit() {
             break;
@@ -2114,6 +2117,38 @@ mod view_key_tests {
     use crate::scripts::{resolve_speaker_perso, LineRequest, Scripts};
     use crate::sys::Key;
     use crate::test_support::with_engine;
+
+    /// The error box shows at once, the button that started the line
+    /// still down (FUN_0042ee88 @ 0x0042f00f..0x0042f048: no wait for the
+    /// release before DialogBoxParamA).
+    #[test]
+    fn the_error_box_shows_with_a_button_held() {
+        use crate::sys::{Input, MouseButton};
+        let first = Rc::new(std::cell::Cell::new(None::<u64>));
+        let f2 = first.clone();
+        let ran = with_engine(
+            "the_error_box_shows_with_a_button_held",
+            move |e| async move {
+                crate::test_support::button(&e.sys, MouseButton::Left, true);
+                let font = crate::subtitles::SubtitleFont::new();
+                error_box(&e, &font, "Fichier introuvable").await;
+            },
+            move |sys, f| {
+                // The box's grey fill, above its text, at any width.
+                if f2.get().is_none() && sys.screen.borrow()[206 * SCREEN_W + 320] == 0xc618 {
+                    f2.set(Some(f));
+                }
+                match f {
+                    30 => crate::test_support::button(sys, MouseButton::Left, false),
+                    32 => sys.push_input(Input::KeyDown(Key::Enter)),
+                    _ => {}
+                }
+            },
+        );
+        if ran {
+            assert!(first.get().is_some_and(|f| f < 30), "{:?}", first.get());
+        }
+    }
 
     /// FUN_0041a298 adds 0.034906 rad to 0x00bcb59c on every poll with F5
     /// held and no new left press (0x0041a2b5, 0x0041a33c): in a puzzle's
