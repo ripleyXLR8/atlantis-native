@@ -1089,13 +1089,31 @@ impl Engine {
 /// the input of pass i is in the queue when the engine reads it. The first
 /// pass's click cannot be (a button already down when a puzzle starts is
 /// no click): the scenarios used have none.
+///
+/// The golden sets the pointer of every pass; through the engine's input
+/// a click is handled at the pointer of the pass before it in the puzzles
+/// whose handler reads the pointer after their one poll a pass
+/// (FUN_0041a298 returns before its message pump on a press edge), so the
+/// mouse moves to a click's place one pass early.
 fn replay_in_engine(g: Game, id: i32, object: i32, s: &Scenario) -> i32 {
     let mut e = Engine::new(g, id, object);
     let mut colours = 0;
-    for (i, l) in s.lines.iter().enumerate() {
+    let pass = |l: &str| -> (i32, i32, bool, bool) {
         let tok: Vec<&str> = l[..l.find('|').unwrap()].split_whitespace().collect();
-        let (x, y) = (tok[1].parse().unwrap(), tok[2].parse().unwrap());
-        e.pass(x, y, tok[3] == "1", tok.get(4) == Some(&"1"));
+        (
+            tok[1].parse().unwrap(),
+            tok[2].parse().unwrap(),
+            tok[3] == "1",
+            tok.get(4) == Some(&"1"),
+        )
+    };
+    for (i, l) in s.lines.iter().enumerate() {
+        let (x, y, click, right) = pass(l);
+        let (x, y) = match s.lines.get(i + 1).map(|n| pass(n)) {
+            Some((nx, ny, true, _)) if !click => (nx, ny),
+            _ => (x, y),
+        };
+        e.pass(x, y, click, right);
         if e.result().is_some() {
             break;
         }

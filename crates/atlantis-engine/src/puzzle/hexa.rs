@@ -423,8 +423,14 @@ impl HexaGame {
 struct Host<'a>(PuzzleHost<'a>);
 
 impl HexaIo for Host<'_> {
+    /// FUN_004404fc polls once a pass (0x004406a7); FUN_00441390 then
+    /// reads the pointer for the drop, the pick and the grab offsets
+    /// (0x004413be..0x004414a1) and the cursor FUN_00440cb8 draws there,
+    /// with no pump in between: a click is at the previous pass's pointer
+    /// ([`PuzzleHost::read_input_held_pointer`]), so a dropped piece lands
+    /// where the last frame showed it.
     fn start_input(&mut self) -> (i32, i32, bool, bool) {
-        let m = self.0.read_input();
+        let m = self.0.read_input_held_pointer();
         // The handler reads the bar request the poll toggled.
         (m.x, m.y, m.click, self.0.e.bar.request)
     }
@@ -595,4 +601,21 @@ mod latch_tests {
         assert_eq!(turns(true, true), Some(0));
         assert_eq!(turns(true, false), Some(3));
     }
+}
+
+#[cfg(test)]
+mod click_pointer_tests {
+    use super::*;
+
+    // FUN_00441390 reads the pointer the pass's poll (0x004406a7) left
+    // unpumped on a press.
+    crate::puzzle::assets::click_pointer_test!(
+        hexa_click_at_the_previous_pointer,
+        Host,
+        |h: &mut Host<'_>| {
+            let (x, y, click, _) = h.start_input();
+            (x, y, click)
+        },
+        (100, 100)
+    );
 }

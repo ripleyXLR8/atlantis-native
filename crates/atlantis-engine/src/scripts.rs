@@ -2168,6 +2168,9 @@ mod tests {
                 match frame {
                     30 if escape => sys.push_input(Input::KeyDown(Key::Escape)),
                     31 if escape => sys.push_input(Input::KeyUp(Key::Escape)),
+                    // The crab handles a click at the previous pass's
+                    // pointer: the mouse gets to the top band first.
+                    38 => sys.push_input(Input::MouseMove { x: 320, y: 10 }),
                     40 => at(320, 10, true),
                     42 => at(320, 10, false),
                     _ => {}

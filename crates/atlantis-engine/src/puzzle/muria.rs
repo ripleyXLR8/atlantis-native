@@ -379,8 +379,12 @@ impl MuriaGame {
 struct Host<'a>(PuzzleHost<'a>);
 
 impl MuriaIo for Host<'_> {
+    /// FUN_0043ee54 polls once a pass (0x0043f004); FUN_0043f850 then reads
+    /// the pointer (0x0043f87e..0x0043fa74) and the cursor FUN_0043f4d4
+    /// draws there, with no pump in between: a click is at the previous
+    /// pass's pointer ([`PuzzleHost::read_input_held_pointer`]).
     fn start_input(&mut self) -> (i32, i32, bool) {
-        let m = self.0.read_input();
+        let m = self.0.read_input_held_pointer();
         (m.x, m.y, m.click)
     }
     fn boundary(&mut self, _g: &MuriaGame) -> (i32, i32, bool) {
@@ -449,4 +453,18 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     } else {
         r
     }
+}
+
+#[cfg(test)]
+mod click_pointer_tests {
+    use super::*;
+
+    // FUN_0043f850 reads the pointer the pass's poll (0x0043f004) left
+    // unpumped on a press.
+    crate::puzzle::assets::click_pointer_test!(
+        muria_click_at_the_previous_pointer,
+        Host,
+        |h: &mut Host<'_>| h.start_input(),
+        (100, 100)
+    );
 }

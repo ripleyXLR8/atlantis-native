@@ -290,11 +290,24 @@ impl TaquinGame {
     }
 }
 
-struct Host<'a>(PuzzleHost<'a>);
+/// The host and the variant (6, 7 or 14).
+struct Host<'a>(PuzzleHost<'a>, i32);
 
 impl TaquinIo for Host<'_> {
+    /// Taquins 6 and 7 poll once a pass (FUN_00446300 @ 0x00446545,
+    /// FUN_0044659c @ 0x004467e6) and FUN_00447048 and the cursor
+    /// FUN_00446f28 read the pointer with no pump in between: a click is at
+    /// the previous pass's pointer
+    /// ([`PuzzleHost::read_input_held_pointer`]). Taquin 14 polls again at
+    /// the top of its pass (FUN_00446830 @ 0x0044699e), which sees no new
+    /// edge and pumps a message before the handler (0x004469ac): it keeps
+    /// the pointer of this read.
     fn start_input(&mut self) -> (i32, i32, bool) {
-        let m = self.0.read_input();
+        let m = if self.1 == 14 {
+            self.0.read_input()
+        } else {
+            self.0.read_input_held_pointer()
+        };
         (m.x, m.y, m.click)
     }
     fn boundary(&mut self, _g: &TaquinGame) -> (i32, i32, bool) {
@@ -344,7 +357,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, variant: i32) -> 
     let mut game = TaquinGame::new(variant);
     game.object_in_hand = held;
     game.cursor = e.puzzles.cursor;
-    let mut host = Host(PuzzleHost::new(e, hooks));
+    let mut host = Host(PuzzleHost::new(e, hooks), variant);
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;
     host.0.sounds = sounds;
@@ -358,4 +371,32 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, variant: i32) -> 
     } else {
         r
     }
+}
+
+#[cfg(test)]
+mod click_pointer_tests {
+    use super::*;
+
+    // Taquins 6 and 7: FUN_00447048 reads the pointer the poll
+    // (0x00446545, 0x004467e6) left unpumped on a press.
+    crate::puzzle::assets::click_pointer_test!(
+        taquin6_click_at_the_previous_pointer,
+        |host| Host(host, 6),
+        |h: &mut Host<'_>| h.start_input(),
+        (100, 100)
+    );
+    crate::puzzle::assets::click_pointer_test!(
+        taquin7_click_at_the_previous_pointer,
+        |host| Host(host, 7),
+        |h: &mut Host<'_>| h.start_input(),
+        (100, 100)
+    );
+    // Taquin 14: the poll at the top of the pass (0x0044699e) pumps
+    // before the handler; the pointer of the click's pass.
+    crate::puzzle::assets::click_pointer_test!(
+        taquin14_click_at_this_pointer,
+        |host| Host(host, 14),
+        |h: &mut Host<'_>| h.start_input(),
+        (300, 200)
+    );
 }

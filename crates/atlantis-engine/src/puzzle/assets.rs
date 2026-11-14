@@ -512,3 +512,61 @@ impl<'a> PuzzleHost<'a> {
         self.e.should_abort()
     }
 }
+
+/// A test that a puzzle host hands a click at the pointer `$expect` of
+/// the read: (100, 100) the pointer of the pass before the click
+/// ([`PuzzleHost::read_input_held_pointer`]), (300, 200) the pointer of
+/// the click's own pass. `$wrap` makes the host of a [`PuzzleHost`],
+/// `$read` reads (x, y, click) from it.
+#[cfg(test)]
+macro_rules! click_pointer_test {
+    ($name:ident, $wrap:expr, $read:expr, $expect:expr) => {
+        #[test]
+        fn $name() {
+            use crate::sys::{Input, MouseButton};
+            use crate::test_support::with_engine;
+            let got = std::rc::Rc::new(std::cell::Cell::new(None));
+            let g2 = got.clone();
+            let ran = with_engine(
+                stringify!($name),
+                move |mut e| async move {
+                    let sys = e.sys.clone();
+                    let mut hooks = crate::hooks::NoScripts;
+                    let mut h = $wrap(crate::puzzle::PuzzleHost::new(&mut e, &mut hooks));
+                    for _ in 0..8 {
+                        let (x, y, click) = $read(&mut h);
+                        if click {
+                            g2.set(Some((x, y)));
+                        }
+                        sys.frame().await;
+                    }
+                },
+                |sys, f| {
+                    let b = MouseButton::Left;
+                    match f {
+                        1 => sys.push_input(Input::MouseMove { x: 100, y: 100 }),
+                        4 => {
+                            sys.push_input(Input::MouseMove { x: 300, y: 200 });
+                            sys.push_input(Input::MouseDown {
+                                button: b,
+                                x: 300,
+                                y: 200,
+                            });
+                        }
+                        6 => sys.push_input(Input::MouseUp {
+                            button: b,
+                            x: 300,
+                            y: 200,
+                        }),
+                        _ => {}
+                    }
+                },
+            );
+            if ran {
+                assert_eq!(got.get(), Some($expect));
+            }
+        }
+    };
+}
+#[cfg(test)]
+pub(crate) use click_pointer_test;

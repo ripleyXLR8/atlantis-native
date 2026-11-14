@@ -726,8 +726,12 @@ struct Host<'a> {
 }
 
 impl CrabIo for Host<'_> {
+    /// FUN_0043d28c polls once a pass (0x0043d3c8) and FUN_0043ebf8 then
+    /// reads the pointer with no pump in between (0x0043ec4b..0x0043ed6b),
+    /// as does the cursor FUN_0043e5a4: a click is at the previous pass's
+    /// pointer ([`PuzzleHost::read_input_held_pointer`]).
     fn start_input(&mut self) -> (i32, i32, bool) {
-        let m = self.host.read_input();
+        let m = self.host.read_input_held_pointer();
         (m.x, m.y, m.click)
     }
     fn boundary(&mut self, _g: &CrabGame) -> (i32, i32, bool) {
@@ -826,4 +830,18 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     } else {
         r
     }
+}
+
+#[cfg(test)]
+mod click_pointer_tests {
+    use super::*;
+
+    // FUN_0043ebf8 reads the pointer the pass's poll (0x0043d3c8) left
+    // unpumped on a press.
+    crate::puzzle::assets::click_pointer_test!(
+        crab_click_at_the_previous_pointer,
+        |host| Host { host },
+        |h: &mut Host<'_>| h.start_input(),
+        (100, 100)
+    );
 }
