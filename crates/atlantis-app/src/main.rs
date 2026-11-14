@@ -575,6 +575,7 @@ fn main() {
             } else {
                 Enhancements::default()
             },
+            original_start_values: original,
             start: if puzzle.is_some() {
                 start
             } else {

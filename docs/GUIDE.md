@@ -953,7 +953,9 @@ the DVD's root alone lists its languages' paths.
 the player screen.
 
 `atlantis-native --original /path/to/game` plays the original game, bug for
-bug (see [Enhancements](TECHNICAL.md#enhancements)); with Atlantis II too
+bug (see [Enhancements](TECHNICAL.md#enhancements)), and starts with the
+original's options (SUBTITLES off, OMNI 3D MODE 1, the volumes 127, 110,
+110 and 110) whatever `settings.ini` keeps; with Atlantis II too
 (its music tracks then lose their last ~5.8 s when another follows, as
 in the original) and Atlantis III (GOG.com's Spanish edition then starts
 with the texture size its `Atlantis3.cfg` asks for, 1024).
@@ -1055,7 +1057,11 @@ each: one per bug fix (`fix_music_loop`, `fix_cinema_sound`, `fix_head_overlay`,
 `on` by default). SUBTITLES is off at first, as every start of the
 original; `--original` starts with it off whatever `settings.ini`
 keeps (a `settings.ini` written by an earlier version keeps the `on`
-it was written with). A
+it was written with), and also with OMNI 3D MODE 1 and the volumes
+127, 110, 110 and 110, as every start of the original; a checkpoint
+loaded then sets the ones it holds, and a choice confirmed in the
+menus is saved as usual. Without `--original` the OMNI 3D mode and the
+volumes start as `settings.ini` keeps them. A
 `settings.ini` written by an earlier version, with its single
 `minor_bug_fixes` line, is still read: that line sets every fix. It also keeps `music_on_disk`, the music tracks the original game
 would have copied to its folder (it reads them from the archives here),

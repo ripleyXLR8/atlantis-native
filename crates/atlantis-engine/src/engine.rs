@@ -173,6 +173,11 @@ pub struct Options {
     /// Where the players, the checkpoints and the settings are kept.
     pub saves: Rc<dyn SaveStore>,
     pub start: Start,
+    /// `--original`: OMNI 3D MODE 1 and the volumes `7f 6e 6e 6e` at the
+    /// start, as every run of the original (0x004960ac = 0, 0x00495e70..
+    /// data bytes), whatever `settings.ini` keeps; a checkpoint load still
+    /// sets the ones it holds.
+    pub original_start_values: bool,
 }
 
 impl Default for Options {
@@ -185,6 +190,7 @@ impl Default for Options {
             subtitles: true,
             saves: Rc::new(MemStore::new()),
             start: Start::default(),
+            original_start_values: false,
         }
     }
 }
@@ -1128,6 +1134,7 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
         subtitles,
         saves,
         start,
+        original_start_values,
     } = opts;
     let mut e = Engine::new(sys, game, loader);
     e.trace = trace;
@@ -1143,6 +1150,9 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
         enhancements,
         ..Settings::default()
     });
+    if original_start_values {
+        e.original_start_values();
+    }
     e.load_interface().await;
     if start == Start::Boot {
         e.play_startup().await;
