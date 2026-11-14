@@ -843,7 +843,16 @@ impl Dialogs {
         let sprites = Self::sprites(e, &mut self.subject_sprites, "SUJETS.SPR").await;
         let ids: Vec<i32> = subjects.iter().map(|&s| i32::from(s)).collect();
         let (draws, gx, gy) = menu_draws(&ids);
-        drain(e).await;
+        // FUN_00425828 only clears the click flag before its loop
+        // (0x0042585d) and waits for no release: the menu runs while the
+        // button that clicked the character is still down (no press edge,
+        // FUN_0042e624), and a press made since the last poll is the first
+        // poll's edge.
+        // FUN_004211f0 hit-tests the pointer 0x004960ec / 0x004960f0
+        // (0x00421218, 0x00421236), written only by the message pump
+        // (0x00419c14), which the poll that sees the press skips
+        // (0x0041a2b5): the pointer of the previous pass's poll.
+        let mut pointer = e.sys.mouse();
         loop {
             if e.should_abort() {
                 return None;
@@ -896,9 +905,14 @@ impl Dialogs {
             if fi.escape && !fi.left_press && e.escape_gate_open() {
                 e.escape_request = true;
             }
-            if fi.left_press || e.sys.buttons().0 {
-                let (mx, my) = e.sys.mouse();
-                drain(e).await;
+            if !fi.left_press {
+                pointer = e.sys.mouse();
+            }
+            // The loop ends on the click flag only (0x004259b6..0x004259cc),
+            // and FUN_0042844c starts the conversation with no wait for the
+            // release.
+            if fi.left_press {
+                let (mx, my) = pointer;
                 let idx = menu_hit(ids.len() as i32, gx, gy, mx, my);
                 let s = menu_subject(&ids, idx);
                 let chosen = (s >= 0).then_some(s);
@@ -1034,7 +1048,9 @@ impl Dialogs {
                 e.sys.frame().await;
             }
         }
-        e.bar.request = skip.bar_request;
+        // @ 0x00426c0f..0x00426c4b: the click and right-press flags, the
+        // menu request and the bar request cleared, 0x00496124 = 1.
+        e.bar.flags_reset();
         e.escape_request = false;
         // @ 0x00426b9c..0x00426be6: the back surface is cleared (FUN_00450ec0
         // on all 0x96000 bytes) and not presented; the last present is the
@@ -1045,7 +1061,9 @@ impl Dialogs {
         // stays on screen until the reloaded game's first frame. The port's
         // screen is the one shown (a front end shows it between frames
         // too), so it keeps the picture rather than the cleared surface.
-        drain(e).await;
+        // None of this polls or waits for the release (0x00426b79..
+        // 0x00426c5c), nor does the way to the reload: the reloaded game's
+        // loops read press edges.
     }
 }
 
