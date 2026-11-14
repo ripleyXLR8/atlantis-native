@@ -274,6 +274,12 @@ pub struct PuzzleState {
     /// The rat's run state (static data at 0x004969c0, partly reset by
     /// each run).
     pub rat: Option<rat::RatRules>,
+    /// The ogre's path cells, origin, elbow, destination, x then y
+    /// (0x00773870, in .bss: 0 at launch). Only `FUN_00443f94` writes them
+    /// (0x0044415a..0x004441b9); the entry `FUN_0044203c` clears the
+    /// occupancy only (0x00442077..0x00442083), so a play starts with the
+    /// cells the previous play of the launch left.
+    pub ogre_path: ([i32; 3], [i32; 3]),
 }
 
 impl Default for PuzzleState {
@@ -288,6 +294,7 @@ impl Default for PuzzleState {
             snakes: None,
             hen_marks: None,
             rat: None,
+            ogre_path: ([0; 3], [0; 3]),
         }
     }
 }
