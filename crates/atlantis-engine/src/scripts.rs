@@ -1258,8 +1258,13 @@ impl Scripts {
                     }
                 }
             }
-            // The click that ended the last line is not a navigation press.
-            e.wait_buttons_up().await;
+            // No wait for the buttons' release: the executor's exit
+            // (0x00428c92..0x00428da4) sets back ClicPerso and the angles,
+            // clears the click flag 0x0049611c (0x00428d77) and the menu
+            // request 0x00496138 (0x00428d81) and returns, with no poll. The
+            // press that ended the last line was taken by that line's poll
+            // (an event the port's line player consumed), so the next loops,
+            // whose presses are edges, see a button still held as no press.
         })
     }
 }
@@ -1938,6 +1943,59 @@ mod tests {
         );
         let fixed = tim2_after_a_tim1_game_over(true).unwrap();
         assert_eq!(fixed, (vec![], vec![(3, true)], 0, Some(Abort::NewGame)));
+    }
+
+    /// A line's player that leaves the left button down (the press that
+    /// ended the line) and records when.
+    struct PressAndHold(Rc<std::cell::Cell<Option<u64>>>);
+
+    impl DialogPresenter for PressAndHold {
+        fn play_line<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _req: &'a LineRequest,
+        ) -> HookFuture<'a, LineOutcome> {
+            crate::test_support::button(&e.sys, crate::sys::MouseButton::Left, true);
+            while e.sys.poll_event().is_some() {}
+            self.0.set(Some(e.sys.millis()));
+            ready(LineOutcome::default())
+        }
+    }
+
+    /// The executor's exit (0x00428c92..0x00428da4) waits for no release:
+    /// the section returns at once while the press that ended its last
+    /// line is still held (here 500 ms).
+    #[test]
+    fn a_section_ends_with_the_button_still_held() {
+        let pressed = Rc::new(std::cell::Cell::new(None));
+        let (p2, p3) = (pressed.clone(), pressed.clone());
+        let held_ms = Rc::new(std::cell::Cell::new(None));
+        let h2 = held_ms.clone();
+        let ran = with_engine(
+            "a_section_ends_with_the_button_still_held",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(PressAndHold(p2)));
+                e.new_game(&mut s, false).await;
+                s.script = crate::con_script::ConScript::parse(
+                    b"/2\r\n/tim2(flagtemp2=1)\r\n[Seth,off] Hello.\r\n/0\r\n",
+                );
+                e.vars.set("testtime2", 1);
+                e.vars.set("flagtemp2", 1);
+                s.run_con_timers(&mut e, false).await;
+                h2.set(Some(e.sys.millis() - p3.get().unwrap()));
+            },
+            move |sys, f| {
+                if let Some(t) = pressed.get() {
+                    if f * 16 >= t + 500 && sys.buttons().0 {
+                        crate::test_support::button(sys, crate::sys::MouseButton::Left, false);
+                    }
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        assert!(held_ms.get().unwrap() < 100, "{:?}", held_ms.get());
     }
 
     /// The game overs (GAMEOVER, with a narrator), the puzzles' (id,

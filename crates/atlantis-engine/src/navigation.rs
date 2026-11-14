@@ -808,10 +808,12 @@ impl Engine {
             self.turn_double_click
                 .first_press(now, self.pointer.pos.0, self.pointer.pos.1);
         }
-        // Wait until the click that ended the loop is released (the port's:
-        // the original goes on at once and its later loops' polls latch the
-        // held button).
-        self.wait_buttons_up().await;
+        // No wait for the release: FUN_0041bfa0 returns from its exit block
+        // (0x0041c71e) and FUN_00423ad8 goes on with the departure scan and
+        // the turn at once. The buttons are read only through the latch
+        // FUN_0042e624, whose press bit is set on the poll the button goes
+        // down, so the later loops (their presses are edges) see a held
+        // button as no press.
         log::debug!("handle_warp: action {action}");
         action
     }
@@ -1932,6 +1934,41 @@ mod tests {
         };
         let turned = alpha_with_the_left_button_held(true).unwrap();
         assert_ne!(turned, still);
+    }
+
+    /// FUN_0041bfa0 returns from its exit block (0x0041c71e) without
+    /// waiting for the release: the warp loop ended by a left press held
+    /// 500 ms returns with the button still down.
+    #[test]
+    fn the_warp_loop_returns_with_the_button_still_held() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let (mut locked, mut pressed_at) = (0u64, None::<u64>);
+        let ran = with_engine(
+            "the_warp_loop_returns_with_the_button_still_held",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.handle_warp(&mut crate::hooks::NoScripts).await;
+                g2.set(Some(e.sys.buttons().0));
+            },
+            move |sys, f| {
+                if pressed_at.is_none() && sys.mouse_locked() {
+                    locked += 1;
+                    if locked == 5 {
+                        button(sys, MouseButton::Left, true);
+                        pressed_at = Some(f);
+                    }
+                }
+                if pressed_at.is_some_and(|p| f == p + 30) {
+                    button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some(true));
+        }
     }
 
     /// The arrow keys turn the view as F5..F8 by default
