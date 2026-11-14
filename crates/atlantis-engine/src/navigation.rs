@@ -421,7 +421,7 @@ impl Engine {
         // The entry block clears 0x00496120 and 0x004960c4 (0x0041bff4),
         // and the double-click flag 0x00496118 (0x0041bfc2).
         self.bar.flags_reset();
-        self.turn_double_click.clear();
+        self.sys.double_click().clear();
         // No wait at the entry (0x0041bfb8..0x0041c01e; the first frame
         // polls FUN_0041a298 @ 0x0041c5f2). A click is a press edge
         // (FUN_0042e624's latch): a button still down from a press an
@@ -451,10 +451,19 @@ impl Engine {
         // WM_MOUSEMOVE waits for the next poll.
         let mut unpumped = (0, 0);
         while !left_pressed && !exit {
+            // Windows sees a press at its cursor, the loop's pointer (the
+            // original's SetCursorPos keeps the two together): every left
+            // press of the loop is paired there (Sys::double_click), the
+            // click that ends it, a character click, a bow shot and a
+            // press the latch did not report alike.
+            self.sys.set_locked_cursor(self.pointer.pos);
             let fi = self.poll_frame_input();
             // Each frame starts by clearing the double-click flag
-            // (0x0041c04a).
-            self.turn_double_click.clear();
+            // (0x0041c04a), after the previous frame's poll (0x0041c5f2)
+            // pumped the messages, unless it saw a left press edge: a
+            // WM_LBUTTONDBLCLK of the click that ends the loop stays
+            // queued.
+            self.sys.double_click().clear();
             // This frame's relative motion (x right, y down).
             let (motion_x, motion_y) = self.sys.take_mouse_relative();
             unpumped = (unpumped.0 + motion_x, unpumped.1 + motion_y);
@@ -794,19 +803,14 @@ impl Engine {
         self.sys
             .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
         self.mark_pointer_mouse();
-        // The click that ended the loop: Windows pairs it with the last
+        // The click that ended the loop: Windows paired it with the last
         // press whatever loop read that one (the press that cut the
         // previous move's film, or ended a line), and pairs the next press
-        // with it. As the second of a pair it comes as WM_LBUTTONDBLCLK,
+        // with it. As the second of a pair it came as WM_LBUTTONDBLCLK,
         // which this loop's last poll did not pump (0x0041a2b5): the next
         // poll that pumps (a departure line's, the turn's with the cursor
         // state 5) sets 0x00496118 and the move's film is skipped
-        // (0x00423f8a). TurnDoubleClick.
-        if left_pressed {
-            let now = self.sys.millis();
-            self.turn_double_click
-                .queue_press(now, self.pointer.pos.0, self.pointer.pos.1);
-        }
+        // (0x00423f8a). Sys::double_click.
         // No wait for the release: FUN_0041bfa0 returns from its exit block
         // (0x0041c71e) and FUN_00423ad8 goes on with the departure scan and
         // the turn at once. The buttons are read only through the latch

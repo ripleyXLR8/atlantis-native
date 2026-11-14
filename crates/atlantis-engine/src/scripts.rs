@@ -523,6 +523,10 @@ impl Scripts {
                 "changecd" => {
                     e.disc = change_cd_disc(value);
                     e.vars.set("objetenmain", 0);
+                    // The prompt's loop polls FUN_0041a298 (up to 1000
+                    // ms) before those stores: it pumps a WM_LBUTTONDBLCLK
+                    // still queued.
+                    e.sys.double_click().pump();
                     e.input_flags_reset();
                 }
                 // HideGuest / ShowGuest store no variable.
@@ -2751,12 +2755,12 @@ mod tests {
                         e.music.handle_set = true;
                     }
                     e.escape_request = true;
-                    e.turn_double_click.flag = true;
+                    e.sys.double_click().flag = true;
                     e.bar.request = true;
                     s.exec_set(&mut e, None, cmd).await;
                     g2.borrow_mut().push((
                         e.escape_request,
-                        e.turn_double_click.flag,
+                        e.sys.double_click().flag,
                         e.bar.request,
                     ));
                 }
@@ -2765,6 +2769,42 @@ mod tests {
         );
         if ran {
             assert_eq!(*got.borrow(), [(false, false, false); 3]);
+        }
+    }
+
+    /// StartMusik of another track and StopMusik with the stream open
+    /// store 0x00496118 = 0 and pump no message (0x0042add3..0x0042ae05,
+    /// 0x0042af26..0x0042af58): a WM_LBUTTONDBLCLK a line's press edge
+    /// left queued is dispatched by the next pumping poll (the turn's,
+    /// cursor state 5). The disc prompt of ChangeCd polls
+    /// (`FUN_0041eda8`) before its stores: the message is gone.
+    #[test]
+    fn music_commands_keep_a_queued_double_click() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "music_commands_keep_a_queued_double_click",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                for cmd in ["changecd=2", "startmusik=5", "stopmusik=1"] {
+                    if cmd != "changecd=2" {
+                        e.music.handle_set = true;
+                    }
+                    let now = e.sys.millis();
+                    e.sys.double_click().first_press(now, 320, 240);
+                    assert!(e.sys.double_click().queue_press(now, 320, 240));
+                    s.exec_set(&mut e, None, cmd).await;
+                    e.sys.double_click().pump();
+                    e.sys.double_click().dispatch(5, false);
+                    g2.borrow_mut().push(e.sys.double_click().flag);
+                    e.sys.double_click().clear();
+                }
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [false, true, true]);
         }
     }
 

@@ -130,7 +130,17 @@ pub struct Sys {
     now_ms: Cell<u64>,
     mouse: Cell<(i32, i32)>,
     buttons: Cell<(bool, bool)>,
-    events: RefCell<VecDeque<Input>>,
+    /// The input events, each with the time it came (the message time
+    /// Windows pairs the left presses by).
+    events: RefCell<VecDeque<(Input, u64)>>,
+    /// Windows' double-click pairing of the left presses and the flag
+    /// 0x00496118 the window procedure sets on WM_LBUTTONDBLCLK, see
+    /// [`Sys::double_click`].
+    double_click: RefCell<crate::turn::TurnDoubleClick>,
+    /// The Windows cursor while the mouse is locked (the warp loop's
+    /// pointer), where Windows sees a left press then, see
+    /// [`Sys::set_locked_cursor`].
+    locked_cursor: Cell<(i32, i32)>,
     /// `FUN_0042e624`'s latch (bit 2 of 0x006140c1 / 0x006140c2) of the
     /// left and right buttons, see [`Sys::poll_event`].
     latch: Cell<[bool; 2]>,
@@ -186,6 +196,8 @@ impl Sys {
             mouse: Cell::new((SCREEN_W as i32 / 2, SCREEN_H as i32 / 2)),
             buttons: Cell::new((false, false)),
             events: RefCell::new(VecDeque::new()),
+            double_click: RefCell::new(Default::default()),
+            locked_cursor: Cell::new((SCREEN_W as i32 / 2, SCREEN_H as i32 / 2)),
             latch: Cell::new([false; 2]),
             pressed_since: Cell::new([false; 2]),
             unjudged: Cell::new(0),
@@ -308,6 +320,26 @@ impl Sys {
         self.warp_request.set(Some((x, y)));
     }
 
+    /// Where Windows sees a left press while the mouse is locked: the
+    /// warp loop keeps the Windows cursor as its own pointer (the original
+    /// moves it with SetCursorPos), not as [`Sys::mouse`].
+    pub fn set_locked_cursor(&self, p: (i32, i32)) {
+        self.locked_cursor.set(p);
+    }
+
+    /// Windows' double-click pairing and the flag 0x00496118
+    /// ([`crate::turn::TurnDoubleClick`]): each read of the buttons (see
+    /// [`Sys::poll_event`]) pairs the left presses queued since the last
+    /// one, latched or not, as Windows pairs every WM_LBUTTONDOWN it
+    /// posts whatever loop polls, and pumps a queued WM_LBUTTONDBLCLK when
+    /// it saw no left press edge (`FUN_0041a298` returns before its
+    /// message pump on one, 0x0041a2b5). The loops that test the message
+    /// (the turn, a film, a line) call
+    /// [`crate::turn::TurnDoubleClick::dispatch`] after their poll.
+    pub fn double_click(&self) -> std::cell::RefMut<'_, crate::turn::TurnDoubleClick> {
+        self.double_click.borrow_mut()
+    }
+
     pub fn should_quit(&self) -> bool {
         self.quit.get()
     }
@@ -340,7 +372,7 @@ impl Sys {
         if self.read_frame.get() != Some(self.frames.get()) || self.unjudged.get() > 0 {
             self.latch_read();
         }
-        self.events.borrow_mut().pop_front()
+        self.events.borrow_mut().pop_front().map(|(ev, _)| ev)
     }
 
     /// One read of `FUN_0042e624` for the two buttons.
@@ -360,7 +392,7 @@ impl Sys {
             if edge {
                 continue;
             }
-            for ev in q.range_mut(start..) {
+            for (ev, _) in q.range_mut(start..) {
                 if let Input::MouseDown { button, x, y } = *ev {
                     if button == which {
                         *ev = Input::MouseDownLatched { button, x, y };
@@ -369,6 +401,38 @@ impl Sys {
             }
         }
         self.latch.set(latch);
+        // Windows' pairing of the left presses this read judged, and the
+        // poll's message pump when it saw no left press edge.
+        let mut dc = self.double_click.borrow_mut();
+        dc.poll_started();
+        let mut edge = false;
+        for &(ev, ms) in q.range(start..) {
+            let (x, y) = match ev {
+                Input::MouseDown {
+                    button: MouseButton::Left,
+                    x,
+                    y,
+                } => {
+                    edge = true;
+                    (x, y)
+                }
+                Input::MouseDownLatched {
+                    button: MouseButton::Left,
+                    x,
+                    y,
+                } => (x, y),
+                _ => continue,
+            };
+            let (x, y) = if self.locked.get() {
+                self.locked_cursor.get()
+            } else {
+                (x, y)
+            };
+            dc.queue_press(ms, x, y);
+        }
+        if !edge {
+            dc.pump();
+        }
     }
 
     /// The frames presented so far (a loop can tell whether a call it made
@@ -443,7 +507,9 @@ impl Sys {
             }
             Input::KeyUp(k) => self.keys_held.borrow_mut().retain(|&h| h != k),
         }
-        self.events.borrow_mut().push_back(input);
+        self.events
+            .borrow_mut()
+            .push_back((input, self.now_ms.get()));
         self.unjudged.set(self.unjudged.get() + 1);
     }
 
@@ -732,5 +798,80 @@ mod tests {
         left(&sys, false);
         sys.frames.set(sys.frames.get() + 5);
         assert_eq!(poll_presses(&sys), (0, 1));
+    }
+
+    /// Windows pairs every left press it posts, whatever loop polls (a
+    /// bar's, a puzzle's, the end of a move's, the game over's) and
+    /// whether the latch reports it or not: the second comes as
+    /// WM_LBUTTONDBLCLK, which a poll pumps unless it saw a left press
+    /// edge (0x0041a2b5), and the window procedure sets 0x00496118 with
+    /// the cursor state 5 (0x00419c79).
+    #[test]
+    fn every_left_press_feeds_the_double_click_pairing() {
+        let sys = Sys::new(Mixer::new());
+        sys.now_ms.set(1000);
+        // Any loop's poll reads the first press; it pairs with the next.
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.now_ms.set(1200);
+        left(&sys, true);
+        // The poll that reads the second press (an edge) does not pump.
+        assert_eq!(poll_presses(&sys), (1, 0));
+        sys.double_click().dispatch(5, false);
+        assert!(!sys.double_click().flag);
+        // The next poll pumps it.
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.double_click().dispatch(5, false);
+        assert!(sys.double_click().flag);
+        sys.double_click().clear();
+        // A latched press pairs too, and its poll pumps at once.
+        sys.now_ms.set(3000);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        left(&sys, false);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (0, 1));
+        sys.double_click().dispatch(5, false);
+        assert!(sys.double_click().flag);
+        // A pumped message no loop tested is gone at the next poll.
+        sys.double_click().clear();
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.now_ms.set(5000);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        left(&sys, false);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (0, 1));
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.double_click().dispatch(5, false);
+        assert!(!sys.double_click().flag);
+    }
+
+    /// While the mouse is locked (the warp loop) Windows sees a press at
+    /// its cursor, the loop's pointer, not at the locked mouse.
+    #[test]
+    fn a_locked_press_pairs_at_the_windows_cursor() {
+        let sys = Sys::new(Mixer::new());
+        sys.now_ms.set(1000);
+        sys.double_click().first_press(1000, 320, 240);
+        sys.set_mouse_locked(true);
+        sys.set_locked_cursor((320, 240));
+        // The press event carries (1, 1).
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        assert!(sys.double_click().menu_press());
+        sys.set_locked_cursor((100, 100));
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.now_ms.set(1100);
+        sys.double_click().first_press(1100, 320, 240);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        assert!(!sys.double_click().menu_press());
     }
 }
