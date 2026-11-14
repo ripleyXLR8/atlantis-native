@@ -338,6 +338,10 @@ pub struct Engine {
     pub sprite_anim_current: Vec<usize>,
     pub(crate) sprite_anim_last: [u32; atlantis_data::sprite_anim::SPRITE_ANIM_SLOTS],
     pub(crate) sprite_anim_tick: u32,
+    /// A step of [`Engine::animate_sprites`] changed a frame or an active
+    /// flag that the panorama's sprite layer does not show yet: the next
+    /// call draws it before it steps (`FUN_00425304` draws, then steps).
+    pub(crate) sprite_layer_stale: bool,
     /// WSPRFRAME.
     pub wspr_frame: i32,
     /// F9 during navigation: the diagnostic overlay (port-only).
@@ -488,6 +492,7 @@ impl Engine {
             sprite_anim_current: vec![0; 512],
             sprite_anim_last: [0; atlantis_data::sprite_anim::SPRITE_ANIM_SLOTS],
             sprite_anim_tick: 0,
+            sprite_layer_stale: false,
             wspr_frame: 0,
             debug_overlay: std::cell::Cell::new(false),
             debug_font: std::cell::OnceCell::new(),
