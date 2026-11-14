@@ -155,6 +155,48 @@ pub fn ingame_menu_outcome(record: Option<usize>, load_exit: u8, quit_exit: u8) 
     }
 }
 
+/// The original's LOAD list (`FUN_0041cf78`): the file names of `names`
+/// that `p<letter>*.gam` matches (without regard to case, as
+/// FindFirstFileA), in `names`' order (FindFirstFile / FindNextFile's
+/// order, copied to the 13-byte slots of 0x00611800 @
+/// 0x0041d10a..0x0041d153), at most 0x80 (`local_4c < 0x80`); then its
+/// pass @ 0x0041d16a..0x0041d1f3, i and j each over the whole list: slots
+/// i and j swapped (FUN_0041d58c @ 0x0041d1e4) when `strcmp(i, j) < 0`
+/// (FUN_00450610, `jl` @ 0x0041d1bc) or else `strlen(i) < strlen(j)`
+/// (FUN_00451c71 twice, `jae` @ 0x0041d1e2). The rows are drawn and
+/// clicked in the resulting order (FUN_00420b48). The two tests disagree
+/// on names of different lengths, so the result is not sorted: `pa1 ..
+/// pa6 pa9 pa11` give `pa1 .. pa6 pa11 pa9`. Every build has this pass
+/// (the same code, addresses aside). Which order Windows lists a folder
+/// in (directory order on FAT, alphabetical on NTFS) is the file
+/// system's [INFERRED]; the port takes its save store's listing, which
+/// on Windows is the same FindFirstFile order.
+pub(crate) fn original_load_order(names: &[String], letter: u8) -> Vec<String> {
+    let letter = letter.to_ascii_lowercase();
+    let mut v: Vec<String> = names
+        .iter()
+        .filter(|n| {
+            let b = n.as_bytes();
+            b.len() >= 6
+                && b[0].eq_ignore_ascii_case(&b'p')
+                && b[1].to_ascii_lowercase() == letter
+                && b[b.len() - 4..].eq_ignore_ascii_case(b".gam")
+        })
+        .take(0x80)
+        .cloned()
+        .collect();
+    let n = v.len();
+    for i in 0..n {
+        for j in 0..n {
+            let (a, b) = (v[i].as_bytes(), v[j].as_bytes());
+            if a < b || a.len() < b.len() {
+                v.swap(i, j);
+            }
+        }
+    }
+    v
+}
+
 impl Engine {
     pub(crate) fn poll_menu_input(&self) -> MenuInput {
         self.sys.mark_menu_input();
@@ -764,25 +806,23 @@ impl Engine {
             .start_pcm(1, pcm, if right { 0x7f } else { 0 }, vol);
     }
 
-    /// The current player's checkpoints, ascending chapters (the picker's
-    /// `p<letter>*.gam`, sorted).
+    /// The current player's checkpoints, in the LOAD list's order, as
+    /// the original ([`original_load_order`]): the names `p<letter>*.gam`
+    /// in the order the save store lists them (the original's
+    /// FindFirstFile / FindNextFile order), the first 0x80, through its
+    /// swap pass, each row the chapter of its name (not ascending chapters
+    /// once there are chapters of one and two digits).
     /// A chapter-0 file is left out: the original lists it but its rows
     /// drawer skips it (`atoi(name + 2) - 1 == -1`, FUN_00420b48 @
     /// 0x00420be0..0x00420bed), and its click would walk EPI.TXT without
     /// an end; no build writes one.
     pub(crate) fn player_checkpoints(&self) -> Vec<u8> {
         let letter = self.players.letters[self.player.min(MAX_PLAYERS - 1)];
-        let mut v: Vec<u8> = self
-            .saves
-            .list()
+        original_load_order(&self.saves.list(), letter)
             .iter()
             .filter_map(|n| checkpoint_chapter(n, letter))
             .filter(|&c| c != 0)
-            .collect();
-        v.sort_unstable();
-        v.dedup();
-        v.truncate(0x80);
-        v
+            .collect()
     }
 
     /// The load picker `FUN_0041cf78` (LOADMENU): the player's checkpoints
@@ -1266,6 +1306,142 @@ mod record_table_tests {
                 (true, first),
             ]
         );
+    }
+}
+
+#[cfg(test)]
+mod load_order_tests {
+    use super::original_load_order;
+    use crate::enhancements::Enhancements;
+    use crate::persist::SaveStore;
+    use crate::test_support::with_engine;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    fn names(chapters: &[u32]) -> Vec<String> {
+        chapters.iter().map(|c| format!("pa{c}.gam")).collect()
+    }
+
+    fn chapters(names: &[String]) -> Vec<u32> {
+        names
+            .iter()
+            .map(|n| n[2..n.len() - 4].parse().unwrap())
+            .collect()
+    }
+
+    /// The original's pass (0x0041d16a..0x0041d1f3) on the names in the
+    /// order the folder lists them: the round 8 critic's emulation of the
+    /// shipped code (`harness/critic_load_sort.txt`).
+    #[test]
+    fn original_load_order_is_the_original_pass() {
+        let cases: [(&[u32], &[u32]); 13] = [
+            (&[1, 2, 3, 4, 5, 6, 9], &[1, 2, 3, 4, 5, 6, 9]),
+            (&[1, 2, 3, 4, 5, 6, 9, 11], &[1, 2, 3, 4, 5, 6, 11, 9]),
+            (&[1, 11, 2, 3, 4, 5, 6, 9], &[1, 6, 5, 4, 3, 2, 9, 11]),
+            (
+                &[1, 2, 3, 4, 5, 6, 9, 11, 12],
+                &[1, 2, 3, 4, 5, 6, 11, 12, 9],
+            ),
+            (
+                &[1, 11, 12, 2, 3, 4, 5, 6, 9],
+                &[1, 11, 5, 4, 3, 2, 6, 9, 12],
+            ),
+            (
+                &[1, 2, 3, 4, 5, 6, 9, 11, 12, 13],
+                &[1, 2, 3, 4, 5, 6, 11, 12, 13, 9],
+            ),
+            (
+                &[1, 11, 12, 13, 2, 3, 4, 5, 6, 9],
+                &[1, 11, 12, 4, 3, 2, 5, 6, 9, 13],
+            ),
+            (
+                &[1, 2, 3, 4, 5, 6, 9, 11, 12, 13, 14, 15],
+                &[1, 2, 3, 4, 5, 6, 11, 12, 13, 14, 15, 9],
+            ),
+            (
+                &[1, 11, 12, 13, 14, 15, 2, 3, 4, 5, 6, 9],
+                &[1, 11, 12, 13, 14, 2, 3, 4, 5, 6, 9, 15],
+            ),
+            (
+                &[1, 2, 3, 4, 5, 6, 9, 11, 12, 13, 14, 15, 16, 17, 18, 20],
+                &[1, 3, 4, 5, 6, 9, 11, 12, 13, 14, 15, 16, 17, 18, 2, 20],
+            ),
+            (
+                &[1, 11, 12, 13, 14, 15, 16, 17, 18, 2, 20, 3, 4, 5, 6, 9],
+                &[1, 2, 11, 12, 13, 14, 15, 16, 17, 18, 3, 4, 5, 6, 9, 20],
+            ),
+            // The older note's "ascending" claim does not hold either.
+            (&[1, 10, 11, 2, 3], &[1, 10, 2, 3, 11]),
+            (&[], &[]),
+        ];
+        for (found, shown) in cases {
+            let got = chapters(&original_load_order(&names(found), b'a'));
+            assert_eq!(got, shown, "found {found:?}");
+        }
+        // Only `p<letter>*.gam`, the first 0x80 of them in the listing.
+        let mut list = vec!["players.atl".to_string(), "pb3.gam".to_string()];
+        list.extend(names(&[9, 11]));
+        list.push("pa2.gam.tmp".to_string());
+        assert_eq!(chapters(&original_load_order(&list, b'a')), [9, 11]);
+        let many: Vec<u32> = (1..=200).collect();
+        let got = original_load_order(&names(&many), b'a');
+        assert_eq!(got.len(), 0x80);
+        assert!(!got.contains(&"pa129.gam".to_string()));
+    }
+
+    /// A store that lists its files in the order they were first written
+    /// (a folder's directory order).
+    #[derive(Default)]
+    struct Listed(RefCell<Vec<(String, Vec<u8>)>>);
+
+    impl SaveStore for Listed {
+        fn read(&self, name: &str) -> Option<Vec<u8>> {
+            let v = self.0.borrow();
+            v.iter().find(|(n, _)| n == name).map(|(_, d)| d.clone())
+        }
+        fn write(&self, name: &str, data: &[u8]) -> bool {
+            let mut v = self.0.borrow_mut();
+            match v.iter_mut().find(|(n, _)| n == name) {
+                Some(e) => e.1 = data.to_vec(),
+                None => v.push((name.to_string(), data.to_vec())),
+            }
+            true
+        }
+        fn remove(&self, name: &str) {
+            self.0.borrow_mut().retain(|(n, _)| n != name);
+        }
+        fn list(&self) -> Vec<String> {
+            self.0.borrow().iter().map(|(n, _)| n.clone()).collect()
+        }
+    }
+
+    /// The LOAD list's rows: the original's order, by default and with
+    /// `--original` (the store lists the files in the order written).
+    #[test]
+    fn player_checkpoints_order() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "player_checkpoints_order",
+            move |mut e| async move {
+                let store = Rc::new(Listed::default());
+                let letter = e.players.letters[e.player];
+                for c in [1, 2, 3, 4, 5, 6, 9, 11] {
+                    store.write(&atlantis_data::saves::checkpoint_name(letter, c), b"");
+                }
+                e.saves = store;
+                for x in [Enhancements::original(), Enhancements::default()] {
+                    e.set_enhancements(x);
+                    g2.borrow_mut().push(e.player_checkpoints());
+                }
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let shown = vec![1, 2, 3, 4, 5, 6, 11, 9];
+        assert_eq!(*got.borrow(), [shown.clone(), shown]);
     }
 }
 
