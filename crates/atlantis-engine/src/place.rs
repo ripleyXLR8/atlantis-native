@@ -75,11 +75,14 @@ fn with_ext(name: &str, ext: &str) -> String {
 
 impl Engine {
     /// The mouse moved since the mark: the pointer is the last mouse
-    /// position (WM_MOUSEMOVE, 0x00419c14).
+    /// position (WM_MOUSEMOVE, 0x00419c14). The Windows cursor is the
+    /// system mouse whenever the mouse is not locked, moved or not.
     pub(crate) fn sync_pointer_mouse(&mut self) {
         let m = self.sys.mouse();
         if m != self.pointer_mouse_mark {
             self.pointer.mouse_moved(m);
+        } else if !self.sys.mouse_locked() {
+            self.pointer.cursor_at(m);
         }
         self.pointer_mouse_mark = m;
     }
@@ -120,8 +123,9 @@ impl Engine {
         if self.load_cyclo(&cyclo).await {
             self.composite_npc_sprites().await;
         }
-        self.sys.set_mouse_pos(320, 240);
-        self.mark_pointer_mouse(); // the engine's own move is no mouse motion
+        // FUN_00421b4c calls no SetCursorPos: the Windows cursor stays where
+        // the mouse is (the turn left it at (320, 240) after a move).
+        self.mark_pointer_mouse();
         self.emit(Event::PlaceEntered {
             wam: self.wam_name.clone(),
             place: next,

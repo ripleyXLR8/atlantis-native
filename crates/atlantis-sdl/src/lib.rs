@@ -65,8 +65,35 @@ pub fn run_options(
     }
 }
 
+/// The window point of the 640x480 frame's pixel `(x, y)`, the frame
+/// scaled into a `size` window keeping 4:3 and centred (as
+/// `set_logical_size` shows it): the middle of the pixel, so SDL maps
+/// the point back to the same pixel.
+pub fn logical_to_window((x, y): (i32, i32), size: (u32, u32)) -> (i32, i32) {
+    use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
+    let (w, h) = (size.0 as f32, size.1 as f32);
+    let s = (w / SCREEN_W as f32).min(h / SCREEN_H as f32);
+    let ox = (w - SCREEN_W as f32 * s) / 2.0;
+    let oy = (h - SCREEN_H as f32 * s) / 2.0;
+    (
+        (ox + (x as f32 + 0.5) * s) as i32,
+        (oy + (y as f32 + 0.5) * s) as i32,
+    )
+}
+
 #[cfg(test)]
 mod tests {
+    /// The engine's pointer moves (SetCursorPos) land on the frame's
+    /// pixel in the window: unscaled, and letterboxed at 1.5x.
+    #[test]
+    fn logical_points_map_to_the_window() {
+        use super::logical_to_window;
+        assert_eq!(logical_to_window((320, 240), (640, 480)), (320, 240));
+        assert_eq!(logical_to_window((0, 0), (1280, 720)), (160, 0));
+        assert_eq!(logical_to_window((639, 479), (1280, 720)), (1119, 719));
+        assert_eq!(logical_to_window((320, 240), (1280, 720)), (640, 360));
+    }
+
     #[test]
     fn atlantis_evolution_is_refused_with_a_message() {
         let d = std::env::temp_dir().join(format!("atlantis-sdl-other-{}", std::process::id()));

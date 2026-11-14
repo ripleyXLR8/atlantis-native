@@ -866,9 +866,14 @@ impl CrabIo for CrabReplay<'_> {
         let (x, y, c, _) = self.r.input();
         (x, y, c)
     }
-    fn boundary(&mut self, g: &CrabGame) -> (i32, i32, bool) {
+    /// The harness stubs FUN_0041a298 and writes the next pass's input at
+    /// the boundary FUN_0043318c.
+    fn poll(&mut self) -> Option<(i32, i32, bool)> {
+        None
+    }
+    fn boundary(&mut self, g: &CrabGame) -> Option<(i32, i32, bool)> {
         self.r.close(&crab_state(g));
-        self.start_input()
+        Some(self.start_input())
     }
     fn load_picture(&mut self, name: &str) {
         self.r.add(&format!("picture {name}"));

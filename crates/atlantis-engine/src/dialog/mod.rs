@@ -689,8 +689,13 @@ impl Dialogs {
                 // which steps the warp cursor over what is under the pointer;
                 // its sprite goes to the back buffer after the copy, so the
                 // frame shows none (Engine::still_frame_cursor_step). off0 /
-                // off1 do not call it.
+                // off1 do not call it. The pointer it tests (FUN_00422bb0 /
+                // FUN_00422d5c read 0x004960ec / 0x004960f0, @ 0x00422bd5,
+                // 0x00422d7a) is where the last WM_MOUSEMOVE put it
+                // (0x00419c10..0x00419c29): the mouse moved in the subject
+                // menu or during earlier lines counts.
                 if l.voice_off && !talking_head {
+                    e.sync_pointer_mouse();
                     e.still_frame_cursor_step();
                 }
                 loop {
@@ -2086,6 +2091,97 @@ mod still_cursor_tests {
         }
         assert!(got.borrow().is_some());
         shot.take()
+    }
+
+    /// The cursor state 0x004968ac after the voice-only line CHAPI001 /2 A
+    /// played with the pointer over a navigation zone of place 1, the
+    /// mouse moved off every zone before it when `moved`.
+    fn off_line_cursor_mode(moved: bool) -> Option<u8> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let armed = Rc::new(Cell::new(0u32));
+        let a2 = armed.clone();
+        let ran = with_engine(
+            "a_voice_only_line_steps_the_cursor_at_the_mouse",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let points: Vec<(i32, i32)> = (0..48)
+                    .flat_map(|j| (0..64).map(move |i| (i * 10, j * 10)))
+                    .collect();
+                let mut find = |want: &dyn Fn((u32, u32)) -> bool| {
+                    points.iter().copied().find(|&p| {
+                        e.pointer.pos = p;
+                        want(e.pointer_targets())
+                    })
+                };
+                let at = find(&|(z, _)| (1..0x200).contains(&z)).expect("a navigation zone");
+                let off = find(&|t| t == (0, 0)).expect("a point over nothing");
+                // The pointer the click left, the mouse with it.
+                e.sys.set_mouse_pos(at.0, at.1);
+                e.pointer.mouse_moved(at);
+                e.mark_pointer_mouse();
+                if moved {
+                    e.sys
+                        .push_input(crate::sys::Input::MouseMove { x: off.0, y: off.1 });
+                }
+                e.load_cursor_sprites().await;
+                e.cursor_state = Default::default();
+                let sec = s.script.sections().iter().find(|x| x.id == 2).cloned();
+                let line = sec
+                    .and_then(|x| {
+                        x.items.into_iter().find_map(|i| match i {
+                            ConItem::Line(l) => Some(l),
+                            _ => None,
+                        })
+                    })
+                    .expect("CHAPI001 /2");
+                let req = LineRequest {
+                    section: 2,
+                    letter: 'A',
+                    perso: resolve_speaker_perso(&line.speaker),
+                    line,
+                    interactive: false,
+                    inc_perso: 0,
+                };
+                a2.set(1);
+                let mut d = Dialogs::new();
+                d.play_line(&mut e, &req).await;
+                g2.set(Some(e.cursor_state.mode));
+            },
+            move |sys, _| {
+                let n = armed.get();
+                if n > 0 {
+                    armed.set(n + 1);
+                    if n == 10 {
+                        button(sys, crate::sys::MouseButton::Left, true);
+                    } else if n == 11 {
+                        button(sys, crate::sys::MouseButton::Left, false);
+                    }
+                }
+            },
+        );
+        if !ran {
+            return None;
+        }
+        got.get()
+    }
+
+    /// `FUN_00430258`'s cursor step (`FUN_0041afd0` -> `FUN_00422fcc`,
+    /// 0x0041b050) hit-tests the pointer 0x004960ec / 0x004960f0 that every
+    /// WM_MOUSEMOVE sets (0x00419c10..0x00419c29): with the mouse moved off
+    /// the zone since the click, the step finds no zone (state 0), not the
+    /// navigation zone of the click (state 5) (round 7, dialogs).
+    #[test]
+    fn a_voice_only_line_steps_the_cursor_at_the_mouse() {
+        let Some(still) = off_line_cursor_mode(false) else {
+            return;
+        };
+        assert_eq!(still, 5);
+        assert_eq!(off_line_cursor_mode(true), Some(0));
     }
 
     /// `FUN_00430258` presents its still frame once through `FUN_0041afd0`

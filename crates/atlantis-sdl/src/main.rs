@@ -511,6 +511,16 @@ fn main() {
             }
             if let Some(p) = sys.take_warp_request() {
                 motion.set_pointer(p);
+                // The original's SetCursorPos (0x0041c312, the turn frames
+                // 0x00421593 / 0x0042197d, the bar close): the system
+                // pointer goes there too, so the next motion and press
+                // start from it, as the desktop front end does. While
+                // locked the engine follows the relative motion itself.
+                if !locked {
+                    let w = canvas.window();
+                    let (wx, wy) = atlantis_sdl::logical_to_window(p, w.size());
+                    sdl.mouse().warp_mouse_in_window(w, wx, wy);
+                }
             }
             pad.buttons.tick(pad.stick());
             let dt = now.duration_since(last_motion).as_secs_f32();
