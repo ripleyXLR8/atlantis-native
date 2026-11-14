@@ -1003,7 +1003,7 @@ impl SnakesIo for SnakesLog {
 /// The exits of `FUN_0043b0f4`: a phase-1 leave goes through the phase-2
 /// loop head, which steers a press taken by the last poll before the
 /// result is returned; a win is followed by the cursor drawn onto the
-/// win animation's last step and one more present.
+/// win animation's last step, one more present and the pass's poll.
 #[test]
 fn snakes_exits_as_original() {
     let Some(data) = game("snakes_exits_as_original") else {
@@ -1053,9 +1053,16 @@ fn snakes_exits_as_original() {
         log: Vec::new(),
     };
     assert_eq!(block_on(g.run(&mut io)), 255);
-    assert_eq!(io.log.iter().filter(|l| *l == "read").count(), clicks.len());
-    let last_read = io.log.iter().rposition(|l| l == "read").unwrap();
-    let tail = &io.log[last_read..];
+    // The clicks' reads, then the win pass's poll after its present
+    // (0x0043b46a).
+    assert_eq!(
+        io.log.iter().filter(|l| *l == "read").count(),
+        clicks.len() + 1
+    );
+    let n = io.log.len();
+    assert_eq!(io.log[n - 1], "read");
+    let last_click = io.log[..n - 1].iter().rposition(|l| l == "read").unwrap();
+    let tail = &io.log[last_click..n - 1];
     assert_eq!(tail.iter().filter(|l| *l == "present").count(), 21);
     let n = tail.len();
     let edge = if snakes::at_edge(lx) { 11 } else { 6 };

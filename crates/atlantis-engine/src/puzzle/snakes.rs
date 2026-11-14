@@ -590,7 +590,8 @@ impl SnakesGame {
     /// phase-2 loop head (0x0043b384), which runs `FUN_0043c6bc` on a press
     /// taken by that poll before the result is returned (0x0043b392). A
     /// win (`FUN_0043c114` inside `FUN_0043bebc`) is followed by the cursor
-    /// and one more present in both loops. 255 solved, 1 left.
+    /// and one more present in both loops, then phase 2's poll
+    /// (0x0043b46a). 255 solved, 1 left.
     pub async fn run(&mut self, io: &mut impl SnakesIo) -> i32 {
         while self.result == 0 {
             let (mx, my, clicked) = io.read_input();
@@ -637,6 +638,11 @@ impl SnakesGame {
                             io.play_sound(snd);
                         }
                     }
+                } else {
+                    // A phase-2 win: the pass's present is followed by its
+                    // poll (`FUN_0041a298` @ 0x0043b46a) before the loop
+                    // test, whose click flag nothing reads.
+                    io.read_input();
                 }
                 break;
             }
