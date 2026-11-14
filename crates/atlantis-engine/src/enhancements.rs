@@ -101,8 +101,11 @@ pub enum BugFix {
     /// (dialog 0x65, code 0xc, the path @ 0x00421f07..0x00421f30) on a
     /// file that archive lacks and keeps the WAM in memory. CHAPI079 (disc
     /// 4) holds `ChangeWam=atlan4.wam`, which only disc 1 has: the box,
-    /// and the player stays in PALAIS3 (with the fix, in the day city).
-    /// The WAM loads only ([`crate::engine::Engine::load_wam`]).
+    /// PALAIS3 kept, then the next command `Vue=119`, a place PALAIS3
+    /// lacks, crashes the original (0x0044a453); the port shows why and
+    /// ends the game there, back to the player screen (with the fix, the
+    /// player enters the day city). The WAM loads only
+    /// ([`crate::engine::Engine::load_wam`]).
     AnyDisc,
     /// The hexagon puzzle always places its pieces, as the 2001 entry does
     /// (OBJETENMAIN set to 402 before its test). Off, as the 1997 and the
