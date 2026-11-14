@@ -49,8 +49,8 @@ use game_over::{
     game_over_voice_name, game_over_wait_ends,
 };
 use rules::{
-    dial_row, head_open_fail_text, head_open_fails, line_fov, line_view, pick_dial_cam, Angles,
-    DialInit, LineHeader,
+    dial_row, head_open_fail_text, head_open_fails, header_angle, line_fov, line_view,
+    pick_dial_cam, Angles, DialInit, LineHeader,
 };
 use subject_menu::{menu_draws, menu_hit, menu_subject};
 
@@ -461,12 +461,10 @@ impl Dialogs {
             alpha: f64::from(kept_f.0),
             beta: f64::from(kept_f.1),
         };
-        let angle = req.line.angle.map(|(x, y)| {
-            (
-                f64::from(x) * std::f64::consts::PI / 180.0,
-                f64::from(y) * std::f64::consts::PI / 180.0,
-            )
-        });
+        let angle = req
+            .line
+            .angle
+            .map(|(x, y)| (f64::from(header_angle(x)), f64::from(header_angle(y))));
         let view = line_view(kept, header.seth && !off, perso, angle, e.warp.beta_limit());
         let set_view = |e: &mut Engine, a: Angles| {
             if e.warp_loaded {

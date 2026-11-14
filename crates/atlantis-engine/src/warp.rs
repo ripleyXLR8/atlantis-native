@@ -188,6 +188,11 @@ impl Warp {
         exe_pi_f64() as f32
     }
 
+    /// 2 pi as the original stores it (0x00bcab54, a float, @ 0x004517d6).
+    pub fn exe_two_pi() -> f32 {
+        (exe_pi_f64() * 2.0) as f32
+    }
+
     /// Sets the horizontal field of view, in degrees: `FUN_0045179a(hfov,
     /// 50)` (every caller passes 50 deg as the vertical one). The view
     /// angles are kept.

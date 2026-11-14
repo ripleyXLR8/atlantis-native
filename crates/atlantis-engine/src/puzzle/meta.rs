@@ -264,19 +264,31 @@ impl MetaGame {
     }
 
     /// The covered map cells of frame `f` drawn at (x, y), clipped to the
-    /// screen.
+    /// screen, as the histogram `FUN_00410eb5` and the mark writer
+    /// `FUN_00410e35` visit them over the 0x4b000 words: a run of covered
+    /// words is followed with a count in ECX that ends the helper when it
+    /// reaches 0 before the word is taken (`dec ecx` / `jz` @
+    /// 0x00410efe..0x00410eff, 0x00410e80..0x00410e81, 0x00410ead..
+    /// 0x00410eae), so the last word (639, 479) is left out when (638, 479)
+    /// is covered too.
     pub(crate) fn cells(coverage: &[Coverage], f: i32, x: i32, y: i32) -> Vec<usize> {
+        const LAST: usize = 640 * 480 - 1;
         let Some(c) = usize::try_from(f).ok().and_then(|f| coverage.get(f)) else {
             return Vec::new();
         };
-        c.dx.iter()
-            .zip(&c.dy)
-            .filter_map(|(&dx, &dy)| {
-                let (px, py) = (x + i32::from(dx), y + i32::from(dy));
-                ((0..640).contains(&px) && (0..480).contains(&py))
-                    .then_some((py * 640 + px) as usize)
-            })
-            .collect()
+        let mut cells: Vec<usize> =
+            c.dx.iter()
+                .zip(&c.dy)
+                .filter_map(|(&dx, &dy)| {
+                    let (px, py) = (x + i32::from(dx), y + i32::from(dy));
+                    ((0..640).contains(&px) && (0..480).contains(&py))
+                        .then_some((py * 640 + px) as usize)
+                })
+                .collect();
+        if cells.contains(&(LAST - 1)) {
+            cells.retain(|&k| k != LAST);
+        }
+        cells
     }
 
     /// `FUN_00448404`: piece `i` dropped at (x, y), true when it lies

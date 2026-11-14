@@ -526,6 +526,44 @@ mod tests {
         )
     }
 
+    /// FUN_00410eb5 / FUN_00410e35 leave out the last word (639, 479)
+    /// when (638, 479) is covered too (0x00410efe / 0x00410e80, 0x00410ead):
+    /// a piece off the board over the bottom-right corner, with that cell
+    /// of class 31, takes the first largest class of the other cells (a
+    /// tie: 0), not 31. Without (638, 479) the corner still counts.
+    #[test]
+    fn corner_word_left_out_after_a_covered_word() {
+        let place = |dx: Vec<i16>| {
+            let mut map = vec![0u8; 640 * 480];
+            map[479 * 640 + 637] = 0x1f;
+            map[479 * 640 + 639] = 0x1f;
+            let n = dx.len();
+            let cov = Coverage { dx, dy: vec![0; n] };
+            let mut g = HexaGame::new(map.clone(), vec![cov]);
+            g.map = map;
+            g.pieces[0].base = 0;
+            g.pieces[0].orient = 0;
+            assert!(g.place_piece(0, 637, 479));
+            g.pieces[0].cls
+        };
+        // (637, 638, 639): 0x1f, 0, 0x1f; the corner is not counted.
+        assert_eq!(place(vec![0, 1, 2]), 0);
+        // (635, 637, 639): no covered word before the corner: counted.
+        assert_eq!(place(vec![-2, 0, 2]), 0x1f);
+        assert_eq!(
+            MetaGame::cells(
+                &[Coverage {
+                    dx: vec![0, 1],
+                    dy: vec![0, 0]
+                }],
+                0,
+                638,
+                479
+            ),
+            vec![479 * 640 + 638]
+        );
+    }
+
     /// FUN_004406fc places the three pieces whatever the player holds;
     /// atlantis-cd-en-688128 FUN_0043c570 only with 402 in hand or
     /// FLAGTEMP6 = 2, and leaves FLAGTEMP6 otherwise.

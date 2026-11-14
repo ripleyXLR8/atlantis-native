@@ -11,6 +11,12 @@ use std::rc::Rc;
 use atlantis_codecs::HnmVideo;
 use atlantis_data::sprite::{composite_spf_frame, decode_spw_pixels, spw_frame_count};
 use atlantis_data::sprite_anim::{animate_place_sprites, enter_place, SPRITE_TICK_MS};
+
+/// The longest gap between two calls of [`Engine::animate_sprites`]
+/// replayed tick by tick: 14 ticks hold at most one step of a row (a step
+/// needs more than 13 ticks since the last), so a replay never steps more
+/// than one call of `FUN_00425304` does.
+const SPRITE_REPLAY_TICKS: u32 = 14;
 use atlantis_data::sprite_list::{npc_click_rects, npc_row_matches};
 use atlantis_data::wam::{CentrePos, Transition};
 
@@ -324,9 +330,15 @@ impl Engine {
     }
 
     /// `FUN_00425304` once per frame: the test "more than 13 ticks" of the
-    /// 200 Hz counter is run for each tick elapsed since the last call (at
-    /// most 2 s, e.g. after a video), as the original, which does not wait
-    /// for the display, steps every 14 or 15 ticks.
+    /// 200 Hz counter (@ 0x0042550e..0x00425546) is run for each tick
+    /// elapsed since the last call when that is at most 14 ticks, as the
+    /// original, which does not wait for the display, steps every 14 or 15
+    /// ticks. Such a replay steps a row at most once, as one call of the
+    /// original. After a longer gap (a move's film, a place load, a menu:
+    /// loops that do not call FUN_00425304) the test runs once, at the
+    /// current tick: the original's first call after the gap steps each
+    /// row once (from frame 0 after a place load, FUN_0042431c), not by the
+    /// gap's length.
     ///
     /// The original draws each row at its current frame (`call 0x00452d39`
     /// @ 0x00425476) before it steps it (last tick written @ 0x0042552c,
@@ -343,7 +355,8 @@ impl Engine {
             return;
         }
         let now = (self.sys.millis() / u64::from(SPRITE_TICK_MS)) as u32;
-        let mut t = if self.sprite_anim_tick != 0 && now.wrapping_sub(self.sprite_anim_tick) <= 400
+        let mut t = if self.sprite_anim_tick != 0
+            && now.wrapping_sub(self.sprite_anim_tick) <= SPRITE_REPLAY_TICKS
         {
             self.sprite_anim_tick + 1
         } else {
@@ -665,8 +678,23 @@ impl Engine {
             video.to_string()
         };
         let Some(data) = self.read(&format!("UBB_VUE\\{name}")).await else {
+            // FUN_00448c70 opens neither <name>.hnm nor <name>.ubb: it sets
+            // 0x0049610c = 1, reads no header and still returns 1
+            // (dc:40504..40515). FUN_00423ad8 then runs FUN_0043259c
+            // unconditionally (@ 0x00423fed) and skips only the player
+            // (@ 0x00423ff2): a move's glide steps are set with the frame
+            // count of the last film opened. A name without a '.' opens
+            // nothing: FUN_00422f2c returns -1 and FUN_00423ad8 skips the
+            // whole block (dc:16898..16901).
+            if let (Some((_, to)), true) = (places, video.contains('.')) {
+                self.ambient_prepare_glide(to, self.last_film_frames);
+            }
             return;
         };
+        // The 0x40-byte header to 0x00896c40: the frame count at + 0x10.
+        if let Some(b) = data.get(16..20) {
+            self.last_film_frames = i32::from_le_bytes([b[0], b[1], b[2], b[3]]);
+        }
         // The SPF sprites of the move, skipping the hidden persos.
         let mut spf_names = Vec::new();
         if let Some((from, to)) = places {
@@ -831,14 +859,23 @@ impl Engine {
                                 }
                             }
                         }
+                        // The frame after the ending poll (0x0041be2e) or the
+                        // last one: no poll follows it.
+                        let last =
+                            hnm.frame_count() != 0 && hnm.frames_decoded() >= hnm.frame_count();
                         // FUN_0041bc74 decodes the first frame before its
-                        // loop; each pass decodes the next, then runs
-                        // FUN_00432758.
-                        if !first {
+                        // loop; each pass decodes the next, runs
+                        // FUN_00432758 and the NewSound poller FUN_00432a64
+                        // (0x0041bdcb), then presents the frame decoded
+                        // before (FUN_0041b064 @ 0x0041bdec). So both run
+                        // before frames 0 .. N - 2 are shown (a start-up
+                        // film's sound starts with its first picture), and
+                        // not before the frame the loop's exit presents
+                        // (0x0041be4a): the last one or the one after the
+                        // ending poll. A sound that ends during the film
+                        // clears NEWSOUND at such a poll.
+                        if !last && !run.stop_after_frame {
                             self.ambient_video_frame();
-                            // The NewSound poller after the decode
-                            // (0x0041bdcb): a sound that ends during the
-                            // film clears NEWSOUND then.
                             self.poll_new_sound().await;
                         }
                         first = false;
@@ -849,10 +886,6 @@ impl Engine {
                         }
                         // HD: a video's frame is smoothed as a photograph.
                         self.sys.mark_photo();
-                        // The frame after the ending poll (0x0041be2e) or the
-                        // last one: no poll follows it.
-                        let last =
-                            hnm.frame_count() != 0 && hnm.frames_decoded() >= hnm.frame_count();
                         if run.frame_presented(last) {
                             self.sys.frame().await;
                             break;
@@ -1013,7 +1046,8 @@ impl Engine {
             .prepare_glide(&place, &self.wam.ambient_objects, &cam, a, b, frames);
     }
 
-    /// `FUN_00432758`, on each frame of the video loop after the first.
+    /// `FUN_00432758`, on each pass of the video loop (before frames 0 ..
+    /// N - 2 are shown).
     fn ambient_video_frame(&mut self) {
         if !self.ambient.active() {
             return;
@@ -1302,6 +1336,57 @@ mod wsprframe_tests {
             &seen[..40]
         );
         assert!(*seen.iter().max().unwrap() > 33);
+    }
+}
+
+#[cfg(test)]
+mod sprite_gap_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// FUN_00425304 runs one "more than 13 ticks" test per call
+    /// (@ 0x0042550e..0x00425546) and is not called by the film loop
+    /// FUN_0041bc74: after a 600 ms gap the slave of the ATLAN5 alley
+    /// (view 126, type 1, step every 14 ticks) moves one frame, not the
+    /// eight or nine of the gap.
+    #[test]
+    fn one_step_after_a_gap() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let got = Rc::new(std::cell::RefCell::new(None));
+        let g2 = got.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("ATLAN5.WAM").await);
+            e.next_place_id = Some(126);
+            e.do_place_change().await;
+            let mut seen = Vec::new();
+            for _ in 0..20 {
+                e.animate_sprites();
+                seen.push(e.vars.get("wsprframe"));
+                e.sys.frame().await;
+            }
+            let before = e.vars.get("wsprframe");
+            e.sys.delay(600).await;
+            e.animate_sprites();
+            *g2.borrow_mut() = Some((seen, before, e.vars.get("wsprframe")));
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        let (seen, before, after) = got.borrow().clone().expect("the task did not end");
+        // Between frames of the loop the replay keeps the 14-tick cadence.
+        assert!(seen.windows(2).all(|w| w[1] - w[0] <= 1), "{seen:?}");
+        assert!(*seen.last().unwrap() >= 3, "{seen:?}");
+        assert_eq!(after, before + 1);
     }
 }
 
@@ -1798,5 +1883,59 @@ mod move_panorama_tests {
             assert_ne!(fov, TURN_END_FOV_DEG);
             assert_eq!(pos, (0x140, 0x140));
         }
+    }
+}
+
+#[cfg(test)]
+mod missing_film_glide_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// No move between the fountain views of PALAIS2 has a film in the
+    /// archive. FUN_00448c70 then reads no header and returns 1, and
+    /// FUN_00423ad8 still runs FUN_0043259c (@ 0x00423fed): the glide steps
+    /// toward the destination are set with the frame count of the last film
+    /// opened (0x00896c50), here CINEM058's 85.
+    #[test]
+    fn move_without_film_sets_the_glide_steps() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let out = Rc::new(std::cell::RefCell::new(None));
+        let o2 = out.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("PALAIS2.WAM").await);
+            e.next_place_id = Some(197);
+            e.do_place_change().await;
+            let t = e
+                .place()
+                .and_then(|p| p.transitions.iter().find(|t| t.dst_place == 194))
+                .cloned()
+                .expect("no move 197 -> 194");
+            assert!(t.video.contains('.'));
+            assert!(
+                e.read(&format!("UBB_VUE\\{}", with_ext(&t.video, "HNM")))
+                    .await
+                    .is_none(),
+                "the move's film is in the archive"
+            );
+            assert!(!e.place().unwrap().ambient_refs.is_empty());
+            e.last_film_frames = 85;
+            e.execute_transition(194).await;
+            *o2.borrow_mut() = Some(e.ambient.step_vol);
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        let steps = out.borrow().expect("the move did not end");
+        assert!(steps.iter().any(|&s| s != 0.0), "{steps:?}");
     }
 }
