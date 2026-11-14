@@ -118,6 +118,11 @@ pub trait MetaIo {
     fn start_input(&mut self) -> (i32, i32, bool, bool);
     /// `FUN_0043318c`: a frame boundary.
     fn boundary(&mut self, g: &MetaGame) -> (i32, i32, bool, bool);
+    /// The boundary of a win-animation frame (`FUN_00447ad0`), which polls
+    /// once (0x00447bea, 0x00447cc4) where the main loop polls twice.
+    fn frame_boundary(&mut self, g: &MetaGame) -> (i32, i32, bool, bool) {
+        self.boundary(g)
+    }
     /// `FUN_00447834`'s picture 1..4.
     fn load_picture(&mut self, n: i32);
     fn draw_background(&mut self);
@@ -234,7 +239,11 @@ impl MetaGame {
     }
 
     fn read_boundary(&mut self, io: &mut impl MetaIo) {
-        let (mx, my, c, r) = io.boundary(self);
+        let m = io.boundary(self);
+        self.take_input(m);
+    }
+
+    fn take_input(&mut self, (mx, my, c, r): (i32, i32, bool, bool)) {
         self.mx = mx;
         self.my = my;
         if c {
@@ -543,13 +552,15 @@ impl MetaGame {
         io.draw_sprite('C', self.mx, self.my, if b == 0x1f { 10 } else { 5 });
     }
 
-    /// A pass of the win animation.
+    /// A pass of the win animation: one poll after the present
+    /// (0x00447bea, 0x00447cc4).
     async fn frame(&mut self, io: &mut impl MetaIo) {
         self.draw(io);
         io.draw_background();
         io.present(self).await;
         self.click = false;
-        self.read_boundary(io);
+        let m = io.frame_boundary(self);
+        self.take_input(m);
     }
 
     /// `FUN_00447ad0`.
@@ -616,6 +627,13 @@ impl MetaIo for Host<'_> {
     fn boundary(&mut self, _g: &MetaGame) -> (i32, i32, bool, bool) {
         let m = self.host.read_input();
         self.host.second_poll();
+        (m.x, m.y, m.click, m.right)
+    }
+    /// `FUN_00447ad0` polls once a frame (0x00447bea after the frame
+    /// without the piece, 0x00447cc4 after the frame with it): one F5..F8
+    /// step.
+    fn frame_boundary(&mut self, _g: &MetaGame) -> (i32, i32, bool, bool) {
+        let m = self.host.read_input();
         (m.x, m.y, m.click, m.right)
     }
     fn load_picture(&mut self, n: i32) {
@@ -727,6 +745,12 @@ mod poll_count_tests {
             io.start_input();
             io.boundary(&MetaGame::new(Vec::new(), Vec::new()));
         });
-        assert_eq!((entry, pass), (0, Some(2)));
+        // A win-animation frame (FUN_00447ad0) polls once.
+        let frame = f5_steps("meta_f5_frame", move |h| {
+            let mut io = host(h);
+            io.start_input();
+            io.frame_boundary(&MetaGame::new(Vec::new(), Vec::new()));
+        });
+        assert_eq!((entry, pass, frame), (0, Some(2), Some(1)));
     }
 }

@@ -34,6 +34,11 @@ pub trait TaquinIo {
     fn start_input(&mut self) -> (i32, i32, bool);
     /// `FUN_0043318c`: a frame boundary, where the input is read.
     fn boundary(&mut self, g: &TaquinGame) -> (i32, i32, bool);
+    /// The boundary of a set-up / win frame (`FUN_00446ac8`), which polls
+    /// once (0x00446ba9) where taquin 14's main loop polls twice.
+    fn frame_boundary(&mut self, g: &TaquinGame) -> (i32, i32, bool) {
+        self.boundary(g)
+    }
     fn draw_background(&mut self);
     /// 'P' PUZTAQn, 'C' CURSEURS.
     fn draw_sprite(&mut self, bank: char, x: i32, y: i32, frame: i32);
@@ -103,7 +108,11 @@ impl TaquinGame {
     }
 
     fn read_boundary(&mut self, io: &mut impl TaquinIo) {
-        let (mx, my, c) = io.boundary(self);
+        let m = io.boundary(self);
+        self.take_input(m);
+    }
+
+    fn take_input(&mut self, (mx, my, c): (i32, i32, bool)) {
         self.mx = mx;
         self.my = my;
         if c {
@@ -150,13 +159,14 @@ impl TaquinGame {
         }
     }
 
-    /// `FUN_00446ac8`.
+    /// `FUN_00446ac8`: one poll after the present (0x00446ba9).
     async fn frame(&mut self, io: &mut impl TaquinIo, extra: i16) {
         self.draw(io, extra);
         io.draw_background();
         io.present(self).await;
         self.click = false;
-        self.read_boundary(io);
+        let m = io.frame_boundary(self);
+        self.take_input(m);
     }
 
     /// `FUN_0044727c`.
@@ -324,6 +334,16 @@ impl TaquinIo for Host<'_> {
         };
         (m.x, m.y, m.click)
     }
+    /// `FUN_00446ac8`, the set-up and win frames of all three, polls once
+    /// (0x00446ba9): taquin 14 makes no second poll there.
+    fn frame_boundary(&mut self, _g: &TaquinGame) -> (i32, i32, bool) {
+        let m = if self.1 == 14 {
+            self.0.read_input()
+        } else {
+            self.0.read_input_held_pointer()
+        };
+        (m.x, m.y, m.click)
+    }
     fn draw_background(&mut self) {
         self.0.draw_background();
     }
@@ -433,7 +453,18 @@ mod poll_count_tests {
                 io.start_input();
                 io.boundary(&TaquinGame::new(v));
             });
-            assert_eq!((entry, pass), (0, Some(per_pass)), "taquin {v}");
+            // A set-up / win frame (FUN_00446ac8) polls once
+            // (0x00446ba9) for all three.
+            let frame = f5_steps("taquin_f5_frame", move |h| {
+                let mut io = Host(h, v);
+                io.start_input();
+                io.frame_boundary(&TaquinGame::new(v));
+            });
+            assert_eq!(
+                (entry, pass, frame),
+                (0, Some(per_pass), Some(1)),
+                "taquin {v}"
+            );
         }
     }
 }
