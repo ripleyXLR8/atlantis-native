@@ -24,7 +24,7 @@
 
 use atlantis_data::sprite_list::npc_hit_test;
 
-use crate::cursor::{warp_cursor_frame, warp_cursor_step, WarpCursorInput};
+use crate::cursor::{warp_cursor_frame_drawn, warp_cursor_step, WarpCursorInput};
 use crate::engine::{Abort, Engine, CURSOR_UNSET, WARP_ABORT};
 use crate::hooks::ScriptHooks;
 use crate::look::warp_look_frame;
@@ -308,9 +308,13 @@ impl Engine {
         // section of this frame left (0x0041c4ca: 0x004960c4 == 0; the bar
         // opens at the frame's end, here at the next pass's start); its
         // animation state does not advance.
+        self.warp_buffer_cursor = None;
         if !self.bow_mode && !self.bar.request {
             self.step_warp_cursor();
             self.draw_cursor_sprite();
+            if self.cursor_after_copy >= 0 {
+                self.warp_buffer_cursor = Some((self.cursor_after_copy, self.pointer.pos));
+            }
         }
     }
 
@@ -339,7 +343,10 @@ impl Engine {
             || first.mode != self.cursor_state.mode
         {
             let steps = self.game.exe.build.warp_cursor_steps;
-            self.cursor_shown = warp_cursor_frame(&mut self.cursor_state, &input, steps).sprite;
+            let (shown, after_copy) =
+                warp_cursor_frame_drawn(&mut self.cursor_state, &input, steps);
+            self.cursor_shown = shown.sprite;
+            self.cursor_after_copy = after_copy;
             self.cursor_next_ms = now + CURSOR_FRAME_MS;
         }
     }
@@ -786,6 +793,7 @@ impl Engine {
             self.ambient_frame();
             if !exit {
                 self.sys.frame().await;
+                self.warp_frame_presented = Some(self.sys.frames_presented());
             }
         }
 
@@ -921,6 +929,113 @@ mod tests {
             assert!(got.contains(&s), "{s} never shown: {got:?}");
         }
         assert!(got.iter().all(|s| [9, 11, 13].contains(s)), "{got:?}");
+    }
+
+    /// FUN_0041cc28 (@ 0x0041ccd2) dims the warp frame's back buffer as
+    /// composed: the screen of the last warp frame with the cursor sprite
+    /// FUN_0041afd0 drew after the copy (@ 0x0041c5ed) over it. With
+    /// another frame presented since, the view rendered anew.
+    #[test]
+    fn the_menu_backdrop_is_the_composed_warp_frame() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_menu_backdrop_is_the_composed_warp_frame",
+            move |mut e| async move {
+                e.load_interface().await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let pattern: Vec<u16> = (0..SCREEN_W * SCREEN_H).map(|k| k as u16).collect();
+                e.sys.screen.borrow_mut().copy_from_slice(&pattern);
+                e.warp_frame_presented = Some(e.sys.frames_presented());
+                e.warp_buffer_cursor = Some((10, (320, 240)));
+                let composed = e.dimmed_view();
+                let mut want = pattern.clone();
+                e.cursor_sprites[10].draw(&mut want, SCREEN_W, SCREEN_H, 320, 240);
+                crate::ui::dim_screen(&mut want);
+                let cursor_drawn = want != {
+                    let mut p = pattern.clone();
+                    crate::ui::dim_screen(&mut p);
+                    p
+                };
+                // A frame presented since: the view rendered anew.
+                e.sys.screen.borrow_mut().copy_from_slice(&pattern);
+                e.sys.frame().await;
+                let fresh = e.dimmed_view();
+                *g2.borrow_mut() = Some((composed == want, cursor_drawn, fresh != want));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(got.borrow_mut().take(), Some((true, true, true)));
+        }
+    }
+
+    /// With a follower, the menu opened from the warp loop shows the dimmed
+    /// portraits the warp frame drew (FUN_0042bc58 @ 0x0041c489).
+    #[test]
+    fn the_menu_backdrop_keeps_the_guests_portraits() {
+        let shots = Rc::new(RefCell::new((None::<Vec<u16>>, None::<Vec<u16>>)));
+        let s2 = shots.clone();
+        let box_ = Rc::new(Cell::new(None));
+        let b2 = box_.clone();
+        let (mut locked, mut escape_at) = (0u64, None::<u64>);
+        let ran = with_engine(
+            "the_menu_backdrop_keeps_the_guests_portraits",
+            move |mut e| async move {
+                e.load_interface().await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.guests.id[0] = 600;
+                e.guests.sprite[0] = 0;
+                e.guests.count = 1;
+                e.guests_shown = true;
+                e.guests.portrait_y = 350;
+                let spr = &e.ui.guests[0];
+                let (x0, y0) = (540 - i32::from(spr.xoff), 350 - i32::from(spr.yoff));
+                b2.set(Some((x0, y0, i32::from(spr.w), i32::from(spr.h))));
+                e.handle_warp(&mut crate::hooks::NoScripts).await;
+            },
+            move |sys, f| {
+                if escape_at.is_none() && sys.mouse_locked() {
+                    locked += 1;
+                    if locked == 5 {
+                        s2.borrow_mut().0 = Some(sys.screen.borrow().clone());
+                        sys.push_input(Input::KeyDown(Key::Escape));
+                        sys.push_input(Input::KeyUp(Key::Escape));
+                        escape_at = Some(f);
+                    }
+                }
+                match escape_at.map(|e| f - e) {
+                    Some(10) => s2.borrow_mut().1 = Some(sys.screen.borrow().clone()),
+                    Some(12) => {
+                        sys.push_input(Input::MouseMove { x: 2, y: 2 });
+                        button(sys, MouseButton::Left, true);
+                    }
+                    Some(13) => button(sys, MouseButton::Left, false),
+                    Some(30) => sys.push_input(Input::Quit),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (warp, menu) = std::mem::take(&mut *shots.borrow_mut());
+        let (mut warp, menu) = (warp.unwrap(), menu.unwrap());
+        crate::ui::dim_screen(&mut warp);
+        let (x0, y0, w, h) = box_.get().unwrap();
+        let (mut same, mut all) = (0, 0);
+        for y in y0.max(0)..(y0 + h).min(SCREEN_H as i32) {
+            for x in x0.max(0)..(x0 + w).min(SCREEN_W as i32) {
+                let k = y as usize * SCREEN_W + x as usize;
+                all += 1;
+                same += usize::from(warp[k] == menu[k]);
+            }
+        }
+        assert!(all > 0 && same == all, "{same}/{all}");
     }
 
     /// A timer section that moved the player while the bar was open (as a

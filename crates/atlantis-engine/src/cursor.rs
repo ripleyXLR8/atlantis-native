@@ -194,11 +194,26 @@ pub fn warp_cursor_frame(
     input: &WarpCursorInput,
     steps: u8,
 ) -> WarpCursorResult {
+    warp_cursor_frame_drawn(st, input, steps).0
+}
+
+/// [`warp_cursor_frame`], with the sprite the last call drew into the back
+/// buffer `[0x004960d8]` after the copy (`FUN_0041afd0` @ 0x0041c5ed ->
+/// 0x0041b050; -1 for none, and with one call a frame): the buffer holds
+/// it over the shown one until the next render (0x0041c403), so it is in
+/// what the in-game menu dims (`FUN_0041cc28` @ 0x0041ccd2). The builds
+/// call `FUN_00422fcc` at most twice a frame.
+pub fn warp_cursor_frame_drawn(
+    st: &mut WarpCursorState,
+    input: &WarpCursorInput,
+    steps: u8,
+) -> (WarpCursorResult, i32) {
     let shown = warp_cursor_step(st, input);
+    let mut after_copy = -1;
     for _ in 1..steps.max(1) {
-        warp_cursor_step(st, input);
+        after_copy = warp_cursor_step(st, input).sprite;
     }
-    shown
+    (shown, after_copy)
 }
 
 #[cfg(test)]

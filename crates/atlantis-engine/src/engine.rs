@@ -439,6 +439,16 @@ pub struct Engine {
     /// move's video @ 0x00423f8a).
     pub(crate) turn_double_click: crate::turn::TurnDoubleClick,
     pub(crate) cursor_shown: i32,
+    /// The sprite the frame of cursor calls drew into the back buffer after
+    /// the copy ([`crate::cursor::warp_cursor_frame_drawn`]), -1 for none.
+    pub(crate) cursor_after_copy: i32,
+    /// The warp frame's back buffer `[0x004960d8]` beyond what it showed:
+    /// that sprite and the pointer it was drawn at, when the frame drew the
+    /// cursor.
+    pub(crate) warp_buffer_cursor: Option<(i32, (i32, i32))>,
+    /// `Sys::frames_presented` after the last warp frame's present: while
+    /// nothing else was presented, the screen holds that frame as composed.
+    pub(crate) warp_frame_presented: Option<u64>,
     pub(crate) cursor_next_ms: u64,
     /// The view keys F5..F8 held at the polls (`FUN_0041a298`) of the loops
     /// other than the warp loop's look, one mask per poll
@@ -593,6 +603,9 @@ impl Engine {
             cursor_state: WarpCursorState::default(),
             turn_double_click: Default::default(),
             cursor_shown: CURSOR_UNSET,
+            cursor_after_copy: -1,
+            warp_buffer_cursor: None,
+            warp_frame_presented: None,
             cursor_next_ms: 0,
             view_key_polls: RefCell::new(Vec::new()),
             ix_buffers: Vec::new(),

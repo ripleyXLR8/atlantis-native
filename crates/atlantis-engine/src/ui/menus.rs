@@ -293,16 +293,36 @@ impl Engine {
         s
     }
 
-    /// The view as the warp loop last drew it, without the cursor (the
-    /// in-game menu's backdrop), dimmed (`FUN_0041cc28`).
+    /// The in-game menu's backdrop, dimmed (`FUN_0041cc28`): the warp
+    /// frame as composed. The warp frame draws into the back buffer
+    /// `[0x004960d8]` the view, the guests' portraits (`FUN_0042bc58` @
+    /// 0x0041c489) and the cursor (`FUN_00422fcc` @ 0x0041c535), copies it
+    /// to the surface (0x0041c5a4), then `FUN_0041afd0` (@ 0x0041c5ed)
+    /// draws the next cursor sprite into the buffer; the poll that sees
+    /// Escape (0x0041c5f2) calls `FUN_0041c838` (0x0041c618), whose
+    /// `FUN_0041cc28` dims the buffer in place (0x0041ccd2) with no render
+    /// in between. When a warp frame was the last frame presented, that is
+    /// the screen with the second cursor sprite over it; otherwise the
+    /// view rendered anew.
     pub(crate) fn dimmed_view(&mut self) -> Screen {
+        let composed =
+            self.warp_loaded && self.warp_frame_presented == Some(self.sys.frames_presented());
         if self.warp_loaded {
-            self.render_view();
+            if !composed {
+                self.render_view();
+            }
             self.sys.hd_unmark(); // dimmed: no HD view
         }
         let mut bg = self.sys.screen.borrow().clone();
         if !self.warp_loaded {
             bg.fill(0);
+        } else if let (true, Some((k, (x, y)))) = (composed, self.warp_buffer_cursor) {
+            if let Some(spr) = usize::try_from(k)
+                .ok()
+                .and_then(|k| self.cursor_sprites.get(k))
+            {
+                spr.draw(&mut bg, SCREEN_W, SCREEN_H, x, y);
+            }
         }
         dim_screen(&mut bg);
         bg
