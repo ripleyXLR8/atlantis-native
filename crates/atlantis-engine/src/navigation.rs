@@ -512,6 +512,13 @@ impl Engine {
                         .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
                     self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
+                    // The original opens the bar at the end of its frame
+                    // (0x0041c6d2), a guest's conversation inside it
+                    // (FUN_0042c8ac -> FUN_00425828); the next frame reads
+                    // the clocks (FUN_0041c75c @ 0x0041c086) before its
+                    // timers: a Time1= of the conversation (CHAPI032 /419)
+                    // is seen at once.
+                    self.update_con_clocks();
                 }
             } else if !exit && fi.escape && !self.bow_mode && self.vars.get("objetenmain") == 0 {
                 self.sys.set_mouse_locked(false);
@@ -1453,6 +1460,87 @@ mod tests {
         }
         // The icon overlaps the portrait, and the frame has it under.
         assert_eq!(got.borrow().unwrap(), (true, true));
+    }
+
+    /// A guest's conversation from the bar that sets Time1 (CHAPI032
+    /// /419's time1=20000); the time1 the timers see next.
+    struct GuestTimer {
+        talked: Rc<Cell<bool>>,
+        seen: Rc<RefCell<Vec<i32>>>,
+    }
+
+    impl ScriptHooks for GuestTimer {
+        fn talk_to_guest<'a>(&'a mut self, e: &'a mut Engine, _id: i32) -> HookFuture<'a, ()> {
+            let now = e.now();
+            e.clocks.restart(1, 20000, now);
+            self.talked.set(true);
+            ready(())
+        }
+
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.talked.get() && self.seen.borrow().is_empty() {
+                self.seen.borrow_mut().push(e.vars.get("time1"));
+            }
+            ready(false)
+        }
+    }
+
+    /// The timers after a guest's conversation from the bar read the
+    /// clocks again (the original's next frame, FUN_0041c75c @ 0x0041c086):
+    /// a Time1=20000 in it is seen at once.
+    #[test]
+    fn timers_after_a_bar_conversation_read_fresh_clocks() {
+        let talked = Rc::new(Cell::new(false));
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let (t2, s2) = (talked.clone(), seen.clone());
+        let (t3, s3) = (talked.clone(), seen.clone());
+        let mut locked = 0u64;
+        let mut opened = None::<u64>;
+        let ran = with_engine(
+            "timers_after_a_bar_conversation_read_fresh_clocks",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                let table = e.game.exe.guest_sprite_ids.clone();
+                e.guests.add(table[0], &table);
+                e.guests_shown = true;
+                e.next_place_id = Some(1);
+                let mut hooks = GuestTimer {
+                    talked: t2,
+                    seen: s2,
+                };
+                e.game_step(&mut hooks).await;
+            },
+            move |sys, f| {
+                if !s3.borrow().is_empty() || (t3.get() && opened.is_some_and(|t| f > t + 300)) {
+                    sys.push_input(Input::Quit);
+                    return;
+                }
+                let Some(t) = opened else {
+                    locked = if sys.mouse_locked() { locked + 1 } else { 0 };
+                    if locked == 10 {
+                        button(sys, MouseButton::Right, true);
+                        opened = Some(f);
+                    }
+                    return;
+                };
+                match f - t {
+                    2 => button(sys, MouseButton::Right, false),
+                    // The guest's portrait, raised with the bar.
+                    60 => {
+                        sys.push_input(Input::MouseMove { x: 580, y: 340 });
+                        button(sys, MouseButton::Left, true);
+                    }
+                    62 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        assert!(talked.get(), "no conversation");
+        assert_eq!(seen.borrow().len(), 1);
+        assert!(seen.borrow()[0] >= 20000, "time1 = {}", seen.borrow()[0]);
     }
 
     /// The view's alpha after the warp loop of place 1, with the left
