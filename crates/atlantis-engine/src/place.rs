@@ -610,20 +610,33 @@ impl Engine {
         self.poll_view_keys(false);
         // The message pump: a WM_LBUTTONDBLCLK queued during the departure
         // scan's lines or by an earlier poll of the turn.
-        let (mode, menu) = (self.cursor_state.mode, self.escape_request);
+        let (mode, menu) = (self.cursor_state.mode, self.menu_request());
         self.turn_double_click.dispatch(mode, menu);
         if right {
             self.bar
-                .right_pressed(self.section_play, self.escape_request);
+                .right_pressed(self.section_play, self.menu_request());
         }
         if escape && self.escape_gate_open() {
-            self.escape_request = true;
+            self.latch_escape();
         }
     }
 
     /// Escape clears 0x00496124 (`FUN_0041a298` @ 0x0041a3e8..0x0041a419)
     /// when no talking head plays (0x00496188, never in these loops) and
     /// bow mode, the bar request and OBJETENMAIN are all 0.
+    /// The Escape of `FUN_0041a298` (0x0041a419..0x0041a423): 0x00496124 =
+    /// 0 and the menu request 0x00496138 = 1.
+    pub(crate) fn latch_escape(&mut self) {
+        self.escape_request = true;
+        self.menu_request_cleared = false;
+    }
+
+    /// The menu request 0x00496138: set by the Escape latch, cleared with
+    /// it, and alone by the executor's exit (0x00428d81).
+    pub(crate) fn menu_request(&self) -> bool {
+        self.escape_request && !self.menu_request_cleared
+    }
+
     pub(crate) fn escape_gate_open(&self) -> bool {
         !self.bow_mode && !self.bar.request && self.vars.get("objetenmain") == 0
     }
@@ -751,7 +764,7 @@ impl Engine {
         // (0x0041be4a), with the menu request still set.
         if self.escape_request {
             run.s.keep_running = false;
-            run.s.menu_request = true;
+            run.s.menu_request = self.menu_request();
             run.stop_after_frame = true;
         }
         let (w, h) = (hnm.width(), hnm.height());
@@ -910,7 +923,7 @@ impl Engine {
                         // (0x0041a2be): a queued WM_LBUTTONDBLCLK is
                         // dispatched (window procedure @ 0x00419c79).
                         if !left {
-                            let (mode, menu) = (self.cursor_state.mode, self.escape_request);
+                            let (mode, menu) = (self.cursor_state.mode, self.menu_request());
                             self.turn_double_click.dispatch(mode, menu);
                         }
                         run.poll(left, right, escape);

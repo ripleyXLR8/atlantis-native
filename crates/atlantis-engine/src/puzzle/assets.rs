@@ -336,10 +336,10 @@ fn poll_flags_with(e: &mut Engine, m: &PuzzleMouse, view_keys: bool) {
         e.poll_view_keys(false);
     }
     if m.right {
-        e.bar.right_pressed(e.section_play, e.escape_request);
+        e.bar.right_pressed(e.section_play, e.menu_request());
     }
     if m.escape && e.escape_gate_open() && e.puzzle_escape_latches() {
-        e.escape_request = true;
+        e.latch_escape();
     }
 }
 

@@ -269,6 +269,12 @@ pub struct Engine {
     /// voice-only line, the game-over wait) stops at once and puts both
     /// back; the end of a conversation puts them back too (0x00425be5).
     pub escape_request: bool,
+    /// The executor's exit (`FUN_0042844c` @ 0x00428d81) cleared the menu
+    /// request 0x00496138 while 0x00496124 stayed 0: of the latch
+    /// [`Engine::escape_request`] stands for, only the stop half is left
+    /// ([`Engine::menu_request`]). Set again with the latch
+    /// ([`Engine::latch_escape`]).
+    pub menu_request_cleared: bool,
     /// The warp loop ended without a click, as the original's place loop
     /// then still acts on the zone under the pointer
     /// ([`Engine::no_click_exit`], [`BugFix::GameOverPuzzle`] off): `true`
@@ -495,6 +501,7 @@ impl Engine {
             abort: None,
             section_play: false,
             escape_request: false,
+            menu_request_cleared: false,
             pending_no_click_exit: None,
             vue_override: None,
             inventory: Vec::new(),

@@ -390,7 +390,7 @@ impl Engine {
             || self.bow_mode
             || self.vars.get("gameover") != 0
             || self.bar.request
-            || self.escape_request
+            || self.menu_request()
         {
             return false;
         }

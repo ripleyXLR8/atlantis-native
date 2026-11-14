@@ -360,10 +360,10 @@ impl Engine {
         *pointer = self.sys.mouse();
         if mi.right_press {
             self.bar
-                .right_pressed(self.section_play, self.escape_request);
+                .right_pressed(self.section_play, self.menu_request());
         }
         if mi.escape && self.escape_gate_open() {
-            self.escape_request = true;
+            self.latch_escape();
         }
     }
 
