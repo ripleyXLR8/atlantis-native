@@ -646,7 +646,11 @@ impl Dialogs {
             section_play: e.section_play,
             ..VideoSkipState::default()
         };
-        drain(e).await;
+        // No wait for the buttons (FUN_0042ee88, FUN_00430258 and
+        // FUN_004305e8 go straight to the voice and the frames): a button
+        // still held from the press that ended the previous line is no
+        // press (FUN_0042e624's latch; the engine's press events are those
+        // edges).
         // FUN_00430258 lowers the music when no fade runs (@ 0x0043027f) and
         // raises it once the voice has played (@ 0x004305a6); without the
         // voice it returns before, leaving the music low.
@@ -722,7 +726,7 @@ impl Dialogs {
                     // The bar request as the right presses left it.
                     escape_poll.bar_request = e.bar.request;
                     let escape = fi.escape && escape_poll.poll(false, false, true);
-                    if escape || fi.left_press || e.sys.buttons().0 {
+                    if escape || fi.left_press {
                         // With a talking head Escape also sets the dialog-skip
                         // flag 0x00496134 that FUN_0042844c reads after the
                         // line.
@@ -938,7 +942,6 @@ impl Dialogs {
         }
         e.sys.screen.borrow_mut().copy_from_slice(&frame);
         e.sys.frame().await;
-        drain(e).await;
 
         // The narrator's voice: wait for it, or hold the image 5 s without
         // it (game_over_wait_ends). FUN_0041a298 polls with the flags of the
@@ -2200,6 +2203,67 @@ mod puzzle_latch_tests {
         } else {
             None
         }
+    }
+
+    /// How long the line CHAPI041 /590 B (`[Chat,off]`) plays, in ms, with
+    /// the left button held down (its press seen before the line) until
+    /// 2 s after the start, or not held.
+    fn held_play_ms(held: bool) -> Option<u64> {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_held_button_does_not_hold_the_line_back",
+            move |mut e| async move {
+                if held {
+                    crate::test_support::button(&e.sys, MouseButton::Left, true);
+                    while e.sys.poll_event().is_some() {}
+                }
+                let line = ConLine {
+                    speaker: "Chat".into(),
+                    params: "off".into(),
+                    text: "...".into(),
+                    ..ConLine::default()
+                };
+                let req = LineRequest {
+                    section: 590,
+                    letter: 'B',
+                    line,
+                    perso: 514,
+                    interactive: false,
+                    inc_perso: 0,
+                };
+                let mut d = Dialogs::new();
+                let t0 = e.sys.millis();
+                d.line(&mut e, &req).await;
+                *g2.borrow_mut() = Some(e.sys.millis() - t0);
+            },
+            move |sys, f| {
+                let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut sound, 22050, 2);
+                if held && f == 125 {
+                    crate::test_support::button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            *got.borrow()
+        } else {
+            None
+        }
+    }
+
+    /// No line player waits for the buttons (FUN_0042ee88, FUN_00430258,
+    /// FUN_004305e8), and a held button is no press (the latch of
+    /// FUN_0042e624): a button held from before the line neither holds the
+    /// line back nor ends it.
+    #[test]
+    fn a_held_button_does_not_hold_the_line_back() {
+        let Some(free) = held_play_ms(false) else {
+            return;
+        };
+        let held = held_play_ms(true).unwrap();
+        assert!(free > 300, "{free} ms");
+        assert!(held.abs_diff(free) <= 50, "{held} ms held, {free} ms not");
     }
 
     /// The voice-only lines that follow a puzzle in which Escape was

@@ -1043,9 +1043,9 @@ impl Scripts {
         chain: Option<Walk>,
     ) -> HookFuture<'a, ()> {
         Box::pin(async move {
-            // The gesture that triggered the section is drained, so that the
-            // first line is not skipped by a click still held.
-            e.wait_buttons_up().await;
+            // No wait for the buttons (the executor polls nothing before
+            // its first line): a click still held is no press for the line
+            // players, whose presses are edges.
             let entry_chapter = self.chapter;
             e.emit(Event::Section {
                 chapter: self.chapter,
