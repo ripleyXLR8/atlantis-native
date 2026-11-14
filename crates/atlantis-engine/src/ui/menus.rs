@@ -71,14 +71,15 @@ impl Menu {
 
     /// Walks the file (`FUN_0041fb6c`) with the hovered line and the
     /// options toggles, its records in the session's `table`
-    /// ([`Engine::menu_table`]) or, without one, its own.
+    /// ([`Engine::menu_table`]) or, without one, its own. Returns the
+    /// walk's input polls ([`walk_menu_text_in`]).
     pub fn walk(
         &mut self,
         hover: Option<usize>,
         toggle_a: i32,
         toggle_b: i32,
         table: Option<&mut MenuRecordTable>,
-    ) {
+    ) -> usize {
         let hover = hover.map_or(-1, |h| h as i32);
         walk_menu_text_in(
             &self.text,
@@ -89,7 +90,7 @@ impl Menu {
             self.rules,
             &mut self.walk,
             table,
-        );
+        )
     }
 
     /// The record under the point (`FUN_004210c0`), read from the table as
@@ -193,6 +194,20 @@ impl Engine {
         mi
     }
 
+    /// The input polls of a menu walk (`FUN_0041fb6c` calls `FUN_0041a298`
+    /// once per iteration, @ 0x0041fd03): each, without a new left press,
+    /// moves the stored view angles for a held F5..F8 (0x0041a33c..
+    /// 0x0041a3ba), so a pass of MAINMENU's loop turns them 33 times, plus
+    /// the pass's own poll after the present ([`Engine::poll_menu_input`]),
+    /// which takes the press edges. Every menu loop (`FUN_0041c838`,
+    /// `FUN_0041d5f4`, `FUN_0041d940`, `FUN_0041ec7c`, `FUN_0041cf78`,
+    /// `FUN_0041dea4`) walks once a pass and polls once after it.
+    pub(crate) fn menu_walk_polls(&self, polls: usize) {
+        for _ in 0..polls {
+            self.poll_view_keys(false);
+        }
+    }
+
     /// `SPRLIST\<name>`, `None` when the archive lacks it. Not walked
     /// yet: each menu walks it before its first hit test, with its toggles.
     pub(crate) async fn load_menu(&self, name: &str) -> Option<Menu> {
@@ -276,7 +291,8 @@ impl Engine {
         };
         let mut st = PlayerScreenState::default();
         let mut dbl = MenuDoubleClick::default();
-        menu.walk(None, 0, 0, self.menu_table());
+        let polls = menu.walk(None, 0, 0, self.menu_table());
+        self.menu_walk_polls(polls);
         // FUN_0041dea4 waits for no release; a press made before it is not
         // a click (its loop clears the flag each pass, 0x0041e036).
         while self.sys.poll_event().is_some() {}
@@ -327,7 +343,8 @@ impl Engine {
                 // The frame: the backdrop, the menu, the rows (FUN_00420d8c:
                 // x 185, y 270 + 22 j, FONTMIN2 under the mouse), the name
                 // field (FUN_00420f60 at (160, 190)) when not empty.
-                menu.walk(record, 0, 0, self.menu_table());
+                let polls = menu.walk(record, 0, 0, self.menu_table());
+                self.menu_walk_polls(polls);
                 let mut s = bg.clone();
                 self.ui.draw_menu(&mut s, &menu.walk);
                 let sharp_s_as_ss = self.sharp_s_as_ss();
@@ -387,7 +404,8 @@ impl Engine {
         let Some(mut menu) = self.load_menu("SUREMENU.TXT").await else {
             return true;
         };
-        menu.walk(None, 0, 0, self.menu_table());
+        let polls = menu.walk(None, 0, 0, self.menu_table());
+        self.menu_walk_polls(polls);
         loop {
             if self.should_abort() {
                 return false;
@@ -402,7 +420,8 @@ impl Engine {
                     return r == 3;
                 }
             }
-            menu.walk(hit, 0, 0, self.menu_table());
+            let polls = menu.walk(hit, 0, 0, self.menu_table());
+            self.menu_walk_polls(polls);
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -418,7 +437,8 @@ impl Engine {
         let Some(mut menu) = self.load_menu("MAINMENU.TXT").await else {
             return MenuOutcome::Resume;
         };
-        menu.walk(None, 0, 0, self.menu_table());
+        let polls = menu.walk(None, 0, 0, self.menu_table());
+        self.menu_walk_polls(polls);
         // FUN_0041c838 clears the click flag before its loop.
         while self.sys.poll_event().is_some() {}
         let mut outcome = MenuOutcome::Resume;
@@ -447,7 +467,8 @@ impl Engine {
                 }
                 break;
             }
-            menu.walk(hit, 0, 0, self.menu_table());
+            let polls = menu.walk(hit, 0, 0, self.menu_table());
+            self.menu_walk_polls(polls);
             let mut s = bg.clone();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -470,12 +491,13 @@ impl Engine {
         // with SUBTITLES off keeps the x / y the session's table holds from
         // an earlier visit (see MenuRules::toggle_in_step).
         menu.rules.subtitle_counter = self.subtitle_clicks;
-        menu.walk(
+        let polls = menu.walk(
             None,
             i32::from(self.subtitles),
             i32::from(self.settings.omni3d_mode2),
             self.menu_table(),
         );
+        self.menu_walk_polls(polls);
         // The hovered record is the one under the pointer, whatever it is
         // (@ 0x0041d5f1..0x0041d600): with the sprite menus the labels
         // SUBTITLES and OMNI 3D (records 2 and 4) are drawn hovered too
@@ -520,12 +542,13 @@ impl Engine {
                     _ => {}
                 }
             }
-            menu.walk(
+            let polls = menu.walk(
                 if sprite_menus { under } else { hit },
                 i32::from(self.subtitles),
                 i32::from(self.settings.omni3d_mode2),
                 self.menu_table(),
             );
+            self.menu_walk_polls(polls);
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -552,7 +575,8 @@ impl Engine {
         // SUREMENU's count byte and records 0-1. The knobs are its records
         // 5..8, whose x the sliders write (atlantis-cd-en-688128 @
         // 0x0041d2b2) and the walk keeps (son_knob_x mirrors them).
-        menu.walk(None, 0, 0, self.menu_table());
+        let polls = menu.walk(None, 0, 0, self.menu_table());
+        self.menu_walk_polls(polls);
         for t in 0..4 {
             if self.son_knob_x[t] == 0 {
                 let r = menu.stored_record(5 + t, self.menu_table().as_deref());
@@ -599,7 +623,8 @@ impl Engine {
                 }
             }
             set_knobs(self, &mut menu);
-            menu.walk(hit, 0, 0, self.menu_table());
+            let polls = menu.walk(hit, 0, 0, self.menu_table());
+            self.menu_walk_polls(polls);
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             self.present(&s, true).await;
@@ -691,7 +716,8 @@ impl Engine {
         let knob =
             load_picker_knob_record(menu.stored_record(4, self.menu_table().as_deref()), &sb);
         menu.set_stored_record(4, knob, self.menu_table());
-        menu.walk(None, 0, 0, self.menu_table());
+        let polls = menu.walk(None, 0, 0, self.menu_table());
+        self.menu_walk_polls(polls);
         let sprite_rows = matches!(build.load_list, LoadList::Sprites { .. });
         let mut title: Option<(Vec<u8>, i32)> = None;
         // The Chinese builds' title: EPICHI2 frame `row` at x.
@@ -812,7 +838,8 @@ impl Engine {
             let knob =
                 load_picker_knob_record(menu.stored_record(4, self.menu_table().as_deref()), &sb);
             menu.set_stored_record(4, knob, self.menu_table());
-            menu.walk(button, 0, 0, self.menu_table());
+            let polls = menu.walk(button, 0, 0, self.menu_table());
+            self.menu_walk_polls(polls);
             let mut s = bg.to_vec();
             self.ui.draw_menu(&mut s, &menu.walk);
             if sprite_rows {
@@ -1299,5 +1326,74 @@ mod release_wait_tests {
             return;
         };
         assert!(menu_screen(true).expect("no frame 20") == up);
+    }
+}
+
+#[cfg(test)]
+mod walk_poll_tests {
+    use crate::sys::{Input, Key, MouseButton};
+    use crate::test_support::{button, with_engine};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// `FUN_0041fb6c` calls `FUN_0041a298` once per walk iteration (@
+    /// 0x0041fd03): the shipped menus' counts (round-3 ui review, harness
+    /// `ui_r3_data.py` §4).
+    #[test]
+    fn menu_walk_polls() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "menu_walk_polls",
+            move |mut e| async move {
+                for name in [
+                    "SELEMENU.TXT",
+                    "MAINMENU.TXT",
+                    "SONMENU.TXT",
+                    "SUREMENU.TXT",
+                    "LOADMENU.TXT",
+                ] {
+                    let mut m = e.load_menu(name).await.expect(name);
+                    let polls = m.walk(None, 0, 0, e.menu_table());
+                    g2.borrow_mut().push(polls);
+                }
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [45, 33, 72, 27, 40]);
+        }
+    }
+
+    /// F5 held in the in-game menu: each pass of `FUN_0041c838` moves the
+    /// stored angle once per walk poll (33 for MAINMENU) and once at its
+    /// own poll; the pass whose poll sees the click adds none there.
+    #[test]
+    fn a_held_view_key_turns_once_per_menu_poll() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_held_view_key_turns_once_per_menu_poll",
+            move |mut e| async move {
+                e.load_interface().await;
+                e.sys.push_input(Input::KeyDown(Key::F(5)));
+                e.ingame_menu().await;
+                *g2.borrow_mut() = Some(e.view_key_polls.borrow().len());
+            },
+            |sys, f| match f {
+                10 => {
+                    sys.push_input(Input::MouseMove { x: 2, y: 2 });
+                    button(sys, MouseButton::Left, true);
+                }
+                11 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let n = got.borrow().expect("the menu did not end");
+        // The entry walk, then (poll + walk) per pass before the click.
+        assert!(n > 33 + 34 && n % 34 == 33, "{n} polls");
     }
 }
