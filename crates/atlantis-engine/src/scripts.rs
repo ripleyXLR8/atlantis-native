@@ -1066,54 +1066,30 @@ impl Scripts {
                         let n = gameover_value(cmd);
                         self.exec_set(e, Some(*offset), cmd).await;
                         if n != 0 {
-                            // The narrator's voice is ATA<section><letter>,
-                            // the letter counting the lines before it
-                            // (FUN_00426590 @ 0x004267ea, 0x004268b2..).
-                            // The 1997 build takes the executor's current
-                            // letter (atlantis-cd-en-688128 FUN_004256a4 @
-                            // 0x004256ee), the same file for every game
-                            // over of the shipped scripts.
-                            let mut narrator = con_game_over_narrator(&sec.items, i)
-                                .map(|l| (l.text.clone() + &l.trail, con_track_letter(line_idx)));
-                            // The 1999 build: the second death in a section
-                            // plays the next narrator line.
-                            // The 2001 and 1997 builds with the restored
-                            // content too.
-                            let alt = e.game.exe.build.alt_game_over_narration
-                                || e.enhancements().restored_content;
-                            let mut narrator_item = i + 1;
-                            if let (Some((text, letter)), true) = (narrator.as_mut(), alt) {
-                                let count = self.game_over_count.entry(sec.id).or_default();
-                                let pick = con_alt_game_over_narration(&sec.items, i, count);
-                                if pick > 0 {
-                                    if let ConItem::Line(l) = &sec.items[i + 1 + pick] {
-                                        *text = l.text.clone() + &l.trail;
-                                    }
-                                    *letter = char::from(*letter as u8 + pick as u8);
-                                    narrator_item += pick;
-                                }
-                            }
-                            // The game-over screen copies the narrator line
-                            // into the subtitle text buffer, shown or not
-                            // (atlantis-cd-en-688128 FUN_004256a4 @
-                            // 0x00425a31..0x00425a50).
-                            if let (Some(_), Some(ConItem::Line(l))) =
-                                (&narrator, sec.items.get(narrator_item))
-                            {
-                                e.subtitle_text
-                                    .store(con_narrator_buffer_text(&latin1_bytes(&l.raw)));
-                            }
-                            game_over = Some(GameOverRequest {
-                                section: sec.id,
-                                n,
-                                narrator,
-                            });
+                            game_over = Some(self.game_over_at(e, &sec, i, line_idx, n));
                             break;
                         }
                         // A chapter change replaced the script: the walk ends.
                         // The executor still ends that item with FUN_00428da8
                         // (only GameOver breaks before it, 0x00428bf9..).
                         if self.chapter != entry_chapter {
+                            // The handler's result is the executor's new
+                            // text position (0x00428bf9..0x00428c02), and the
+                            // GAMEOVER test (0x00428c05) still comes before
+                            // FUN_00428da8: a GAMEOVER left set
+                            // (BugFix::GameOverPuzzle off) shows the screen
+                            // again, with no narrator, the position being a
+                            // header or the new file's head [INFERRED: no
+                            // `[` there].
+                            let n = e.vars.get("gameover");
+                            if n != 0 {
+                                game_over = Some(GameOverRequest {
+                                    section: sec.id,
+                                    n,
+                                    narrator: None,
+                                });
+                                break;
+                            }
                             after_item(e).await;
                             break;
                         }
@@ -1123,7 +1099,7 @@ impl Scripts {
                         // off, the place loop's puzzle and /sel scans after
                         // a game over that left the warp loop without a
                         // click (Engine::no_click_exit) run with it.
-                        if let Some(req) = pending_game_over(e, &sec, i, line_idx) {
+                        if let Some(req) = self.pending_game_over(e, &sec, i, line_idx) {
                             game_over = Some(req);
                             break;
                         }
@@ -1182,7 +1158,7 @@ impl Scripts {
                         // the next line) before the GAMEOVER test.
                         let set_next = matches!(sec.items.get(i + 1), Some(ConItem::Set { .. }));
                         if !set_next {
-                            if let Some(req) = pending_game_over(e, &sec, i, line_idx) {
+                            if let Some(req) = self.pending_game_over(e, &sec, i, line_idx) {
                                 game_over = Some(req);
                                 break;
                             }
@@ -1254,6 +1230,71 @@ impl Scripts {
 }
 
 impl Scripts {
+    /// The game over GameOver=`n` asks for at the item `i` of `sec`, its
+    /// text the line after the item: the narrator only when that line is
+    /// one, its voice ATA<section><letter>, the letter counting the lines
+    /// before it (FUN_00426590 @ 0x004267ea, 0x004268b2..). The 1997 build
+    /// takes the executor's current letter (atlantis-cd-en-688128
+    /// FUN_004256a4 @ 0x004256ee), the same file for every game over of
+    /// the shipped scripts. The game-over function itself makes the 1999
+    /// build's pick of an alternative narration and counts the section's
+    /// deaths (GOG FUN_00426570 @ 0x004267ce..0x00426882, 0x004269e3), so
+    /// both its callers, the GameOver= command and the executor's test after
+    /// an item (0x00428c05), go through here.
+    fn game_over_at(
+        &mut self,
+        e: &mut Engine,
+        sec: &ConSection,
+        i: usize,
+        line_idx: usize,
+        n: i32,
+    ) -> GameOverRequest {
+        let mut narrator = con_game_over_narrator(&sec.items, i)
+            .map(|l| (l.text.clone() + &l.trail, con_track_letter(line_idx)));
+        // The 1999 build: the second death in a section plays the next
+        // narrator line. The 2001 and 1997 builds with the restored content
+        // too.
+        let alt = e.game.exe.build.alt_game_over_narration || e.enhancements().restored_content;
+        let mut narrator_item = i + 1;
+        if let (Some((text, letter)), true) = (narrator.as_mut(), alt) {
+            let count = self.game_over_count.entry(sec.id).or_default();
+            let pick = con_alt_game_over_narration(&sec.items, i, count);
+            if pick > 0 {
+                if let ConItem::Line(l) = &sec.items[i + 1 + pick] {
+                    *text = l.text.clone() + &l.trail;
+                }
+                *letter = char::from(*letter as u8 + pick as u8);
+                narrator_item += pick;
+            }
+        }
+        // The game-over screen copies the narrator line into the subtitle
+        // text buffer, shown or not (atlantis-cd-en-688128 FUN_004256a4 @
+        // 0x00425a31..0x00425a50).
+        if let (Some(_), Some(ConItem::Line(l))) = (&narrator, sec.items.get(narrator_item)) {
+            e.subtitle_text
+                .store(con_narrator_buffer_text(&latin1_bytes(&l.raw)));
+        }
+        GameOverRequest {
+            section: sec.id,
+            n,
+            narrator,
+        }
+    }
+
+    /// The game over the executor's test after the item `i` of `sec` meets
+    /// when GAMEOVER is already set (0x00428c05, FUN_00426590 with the text
+    /// after the item).
+    fn pending_game_over(
+        &mut self,
+        e: &mut Engine,
+        sec: &ConSection,
+        i: usize,
+        line_idx: usize,
+    ) -> Option<GameOverRequest> {
+        let n = e.vars.get("gameover");
+        (n != 0).then(|| self.game_over_at(e, sec, i, line_idx, n))
+    }
+
     /// The script side of a checkpoint; `left` is CHAPTER before the
     /// chapter= that writes it.
     fn script_state(&self, e: &Engine, left: i32) -> ScriptState {
@@ -1322,32 +1363,6 @@ fn gameover_value(cmd: &str) -> i32 {
 /// FUN_00428da8's last call). So a sound that ended during a line is seen
 /// as done, NEWSOUND cleared, before the next item (a `Cinema=` among
 /// them) runs.
-/// The game over the executor's test after the item `i` of `sec` meets
-/// when GAMEOVER is already set (0x00428c05, FUN_00426590 with the text
-/// after the item: its narrator only when the next line is one).
-fn pending_game_over(
-    e: &mut Engine,
-    sec: &ConSection,
-    i: usize,
-    line_idx: usize,
-) -> Option<GameOverRequest> {
-    let n = e.vars.get("gameover");
-    if n == 0 {
-        return None;
-    }
-    let narrator = con_game_over_narrator(&sec.items, i)
-        .map(|l| (l.text.clone() + &l.trail, con_track_letter(line_idx)));
-    if let (Some(_), Some(ConItem::Line(l))) = (&narrator, sec.items.get(i + 1)) {
-        e.subtitle_text
-            .store(con_narrator_buffer_text(&latin1_bytes(&l.raw)));
-    }
-    Some(GameOverRequest {
-        section: sec.id,
-        n,
-        narrator,
-    })
-}
-
 async fn after_item(e: &mut Engine) {
     e.poll_new_sound().await;
 }

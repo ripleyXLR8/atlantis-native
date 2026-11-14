@@ -227,6 +227,8 @@ impl Engine {
         // set `abort`; the rebuild runs with it cleared, so that the
         // /INIT's commands (a Vue=, a video) are not cut short.
         self.abort = None;
+        // A move the abort cut short leaves no panorama name behind.
+        self.move_cyclo = None;
         self.stop_ambient();
         self.bar_first = 0; // 0x0042e2ec
         self.vars.set("objetenmain", 0);

@@ -87,6 +87,9 @@ impl Engine {
         let Some(next) = self.next_place_id else {
             return;
         };
+        // The move's panorama name is for this entry only (every entry
+        // rebuilds 0x006cd288: FUN_00421b4c), even one that fails.
+        let move_cyclo = self.move_cyclo.take();
         let Some(index) = self.wam.places.iter().position(|p| p.id == next) else {
             log::warn!("place {next} not in {}", self.wam_name);
             self.next_place_id = None;
@@ -101,7 +104,7 @@ impl Engine {
         // (FUN_0044a424 @ 0x00423ed4); FUN_00421b4c (0x00424068) only
         // selects the place and rebuilds the name. Every other entry
         // loads the record's.
-        let cyclo = match self.move_cyclo.take() {
+        let cyclo = match move_cyclo {
             Some((id, name)) if id == next => name,
             _ => self.wam.places[index].cyclo.clone(),
         };

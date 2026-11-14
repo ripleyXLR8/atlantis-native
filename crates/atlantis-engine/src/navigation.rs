@@ -595,7 +595,7 @@ impl Engine {
             // Place sprites: FUN_00425304 at 0x0041c3a9, after the timers,
             // unless GameOver or Exit is set (then it leaves, 0x0041c387).
             if !exit && self.vars.get("exit") != 0 {
-                if !self.game_over_cleared_at_once() {
+                if !self.game_over_cleared_at_once() && !self.sys.should_quit() {
                     self.pending_no_click_exit = Some(true);
                 }
                 action = WARP_ABORT;
@@ -708,7 +708,11 @@ impl Engine {
         }
         // The main loop sets 0x00496124 = 1 before the reload (0x0041975d).
         self.escape_request = false;
-        if abort.is_some() {
+        // The place loop tests the run flag 0x00496124 (LOAD, QUIT) before
+        // GAMEOVER (0x00423ca5, then 0x00423cba): a LOAD or QUIT chosen
+        // during the puzzle or the scan wins over the game over that ended
+        // the warp loop.
+        if self.abort.is_none() {
             self.abort = abort;
         }
     }
