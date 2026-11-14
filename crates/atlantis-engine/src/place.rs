@@ -11,6 +11,12 @@ use std::rc::Rc;
 use atlantis_codecs::HnmVideo;
 use atlantis_data::sprite::{composite_spf_frame, decode_spw_pixels, spw_frame_count};
 use atlantis_data::sprite_anim::{animate_place_sprites, enter_place, SPRITE_TICK_MS};
+
+/// The longest gap between two calls of [`Engine::animate_sprites`]
+/// replayed tick by tick: 14 ticks hold at most one step of a row (a step
+/// needs more than 13 ticks since the last), so a replay never steps more
+/// than one call of `FUN_00425304` does.
+const SPRITE_REPLAY_TICKS: u32 = 14;
 use atlantis_data::sprite_list::{npc_click_rects, npc_row_matches};
 use atlantis_data::wam::{CentrePos, Transition};
 
@@ -324,9 +330,15 @@ impl Engine {
     }
 
     /// `FUN_00425304` once per frame: the test "more than 13 ticks" of the
-    /// 200 Hz counter is run for each tick elapsed since the last call (at
-    /// most 2 s, e.g. after a video), as the original, which does not wait
-    /// for the display, steps every 14 or 15 ticks.
+    /// 200 Hz counter (@ 0x0042550e..0x00425546) is run for each tick
+    /// elapsed since the last call when that is at most 14 ticks, as the
+    /// original, which does not wait for the display, steps every 14 or 15
+    /// ticks. Such a replay steps a row at most once, as one call of the
+    /// original. After a longer gap (a move's film, a place load, a menu:
+    /// loops that do not call FUN_00425304) the test runs once, at the
+    /// current tick: the original's first call after the gap steps each
+    /// row once (from frame 0 after a place load, FUN_0042431c), not by the
+    /// gap's length.
     ///
     /// The original draws each row at its current frame (`call 0x00452d39`
     /// @ 0x00425476) before it steps it (last tick written @ 0x0042552c,
@@ -343,7 +355,8 @@ impl Engine {
             return;
         }
         let now = (self.sys.millis() / u64::from(SPRITE_TICK_MS)) as u32;
-        let mut t = if self.sprite_anim_tick != 0 && now.wrapping_sub(self.sprite_anim_tick) <= 400
+        let mut t = if self.sprite_anim_tick != 0
+            && now.wrapping_sub(self.sprite_anim_tick) <= SPRITE_REPLAY_TICKS
         {
             self.sprite_anim_tick + 1
         } else {
@@ -1323,6 +1336,57 @@ mod wsprframe_tests {
             &seen[..40]
         );
         assert!(*seen.iter().max().unwrap() > 33);
+    }
+}
+
+#[cfg(test)]
+mod sprite_gap_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// FUN_00425304 runs one "more than 13 ticks" test per call
+    /// (@ 0x0042550e..0x00425546) and is not called by the film loop
+    /// FUN_0041bc74: after a 600 ms gap the slave of the ATLAN5 alley
+    /// (view 126, type 1, step every 14 ticks) moves one frame, not the
+    /// eight or nine of the gap.
+    #[test]
+    fn one_step_after_a_gap() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let got = Rc::new(std::cell::RefCell::new(None));
+        let g2 = got.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("ATLAN5.WAM").await);
+            e.next_place_id = Some(126);
+            e.do_place_change().await;
+            let mut seen = Vec::new();
+            for _ in 0..20 {
+                e.animate_sprites();
+                seen.push(e.vars.get("wsprframe"));
+                e.sys.frame().await;
+            }
+            let before = e.vars.get("wsprframe");
+            e.sys.delay(600).await;
+            e.animate_sprites();
+            *g2.borrow_mut() = Some((seen, before, e.vars.get("wsprframe")));
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        let (seen, before, after) = got.borrow().clone().expect("the task did not end");
+        // Between frames of the loop the replay keeps the 14-tick cadence.
+        assert!(seen.windows(2).all(|w| w[1] - w[0] <= 1), "{seen:?}");
+        assert!(*seen.last().unwrap() >= 3, "{seen:?}");
+        assert_eq!(after, before + 1);
     }
 }
 
