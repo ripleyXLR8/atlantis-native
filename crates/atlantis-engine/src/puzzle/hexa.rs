@@ -430,15 +430,16 @@ impl HexaIo for Host<'_> {
     /// ([`PuzzleHost::read_input_held_pointer`]), so a dropped piece lands
     /// where the last frame showed it.
     fn start_input(&mut self) -> (i32, i32, bool, bool) {
-        let m = self.0.read_input_held_pointer();
-        // The handler reads the bar request the poll toggled.
+        let m = self.0.read_entry_held_pointer();
         (m.x, m.y, m.click, self.0.e.bar.request)
     }
     fn right_handled(&mut self) {
         self.0.e.bar.request = false;
     }
     fn boundary(&mut self, _g: &HexaGame) -> (i32, i32, bool, bool) {
-        self.start_input()
+        let m = self.0.read_input_held_pointer();
+        // The handler reads the bar request the poll toggled.
+        (m.x, m.y, m.click, self.0.e.bar.request)
     }
     fn draw_background(&mut self) {
         self.0.draw_background();
@@ -622,4 +623,27 @@ mod click_pointer_tests {
         },
         (100, 100)
     );
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+
+    /// The original polls only after each present (one poll a pass): the
+    /// port's entry read steps no F5, a pass's read one.
+    #[test]
+    fn f5_steps_once_a_pass_and_not_at_entry() {
+        let Some(entry) = f5_steps("hexa_f5_entry", |h| {
+            Host(h).start_input();
+        }) else {
+            return;
+        };
+        let pass = f5_steps("hexa_f5_pass", |h| {
+            let mut io = Host(h);
+            io.start_input();
+            io.boundary(&HexaGame::new(Vec::new(), Vec::new()));
+        });
+        assert_eq!((entry, pass), (0, Some(1)));
+    }
 }

@@ -438,6 +438,12 @@ impl Engine {
             // phase 1 and then the move's video at its first frame.
             if !first {
                 self.turn_poll();
+                // Each step (and phase 1's stop test after the poll) reads
+                // the stored angles 0x00bcb59c / 0x00bcb598: the previous
+                // frame's, wrapped by FUN_00451915, moved by the poll's
+                // view keys (FUN_004212cc l. 15661, 15749-15772).
+                let (a, b) = self.stored_view();
+                turn.set_angles(a, b);
             }
             first = false;
             let Some(f) = turn.next_frame(!self.escape_request) else {
@@ -479,10 +485,10 @@ impl Engine {
                     x,
                     y,
                 } => {
+                    // Windows queues WM_LBUTTONDBLCLK for a second press;
+                    // this poll does not pump it (0x0041a2b5, below).
                     let now = self.sys.millis();
-                    let mode = self.cursor_state.mode;
-                    let menu = self.escape_request;
-                    self.turn_double_click.press(now, x, y, mode, menu);
+                    self.turn_double_click.queue_press(now, x, y);
                     left = Some((x, y));
                 }
                 Input::MouseDown {
@@ -493,12 +499,17 @@ impl Engine {
                 _ => {}
             }
         }
-        // A left press ends the poll before the rest (0x0041a2b5).
+        // A left press ends the poll before the rest (0x0041a2b5), its
+        // message pump included: a double click's second press read here is
+        // dispatched by a later poll without a new press.
         if left.is_some() {
             return;
         }
+        // F5..F8 (0x0041a33c..0x0041a3ba): the turn's next step starts from
+        // the angles they moved.
+        self.poll_view_keys(false);
         // The message pump: a WM_LBUTTONDBLCLK queued during the departure
-        // scan's lines.
+        // scan's lines or by an earlier poll of the turn.
         let (mode, menu) = (self.cursor_state.mode, self.escape_request);
         self.turn_double_click.dispatch(mode, menu);
         if right {
@@ -1295,6 +1306,113 @@ mod escape_tests {
     use crate::test_support::with_engine;
     use crate::turn::{transition_turn, TransitionTurn};
     use crate::warp::Warp;
+
+    /// The yaw after the turn from (0, 0) to the source (0.3, 0) of place
+    /// 1, F5 held (`f5`) or not, and the number of frames.
+    fn turn_with_f5(test: &str, f5: bool) -> Option<(f32, u64)> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            test,
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.set_view(0.0, 0.0);
+                if f5 {
+                    e.sys.push_input(Input::KeyDown(Key::F(5)));
+                    while e.sys.poll_event().is_some() {}
+                }
+                let start = e.sys.millis();
+                e.turn_to_transition(0.3, 0.0).await;
+                g2.set(Some((e.warp.alpha(), (e.sys.millis() - start) / 16)));
+            },
+            |_, _| {},
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// FUN_004212cc's poll after each frame (0x00421670 / 0x00421a5a)
+    /// moves the stored angles by the held view keys, and the next step
+    /// and phase 1's stop test read them: F5 held turns the frames ahead
+    /// and, for 0 -> 0.3, ends phase 1 on the 0.05 test (9 frames, not 11).
+    #[test]
+    fn f5_moves_the_turn_frames() {
+        let Some((still, n_still)) = turn_with_f5("f5_moves_the_turn_frames", false) else {
+            return;
+        };
+        let (turned, n_turned) = turn_with_f5("f5_moves_the_turn_frames", true).unwrap();
+        assert_ne!(turned, still);
+        assert_eq!((n_still, n_turned), (11, 9));
+    }
+
+    /// A second press of a double click read by a poll of the turn: the
+    /// poll returns before its message pump (0x0041a2b5), so the flag
+    /// 0x00496118 is set by the next poll, not this one.
+    #[test]
+    fn the_turn_poll_with_a_press_does_not_pump() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_turn_poll_with_a_press_does_not_pump",
+            move |mut e| async move {
+                e.cursor_state.mode = 5;
+                let now = e.sys.millis();
+                e.turn_double_click.first_press(now, 320, 240);
+                e.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Left,
+                    x: 320,
+                    y: 240,
+                });
+                e.turn_poll();
+                g2.borrow_mut().push(e.turn_double_click.flag);
+                e.turn_poll();
+                g2.borrow_mut().push(e.turn_double_click.flag);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), vec![false, true]);
+        }
+    }
+
+    /// The end of a move polls once (`FUN_0041a298` @ 0x00424093): a held
+    /// F5 moves the stored angles there.
+    #[test]
+    fn f5_at_the_end_of_move_poll() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "f5_at_the_end_of_move_poll",
+            move |mut e| async move {
+                e.set_view(1.0, 0.0);
+                e.sys.push_input(Input::KeyDown(Key::F(5)));
+                e.move_input_poll = true;
+                e.end_of_move_input();
+                g2.borrow_mut().push(e.stored_view().0);
+                // A left press in that poll returns before the keys.
+                e.set_view(1.0, 0.0);
+                e.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Left,
+                    x: 0,
+                    y: 0,
+                });
+                e.move_input_poll = true;
+                e.end_of_move_input();
+                g2.borrow_mut().push(e.stored_view().0);
+            },
+            |_, _| {},
+        );
+        if ran {
+            let got = got.borrow();
+            assert_eq!(got[0], (1.0f64 + 0.034906) as f32);
+            assert_eq!(got[1], 1.0);
+        }
+    }
 
     /// The turn frame by frame: with 0x00496124 set all along, the frames
     /// of `transition_turn`; cleared after the first frame, phase 1 ends

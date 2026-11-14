@@ -315,12 +315,20 @@ impl PuzzleInput {
 /// latched: nothing in a puzzle reads the latch, which only stops the
 /// hexagon's right presses and cuts the first line after the puzzle.
 pub(crate) fn poll_flags(e: &mut Engine, m: &PuzzleMouse) {
+    poll_flags_with(e, m, true);
+}
+
+/// [`poll_flags`]; `view_keys` false for a read the original does not make
+/// (a puzzle's entry read): F5..F8 are not polled.
+fn poll_flags_with(e: &mut Engine, m: &PuzzleMouse, view_keys: bool) {
     if m.click {
         return;
     }
     // F5..F8 move the stored view angles (0x0041a33c..0x0041a3ba); no
     // puzzle function reads them, the view after the puzzle does.
-    e.poll_view_keys(false);
+    if view_keys {
+        e.poll_view_keys(false);
+    }
     if m.right {
         e.bar.right_pressed(e.section_play, e.escape_request);
     }
@@ -421,6 +429,34 @@ impl<'a> PuzzleHost<'a> {
         m
     }
 
+    /// The port's read at a puzzle's entry, for the pointer and a click
+    /// made during the set-up. The original's main loops make no poll
+    /// before their first present (crab 0x0043d3c8, hexagon 0x004406a7,
+    /// Muria 0x0043f004, taquins 6 / 7 0x00446545 / 0x004467e6, ogre
+    /// 0x00442230, each after the present; meta and taquin 14 poll twice a
+    /// pass, [`PuzzleHost::second_poll`]): no F5..F8 step.
+    pub fn read_entry(&mut self) -> PuzzleMouse {
+        let m = self.input.read(&self.e.sys);
+        poll_flags_with(self.e, &m, false);
+        m
+    }
+
+    /// [`PuzzleHost::read_entry`] with the pointer of
+    /// [`PuzzleHost::read_input_held_pointer`].
+    pub fn read_entry_held_pointer(&mut self) -> PuzzleMouse {
+        let m = self.read_entry();
+        self.held_pointer(m)
+    }
+
+    /// The second poll of a pass of the loops that poll twice (meta
+    /// `FUN_0044763c` @ 0x004476f9 and 0x004477d8, taquin 14
+    /// `FUN_00446830` @ 0x0044699e and 0x00446a7a): the port reads the
+    /// events once a pass; of the two polls one sees a press edge (and
+    /// returns before the keys, 0x0041a2b5), the other steps F5..F8.
+    pub fn second_poll(&mut self) {
+        self.e.poll_view_keys(false);
+    }
+
     /// [`PuzzleHost::read_input`] for a loop whose click handler reads the
     /// pointer 0x004960ec / 0x004960f0 after the poll: on the pass that
     /// raises the click flag `FUN_0041a298` returns before its message pump
@@ -428,7 +464,11 @@ impl<'a> PuzzleHost<'a> {
     /// (0x00419bfa), so the click and that pass's cursor are at the
     /// previous pass's pointer.
     pub fn read_input_held_pointer(&mut self) -> PuzzleMouse {
-        let mut m = self.read_input();
+        let m = self.read_input();
+        self.held_pointer(m)
+    }
+
+    fn held_pointer(&mut self, mut m: PuzzleMouse) -> PuzzleMouse {
         if m.click {
             (m.x, m.y) = self.pointer;
         } else {
@@ -573,3 +613,33 @@ macro_rules! click_pointer_test {
 }
 #[cfg(test)]
 pub(crate) use click_pointer_test;
+
+/// The F5 steps (`FUN_0041a298` @ 0x0041a33c) that `polls` makes on a
+/// puzzle host, F5 held. None without the game.
+#[cfg(test)]
+pub(crate) fn f5_steps(
+    test: &str,
+    polls: impl for<'a> FnOnce(PuzzleHost<'a>) + 'static,
+) -> Option<i32> {
+    use std::cell::Cell;
+    use std::rc::Rc;
+    let got = Rc::new(Cell::new(None));
+    let g2 = got.clone();
+    let ran = crate::test_support::with_engine(
+        test,
+        move |mut e| async move {
+            e.set_view(1.0, 0.0);
+            e.sys.push_input(Input::KeyDown(Key::F(5)));
+            let mut hooks = crate::hooks::NoScripts;
+            polls(PuzzleHost::new(&mut e, &mut hooks));
+            let steps = (f64::from(e.stored_view().0) - 1.0) / 0.034906;
+            g2.set(Some(steps.round() as i32));
+        },
+        |_, _| {},
+    );
+    if ran {
+        got.get()
+    } else {
+        None
+    }
+}

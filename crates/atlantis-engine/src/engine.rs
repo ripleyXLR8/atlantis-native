@@ -28,7 +28,7 @@ use crate::look::{WarpMomentum, WarpPointer};
 use crate::music::Music;
 use crate::persist::{MemStore, SaveStore, Settings};
 use crate::scripts::Scripts;
-use crate::sys::Sys;
+use crate::sys::{Input, MouseButton, Sys};
 use crate::ui::menus::MenuOutcome;
 use crate::ui::{BarSession, Guests, UiAssets};
 use crate::warp::Warp;
@@ -228,6 +228,10 @@ pub struct Engine {
     /// with an object in hand (`FUN_00425828` @ 0x00425882..0x004258ad);
     /// `FUN_0041afd0` then draws no cursor (@ 0x0041afe8).
     pub(crate) give_scan: bool,
+    /// 0x00496154: set by `FUN_004240fc` around a puzzle and its /sel scan
+    /// (@ 0x00424166, cleared @ 0x00424242); `FUN_0041afd0` then steps no
+    /// cursor (@ 0x0041b03a).
+    pub(crate) puzzle_scan: bool,
     /// A move ended: the place loop polls the input once and clears every
     /// input flag before the next arrival scan ([`Engine::end_of_move_input`]).
     pub move_input_poll: bool,
@@ -473,6 +477,7 @@ impl Engine {
             arrival_from_vue: 0,
             script_vue_place: None,
             give_scan: false,
+            puzzle_scan: false,
             move_input_poll: false,
             move_cyclo: None,
             arrival_after_load: false,
@@ -1156,7 +1161,20 @@ impl Engine {
         if !std::mem::take(&mut self.move_input_poll) {
             return;
         }
-        while self.sys.poll_event().is_some() {}
+        let mut left = false;
+        while let Some(ev) = self.sys.poll_event() {
+            if let Input::MouseDown {
+                button: MouseButton::Left,
+                ..
+            } = ev
+            {
+                left = true;
+            }
+        }
+        // F5..F8 move the stored angles (0x0041a33c..0x0041a3ba) unless the
+        // poll saw a new left press (0x0041a2b5); nothing writes them
+        // before the warp loop's first frame, which shows them.
+        self.poll_view_keys(left);
         self.turn_double_click.clear();
         self.escape_request = false;
         self.bar.flags_reset();

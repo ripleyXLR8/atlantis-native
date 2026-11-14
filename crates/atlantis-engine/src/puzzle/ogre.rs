@@ -337,6 +337,11 @@ pub trait OgreIo {
     /// `FUN_0041a298` then `FUN_0043318c`: the mouse and a new left
     /// click.
     fn read_input(&mut self, g: &OgreGame) -> (i32, i32, bool);
+    /// The port's read before the first pass, for the mouse: the original
+    /// polls only after each present (0x00442230), so it steps no F5..F8.
+    fn start_input(&mut self, g: &OgreGame) -> (i32, i32, bool) {
+        self.read_input(g)
+    }
     /// `FUN_00410f36`: the background, or the copy of the frame.
     fn draw_background(&mut self);
     /// 'P' PUZCYCLO, 'C' CURSEURS.
@@ -660,6 +665,10 @@ impl OgreGame {
     /// stays where the previous pass left it.
     fn read_input(&mut self, io: &mut impl OgreIo) {
         let (x, y, click) = io.read_input(self);
+        self.take_input(x, y, click);
+    }
+
+    fn take_input(&mut self, x: i32, y: i32, click: bool) {
         if !click {
             (self.mx, self.my) = (x, y);
         }
@@ -668,7 +677,8 @@ impl OgreGame {
 
     /// `FUN_0044203c` after the set-up: 255 won, 2 lost, 1 left.
     pub async fn run(&mut self, io: &mut impl OgreIo) -> i32 {
-        self.read_input(io);
+        let (x, y, click) = io.start_input(self);
+        self.take_input(x, y, click);
         self.click = false;
         self.result = 0;
         loop {
@@ -714,6 +724,10 @@ struct Host<'a>(PuzzleHost<'a>);
 impl OgreIo for Host<'_> {
     fn read_input(&mut self, _g: &OgreGame) -> (i32, i32, bool) {
         let m = self.0.read_input();
+        (m.x, m.y, m.click)
+    }
+    fn start_input(&mut self, _g: &OgreGame) -> (i32, i32, bool) {
+        let m = self.0.read_entry();
         (m.x, m.y, m.click)
     }
     fn draw_background(&mut self) {
@@ -847,5 +861,30 @@ mod replay_tests {
         };
         assert_eq!(stale, 255);
         assert_eq!(put_back(([0; 3], [0; 3])), Some(1));
+    }
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+
+    /// FUN_0044203c polls once a pass after the present (0x00442230), none
+    /// before: the port's entry read steps no F5.
+    #[test]
+    fn f5_steps_once_a_pass_and_not_at_entry() {
+        let g = OgreGame::default();
+        let Some(entry) = f5_steps("ogre_f5_entry", move |h| {
+            Host(h).start_input(&g);
+        }) else {
+            return;
+        };
+        let g = OgreGame::default();
+        let pass = f5_steps("ogre_f5_pass", move |h| {
+            let mut io = Host(h);
+            io.start_input(&g);
+            io.read_input(&g);
+        });
+        assert_eq!((entry, pass), (0, Some(1)));
     }
 }

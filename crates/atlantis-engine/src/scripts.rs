@@ -1032,6 +1032,15 @@ impl Scripts {
     /// it the music goes down by half (0x00495ea4 = 50, 0x00495eac = 2),
     /// then back up with 80 % again.
     async fn run_puzzle_zone(&mut self, e: &mut Engine, n: u32) {
+        // 0x00496154 = 1 (0x00424166) until after the /sel scan
+        // (0x00424242): the still frames of that scan's voice-only lines
+        // step no cursor (FUN_0041afd0 @ 0x0041b03a).
+        e.puzzle_scan = true;
+        self.run_puzzle_zone_flagged(e, n).await;
+        e.puzzle_scan = false;
+    }
+
+    async fn run_puzzle_zone_flagged(&mut self, e: &mut Engine, n: u32) {
         e.stop_ambient();
         e.music.duck(false, Some(50));
         // FinPuzzle = the result (crate::puzzle, FUN_0043a1e0).
@@ -1089,6 +1098,24 @@ impl Scripts {
             // loop once the variable goes non-zero); the line after it feeds
             // the game-over screen.
             let mut game_over = None;
+            // A section whose first item is its /go (no item before it, as
+            // the parser ends the items at the /go): the executor runs
+            // FUN_0042831c on the /go (0x00428bf1), which returns the
+            // target's header (FUN_00425c04), then tests GAMEOVER
+            // (0x00428c05) before any item of the target. Set (a walk
+            // started with GAMEOVER left set, BugFix::GameOverPuzzle off),
+            // it calls FUN_00426590 with the text after that position, a
+            // header, so no narrator (0x00428c20..0x00428c3e), and ends.
+            if sec.items.is_empty() && sec.goto_id > 0 && !e.should_abort() {
+                let n = e.vars.get("gameover");
+                if n != 0 {
+                    game_over = Some(GameOverRequest {
+                        section: sec.id,
+                        n,
+                        narrator: None,
+                    });
+                }
+            }
             let mut line_idx = 0usize;
             let mut i = 0;
             while i < sec.items.len() {
@@ -1258,8 +1285,13 @@ impl Scripts {
                     }
                 }
             }
-            // The click that ended the last line is not a navigation press.
-            e.wait_buttons_up().await;
+            // No wait for the buttons' release: the executor's exit
+            // (0x00428c92..0x00428da4) sets back ClicPerso and the angles,
+            // clears the click flag 0x0049611c (0x00428d77) and the menu
+            // request 0x00496138 (0x00428d81) and returns, with no poll. The
+            // press that ended the last line was taken by that line's poll
+            // (an event the port's line player consumed), so the next loops,
+            // whose presses are edges, see a button still held as no press.
         })
     }
 }
@@ -1751,6 +1783,40 @@ mod tests {
         ran.then(|| got.borrow().clone())
     }
 
+    /// `FUN_004240fc` sets 0x00496154 around a puzzle and its /sel scan
+    /// (@ 0x00424166 .. 0x00424242), and `FUN_0041afd0` does not step the
+    /// cursor while it is set (@ 0x0041b03a): the still frame of the
+    /// scan's voice-only line leaves the animation as it was; after the
+    /// zone it steps again.
+    #[test]
+    fn no_cursor_on_the_lines_of_the_post_puzzle_scan() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "no_cursor_on_the_lines_of_the_post_puzzle_scan",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(CursorProbe(g2.clone())));
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/sel(flagtemp1=1)\r\n[Seth,off] Here.\r\n/0\r\n",
+                );
+                e.vars.set("flagtemp1", 1);
+                e.vars.set("objetenmain", 0);
+                // A StartPuzzle number past the puzzles: refused at once.
+                s.run_puzzle_zone(&mut e, 99).await;
+                let after = e.still_frame_cursor_step();
+                g2.borrow_mut().push(after);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [false, true]);
+        }
+    }
+
     /// `FUN_00425828` sets 0x004960c0 around the /con click scan of a
     /// character clicked with an object in hand (@ 0x00425882..
     /// 0x004258ad), and `FUN_0041afd0` does not step the cursor while it
@@ -1938,6 +2004,97 @@ mod tests {
         );
         let fixed = tim2_after_a_tim1_game_over(true).unwrap();
         assert_eq!(fixed, (vec![], vec![(3, true)], 0, Some(Abort::NewGame)));
+    }
+
+    /// A /tim2 section whose first item is a /go after a /tim1 game over
+    /// (as CHAPI032 /tim2(time2>700) -> /go418), GAMEOVER left set
+    /// (`--original`): the executor runs FUN_0042831c on the /go
+    /// (0x00428bf1, FUN_00425c04 returns the target's header) and tests
+    /// GAMEOVER at 0x00428c05 before any item of the target, with no
+    /// narrator. No line of /3 and the second picture is GameOver 3's.
+    #[test]
+    fn a_go_first_section_shows_the_game_over_before_its_target() {
+        let got = Rc::new(RefCell::new((Vec::new(), Vec::new())));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_go_first_section_shows_the_game_over_before_its_target",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(LinesAndGameOvers(g2)));
+                e.new_game(&mut s, false).await;
+                e.set_enhancements(crate::enhancements::Enhancements::original());
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/tim1(flagtemp1=1)\r\n/set(GameOver=3)\r\n\
+                      [Narrator,off] Dead.\r\n/0\r\n\
+                      /2\r\n/tim2(flagtemp2=1)\r\n/go3\r\n\
+                      /3\r\n/sel(flagtemp3=1)\r\n[Soldat] Well.\r\n\
+                      /set(GameOver=1)\r\n[Narratrice] Gone.\r\n/0\r\n",
+                );
+                e.vars.set("testtime1", 1);
+                e.vars.set("testtime2", 1);
+                e.vars.set("flagtemp1", 1);
+                e.vars.set("flagtemp2", 1);
+                s.run_con_timers(&mut e, false).await;
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let (lines, overs) = got.borrow().clone();
+        assert_eq!((lines, overs), (vec![], vec![(3, true), (3, false)]));
+    }
+
+    /// A line's player that leaves the left button down (the press that
+    /// ended the line) and records when.
+    struct PressAndHold(Rc<std::cell::Cell<Option<u64>>>);
+
+    impl DialogPresenter for PressAndHold {
+        fn play_line<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _req: &'a LineRequest,
+        ) -> HookFuture<'a, LineOutcome> {
+            crate::test_support::button(&e.sys, crate::sys::MouseButton::Left, true);
+            while e.sys.poll_event().is_some() {}
+            self.0.set(Some(e.sys.millis()));
+            ready(LineOutcome::default())
+        }
+    }
+
+    /// The executor's exit (0x00428c92..0x00428da4) waits for no release:
+    /// the section returns at once while the press that ended its last
+    /// line is still held (here 500 ms).
+    #[test]
+    fn a_section_ends_with_the_button_still_held() {
+        let pressed = Rc::new(std::cell::Cell::new(None));
+        let (p2, p3) = (pressed.clone(), pressed.clone());
+        let held_ms = Rc::new(std::cell::Cell::new(None));
+        let h2 = held_ms.clone();
+        let ran = with_engine(
+            "a_section_ends_with_the_button_still_held",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(PressAndHold(p2)));
+                e.new_game(&mut s, false).await;
+                s.script = crate::con_script::ConScript::parse(
+                    b"/2\r\n/tim2(flagtemp2=1)\r\n[Seth,off] Hello.\r\n/0\r\n",
+                );
+                e.vars.set("testtime2", 1);
+                e.vars.set("flagtemp2", 1);
+                s.run_con_timers(&mut e, false).await;
+                h2.set(Some(e.sys.millis() - p3.get().unwrap()));
+            },
+            move |sys, f| {
+                if let Some(t) = pressed.get() {
+                    if f * 16 >= t + 500 && sys.buttons().0 {
+                        crate::test_support::button(sys, crate::sys::MouseButton::Left, false);
+                    }
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        assert!(held_ms.get().unwrap() < 100, "{:?}", held_ms.get());
     }
 
     /// The game overs (GAMEOVER, with a narrator), the puzzles' (id,
