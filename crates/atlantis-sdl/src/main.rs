@@ -41,7 +41,7 @@ use atlantis_engine::persist::DirStore;
 use atlantis_engine::subtitles::SubtitleFont;
 use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
 use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
-use atlantis_engine::{BugFix, Enhancements, Graphics, Options, SaveStore, Settings, Start};
+use atlantis_engine::{BugFix, Graphics, SaveStore, Settings, Start};
 use atlantis_sdl::buttons::Action;
 use atlantis_sdl::motion::{Motion, Step};
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
@@ -81,29 +81,6 @@ fn fail(text: &str) -> ! {
     log::error!("{text}");
     eprintln!("{text}");
     std::process::exit(1);
-}
-
-/// The options of a run with its saves in `saves` (as the desktop's
-/// `options_with_settings`).
-fn options(saves: Rc<dyn SaveStore>, original: bool, start: Start) -> Options {
-    let stored = Settings::load(saves.as_ref());
-    let settings = stored.unwrap_or_default();
-    if stored.is_none() {
-        settings.save(saves.as_ref());
-    }
-    Options {
-        enhancements: if original {
-            Enhancements::original()
-        } else {
-            settings.enhancements
-        },
-        // `--original` starts with SUBTITLES off, as every start of the
-        // original (0x004960a8 = 0), whatever settings.ini keeps.
-        subtitles: settings.subtitles && !original,
-        saves,
-        start,
-        ..Options::default()
-    }
 }
 
 /// A keyboard key for the engine (a keyboard on the device's USB port, or
@@ -274,7 +251,7 @@ fn main() {
     } else {
         Start::Boot
     };
-    let opts = options(saves.clone(), original, start);
+    let opts = atlantis_sdl::run_options(saves.clone(), original, start);
 
     let mut menu = PortMenu {
         menu: OptionsMenu::new(),
