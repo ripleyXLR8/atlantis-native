@@ -598,26 +598,18 @@ impl Engine {
             if bar {
                 // Closing the bar enters bow mode with the bow in hand and
                 // ArcMagique set, before the slide-out (FUN_0042d098 in
-                // `display_bar`).
+                // `display_bar`). The slide-out ends with the timers
+                // resuming (FUN_0042c59c @ 0x0042c844); a guest's portrait
+                // under the pointer gets its conversation inside the bar
+                // loop (FUN_0042c8ac @ 0x0042cc57).
                 let guest = self.display_bar(hooks).await;
-                // FUN_0042c59c @ 0x0042c844: the timers resume.
-                self.rebase_con_clocks();
                 // A guest's conversation that moved the player (a Vue= or a
                 // Chapter=) ends the loop for the arrival scan. A Vue= from
                 // a timer section that ran while the bar was open does not:
                 // the loop runs on in the new place, and the arrival scan
                 // comes after the next click unless that click moves (as for
                 // a warp-frame timer, `Engine::game_step`).
-                let mut moved = false;
-                if guest != 0 && !self.should_abort() {
-                    hooks.talk_to_guest(self, guest).await;
-                    moved = self.arrival_scan_pending;
-                    // FUN_0042c098's poll after the bar (0x0042c228) comes
-                    // after the conversation on this path, without GameOver.
-                    if self.vars.get("gameover") == 0 {
-                        self.drop_press_edges();
-                    }
-                }
+                let moved = guest != 0 && !self.should_abort() && self.arrival_scan_pending;
                 if self.should_abort() || moved {
                     // GAMEOVER after the bar (0x0041c6fe..0x0041c717): the
                     // bar closed with the pointer at (320, 240) (FUN_0042c098
