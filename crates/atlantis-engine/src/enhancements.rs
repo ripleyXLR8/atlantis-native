@@ -508,6 +508,19 @@ pub struct Enhancements {
     /// poll (`FUN_0041a298` @ 0x0041a33c..0x0041a3ba) reads F5..F8 only
     /// and whose picker (`FUN_0041cf78`) reads no key.
     pub arrow_keys: bool,
+    /// The game goes on while its window is not the active one (default
+    /// on, a port convenience as Atlantis II's); off, as the original: its
+    /// input poll `FUN_0041a298` pumps messages while 0x00496128 is 0
+    /// (@ 0x0041a42d), the flag the window procedure writes on
+    /// WM_ACTIVATEAPP (@ 0x00419cbe..0x00419cfa: 1 only when wParam != 0,
+    /// the window is the foreground window and not minimised). Every frame
+    /// loop polls through it, so no frame, film, line or music refill
+    /// (`FUN_0043318c`) runs until the window is active again; the 200 Hz
+    /// timer still runs (the ring's releases, the fades), the sounds
+    /// playing go on, and the clocks (timeGetTime) count the time away
+    /// ([`crate::sys::Runner::hold`]). Read by the desktop front ends (the
+    /// browser holds a hidden page whatever, `atlantis-app`).
+    pub background_run: bool,
 }
 
 impl Default for Enhancements {
@@ -517,6 +530,7 @@ impl Default for Enhancements {
             restored_content: false,
             ui_ux: false,
             arrow_keys: true,
+            background_run: true,
         }
     }
 }
@@ -529,6 +543,7 @@ impl Enhancements {
             restored_content: false,
             ui_ux: false,
             arrow_keys: false,
+            background_run: false,
         }
     }
 
@@ -585,6 +600,11 @@ impl Enhancements {
         );
         x.ui_ux = pick(self.ui_ux, before.ui_ux, after.ui_ux);
         x.arrow_keys = pick(self.arrow_keys, before.arrow_keys, after.arrow_keys);
+        x.background_run = pick(
+            self.background_run,
+            before.background_run,
+            after.background_run,
+        );
         x
     }
 }

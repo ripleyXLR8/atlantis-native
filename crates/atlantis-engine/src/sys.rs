@@ -594,6 +594,7 @@ impl Runner {
             return false;
         };
         self.sys.now_ms.set(now_ms);
+        self.sys.mixer.set_loops_held(false);
         for t in self.sys.timers.borrow_mut().iter_mut() {
             t(now_ms);
         }
@@ -609,6 +610,26 @@ impl Runner {
             // poll again at the next frame.
             Poll::Pending => true,
         }
+    }
+
+    /// The engine held at time `now_ms` instead of a step, as the original
+    /// is while its window is not the active one (its input poll
+    /// `FUN_0041a298` pumps messages while 0x00496128 is 0, @ 0x0041a42d;
+    /// [`crate::enhancements::Enhancements::background_run`] off): the
+    /// clock goes on (timeGetTime counts the time away), the 200 Hz timer
+    /// callbacks run, the task is not polled, and the music ring gets no
+    /// refill until the next step ([`crate::audio::Mixer::set_loops_held`]).
+    /// False once the engine has returned.
+    pub fn hold(&mut self, now_ms: u64) -> bool {
+        if self.task.is_none() {
+            return false;
+        }
+        self.sys.now_ms.set(now_ms);
+        self.sys.mixer.set_loops_held(true);
+        for t in self.sys.timers.borrow_mut().iter_mut() {
+            t(now_ms);
+        }
+        true
     }
 
     /// Whether the last step presented a new frame (false while the engine
@@ -638,6 +659,39 @@ mod tests {
         assert_eq!(sys.screen.borrow()[0], 1);
         assert!(r.step(33));
         assert!(!r.step(50));
+    }
+
+    /// A hold (the window not the active one, `background_run` off): the
+    /// task stays where it is, the clock and the timers go on, the music
+    /// ring's refills stop until the next step.
+    #[test]
+    fn a_hold_keeps_the_task_and_runs_the_timers() {
+        let sys = Sys::new(Mixer::new());
+        let s = sys.clone();
+        let ticks = Rc::new(Cell::new(Vec::new()));
+        let t2 = ticks.clone();
+        sys.add_timer(Box::new(move |now| {
+            let mut v = t2.take();
+            v.push(now);
+            t2.set(v);
+        }));
+        let held = sys.mixer.loops_held_flag();
+        let mut r = Runner::new(sys.clone(), async move {
+            for i in 0..3u16 {
+                s.screen.borrow_mut()[0] = i;
+                s.frame().await;
+            }
+        });
+        let is_held = || held.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(r.step(0));
+        assert!(r.hold(16) && r.hold(5000));
+        assert_eq!(sys.screen.borrow()[0], 0);
+        assert_eq!(sys.millis(), 5000);
+        assert!(is_held());
+        assert!(r.step(5016));
+        assert_eq!(sys.screen.borrow()[0], 1);
+        assert!(!is_held());
+        assert_eq!(ticks.take(), [0, 16, 5000, 5016]);
     }
 
     /// A key's auto-repeat reaches the engine only while the player

@@ -1241,6 +1241,7 @@ mod tests {
         restored_content: false,
         ui_ux: false,
         arrow_keys: true,
+        background_run: true,
     };
     const HD_OPTS: HdOptions = HdOptions {
         panorama: PanoFilter::Bicubic,

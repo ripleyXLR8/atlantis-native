@@ -317,6 +317,7 @@ impl Settings {
                 ("restored_content", Some(b), _) => s.enhancements.restored_content = b,
                 ("ui_ux", Some(b), _) => s.enhancements.ui_ux = b,
                 ("arrow_keys", Some(b), _) => s.enhancements.arrow_keys = b,
+                ("background_run", Some(b), _) => s.enhancements.background_run = b,
                 ("hd_sharpen", Some(b), _) => s.hd.sharpen = b,
                 ("hd_sharp_subtitles", Some(b), _) => s.hd.sharp_subtitles = b,
                 ("hd_widescreen", Some(b), _) => s.hd.widescreen = b,
@@ -364,6 +365,9 @@ impl Settings {
              ui_ux = {}\n\
              # The arrow keys turn the view (off: F5..F8 only, as the original)\n\
              arrow_keys = {}\n\
+             # The game goes on in a window that is not the active one (off:\n\
+             # it stops, as the original)\n\
+             background_run = {}\n\
              # The music tracks LoadMusik copied (hexadecimal bit set)\n\
              music_on_disk = {:x}\n\
              # The port's graphics (options menu, F10): original or hd\n\
@@ -395,6 +399,7 @@ impl Settings {
             b(self.enhancements.restored_content),
             b(self.enhancements.ui_ux),
             b(self.enhancements.arrow_keys),
+            b(self.enhancements.background_run),
             self.music_on_disk,
             self.graphics.name(),
             self.hd.panorama.name(),

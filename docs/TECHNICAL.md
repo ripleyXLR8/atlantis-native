@@ -163,6 +163,7 @@ with three groups, those of the ScummVM port:
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and May 1997 English and French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 | `arrow_keys` | on | the arrow keys turn the view as F5 to F8 do in the warp loop (the original's input poll reads F5 to F8 only), and the LOAD list takes Enter as OK and Up / Down as a row click (the original's list reads no key); off with `--original` |
+| `background_run` | on | the game goes on while its window is not the active one; off with `--original`, as the original: its input poll pumps the window's messages while the window is not the active, foreground, unminimised one (the WM_ACTIVATEAPP flag 0x00496128), so no frame, film, line or music refill runs until it is again; its 200 Hz timer still runs (the music ring's releases, so the ring's blocks repeat, the fades), the sounds playing go on and the clocks count the time away (`Runner::hold`). Read by the desktop front ends, `atlantis-app` and `atlantis-sdl`; the browser build holds a hidden page whatever this says (see the web build) |
 
 The bug fixes, each with its `settings.ini` key; the last nine fix a
 bug of some games only (`BugFix::applies`: the build's tables, and for

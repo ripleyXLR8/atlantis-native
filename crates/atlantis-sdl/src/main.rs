@@ -45,7 +45,7 @@ use atlantis_engine::{BugFix, Graphics, SaveStore, Settings, Start};
 use atlantis_sdl::buttons::Action;
 use atlantis_sdl::motion::{Motion, Step};
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
-use sdl2::event::Event;
+use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 
@@ -334,6 +334,8 @@ fn main() {
     let mut locked = false;
     let mut menu_was_open = false;
     let mut quit_by: Option<Instant> = None;
+    // The window is the active one (the keyboard focus, not minimised).
+    let mut active = true;
     let mut pixels: Vec<u8> = vec![0; SCREEN_W * SCREEN_H * 2];
     let mut frame: Vec<u16> = vec![0; SCREEN_W * SCREEN_H];
     'run: loop {
@@ -343,6 +345,11 @@ fn main() {
         for event in events.poll_iter() {
             match event {
                 Event::Quit { .. } => actions.push(Action::Quit),
+                Event::Window { win_event, .. } => match win_event {
+                    WindowEvent::FocusGained | WindowEvent::Restored => active = true,
+                    WindowEvent::FocusLost | WindowEvent::Minimized => active = false,
+                    _ => {}
+                },
                 Event::KeyDown {
                     keycode: Some(k), ..
                 } if menu.menu.is_open() => {
@@ -515,6 +522,15 @@ fn main() {
             }
 
             let ms = now.duration_since(t0).as_millis() as u64;
+            // With `--original` (`Enhancements::background_run` off), the
+            // original's hold while its window is not the active one (its
+            // input poll `FUN_0041a298` pumps messages while the
+            // WM_ACTIVATEAPP flag 0x00496128 is 0, @ 0x0041a42d): no step,
+            // the clock and the 200 Hz timer go on (`Runner::hold`).
+            if !active && !sys.enhancements().background_run {
+                runner.hold(ms);
+                continue;
+            }
             if !runner.step(ms) {
                 break 'run;
             }
