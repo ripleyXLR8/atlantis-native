@@ -14,8 +14,6 @@
 //! are found by record number, as the original does, so that the menus of
 //! every language work.
 
-use std::collections::VecDeque;
-
 use atlantis_data::saves::{checkpoint_chapter, epi_episode_name, MAX_PLAYERS};
 use atlantis_data::sprite::read_tga15;
 use atlantis_data::LoadList;
@@ -275,8 +273,6 @@ impl Engine {
         };
         let mut st = PlayerScreenState::default();
         let mut dbl = MenuDoubleClick::default();
-        // The window procedure's WM_CHAR codes, one a frame.
-        let mut keys: VecDeque<u8> = VecDeque::new();
         menu.walk(None, 0, 0, self.menu_table());
         self.wait_buttons_up().await;
         while self.sys.poll_event().is_some() {}
@@ -285,8 +281,12 @@ impl Engine {
                 return None;
             }
             let mi = self.poll_menu_input();
-            keys.extend(&mi.codes);
-            if let Some(k) = keys.pop_front() {
+            // The window procedure stores each WM_CHAR in 0x006ce262
+            // (@ 0x00419ca6), overwriting the last; the walk's polls
+            // dispatch every message queued since the last pass, and the
+            // name entry (0x0041e212..0x0041e4cc) reads one code a pass:
+            // the codes typed within a pass collapse to the last.
+            if let Some(&k) = mi.codes.last() {
                 st.key = k;
             }
             let (mx, my) = self.sys.mouse();
@@ -1204,5 +1204,57 @@ mod channel_test_tests {
             return;
         }
         assert_eq!(*got, [SMP_PLAYING, SMP_STOPPED, SMP_PLAYING, SMP_DONE]);
+    }
+}
+
+#[cfg(test)]
+mod player_screen_input_tests {
+    use crate::sys::{Input, Key, MouseButton};
+    use crate::test_support::{button, with_engine};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// The name a new player gets when `a` and `b` are typed within one
+    /// pass of the player screen, then Enter.
+    fn typed_within_one_pass() -> Option<Vec<u8>> {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "player_screen_keys_of_one_pass_collapse",
+            move |mut e| async move {
+                e.load_interface().await;
+                let row = e.player_screen().await;
+                *g2.borrow_mut() = row.map(|r| e.players.name(r).to_vec());
+            },
+            |sys, f| match f {
+                // The new player row (row 0 of an empty list).
+                10 => sys.push_input(Input::MouseMove { x: 300, y: 255 }),
+                11 => button(sys, MouseButton::Left, true),
+                12 => button(sys, MouseButton::Left, false),
+                20 => {
+                    sys.push_input(Input::KeyDown(Key::Char('a')));
+                    sys.push_input(Input::KeyDown(Key::Char('b')));
+                }
+                30 => sys.push_input(Input::KeyDown(Key::Enter)),
+                400 => sys.push_input(Input::Quit),
+                _ => {}
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let name = got.borrow().clone();
+        Some(name.expect("the player screen did not end on Enter"))
+    }
+
+    /// The window procedure keeps only the last WM_CHAR (0x006ce262 @
+    /// 0x00419ca6) and the name entry reads one code a pass: two keys
+    /// typed within one pass give one character, the last.
+    #[test]
+    fn player_screen_keys_of_one_pass_collapse() {
+        let Some(name) = typed_within_one_pass() else {
+            return;
+        };
+        assert_eq!(name.to_ascii_uppercase(), b"B");
     }
 }
