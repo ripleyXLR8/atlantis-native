@@ -554,13 +554,16 @@ impl Engine {
             }
 
             // The view: FUN_0041bfa0 steps 2..5. The stored angles first
-            // take F5 / F6 (turn) and F8 / F7 (tilt) with the left button
-            // up (FUN_0041a298 at the end of the previous frame); the port
+            // take F5 / F6 (turn) and F8 / F7 (tilt) when the poll
+            // (FUN_0041a298 at the end of the previous frame) saw no new left
+            // press (@ 0x0041a2b5: VK_LBUTTON is an edge key, so a held
+            // button does not stop them; only bow mode keeps a press in
+            // the loop); the port
             // adds the arrow keys (Enhancements::arrow_keys), which the
             // original's view ignores, as the same keys: left F5, right F6,
             // up F7, down F8 (a larger beta looks down).
             let (mut alpha, mut beta) = (self.warp.alpha(), self.warp.beta());
-            if !self.sys.buttons().0 {
+            if !fi.left_press {
                 let arrows = self.enhancements().arrow_keys;
                 let held = |f: u8, arrow: Key| {
                     self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow))
@@ -1578,6 +1581,59 @@ mod tests {
         } else {
             None
         }
+    }
+
+    /// The view's alpha after the warp loop of place 1 in bow mode, the
+    /// left button pressed and held, with F5 held too (`f5`).
+    fn alpha_with_the_left_button_held(f5: bool) -> Option<f32> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let mut locked = 0u64;
+        let ran = with_engine(
+            "f5_turns_the_view_with_the_left_button_held",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.bow_mode = true;
+                e.next_place_id = Some(1);
+                e.game_step(&mut crate::hooks::NoScripts).await;
+                g2.set(Some(e.warp.alpha()));
+            },
+            move |sys, _| {
+                locked = if sys.mouse_locked() {
+                    locked + 1
+                } else {
+                    locked
+                };
+                if locked == 5 {
+                    button(sys, MouseButton::Left, true);
+                    if f5 {
+                        sys.push_input(Input::KeyDown(Key::F(5)));
+                    }
+                } else if locked == 25 {
+                    sys.push_input(Input::KeyUp(Key::F(5)));
+                    button(sys, MouseButton::Left, false);
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// F5..F8 are read whenever the poll saw no new left press
+    /// (`FUN_0041a298` @ 0x0041a2b5; VK_LBUTTON is an edge
+    /// key): holding the left button (in bow mode, where the press does not
+    /// end the loop) does not stop them.
+    #[test]
+    fn f5_turns_the_view_with_the_left_button_held() {
+        let Some(still) = alpha_with_the_left_button_held(false) else {
+            return;
+        };
+        let turned = alpha_with_the_left_button_held(true).unwrap();
+        assert_ne!(turned, still);
     }
 
     /// The arrow keys turn the view as F5..F8 by default
