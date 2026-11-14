@@ -422,6 +422,11 @@ pub struct Engine {
     /// The two IX frame buffers, kept from video to video (malloc(0x12c000)
     /// @ 0x00418f83).
     pub(crate) ix_buffers: Vec<u16>,
+    /// The frame count of the header the last film open read (0x00896c50,
+    /// header + 0x10 read to 0x00896c40 by `FUN_00448c70`): a move whose
+    /// film is missing reads no header and divides its ambient glide by
+    /// this one (`FUN_0043259c`). 0 before any film.
+    pub(crate) last_film_frames: i32,
 
     // The ambient sounds.
     pub(crate) ambient: AmbientSounds,
@@ -560,6 +565,7 @@ impl Engine {
             cursor_next_ms: 0,
             view_key_polls: RefCell::new(Vec::new()),
             ix_buffers: Vec::new(),
+            last_film_frames: 0,
             ambient,
             ambient_out,
             centres: BTreeMap::new(),

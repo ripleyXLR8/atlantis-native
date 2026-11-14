@@ -665,8 +665,23 @@ impl Engine {
             video.to_string()
         };
         let Some(data) = self.read(&format!("UBB_VUE\\{name}")).await else {
+            // FUN_00448c70 opens neither <name>.hnm nor <name>.ubb: it sets
+            // 0x0049610c = 1, reads no header and still returns 1
+            // (dc:40504..40515). FUN_00423ad8 then runs FUN_0043259c
+            // unconditionally (@ 0x00423fed) and skips only the player
+            // (@ 0x00423ff2): a move's glide steps are set with the frame
+            // count of the last film opened. A name without a '.' opens
+            // nothing: FUN_00422f2c returns -1 and FUN_00423ad8 skips the
+            // whole block (dc:16898..16901).
+            if let (Some((_, to)), true) = (places, video.contains('.')) {
+                self.ambient_prepare_glide(to, self.last_film_frames);
+            }
             return;
         };
+        // The 0x40-byte header to 0x00896c40: the frame count at + 0x10.
+        if let Some(b) = data.get(16..20) {
+            self.last_film_frames = i32::from_le_bytes([b[0], b[1], b[2], b[3]]);
+        }
         // The SPF sprites of the move, skipping the hidden persos.
         let mut spf_names = Vec::new();
         if let Some((from, to)) = places {
@@ -1798,5 +1813,59 @@ mod move_panorama_tests {
             assert_ne!(fov, TURN_END_FOV_DEG);
             assert_eq!(pos, (0x140, 0x140));
         }
+    }
+}
+
+#[cfg(test)]
+mod missing_film_glide_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// No move between the fountain views of PALAIS2 has a film in the
+    /// archive. FUN_00448c70 then reads no header and returns 1, and
+    /// FUN_00423ad8 still runs FUN_0043259c (@ 0x00423fed): the glide steps
+    /// toward the destination are set with the frame count of the last film
+    /// opened (0x00896c50), here CINEM058's 85.
+    #[test]
+    fn move_without_film_sets_the_glide_steps() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let out = Rc::new(std::cell::RefCell::new(None));
+        let o2 = out.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("PALAIS2.WAM").await);
+            e.next_place_id = Some(197);
+            e.do_place_change().await;
+            let t = e
+                .place()
+                .and_then(|p| p.transitions.iter().find(|t| t.dst_place == 194))
+                .cloned()
+                .expect("no move 197 -> 194");
+            assert!(t.video.contains('.'));
+            assert!(
+                e.read(&format!("UBB_VUE\\{}", with_ext(&t.video, "HNM")))
+                    .await
+                    .is_none(),
+                "the move's film is in the archive"
+            );
+            assert!(!e.place().unwrap().ambient_refs.is_empty());
+            e.last_film_frames = 85;
+            e.execute_transition(194).await;
+            *o2.borrow_mut() = Some(e.ambient.step_vol);
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        let steps = out.borrow().expect("the move did not end");
+        assert!(steps.iter().any(|&s| s != 0.0), "{steps:?}");
     }
 }
