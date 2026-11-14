@@ -904,7 +904,16 @@ impl Dialogs {
             }
             e.sys.frame().await;
             let fi = poll_input(e);
+            // FUN_004261a0 polls FUN_0041a298 once per subject icon
+            // (0x00426389) and FUN_00425828's wait once more after the draw
+            // (0x004259c0): N + 1 polls a pass. The first sees a new left
+            // press and returns before the view keys (0x0041a2b5); every
+            // other one moves the stored angles per held F5..F8
+            // (0x0041a33c..0x0041a3ba).
             e.poll_view_keys(fi.left_press);
+            for _ in 0..ids.len() {
+                e.poll_view_keys(false);
+            }
             // FUN_0041a298 (0x00426389): Escape clears 0x00496124 and sets
             // the menu request (no talking head, bow mode, bar request or
             // object in hand); the menu goes on until a left click
@@ -2148,6 +2157,37 @@ mod view_key_tests {
         if ran {
             assert!(first.get().is_some_and(|f| f < 30), "{:?}", first.get());
         }
+    }
+
+    /// F5 held in the subject menu: `FUN_004261a0` polls once per subject
+    /// icon (0x00426389) and `FUN_00425828` once more (0x004259c0), so a
+    /// pass moves the stored angle N + 1 times, and the pass whose first
+    /// poll sees the click N times.
+    #[test]
+    fn a_held_view_key_turns_once_per_subject_menu_poll() {
+        use crate::sys::{Input, MouseButton};
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_held_view_key_turns_once_per_subject_menu_poll",
+            move |mut e| async move {
+                let mut d = Dialogs::new();
+                e.sys.push_input(Input::KeyDown(Key::F(5)));
+                e.view_key_polls.borrow_mut().clear();
+                let _ = d.subject_menu_impl(&mut e, 600, &[1, 2, 3]).await;
+                *g2.borrow_mut() = Some(e.view_key_polls.borrow().len());
+            },
+            |sys, f| match f {
+                20 => crate::test_support::button(sys, MouseButton::Left, true),
+                21 => crate::test_support::button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let n = got.borrow().expect("the menu did not end");
+        assert!(n >= 4 * 10 && n % 4 == 3, "{n} polls");
     }
 
     /// FUN_0041a298 adds 0.034906 rad to 0x00bcb59c on every poll with F5
