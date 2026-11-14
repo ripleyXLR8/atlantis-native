@@ -312,6 +312,14 @@ pub struct Engine {
     /// 0x00427ae2, [`crate::ui::bar::pickup_slot_x`]), until the next
     /// slide-in resets the slot table.
     pub bar_pickup_slot: Option<usize>,
+    /// The slots' y (the table 0x00611788) as the last slide left it: the
+    /// slide-in sets 499 and lowers it 7 a frame to 443 (`FUN_0042c2c4`),
+    /// the slide-out raises it 7 a frame (`FUN_0042c59c` @ 0x0042c789).
+    /// The bar loop and the hold loop draw at it (@ 0x0042c97d, 0x0042c9eb;
+    /// 0x0042cdb4, 0x0042ce2c) and the slide-out starts from it (@
+    /// 0x0042c65c, 0x0042c6c9): 443 after a full slide-in, higher after one
+    /// a GameOver or an Exit cut short.
+    pub(crate) bar_slot_y: i32,
     /// The bar request and the right-press flag.
     pub bar: BarSession,
     /// The guests following the player, and whether they are shown
@@ -520,6 +528,7 @@ impl Engine {
             held_icon: None,
             bar_first: 0,
             bar_pickup_slot: None,
+            bar_slot_y: crate::ui::bar::BAR_HOTSPOT_Y,
             bar: BarSession::default(),
             guests: Guests::default(),
             guests_shown: true,

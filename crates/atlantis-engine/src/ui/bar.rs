@@ -275,6 +275,9 @@ impl Engine {
         let mut slot_y = 499 - 7;
         let mut closed = false;
         while slot_y >= BAR_HOTSPOT_Y && !self.should_abort() {
+            // The table 0x00611788 as drawn (-7 before the frame): a timer
+            // that ends the slide leaves it there.
+            self.bar_slot_y = slot_y;
             self.slide_guest_portraits(-7);
             self.animate_sprites();
             self.bar_frame(slot_y, false);
@@ -305,8 +308,10 @@ impl Engine {
     /// slide after its first frame (0x0042c7e1). Then the click and
     /// right-press flags are cleared (0x0042c826, 0x0042c830) and the
     /// timers resume from their values, ChapterTime from 0 (0x0042c844).
+    /// It starts from the slots' y the last slide left (`bar_slot_y`):
+    /// 443, or higher after a slide-in cut short.
     async fn bar_slide_out(&mut self, hooks: &mut dyn ScriptHooks, game_over: bool) -> bool {
-        let mut slot_y = BAR_HOTSPOT_Y;
+        let mut slot_y = self.bar_slot_y;
         let mut pointer = self.sys.mouse();
         let mut closed = false;
         while slot_y < 0x208 && !self.should_abort() {
@@ -315,6 +320,8 @@ impl Engine {
             self.still_frame_cursor_step();
             self.sys.frame().await;
             self.slide_guest_portraits(7);
+            // +7 after the frame (@ 0x0042c789), before the timers.
+            self.bar_slot_y = slot_y + 7;
             if self.bar_tick(hooks, &mut pointer).await.1 || game_over {
                 self.bar.request = false;
                 closed = true;
@@ -538,7 +545,8 @@ impl Engine {
                 break;
             }
             self.animate_sprites();
-            self.bar_frame(BAR_HOTSPOT_Y, false);
+            // The slots at the y the slide-in left (@ 0x0042c97d, 0x0042c9eb).
+            self.bar_frame(self.bar_slot_y, false);
             self.sys.frame().await;
             let mi = self.poll_menu_input();
             // The left-press branch of FUN_0041a298 sets the flag and
@@ -616,6 +624,18 @@ impl Engine {
         self.bar.request = true;
         let mut pointer = self.sys.mouse();
         self.bar_slide_in(hooks, &mut pointer).await;
+        // FUN_004278a0 goes from the slide-in to the hold loop with no
+        // GameOver test (dc:19317-19326), and the hold loop runs no timers
+        // and tests only the presses (0x0042cd05): after a game over a
+        // slide-in timer ran (the game-over screen behind, GAMEOVER set),
+        // the hold loop still runs at the slots' y the cut slide-in left,
+        // the object on the pointer, until a press; the slide-out then
+        // ends after its first frame (its GameOver exit, 0x0042c7e1), and
+        // the reload follows. The port's reload request is held meanwhile.
+        let held_reload = match self.abort {
+            Some(Abort::NewGame) => self.abort.take(),
+            _ => None,
+        };
         // The new record's slot x = index * 0x46 + 0x23, stored after the
         // slide-in (@ 0x00427ae2); a record from 9 on lands past the slots.
         let held = self.vars.get("objetenmain");
@@ -631,7 +651,8 @@ impl Engine {
             // FUN_0042cc98 animates the place sprites (@ 0x0042cd1c) and
             // draws like the bar loop; it runs no timers.
             self.animate_sprites();
-            self.bar_frame(BAR_HOTSPOT_Y, false);
+            // The slots at the y the slide-in left (@ 0x0042cdb4, 0x0042ce2c).
+            self.bar_frame(self.bar_slot_y, false);
             self.sys.frame().await;
             let mi = self.poll_menu_input();
             // Its poll (@ 0x0042cf14) toggles the request on a right press:
@@ -655,7 +676,10 @@ impl Engine {
         }
         // The slide-out ends with the timers resuming from their values,
         // ChapterTime from 0 (FUN_0042c59c @ 0x0042c844).
-        self.bar_slide_out(hooks, false).await;
+        self.bar_slide_out(hooks, held_reload.is_some()).await;
+        if held_reload.is_some() && !self.sys.should_quit() {
+            self.abort = held_reload;
+        }
         // FUN_004278a0 then clears the request (@ 0x00427b53), cancels the
         // cursor's click animation (0x004968b8 = 0 @ 0x00427b5d) and the
         // click and right-press flags (@ 0x00427b67, 0x00427b71).
@@ -1611,6 +1635,132 @@ mod tests {
             drawn += usize::from(all > 0);
         }
         assert!(drawn > 10, "{drawn} frames with the portrait on screen");
+    }
+
+    /// The screen each timer pass sees (the frame just presented); a
+    /// timer section on pass `at` sets Exit, or GameOver with the port's
+    /// reload (`game_over`).
+    struct CutSlideIn {
+        at: u32,
+        game_over: bool,
+        shots: Rc<RefCell<Vec<Vec<u16>>>>,
+    }
+
+    impl ScriptHooks for CutSlideIn {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.shots.borrow_mut().push(e.sys.screen.borrow().clone());
+            let fire = self.shots.borrow().len() as u32 == self.at;
+            if fire && self.game_over {
+                e.vars.set("gameover", 1);
+                e.abort = Some(Abort::NewGame);
+            } else if fire {
+                e.vars.set("exit", 1);
+            }
+            ready(fire)
+        }
+    }
+
+    /// A view of ATLAN1's first place with the bar's sprites, the pointer
+    /// out of the bar's way.
+    async fn bar_test_view(e: &mut Engine) {
+        assert!(e.load_wam("ATLAN1.WAM").await);
+        e.current_place = Some(0);
+        e.current_place_id = Some(e.wam.places[0].id);
+        e.reload_current_view().await;
+        e.load_ui_assets().await;
+        e.sys.set_mouse_pos(320, 100);
+    }
+
+    /// Whether the bar sprite is on `s` with its hotspot at y `y`.
+    fn bar_at(e_bar: &SprSprite, s: &[u16], y: i32) -> bool {
+        let (same, all) = opaque_shown(s, e_bar, 0, y);
+        all > 0 && same == all
+    }
+
+    /// An Exit set by a slide-in timer (its 3rd frame, slots at 478) ends
+    /// the slide-in with the slot y table 0x00611788 there
+    /// (0x0042c55b..0x0042c567); FUN_0042c098 still runs one pass of the
+    /// bar loop and one slide-out frame, both drawn from that table
+    /// (@ 0x0042c97d, 0x0042c65c), not at 443.
+    #[test]
+    fn after_a_slide_in_cut_by_exit_the_bar_stays_at_its_y() {
+        let shots: Rc<RefCell<Vec<Vec<u16>>>> = Rc::default();
+        let got = Rc::new(RefCell::new(None));
+        let (s2, g2) = (shots.clone(), got.clone());
+        let ran = with_engine(
+            "after_a_slide_in_cut_by_exit_the_bar_stays_at_its_y",
+            move |mut e| async move {
+                bar_test_view(&mut e).await;
+                let mut hooks = CutSlideIn {
+                    at: 3,
+                    game_over: false,
+                    shots: s2,
+                };
+                e.display_bar(&mut hooks).await;
+                *g2.borrow_mut() = e.ui.bar.clone();
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let bar = got.borrow_mut().take().expect("the bar sprite");
+        let shots = shots.borrow();
+        // 3 slide-in frames, 1 bar-loop pass, 1 slide-out frame.
+        assert_eq!(shots.len(), 5);
+        assert!(bar_at(&bar, &shots[2], 478));
+        assert!(bar_at(&bar, &shots[3], 478), "the bar loop's pass");
+        assert!(!bar_at(&bar, &shots[3], 443));
+        assert!(bar_at(&bar, &shots[4], 478), "the slide-out's frame");
+    }
+
+    /// A GameOver set by a slide-in timer of a pick-up (its 3rd frame):
+    /// `FUN_004278a0` still runs the hold loop `FUN_0042cc98` (no timers,
+    /// no GameOver test, 0x0042cd05) with the bar at the slot y the cut
+    /// slide-in left (@ 0x0042cdb4) until a press, then one slide-out
+    /// frame (its GameOver exit, 0x0042c7e1); the reload follows.
+    #[test]
+    fn a_game_over_in_the_pickup_slide_in_still_holds_until_a_click() {
+        let shots: Rc<RefCell<Vec<Vec<u16>>>> = Rc::default();
+        let held: Rc<RefCell<Vec<Vec<u16>>>> = Rc::default();
+        let got = Rc::new(RefCell::new(None));
+        let (s2, h2, g2) = (shots.clone(), held.clone(), got.clone());
+        let ran = with_engine(
+            "a_game_over_in_the_pickup_slide_in_still_holds_until_a_click",
+            move |mut e| async move {
+                bar_test_view(&mut e).await;
+                e.inventory = vec![1001];
+                e.vars.set("objetenmain", 1001);
+                let mut hooks = CutSlideIn {
+                    at: 3,
+                    game_over: true,
+                    shots: s2,
+                };
+                e.display_pickup(&mut hooks).await;
+                *g2.borrow_mut() = Some((e.ui.bar.clone(), e.abort, e.sys.millis()));
+            },
+            move |sys, f| match f {
+                50 => h2.borrow_mut().push(sys.screen.borrow().clone()),
+                60 => button(sys, MouseButton::Left, true),
+                62 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (bar, abort, ms) = got.borrow_mut().take().unwrap();
+        let bar = bar.expect("the bar sprite");
+        assert_eq!(abort, Some(Abort::NewGame));
+        assert!(ms >= 60 * 16, "the hold loop waited for the click: {ms} ms");
+        // 3 slide-in frames, 1 slide-out frame (no timers in the hold).
+        assert_eq!(shots.borrow().len(), 4);
+        let held = held.borrow();
+        assert!(bar_at(&bar, &held[0], 478), "the hold loop's frame");
+        assert!(
+            bar_at(&bar, &shots.borrow()[3], 478),
+            "the slide-out's frame"
+        );
     }
 
     /// Counts the timer passes.
