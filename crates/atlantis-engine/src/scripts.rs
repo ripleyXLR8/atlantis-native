@@ -877,10 +877,10 @@ impl Scripts {
             if let Some(sec) = sec {
                 self.bump_counter(sec.id);
                 // The warp's mouse-look ends for the dialog; the mouse at the
-                // warp pointer, the section's motions set it.
+                // Windows cursor, the section's motions set the pointer.
                 e.sys.set_mouse_locked(false);
                 if from_warp {
-                    e.sys.set_mouse_pos(e.pointer.pos.0, e.pointer.pos.1);
+                    e.sys.set_mouse_pos(e.pointer.cursor.0, e.pointer.cursor.1);
                     e.mark_pointer_mouse();
                 }
                 let kind = if timer == 1 { "tim1" } else { "tim2" };

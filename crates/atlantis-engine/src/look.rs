@@ -124,14 +124,32 @@ pub fn warp_look_frame(
 ///   next frame's delta;
 /// - the panorama load `FUN_0044a424` leaves the pointer at (0x140, 0x140)
 ///   (0x0044a70b / 0x0044a715, no SetCursorPos);
-/// - the WM_MOUSEMOVE handler (0x00419c14) sets it to the mouse position,
-///   so after a dialog or a video during which the mouse moved it is the
-///   last mouse position.
+/// - the WM_MOUSEMOVE handler (0x00419bfa, stores @ 0x00419c10..0x00419c29)
+///   sets it to the message's point, the Windows cursor's, so after a
+///   dialog or a video during which the mouse moved it is the last mouse
+///   position.
+///
+/// The Windows cursor is kept apart ([`WarpPointer::cursor`]): only
+/// SetCursorPos moves it besides the mouse, at the step-5 recentre
+/// (0x0041c312), on every turn frame (0x00421593, 0x0042197d), at the bar
+/// close (`FUN_0042c098`, dc:22557) and in the ogre puzzle (dc:37103);
+/// each of them writes the pointer too. So after a panorama load the
+/// pointer is (0x140, 0x140) while the cursor stays where it was, and the
+/// first WM_MOUSEMOVE puts the pointer at the cursor plus the motion: the
+/// look delta of that frame is the whole distance (round 7, navigation).
+/// That Windows reports the cursor's real position in WM_MOUSEMOVE, and
+/// not one relative to the game's pointer, is [INFERRED] (the system's
+/// rule; the program side is static).
 ///
 /// The pointer is (0, 0) in the image.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WarpPointer {
+    /// 0x004960ec / 0x004960f0.
     pub pos: (i32, i32),
+    /// The Windows cursor (GetCursorPos's point, SetCursorPos's target),
+    /// in screen coordinates; outside the warp loop it is the system mouse
+    /// ([`crate::sys::Sys::mouse`]).
+    pub cursor: (i32, i32),
     /// 0x006ce074 / 0x006ce02c.
     pub prev: (i32, i32),
     pub prev_alpha: f32,
@@ -142,6 +160,7 @@ impl Default for WarpPointer {
     fn default() -> Self {
         WarpPointer {
             pos: (0, 0),
+            cursor: (0, 0),
             prev: (0, 0),
             prev_alpha: -1.0,
             prev_beta: -1.0,
@@ -150,19 +169,31 @@ impl Default for WarpPointer {
 }
 
 impl WarpPointer {
-    /// `FUN_0044a424` @ 0x0044a70b / 0x0044a715.
+    /// `FUN_0044a424` @ 0x0044a70b / 0x0044a715: the pointer only, no
+    /// SetCursorPos.
     pub fn panorama_loaded(&mut self) {
         self.pos = (0x140, 0x140);
     }
 
-    /// WM_MOUSEMOVE (0x00419c14).
+    /// WM_MOUSEMOVE (0x00419c14): the cursor moved to `p`, the pointer
+    /// with it.
     pub fn mouse_moved(&mut self, p: (i32, i32)) {
+        self.cursor = p;
         self.pos = p;
     }
 
-    /// The step-5 recentre.
+    /// The Windows cursor where the system mouse is, the pointer left as
+    /// it is (no WM_MOUSEMOVE: the mouse did not move).
+    pub fn cursor_at(&mut self, p: (i32, i32)) {
+        self.cursor = p;
+    }
+
+    /// The pointer at (320, 240) and SetCursorPos(320, 240): the step-5
+    /// recentre (0x0041c2e6..0x0041c312), the turn frames (0x0042156a..
+    /// 0x00421593, 0x00421954..0x0042197d).
     pub fn recentre(&mut self) {
         self.pos = (320, 240);
+        self.cursor = self.pos;
     }
 
     /// The warp loop's entry (0x0041c003 / 0x0041c00d): the previous point
@@ -172,21 +203,26 @@ impl WarpPointer {
     }
 
     /// The bar close `FUN_0042c098`: the pointer at (320, 240) (@
-    /// 0x0042c275) and the previous point with it (@ 0x0042c28e /
-    /// 0x0042c298).
+    /// 0x0042c275), SetCursorPos(320, 240) (dc:22557) and the previous
+    /// point with it (@ 0x0042c28e / 0x0042c298).
     pub fn bar_closed(&mut self) {
         self.recentre();
         self.prev = self.pos;
     }
 
-    /// The relative motion of the mouse (x right, y down) as WM_MOUSEMOVE
-    /// sets the pointer, clamped to the screen (the original takes the
-    /// Windows cursor's position, which Windows keeps on the 640x480
-    /// screen in fullscreen [INFERRED: the system's rule; the game
-    /// imports no ClipCursor]).
+    /// The relative motion of the mouse (x right, y down): it moves the
+    /// Windows cursor, clamped to the screen (Windows keeps it on the
+    /// 640x480 screen in fullscreen [INFERRED: the system's rule; the game
+    /// imports no ClipCursor]), and WM_MOUSEMOVE sets the pointer to it
+    /// (0x00419c10..0x00419c29). No motion, no message: the pointer
+    /// stays.
     pub fn follow(&mut self, dx: i32, dy: i32) {
-        self.pos.0 = i32::from(self.pos.0.saturating_add(dx).clamp(0, 639) as i16);
-        self.pos.1 = i32::from(self.pos.1.saturating_add(dy).clamp(0, 479) as i16);
+        if (dx, dy) == (0, 0) {
+            return;
+        }
+        self.cursor.0 = i32::from(self.cursor.0.saturating_add(dx).clamp(0, 639) as i16);
+        self.cursor.1 = i32::from(self.cursor.1.saturating_add(dy).clamp(0, 479) as i16);
+        self.pos = self.cursor;
     }
 
     /// The motion step 3 reads (x right, y down): the pointer minus the
@@ -279,6 +315,37 @@ mod tests {
         p.mouse_moved((10, 20));
         p.bar_closed();
         assert_eq!((p.pos, p.prev), ((320, 240), (320, 240)));
+        assert_eq!(p.cursor, (320, 240));
+    }
+
+    // After a panorama load the Windows cursor is not at the pointer:
+    // FUN_0044a424 writes 0x004960ec / 0x004960f0 only (0x0044a70b /
+    // 0x0044a715), the loop's entry takes the previous point from the
+    // pointer (0x0041c003 / 0x0041c00d), and the first WM_MOUSEMOVE
+    // (0x00419c10..0x00419c29) sets the pointer to the cursor moved by the
+    // motion: the frame's delta is the whole distance (round 7).
+    #[test]
+    fn the_first_motion_after_a_load_takes_the_cursor() {
+        let mut p = WarpPointer {
+            prev_alpha: 0.0,
+            prev_beta: 0.0,
+            ..WarpPointer::default()
+        };
+        // A puzzle left the mouse at (600, 450).
+        p.cursor_at((600, 450));
+        p.panorama_loaded();
+        assert_eq!((p.pos, p.cursor), ((320, 320), (600, 450)));
+        p.loop_entry();
+        // A frame at rest (no motion, no WM_MOUSEMOVE) keeps both.
+        p.follow(0, 0);
+        assert!(!p.frame(0.0, 0.0, 0.0, 0.0));
+        assert_eq!((p.pos, p.cursor), ((320, 320), (600, 450)));
+        p.follow(1, 0);
+        assert_eq!(p.pos, (601, 450));
+        assert_eq!(p.motion(), (601 - 320, 450 - 320));
+        // A recentre (SetCursorPos) brings the cursor with the pointer.
+        assert!(p.frame(0.5, 0.0, 0.5, 0.0));
+        assert_eq!((p.pos, p.cursor), ((320, 240), (320, 240)));
     }
 
     // The look delta is previous point minus pointer (0x0041c1c3..

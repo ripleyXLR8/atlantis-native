@@ -438,8 +438,9 @@ impl Engine {
         // Engine::end_of_move_input), so a press during the video's last
         // frame or the load is lost. The engine's input events are those
         // edges.
-        self.sys
-            .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+        // The entry block calls no SetCursorPos: the Windows cursor stays
+        // where the mouse is, apart from the pointer after a panorama load
+        // (`WarpPointer::cursor`).
         self.mark_pointer_mouse();
         self.sys.set_mouse_locked(true);
         self.sys.take_mouse_relative();
@@ -458,12 +459,12 @@ impl Engine {
         // WM_MOUSEMOVE waits for the next poll.
         let mut unpumped = (0, 0);
         while !left_pressed && !exit {
-            // Windows sees a press at its cursor, the loop's pointer (the
-            // original's SetCursorPos keeps the two together): every left
-            // press of the loop is paired there (Sys::double_click), the
-            // click that ends it, a character click, a bow shot and a
-            // press the latch did not report alike.
-            self.sys.set_locked_cursor(self.pointer.pos);
+            // Windows sees a press at its cursor (`WarpPointer::cursor`,
+            // the loop's pointer once a motion or a SetCursorPos set it):
+            // every left press of the loop is paired there
+            // (Sys::double_click), the click that ends it, a character
+            // click, a bow shot and a press the latch did not report alike.
+            self.sys.set_locked_cursor(self.pointer.cursor);
             let fi = self.poll_frame_input();
             // Each frame starts by clearing the double-click flag
             // (0x0041c04a), after the previous frame's poll (0x0041c5f2)
@@ -504,9 +505,9 @@ impl Engine {
             if clicked && centre_perso >= 0x100 {
                 self.sys.set_mouse_locked(false);
                 // The original leaves the loop with the mouse at the
-                // pointer; the dialog's mouse motions set the pointer.
+                // Windows cursor; the dialog's mouse motions set the pointer.
                 self.sys
-                    .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                    .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
                 self.mark_pointer_mouse();
                 // ClicZone = the zone under the pointer: the warp loop
                 // returns it with the NPC (0x0041c71e) and the place loop
@@ -546,7 +547,7 @@ impl Engine {
                     self.sys.set_mouse_locked(true);
                     self.sys.take_mouse_relative();
                     self.sys
-                        .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                        .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
                     self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
                     // The loop entered again (0x0041c003 / 0x0041c00d).
@@ -646,7 +647,7 @@ impl Engine {
                     unpumped = (0, 0);
                     self.pointer.bar_closed();
                     self.sys
-                        .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                        .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
                     self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
                     // The original opens the bar at the end of its frame
@@ -660,7 +661,7 @@ impl Engine {
             } else if !exit && fi.escape && !self.bow_mode && self.vars.get("objetenmain") == 0 {
                 self.sys.set_mouse_locked(false);
                 self.sys
-                    .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                    .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
                 self.mark_pointer_mouse();
                 self.run_ingame_menu().await;
                 // The Japanese DVD build's language clicks: the CON text in
@@ -684,7 +685,7 @@ impl Engine {
                     self.sys.set_mouse_locked(true);
                     self.sys.take_mouse_relative();
                     self.sys
-                        .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                        .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
                     self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
                 }
@@ -755,7 +756,7 @@ impl Engine {
                     self.sys.set_mouse_locked(true);
                     self.sys.take_mouse_relative();
                     self.sys
-                        .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+                        .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
                     self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
                 }
@@ -807,9 +808,10 @@ impl Engine {
         }
 
         self.sys.set_mouse_locked(false);
-        // The mouse at the pointer; motions from here on set it.
+        // The mouse at the Windows cursor; motions from here on set the
+        // pointer to it.
         self.sys
-            .set_mouse_pos(self.pointer.pos.0, self.pointer.pos.1);
+            .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
         self.mark_pointer_mouse();
         // The click that ended the loop: Windows paired it with the last
         // press whatever loop read that one (the press that cut the
@@ -1412,11 +1414,11 @@ mod tests {
             self.calls += 1;
             if self.calls == 1 {
                 self.alpha.borrow_mut().push(e.warp.alpha());
-                // As Scripts::timer_scan: the mouse at the warp pointer.
+                // As Scripts::timer_scan: the mouse at the Windows cursor.
                 e.sys.set_mouse_locked(false);
-                e.sys.set_mouse_pos(e.pointer.pos.0, e.pointer.pos.1);
+                e.sys.set_mouse_pos(e.pointer.cursor.0, e.pointer.cursor.1);
                 e.mark_pointer_mouse();
-                let (x, y) = e.pointer.pos;
+                let (x, y) = e.pointer.cursor;
                 e.sys.push_input(Input::MouseMove { x: x + 280, y });
                 return ready(true);
             }
@@ -1459,6 +1461,71 @@ mod tests {
         let turn = f64::from(a[0]) - f64::from(a[1]);
         let turn = turn.rem_euclid(std::f64::consts::TAU);
         assert!((0.4..0.47).contains(&turn), "turned by {turn}");
+    }
+
+    /// The yaw at every warp frame's timer step.
+    struct RecordAlpha {
+        alpha: Rc<RefCell<Vec<f32>>>,
+    }
+
+    impl ScriptHooks for RecordAlpha {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.alpha.borrow_mut().push(e.warp.alpha());
+            ready(false)
+        }
+    }
+
+    /// After a puzzle the panorama load `FUN_0044a424` leaves the pointer
+    /// at (0x140, 0x140) and the Windows cursor where the mouse was
+    /// (0x0044a70b / 0x0044a715, no SetCursorPos); the warp loop's entry
+    /// takes the previous point from the pointer (0x0041c003 / 0x0041c00d)
+    /// and moves no cursor. With the view at rest the first frames do not
+    /// recentre, and the first motion's WM_MOUSEMOVE (0x00419c10..
+    /// 0x00419c29) puts the pointer at the cursor plus that motion: a
+    /// motion of 1 px with the mouse at (600, 450) gives the delta
+    /// 320 - 601, the view turns by about 281 / 600 rad (round 7).
+    #[test]
+    fn the_first_motion_after_a_puzzle_swings_the_view() {
+        let alpha = Rc::new(RefCell::new(Vec::new()));
+        let (a2, a3) = (alpha.clone(), alpha.clone());
+        let moved = Rc::new(Cell::new(false));
+        let ran = with_engine(
+            "the_first_motion_after_a_puzzle_swings_the_view",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.set_view(1.0, 0.0);
+                // The view at rest: the stored angles are the view's.
+                e.pointer.prev_alpha = e.warp.alpha();
+                e.pointer.prev_beta = e.warp.beta();
+                // The puzzle left the mouse at (600, 450).
+                e.sys.set_mouse_pos(600, 450);
+                e.reload_view_after_puzzle().await;
+                assert_eq!(e.pointer.pos, (320, 320));
+                let mut hooks = RecordAlpha { alpha: a2 };
+                e.handle_warp(&mut hooks).await;
+            },
+            move |sys, _| {
+                let n = a3.borrow().len();
+                if n == 3 && !moved.get() {
+                    moved.set(true);
+                    sys.push_input(Input::MouseDelta { dx: 1, dy: 0 });
+                }
+                if n == 80 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let a = alpha.borrow();
+        // At rest until the motion.
+        assert_eq!(a[0], a[2]);
+        let turn = (f64::from(a[0]) - f64::from(a[a.len() - 1])).abs();
+        let turn = turn.min(std::f64::consts::TAU - turn);
+        assert!((0.4..0.5).contains(&turn), "turned by {turn}");
     }
 
     /// A timer section that leaves the bar request (a right press during
