@@ -731,11 +731,12 @@ impl CrabIo for Host<'_> {
     /// as does the cursor FUN_0043e5a4: a click is at the previous pass's
     /// pointer ([`PuzzleHost::read_input_held_pointer`]).
     fn start_input(&mut self) -> (i32, i32, bool) {
-        let m = self.host.read_input_held_pointer();
+        let m = self.host.read_entry_held_pointer();
         (m.x, m.y, m.click)
     }
     fn boundary(&mut self, _g: &CrabGame) -> (i32, i32, bool) {
-        self.start_input()
+        let m = self.host.read_input_held_pointer();
+        (m.x, m.y, m.click)
     }
     fn load_picture(&mut self, name: &str) {
         if let Some(i) = PICTURES.iter().position(|p| p.eq_ignore_ascii_case(name)) {
@@ -844,4 +845,27 @@ mod click_pointer_tests {
         |h: &mut Host<'_>| h.start_input(),
         (100, 100)
     );
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+
+    /// The original polls only after each present (one poll a pass): the
+    /// port's entry read steps no F5, a pass's read one.
+    #[test]
+    fn f5_steps_once_a_pass_and_not_at_entry() {
+        let Some(entry) = f5_steps("crab_f5_entry", |h| {
+            Host { host: h }.start_input();
+        }) else {
+            return;
+        };
+        let pass = f5_steps("crab_f5_pass", |h| {
+            let mut io = Host { host: h };
+            io.start_input();
+            io.boundary(&CrabGame::default());
+        });
+        assert_eq!((entry, pass), (0, Some(1)));
+    }
 }

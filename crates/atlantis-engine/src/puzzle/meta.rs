@@ -602,15 +602,21 @@ struct Host<'a> {
 }
 
 impl MetaIo for Host<'_> {
+    /// The port's entry read: no F5..F8 step (FUN_0044763c's two polls a
+    /// pass are the boundary's).
     fn start_input(&mut self) -> (i32, i32, bool, bool) {
-        let m = self.host.read_input();
+        let m = self.host.read_entry();
         (m.x, m.y, m.click, m.right)
     }
     fn right_handled(&mut self) {
         self.host.e.bar.request = false;
     }
+    /// The poll after the present (0x004477d8) and the next pass's top
+    /// one (0x004476f9) ([`PuzzleHost::second_poll`]).
     fn boundary(&mut self, _g: &MetaGame) -> (i32, i32, bool, bool) {
-        self.start_input()
+        let m = self.host.read_input();
+        self.host.second_poll();
+        (m.x, m.y, m.click, m.right)
     }
     fn load_picture(&mut self, n: i32) {
         let pic = usize::try_from(n - 1)
@@ -693,5 +699,34 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, stage: i32) -> i3
         1
     } else {
         r
+    }
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+
+    /// FUN_0044763c polls twice a pass (0x004476f9, 0x004477d8): a pass
+    /// steps F5 twice, the port's entry read not at all.
+    #[test]
+    fn f5_steps_twice_a_pass() {
+        fn host(h: PuzzleHost<'_>) -> Host<'_> {
+            Host {
+                host: h,
+                pictures: Default::default(),
+            }
+        }
+        let Some(entry) = f5_steps("meta_f5_entry", move |h| {
+            host(h).start_input();
+        }) else {
+            return;
+        };
+        let pass = f5_steps("meta_f5_pass", move |h| {
+            let mut io = host(h);
+            io.start_input();
+            io.boundary(&MetaGame::new(Vec::new(), Vec::new()));
+        });
+        assert_eq!((entry, pass), (0, Some(2)));
     }
 }

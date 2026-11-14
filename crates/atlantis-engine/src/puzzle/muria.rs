@@ -384,11 +384,12 @@ impl MuriaIo for Host<'_> {
     /// draws there, with no pump in between: a click is at the previous
     /// pass's pointer ([`PuzzleHost::read_input_held_pointer`]).
     fn start_input(&mut self) -> (i32, i32, bool) {
-        let m = self.0.read_input_held_pointer();
+        let m = self.0.read_entry_held_pointer();
         (m.x, m.y, m.click)
     }
     fn boundary(&mut self, _g: &MuriaGame) -> (i32, i32, bool) {
-        self.start_input()
+        let m = self.0.read_input_held_pointer();
+        (m.x, m.y, m.click)
     }
     fn load_picture(&mut self, _name: &str) {
         // The one picture, loaded with the puzzle.
@@ -467,4 +468,27 @@ mod click_pointer_tests {
         |h: &mut Host<'_>| h.start_input(),
         (100, 100)
     );
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+
+    /// The original polls only after each present (one poll a pass): the
+    /// port's entry read steps no F5, a pass's read one.
+    #[test]
+    fn f5_steps_once_a_pass_and_not_at_entry() {
+        let Some(entry) = f5_steps("muria_f5_entry", |h| {
+            Host(h).start_input();
+        }) else {
+            return;
+        };
+        let pass = f5_steps("muria_f5_pass", |h| {
+            let mut io = Host(h);
+            io.start_input();
+            io.boundary(&MuriaGame::default());
+        });
+        assert_eq!((entry, pass), (0, Some(1)));
+    }
 }

@@ -302,16 +302,27 @@ impl TaquinIo for Host<'_> {
     /// the top of its pass (FUN_00446830 @ 0x0044699e), which sees no new
     /// edge and pumps a message before the handler (0x004469ac): it keeps
     /// the pointer of this read.
+    ///
+    /// The entry read has no poll of the original's (no F5..F8 step), and
+    /// taquin 14's two polls a pass step the keys twice
+    /// ([`PuzzleHost::second_poll`]).
     fn start_input(&mut self) -> (i32, i32, bool) {
         let m = if self.1 == 14 {
-            self.0.read_input()
+            self.0.read_entry()
         } else {
-            self.0.read_input_held_pointer()
+            self.0.read_entry_held_pointer()
         };
         (m.x, m.y, m.click)
     }
     fn boundary(&mut self, _g: &TaquinGame) -> (i32, i32, bool) {
-        self.start_input()
+        let m = if self.1 == 14 {
+            let m = self.0.read_input();
+            self.0.second_poll();
+            m
+        } else {
+            self.0.read_input_held_pointer()
+        };
+        (m.x, m.y, m.click)
     }
     fn draw_background(&mut self) {
         self.0.draw_background();
@@ -399,4 +410,30 @@ mod click_pointer_tests {
         |h: &mut Host<'_>| h.start_input(),
         (300, 200)
     );
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+
+    /// Taquins 6 and 7 poll once a pass, after the present (0x00446545,
+    /// 0x004467e6); taquin 14 twice (0x0044699e, 0x00446a7a); none before
+    /// the first present: the entry read steps no F5.
+    #[test]
+    fn f5_steps_per_pass_and_not_at_entry() {
+        for (v, per_pass) in [(6, 1), (7, 1), (14, 2)] {
+            let Some(entry) = f5_steps("taquin_f5_entry", move |h| {
+                Host(h, v).start_input();
+            }) else {
+                return;
+            };
+            let pass = f5_steps("taquin_f5_pass", move |h| {
+                let mut io = Host(h, v);
+                io.start_input();
+                io.boundary(&TaquinGame::new(v));
+            });
+            assert_eq!((entry, pass), (0, Some(per_pass)), "taquin {v}");
+        }
+    }
 }
