@@ -147,6 +147,10 @@ pub trait SnakesIo {
     fn aborted(&self) -> bool {
         false
     }
+    /// The music ring's refill held (`true`) for a sequence that makes no
+    /// `FUN_0043318c` call, or running again
+    /// ([`crate::audio::Mixer::set_refill_held`]).
+    fn hold_music_refill(&mut self, _held: bool) {}
 }
 
 /// The snakes' state.
@@ -572,7 +576,13 @@ impl SnakesGame {
     /// pieces shown every other step (from the second), drawn before the
     /// snakes; no cursor in the 20 steps (the entry adds it once after
     /// them, see [`SnakesGame::run`]).
+    ///
+    /// None of its calls (0x0043c114..0x0043c35c) reaches the music ring's
+    /// refill `FUN_0043318c`, which only the frame loops call (the 200 Hz
+    /// timer callback 0x00431150 only releases, @ 0x00431173): the ring's
+    /// refill is held for the 10 s ([`SnakesIo::hold_music_refill`]).
     async fn win_animation(&self, io: &mut impl SnakesIo) {
+        io.hold_music_refill(true);
         let mut hidden = true;
         for _ in 0..0x14 {
             io.draw_background();
@@ -581,9 +591,10 @@ impl SnakesGame {
             io.present(self).await;
             io.wait_ticks(100).await;
             if io.aborted() {
-                return;
+                break;
             }
         }
+        io.hold_music_refill(false);
     }
 
     /// `FUN_0043b0f4`: phase 1 (`FUN_0043c35c`) until the four pieces are
@@ -715,6 +726,9 @@ impl SnakesIo for Host<'_> {
     fn aborted(&self) -> bool {
         self.0.aborted()
     }
+    fn hold_music_refill(&mut self, held: bool) {
+        self.0.e.sys.mixer.set_refill_held(held);
+    }
 }
 
 /// StartPuzzle 8: 255 when solved, 1 when the player leaves or the game is
@@ -803,6 +817,49 @@ mod poll_count_tests {
             assert!(matches!(f.as_mut().poll(&mut cx), Poll::Ready(_)));
         }
         assert_eq!((io.entry, io.pass, io.presents), (1, 2, 3));
+    }
+
+    /// The hold of the music ring's refill at each present and wait of
+    /// the win animation.
+    #[derive(Default)]
+    struct RefillLog {
+        held: bool,
+        seen: Vec<bool>,
+    }
+
+    impl SnakesIo for RefillLog {
+        fn read_input(&mut self) -> (i32, i32, bool) {
+            (320, 240, false)
+        }
+        fn draw_background(&mut self) {}
+        fn draw_sprite(&mut self, _bank: char, _x: i32, _y: i32, _frame: i32) {}
+        async fn present(&mut self, _g: &SnakesGame) {
+            self.seen.push(self.held);
+        }
+        fn play_sound(&mut self, _s: Sound) {}
+        async fn wait_ticks(&mut self, _n: u32) {
+            self.seen.push(self.held);
+        }
+        fn hold_music_refill(&mut self, held: bool) {
+            self.held = held;
+        }
+    }
+
+    /// `FUN_0043c114` calls no `FUN_0043318c` in its 20 steps
+    /// (0x0043c114..0x0043c35c): the music ring's refill is held through
+    /// every present and wait, and runs again after.
+    #[test]
+    fn the_win_animation_holds_the_music_refill() {
+        let g = SnakesGame::new(vec![0; 640 * 480], Default::default());
+        let mut io = RefillLog::default();
+        {
+            let mut f = pin!(g.win_animation(&mut io));
+            let mut cx = Context::from_waker(Waker::noop());
+            assert!(matches!(f.as_mut().poll(&mut cx), Poll::Ready(())));
+        }
+        assert_eq!(io.seen.len(), 40);
+        assert!(io.seen.iter().all(|&h| h), "{:?}", io.seen);
+        assert!(!io.held);
     }
 
     /// The port's entry read steps no F5, a pass's read one.

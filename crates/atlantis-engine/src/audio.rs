@@ -96,9 +96,11 @@ struct State {
 ///
 /// The second field: the game's loops are held (the original's input poll
 /// blocked while its window is not the active one, [`crate::sys::Runner::hold`]),
-/// read by the music ring, whose refills those loops run.
+/// read by the music ring, whose refills those loops run. The third: a
+/// sequence of the game that runs no refill is playing
+/// ([`Mixer::set_refill_held`]).
 #[derive(Clone)]
-pub struct Mixer(Arc<Mutex<State>>, Arc<AtomicBool>);
+pub struct Mixer(Arc<Mutex<State>>, Arc<AtomicBool>, Arc<AtomicBool>);
 
 impl Default for Mixer {
     fn default() -> Self {
@@ -107,6 +109,7 @@ impl Default for Mixer {
                 master: 127,
                 ..State::default()
             })),
+            Arc::new(AtomicBool::new(false)),
             Arc::new(AtomicBool::new(false)),
         )
     }
@@ -203,6 +206,18 @@ impl Mixer {
     /// the audio thread.
     pub fn loops_held_flag(&self) -> Arc<AtomicBool> {
         self.1.clone()
+    }
+
+    /// A sequence of the game that makes no `FUN_0043318c` call runs
+    /// (`true`) or has ended: the music ring gets no refill meanwhile
+    /// ([`crate::music::MusicRingSource`]), its release goes on.
+    pub fn set_refill_held(&self, held: bool) {
+        self.2.store(held, Ordering::Relaxed);
+    }
+
+    /// The flag [`Mixer::set_refill_held`] sets.
+    pub fn refill_held_flag(&self) -> Arc<AtomicBool> {
+        self.2.clone()
     }
 
     /// Pauses (silence, nothing advances) or resumes every voice.
