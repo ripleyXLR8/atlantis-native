@@ -1175,6 +1175,17 @@ impl Engine {
         // poll saw a new left press (0x0041a2b5); nothing writes them
         // before the warp loop's first frame, which shows them.
         self.poll_view_keys(left);
+        self.input_flags_reset();
+    }
+
+    /// The input flags reset the original writes in one block at the end
+    /// of a move (0x00424098..0x004240ca), in StartMusik and StopMusik when
+    /// they close the open stream (`FUN_0042a100` @ 0x0042add3..0x0042ae05,
+    /// 0x0042af26..0x0042af58) and at the end of the disc prompt
+    /// (`FUN_0041eda8` @ 0x0041f032..0x0041f064): 0x00496118 (the double
+    /// click), 0x0049611c, 0x00496120, 0x00496138 = 0, 0x00496124 = 1 (the
+    /// Escape latch) and 0x004960c4 = 0.
+    pub(crate) fn input_flags_reset(&mut self) {
         self.turn_double_click.clear();
         self.escape_request = false;
         self.bar.flags_reset();

@@ -863,10 +863,11 @@ impl Engine {
             }
             return;
         }
-        // Closing the open stream for another track resets the input flags,
-        // the bar request among them (0x0042add3..0x0042ae05).
+        // Closing the open stream for another track resets the input flags
+        // (0x0042add3..0x0042ae05): the double click, the Escape latch and
+        // the bar request among them.
         if self.music.handle_set {
-            self.bar.flags_reset();
+            self.input_flags_reset();
         }
         self.music_switch_track(track).await;
     }
@@ -882,11 +883,12 @@ impl Engine {
         }
         // StopMusik closes and clears 0x006ce0c0 and 0x00772915 only when
         // the handle is set (@ 0x0042aea9, 0x0042af0e, 0x0042af18), then
-        // resets the input flags (0x0042af26..0x0042af58).
+        // resets the input flags (0x0042af26..0x0042af58): the double
+        // click, the Escape latch and the bar request among them.
         if self.music.handle_set {
             self.music.handle_set = false;
             self.music.open_track = 0;
-            self.bar.flags_reset();
+            self.input_flags_reset();
         }
         self.music.track_id = 0;
     }

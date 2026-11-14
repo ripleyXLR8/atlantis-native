@@ -509,12 +509,13 @@ impl Scripts {
                 // to 3). The port reads every disc at once: no prompt, it
                 // only notes the disc, which the checkpoints keep. The
                 // prompt's function also empties the hand (OBJETENMAIN = 0 @
-                // 0x0041ede9) and ends by clearing the input flags, the bar
-                // request among them (0x0041f032..0x0041f064).
+                // 0x0041ede9) and ends by clearing the input flags, the
+                // double click, the Escape latch and the bar request among
+                // them (0x0041f032..0x0041f064).
                 "changecd" => {
                     e.disc = change_cd_disc(value);
                     e.vars.set("objetenmain", 0);
-                    e.bar.flags_reset();
+                    e.input_flags_reset();
                 }
                 // HideGuest / ShowGuest store no variable.
                 "hideguest" | "showguest" => e.guests_shown = key == "showguest",
@@ -2448,6 +2449,42 @@ mod tests {
         );
         if ran {
             assert_eq!(*got.borrow(), [true, false, true]);
+        }
+    }
+
+    /// ChangeCd (`FUN_0041eda8` @ 0x0041f032..0x0041f064), StartMusik of
+    /// another track and StopMusik with the stream open (`FUN_0042a100` @
+    /// 0x0042add3..0x0042ae05, 0x0042af26..0x0042af58) clear the Escape
+    /// latch (0x00496138 = 0, 0x00496124 = 1) and the double-click flag
+    /// 0x00496118 with the bar's flags.
+    #[test]
+    fn stream_close_and_disc_prompt_clear_the_latches() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "stream_close_and_disc_prompt_clear_the_latches",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                for cmd in ["changecd=2", "startmusik=5", "stopmusik=1"] {
+                    if cmd != "changecd=2" {
+                        e.music.handle_set = true;
+                    }
+                    e.escape_request = true;
+                    e.turn_double_click.flag = true;
+                    e.bar.request = true;
+                    s.exec_set(&mut e, None, cmd).await;
+                    g2.borrow_mut().push((
+                        e.escape_request,
+                        e.turn_double_click.flag,
+                        e.bar.request,
+                    ));
+                }
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [(false, false, false); 3]);
         }
     }
 
