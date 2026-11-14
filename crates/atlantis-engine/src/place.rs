@@ -582,6 +582,7 @@ impl Engine {
         // (FUN_00423ad8) opens no sound: the transition-named APCs are
         // NewSound entries that the departure sections play.
         if places.is_none() {
+            self.apply_new_sound_fade_end();
             let apc = format!("WAV\\{}", with_ext(&name, "APC"));
             if self.cinema_sound_fix() && self.music.new_sound_last == 1 {
                 self.music.new_sound_playing = false;
@@ -764,15 +765,16 @@ impl Engine {
         // (FUN_0042a100 @ 0x0042a907..0x0042a954 stops nothing); one cut
         // short fades it out, 2 volume steps every 25 ms from the effects
         // volume (FUN_0041bc74 @ 0x0041be69..0x0041be9e arms 0x00495eb0 =
-        // 2). Then 0x00496124 = 1, 0x00496134 = 0 and the input flags are
-        // cleared (0x0041be55..0x0041bf8d).
+        // 2, with no test of the sample: its end clears NEWSOUND even when
+        // no sound played). Then 0x00496124 = 1, 0x00496134 = 0 and the
+        // input flags are cleared (0x0041be55..0x0041bf8d).
         // The last frame's overlays into its own buffer (0x0041be45).
         if let Some(c) = overlay.take() {
             hnm.frame_mut().copy_from_slice(&c);
         }
         let fade = run.finish(frame_ms == CINEMA_FRAME_MS, &mut self.bar);
         self.escape_request = false;
-        if fade && self.music.new_sound_active() {
+        if fade {
             self.music.fade_out_new_sound(self.effects_volume());
         }
         let shown = run.presented;
@@ -992,6 +994,14 @@ impl Engine {
         self.cinema_captions = None;
     }
 
+    /// The end of a NewSound fade-out (`FUN_0042f7a8` @ 0x0042f92f):
+    /// NEWSOUND = 0.
+    fn apply_new_sound_fade_end(&mut self) {
+        if self.music.take_new_sound_fade_end() {
+            self.vars.set("newsound", 0);
+        }
+    }
+
     /// `FUN_00432a64`, the NewSound poller. The loop flag 0x00496194 is 0
     /// in the image and never written, so a sound plays once.
     pub async fn poll_new_sound(&mut self) {
@@ -1001,6 +1011,7 @@ impl Engine {
     /// The poller; `cinema` is the cinematic's sound the Cinema= handler
     /// names while 0x00496190 is 1 (in place of the table's entry).
     async fn poll_new_sound_named(&mut self, cinema: Option<String>) {
+        self.apply_new_sound_fade_end();
         let value = self.vars.get("newsound");
         if value == 0 {
             return; // 1: nothing is stopped

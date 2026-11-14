@@ -503,6 +503,9 @@ struct SoundTimer {
     last_ms: Option<u64>,
     music_voice: Option<VoiceId>,
     new_sound_voice: Option<VoiceId>,
+    /// The NewSound fade-out ended; its NEWSOUND = 0, 0x006cd87c = 0 and
+    /// 0x00772912 = 0 are applied by [`Music::take_new_sound_fade_end`].
+    new_sound_fade_ended: bool,
 }
 
 impl SoundTimer {
@@ -535,10 +538,13 @@ impl SoundTimer {
             }
         }
         if std::mem::take(&mut self.fade.sfx_stop) {
-            // NewSound is cleared by its poller.
+            // AIL_stop_sample, a stop without a voice included; the
+            // variables the original clears here (@ 0x0042f8fa..0x0042f961)
+            // are the engine's: see Music::take_new_sound_fade_end.
             if let Some(v) = self.new_sound_voice {
                 self.mixer.stop(v);
             }
+            self.new_sound_fade_ended = true;
         }
     }
 }
@@ -574,6 +580,7 @@ impl Music {
             last_ms: None,
             music_voice: None,
             new_sound_voice: None,
+            new_sound_fade_ended: false,
         }));
         let t = timer.clone();
         sys.add_timer(Box::new(move |now| t.borrow_mut().run(now)));
@@ -656,6 +663,7 @@ impl Music {
         t.fade.sfx_mode = 0;
         t.fade.sfx_changed = false;
         t.fade.sfx_stop = false;
+        t.new_sound_fade_ended = false;
         if let Some(v) = t.new_sound_voice.take() {
             t.mixer.stop(v);
         }
@@ -678,6 +686,21 @@ impl Music {
         }
     }
 
+    /// The end of the NewSound fade-out (`FUN_0042f7a8` @
+    /// 0x0042f8fe..0x0042f95c) as the engine sees it: true once after the
+    /// timer ended the fade, with 0x006cd87c (`new_sound_last`) and
+    /// 0x00772912 (`new_sound_playing`) cleared; the caller sets NEWSOUND
+    /// to 0. The timer runs between frames, the engine applies the end at
+    /// its next NewSound poll.
+    pub fn take_new_sound_fade_end(&mut self) -> bool {
+        let ended = std::mem::take(&mut self.timer.borrow_mut().new_sound_fade_ended);
+        if ended {
+            self.new_sound_last = 0;
+            self.new_sound_playing = false;
+        }
+        ended
+    }
+
     pub fn stop_new_sound(&self) {
         let mut t = self.timer.borrow_mut();
         if let Some(v) = t.new_sound_voice.take() {
@@ -687,10 +710,12 @@ impl Music {
 
     /// The NewSound sample fades out: 0x006ce128 = the effects volume, 2
     /// steps every 25 ms (`FUN_0041bc74` @ 0x0041be69..0x0041be9e arms
-    /// 0x00495eb0 = 2).
+    /// 0x00495eb0 = 2, whether a sound plays or not). From the byte
+    /// itself: at 0 the fade ends on the next tick (`FUN_0042f7a8` tests
+    /// 0x006ce128 < 1 on every tick).
     pub fn fade_out_new_sound(&self, effects_volume: u8) {
         self.with_fade(|f| {
-            f.sfx_vol0 = i32::from(effects_volume).max(1);
+            f.sfx_vol0 = i32::from(effects_volume);
             f.sfx_vol = f.sfx_vol0;
             f.sfx_last = f.ticks;
             f.sfx_mode = 2;
@@ -1481,6 +1506,78 @@ mod original_sound_tests {
             sys.mixer.voice_volume(m).map(|x| x.0),
             Some(mixer_volume(1))
         );
+    }
+
+    /// The NewSound fade-out starts from the effects byte itself
+    /// (`FUN_0041bc74` @ 0x0041be8a, `FUN_0042f7a8` tests 0x006ce128 < 1 on
+    /// every tick): at 0 it ends on the first tick, no sound playing
+    /// included, and its end clears 0x006cd87c and 0x00772912
+    /// (@ 0x0042f916, 0x0042f939).
+    #[test]
+    fn new_sound_fade_from_zero_ends_on_the_first_tick() {
+        let sys = Sys::new(Mixer::new());
+        let mut music = Music::new(&sys);
+        music.new_sound_last = 5;
+        music.new_sound_playing = true;
+        music.fade_out_new_sound(0);
+        {
+            let mut t = music.timer.borrow_mut();
+            t.last_ms = Some(0);
+            t.run(5);
+        }
+        assert!(music.take_new_sound_fade_end());
+        assert_eq!((music.new_sound_last, music.new_sound_playing), (0, false));
+        assert!(!music.take_new_sound_fade_end());
+        // A NewSound start clears an end not yet applied (dc:26256).
+        music.fade_out_new_sound(0);
+        {
+            let mut t = music.timer.borrow_mut();
+            t.run(10);
+        }
+        music.start_new_sound(pcm(1), 0x6e);
+        assert!(!music.take_new_sound_fade_end());
+    }
+
+    /// A cinematic without a sound (CINEM068) cut short by a click still
+    /// arms the NewSound fade (`FUN_0041bc74` @ 0x0041be69..0x0041bea4 does
+    /// not test the sample); at an effects volume of 0 its end, on the next
+    /// timer tick, sets NEWSOUND to 0 (@ 0x0042f92f), so a NEWSOUND the
+    /// next line sets before the following poll is dropped.
+    #[test]
+    fn a_cut_short_cinematic_without_sound_still_fades() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_cut_short_cinematic_without_sound_still_fades",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(!e.game.big.contains("WAV\\CINEM068.APC"));
+                e.ambient.effects_volume = 0;
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                e.play_cinema(68).await;
+                let armed = e.music.fade().sfx_mode == 2;
+                e.vars.set("newsound", 5);
+                e.sys.frame().await;
+                e.poll_new_sound().await;
+                let started = trace
+                    .borrow()
+                    .iter()
+                    .any(|ev| matches!(ev, Event::NewSound(5, _)));
+                *g2.borrow_mut() = Some((armed, e.vars.get("newsound"), started));
+            },
+            |sys, f| {
+                if f == 3 {
+                    crate::test_support::button(sys, crate::sys::MouseButton::Left, true);
+                } else if f == 5 {
+                    crate::test_support::button(sys, crate::sys::MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, 0, false)));
+        }
     }
 
     /// Voice files play at the voice sample's 22050 Hz whatever their

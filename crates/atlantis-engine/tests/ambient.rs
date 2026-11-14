@@ -47,6 +47,10 @@ impl AmbientSampleOutput for FakeOut {
         ));
         self.st[slot] = SMP_PLAYING;
     }
+    fn restart(&mut self, slot: usize, object: usize, variant: usize) {
+        self.log.push(format!("restart {slot} {object} {variant}"));
+        self.st[slot] = SMP_PLAYING;
+    }
     fn set_loop_once(&mut self, _: usize) {}
     fn stop(&mut self, slot: usize) {
         self.log.push(format!("stop {slot}"));
@@ -83,6 +87,9 @@ impl AmbientSampleOutput for MilesOut {
     fn start(&mut self, slot: usize, _: usize, _: usize, _: bool) {
         self.miles.started(slot);
         self.active[slot] = true;
+    }
+    fn restart(&mut self, slot: usize, _: usize, _: usize) {
+        self.start(slot, 0, 0, false);
     }
     fn set_loop_once(&mut self, _: usize) {}
     fn stop(&mut self, slot: usize) {
@@ -289,7 +296,9 @@ fn video_pause_reads_chaptertime() {
         a.records[0].object = Some(0);
         out.st[0] = SMP_DONE;
         a.video_frame(&mut out, &p, &objs, ct);
-        assert_eq!(out.has("start 0 0 0 0"), restart, "chaptertime {ct}");
+        // The start @ 0x0043295d sets no loop count.
+        assert_eq!(out.has("restart 0 0 0"), restart, "chaptertime {ct}");
+        assert!(!out.log.iter().any(|l| l.starts_with("start ")));
         assert_eq!(a.records[0].start, start_after, "chaptertime {ct}");
     }
     // Arming: start 0, count 2, the draw gives -1 (no weight).
@@ -463,13 +472,14 @@ fn video_glide() {
     out.log.clear();
     a.video_frame(&mut out, &p, &objs, 100);
     assert_eq!(out.log.len(), 2);
-    // Status 2 restarts a drawn variant with a finite loop count.
+    // Status 2 restarts a drawn variant; the start @ 0x00432882 sets no
+    // loop count.
     out.st[0] = SMP_DONE;
     a.loop_flag = true;
     clock(&mut a, &[60]);
     out.log.clear();
     a.video_frame(&mut out, &p, &objs, 100);
-    assert!(out.has("start 0 0 1 0"));
+    assert!(out.has("restart 0 0 1"));
     assert!(a.loop_flag); // FUN_00432758 neither reads nor clears it
 }
 
