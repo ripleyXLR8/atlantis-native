@@ -123,8 +123,9 @@ impl Engine {
         if left_press {
             return;
         }
-        let held =
-            |f: u8, arrow: Key| self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow));
+        let held = |f: u8, arrow: Key| {
+            self.sys.key_held(Key::F(f)) || (arrows && self.sys.key_held(arrow))
+        };
         let mut k = 0;
         for (bit, f, arrow) in [
             (VIEW_F5, 5, Key::Left),
@@ -568,6 +569,7 @@ impl Engine {
                 break;
             }
             self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
+
             // The poll's WM_MOUSEMOVE (0x00419c14) moves the pointer.
             if !fi.left_press {
                 let (dx, dy) = std::mem::take(&mut unpumped);
