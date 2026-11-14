@@ -599,7 +599,6 @@ impl Dialogs {
         let mut player = LinePlayer {
             talking_head,
             voice_off_step: l.voice_off && !talking_head,
-            still_cursor: None,
             kept_screen: l.keep_screen.then(|| e.sys.screen.borrow().clone()),
             kept_hd: l.keep_screen && e.sys.hd_shown(),
             hd: LineHd::default(),
@@ -669,10 +668,12 @@ impl Dialogs {
                     start_voice(e, &mut voice);
                 }
                 // FUN_00430258 presents its still frame through FUN_0041afd0,
-                // which steps the warp cursor over what is under the pointer
-                // and draws it (off0 / off1 present without it).
+                // which steps the warp cursor over what is under the pointer;
+                // its sprite goes to the back buffer after the copy, so the
+                // frame shows none (Engine::still_frame_cursor_step). off0 /
+                // off1 do not call it.
                 if l.voice_off && !talking_head {
-                    player.still_cursor = e.still_frame_cursor();
+                    e.still_frame_cursor_step();
                 }
                 loop {
                     if e.should_abort() {
@@ -1038,9 +1039,6 @@ pub fn off1_screen(ix_buffers: &[u16]) -> Vec<u16> {
 struct LinePlayer {
     talking_head: bool,
     voice_off_step: bool,
-    /// The cursor `FUN_00430258`'s one present (FUN_0041afd0 @ 0x00430550)
-    /// leaves on its still frame: a CURSEURS.SPR sprite and where.
-    still_cursor: Option<(usize, (i32, i32))>,
     /// off0: the screen as it stood, the subtitle's background; off1: the
     /// screen buffer, once the voice has loaded.
     kept_screen: Option<Vec<u16>>,
@@ -1363,12 +1361,6 @@ impl LinePlayer {
         }
         let under = (e.sys.hd_tile().is_some() && !sub_lines.is_empty()).then(|| bg.clone());
         font.draw_subtitles(&mut bg, SCREEN_W, SCREEN_H, sub_lines, 0);
-        if let Some(spr) = self
-            .still_cursor
-            .and_then(|(i, p)| e.cursor_sprites.get(i).map(|s| (s, p)))
-        {
-            spr.0.draw(&mut bg, SCREEN_W, SCREEN_H, spr.1 .0, spr.1 .1);
-        }
         if let Some(under) = under {
             record_subtitles(e, font, &under, &bg, sub_lines, 0, 0);
         }
@@ -1964,7 +1956,7 @@ mod still_cursor_tests {
         let shot = Rc::new(RefCell::new(None));
         let s2 = shot.clone();
         let ran = with_engine(
-            "voice_only_still_frame_carries_the_cursor",
+            "voice_only_still_frame_shows_no_cursor",
             move |mut e| async move {
                 let mut s = Scripts::new();
                 e.new_game(&mut s, false).await;
@@ -2024,16 +2016,17 @@ mod still_cursor_tests {
     }
 
     /// `FUN_00430258` presents its still frame once through `FUN_0041afd0`
-    /// (@ 0x00430550), which draws the warp cursor over what is under the
-    /// pointer (here a navigation zone) unless the bar request (or another
-    /// of its flags) is set.
+    /// (@ 0x00430550), whose `FUN_00422fcc` draws the cursor into the back
+    /// buffer after the copy to the surface (@ 0x004304eb): the frame shows
+    /// no cursor, whether `FUN_0041afd0` steps it (here a navigation zone
+    /// under the pointer) or not (the bar request set).
     #[test]
-    fn voice_only_still_frame_carries_the_cursor() {
-        let Some(with) = off_line_screen(false) else {
+    fn voice_only_still_frame_shows_no_cursor() {
+        let Some(stepped) = off_line_screen(false) else {
             return;
         };
-        let without = off_line_screen(true).unwrap();
-        assert_ne!(with, without);
+        let gated = off_line_screen(true).unwrap();
+        assert!(stepped == gated, "a cursor sprite on the still frame");
     }
 }
 

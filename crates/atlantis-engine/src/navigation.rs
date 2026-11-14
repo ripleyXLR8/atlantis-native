@@ -279,20 +279,30 @@ impl Engine {
         (u32::from(place.hit_test(px as i16, py as i16)), perso)
     }
 
-    /// `FUN_0041afd0`'s cursor, for a still frame it presents outside the
-    /// warp loop (the voice-only line, `FUN_00430258` @ 0x00430550): with
-    /// 0x004960c0, GAMEOVER, bow mode, 0x00496188, the bar request, the
-    /// menu request, 0x00496154 and 0x0049616c all 0
-    /// (0x0041afe8..0x0041b050), one step of `FUN_00422fcc` over what is
-    /// under the pointer, the sprite to draw at the pointer.
-    pub(crate) fn still_frame_cursor(&mut self) -> Option<(usize, (i32, i32))> {
+    /// `FUN_0041afd0`'s cursor step, for the still frame of a voice-only
+    /// line (`FUN_00430258` @ 0x00430550): with 0x004960c0, GAMEOVER, bow
+    /// mode, 0x00496188, the bar request, the menu request, 0x00496154 and
+    /// 0x0049616c all 0 (0x0041afe8..0x0041b050), one step of
+    /// `FUN_00422fcc` over what is under the pointer. True when it stepped.
+    ///
+    /// Its sprite is not shown: `FUN_00422fcc` draws into the back buffer
+    /// `[0x004960d8]` (`push dword ptr [0x4960d8]` @ 0x00423394, 0x004234eb,
+    /// 0x004236a6; a heap block of its own, `malloc(0x96000)` stored @
+    /// 0x00418f9c), and `FUN_00430258` has already copied that buffer to
+    /// the surface (`FUN_00410f36` @ 0x004304eb) before it draws the
+    /// subtitle and calls `FUN_0041afd0`, whose present (`FUN_004337d4` @
+    /// 0x0041b055) shows the surface. Its wait loop (0x00430555..0x0043058d)
+    /// only polls. So the still frame shows no cursor, with Flip
+    /// (fullscreen) or Blt (windowed) alike; the system pointer is hidden in
+    /// fullscreen (WM_SETCURSOR, `SetCursor(NULL)` @ 0x00419d1a).
+    pub(crate) fn still_frame_cursor_step(&mut self) -> bool {
         if self.give_scan
             || self.bow_mode
             || self.vars.get("gameover") != 0
             || self.bar.request
             || self.escape_request
         {
-            return None;
+            return false;
         }
         let (zone, perso) = self.pointer_targets();
         let input = WarpCursorInput {
@@ -303,8 +313,8 @@ impl Engine {
             edge_scroll: false,
             id_rule: self.game.exe.build.cursor_id_rule,
         };
-        let sprite = warp_cursor_step(&mut self.cursor_state, &input).sprite;
-        usize::try_from(sprite).ok().map(|s| (s, self.pointer.pos))
+        warp_cursor_step(&mut self.cursor_state, &input);
+        true
     }
 
     /// The warp loop `FUN_0041bfa0`: the view until a click. Returns the

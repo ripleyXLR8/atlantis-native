@@ -1654,7 +1654,7 @@ mod tests {
     }
 
     /// A presenter that notes, for each line, whether its still frame
-    /// would carry the warp cursor.
+    /// would step the warp cursor.
     struct CursorProbe(Rc<RefCell<Vec<bool>>>);
 
     impl DialogPresenter for CursorProbe {
@@ -1663,7 +1663,7 @@ mod tests {
             e: &'a mut Engine,
             _req: &'a LineRequest,
         ) -> HookFuture<'a, LineOutcome> {
-            self.0.borrow_mut().push(e.still_frame_cursor().is_some());
+            self.0.borrow_mut().push(e.still_frame_cursor_step());
             ready(LineOutcome::default())
         }
     }
@@ -1671,7 +1671,7 @@ mod tests {
     /// The voice-only line of a /con section that tests only ObjetEnMain,
     /// with object 257 in hand and a character under the pointer, reached
     /// by a click on that character (`give`) or on a zone: whether its
-    /// still frame carries the cursor.
+    /// still frame steps the cursor.
     fn give_line_cursor(give: bool) -> Option<Vec<bool>> {
         let got = Rc::new(RefCell::new(Vec::new()));
         let g2 = got.clone();
@@ -1722,10 +1722,10 @@ mod tests {
 
     /// `FUN_00425828` sets 0x004960c0 around the /con click scan of a
     /// character clicked with an object in hand (@ 0x00425882..
-    /// 0x004258ad), and `FUN_0041afd0` draws no cursor while it is set
-    /// (@ 0x0041afe8): the still frames of that section's voice-only lines
-    /// show none (CHAPI021 /270, CHAPI055 /685). A zone click's scan does
-    /// not set it.
+    /// 0x004258ad), and `FUN_0041afd0` does not step the cursor while it
+    /// is set (@ 0x0041afe8): the still frames of that section's
+    /// voice-only lines leave its animation as it was (CHAPI021 /270,
+    /// CHAPI055 /685). A zone click's scan does not set it.
     #[test]
     fn no_cursor_on_the_lines_of_a_given_object() {
         let Some(given) = give_line_cursor(true) else {
