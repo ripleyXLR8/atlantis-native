@@ -27,6 +27,7 @@ use super::layout::{
 use super::player_screen::{player_screen_exit, PlayerScreenExit, PlayerScreenState};
 use super::{dim_screen, draw_sprite, Screen};
 use crate::engine::Engine;
+use crate::enhancements::BugFix;
 use crate::music::apc_pcm;
 use crate::sys::{Input, Key, MouseButton};
 use crate::video_skip::VideoSkipState;
@@ -821,23 +822,35 @@ impl Engine {
             .start_pcm(1, pcm, if right { 0x7f } else { 0 }, vol);
     }
 
-    /// The current player's checkpoints, in the LOAD list's order, as
-    /// the original ([`original_load_order`]): the names `p<letter>*.gam`
-    /// in the order the save store lists them (the original's
-    /// FindFirstFile / FindNextFile order), the first 0x80, through its
-    /// swap pass, each row the chapter of its name (not ascending chapters
-    /// once there are chapters of one and two digits).
+    /// The current player's checkpoints, in the LOAD list's order. Either
+    /// way the list holds the names `p<letter>*.gam`, the first 0x80 in
+    /// the order the save store lists them (the original's FindFirstFile /
+    /// FindNextFile order), each row the chapter of its name. With
+    /// [`BugFix::LoadOrder`] (the default) the chapters are ascending,
+    /// each once; off, as the original ([`original_load_order`]), they
+    /// come in the order of its swap pass (not ascending once there are
+    /// chapters of one and two digits: `1 .. 6 11 9`).
     /// A chapter-0 file is left out: the original lists it but its rows
     /// drawer skips it (`atoi(name + 2) - 1 == -1`, FUN_00420b48 @
     /// 0x00420be0..0x00420bed), and its click would walk EPI.TXT without
     /// an end; no build writes one.
     pub(crate) fn player_checkpoints(&self) -> Vec<u8> {
         let letter = self.players.letters[self.player.min(MAX_PLAYERS - 1)];
-        original_load_order(&self.saves.list(), letter)
+        let mut v: Vec<u8> = original_load_order(&self.saves.list(), letter)
             .iter()
             .filter_map(|n| checkpoint_chapter(n, letter))
             .filter(|&c| c != 0)
-            .collect()
+            .collect();
+        if self.ascending_load_order() {
+            v.sort_unstable();
+            v.dedup();
+        }
+        v
+    }
+
+    /// The LOAD list's fix ([`BugFix::LoadOrder`]): ascending chapters.
+    pub fn ascending_load_order(&self) -> bool {
+        self.enhancements().fix(BugFix::LoadOrder)
     }
 
     /// The load picker `FUN_0041cf78` (LOADMENU): the player's checkpoints
@@ -1327,7 +1340,7 @@ mod record_table_tests {
 #[cfg(test)]
 mod load_order_tests {
     use super::original_load_order;
-    use crate::enhancements::Enhancements;
+    use crate::enhancements::{BugFix, Enhancements};
     use crate::persist::SaveStore;
     use crate::test_support::with_engine;
     use std::cell::RefCell;
@@ -1430,8 +1443,9 @@ mod load_order_tests {
         }
     }
 
-    /// The LOAD list's rows: the original's order, by default and with
-    /// `--original` (the store lists the files in the order written).
+    /// The LOAD list's rows (the store lists the files in the order
+    /// written): ascending chapters by default ([`BugFix::LoadOrder`]),
+    /// the original's order with `--original` or that fix alone off.
     #[test]
     fn player_checkpoints_order() {
         let got = Rc::new(RefCell::new(Vec::new()));
@@ -1445,7 +1459,12 @@ mod load_order_tests {
                     store.write(&atlantis_data::saves::checkpoint_name(letter, c), b"");
                 }
                 e.saves = store;
-                for x in [Enhancements::original(), Enhancements::default()] {
+                for x in [
+                    Enhancements::default(),
+                    Enhancements::original(),
+                    Enhancements::all_but_fix(BugFix::LoadOrder),
+                    Enhancements::only_fix(BugFix::LoadOrder),
+                ] {
                     e.set_enhancements(x);
                     g2.borrow_mut().push(e.player_checkpoints());
                 }
@@ -1455,8 +1474,9 @@ mod load_order_tests {
         if !ran {
             return;
         }
+        let fixed = vec![1, 2, 3, 4, 5, 6, 9, 11];
         let shown = vec![1, 2, 3, 4, 5, 6, 11, 9];
-        assert_eq!(*got.borrow(), [shown.clone(), shown]);
+        assert_eq!(*got.borrow(), [fixed.clone(), shown.clone(), shown, fixed]);
     }
 }
 

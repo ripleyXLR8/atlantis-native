@@ -107,6 +107,15 @@ pub enum BugFix {
     /// player enters the day city). The WAM loads only
     /// ([`crate::engine::Engine::load_wam`]).
     AnyDisc,
+    /// The LOAD list shows the player's checkpoints in ascending chapters.
+    /// Off, as the original (`FUN_0041cf78` @ 0x0041d16a..0x0041d1f3,
+    /// [`crate::ui::menus::original_load_order`]): the names in the order
+    /// the folder lists them go through a swap pass whose two tests
+    /// (strcmp, then the lengths) disagree on names of one- and two-digit
+    /// chapters, so `pa1 .. pa6 pa9 pa11` show `1 .. 6 11 9`. Either way
+    /// the list holds the `p<letter>*.gam` files, the first 0x80, without
+    /// chapter 0 ([`crate::engine::Engine::player_checkpoints`]).
+    LoadOrder,
     /// The hexagon puzzle always places its pieces, as the 2001 entry does
     /// (OBJETENMAIN set to 402 before its test). Off, as the 1997 and the
     /// Chinese builds (atlantis-cd-en-688128 FUN_0043c570), the pieces are
@@ -184,7 +193,7 @@ pub enum BugFix {
 impl BugFix {
     /// Every fix, in the menu's order: those of every build, then those of
     /// some builds.
-    pub const ALL: [BugFix; 20] = [
+    pub const ALL: [BugFix; 21] = [
         BugFix::MusicLoop,
         BugFix::CinemaSound,
         BugFix::HeadOverlay,
@@ -196,6 +205,7 @@ impl BugFix {
         BugFix::PuzzleEscape,
         BugFix::GameOverPuzzle,
         BugFix::AnyDisc,
+        BugFix::LoadOrder,
         BugFix::HexagonPieces,
         BugFix::LoadMusik,
         BugFix::SharpS,
@@ -221,6 +231,7 @@ impl BugFix {
             BugFix::PuzzleEscape => "fix_puzzle_escape",
             BugFix::GameOverPuzzle => "fix_gameover_puzzle",
             BugFix::AnyDisc => "fix_any_disc",
+            BugFix::LoadOrder => "fix_load_order",
             BugFix::HexagonPieces => "fix_hexagon_pieces",
             BugFix::LoadMusik => "fix_loadmusik",
             BugFix::SharpS => "fix_sharp_s",

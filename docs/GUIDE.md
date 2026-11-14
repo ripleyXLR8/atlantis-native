@@ -1050,7 +1050,7 @@ each: one per bug fix (`fix_music_loop`, `fix_cinema_sound`, `fix_head_overlay`,
 `fix_bar_slide_out`, `fix_pickup_icon`,
 `fix_menu_records`, `fix_fifth_player`, `fix_snakes_first_win`,
 `fix_puzzle_escape`, `fix_gameover_puzzle`, `fix_any_disc`,
-`fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
+`fix_load_order`, `fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
 `fix_disc_revision`, `fix_menu_line_width`, `fix_chinese_rows`,
 `fix_subtitles_toggle`, `fix_dos_letters`, `fix_startup_logos`), `restored_content`, `ui_ux`, `arrow_keys`
 (the arrow keys turn the view and the LOAD list takes Enter and ↑ ↓,
