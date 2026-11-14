@@ -240,7 +240,6 @@ pub fn right_press(down: bool, prev_down: &mut bool, left_press: bool) -> bool {
 /// The input of a puzzle: the buttons' state at the last read.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PuzzleInput {
-    prev_left: bool,
     prev_right: bool,
 }
 
@@ -250,15 +249,14 @@ impl PuzzleInput {
     /// original have seen it already) and the events dropped.
     pub fn new(sys: &Sys) -> PuzzleInput {
         while sys.poll_event().is_some() {}
-        let (left, right) = sys.buttons();
         PuzzleInput {
-            prev_left: left,
-            prev_right: right,
+            prev_right: sys.buttons().1,
         }
     }
 
     /// The events since the last read, then the mouse. A press and its
-    /// release between two reads still count as a click.
+    /// release between two reads count as a click when the edge latch
+    /// reports it ([`Sys::poll_event`]).
     pub fn read(&mut self, sys: &Sys) -> PuzzleMouse {
         self.read_with(sys, |_| {})
     }
@@ -278,6 +276,12 @@ impl PuzzleInput {
                     pressed = true;
                     on_left(true);
                 }
+                // No click (`FUN_0042e624`'s latch), but Windows posted
+                // its WM_LBUTTONDOWN.
+                Input::MouseDownLatched {
+                    button: MouseButton::Left,
+                    ..
+                } => on_left(true),
                 Input::MouseUp {
                     button: MouseButton::Left,
                     ..
@@ -285,10 +289,12 @@ impl PuzzleInput {
                 _ => {}
             }
         }
-        let (left, right) = sys.buttons();
+        let right = sys.buttons().1;
         let (x, y) = sys.mouse();
-        let click = (left && !self.prev_left) || pressed;
-        self.prev_left = left;
+        // The press edge of `FUN_0042e624` (see [`Sys::poll_event`]): a
+        // button held since a read that saw it is none, and so is a new
+        // press made before any read found the button up.
+        let click = pressed;
         let right = right_press(right, &mut self.prev_right, click);
         PuzzleMouse {
             x,
@@ -330,10 +336,10 @@ fn poll_flags_with(e: &mut Engine, m: &PuzzleMouse, view_keys: bool) {
         e.poll_view_keys(false);
     }
     if m.right {
-        e.bar.right_pressed(e.section_play, e.escape_request);
+        e.bar.right_pressed(e.section_play, e.menu_request());
     }
     if m.escape && e.escape_gate_open() && e.puzzle_escape_latches() {
-        e.escape_request = true;
+        e.latch_escape();
     }
 }
 
@@ -480,9 +486,7 @@ impl<'a> PuzzleHost<'a> {
         if sys.frames_presented() == frames_before {
             return None;
         }
-        let (left, right) = sys.buttons();
-        self.input.prev_left = left;
-        self.input.prev_right = right;
+        self.input.prev_right = sys.buttons().1;
         self.pointer = sys.mouse();
         Some(self.pointer)
     }
@@ -660,5 +664,55 @@ pub(crate) fn f5_steps(
         got.get()
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::Runner;
+    use crate::test_support::button;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// A click handler that runs a sequence with no poll (the hens'
+    /// weighing `FUN_00444d80`, the ogre's drop `FUN_00443c3c`) follows the
+    /// poll that saw its press, which set `FUN_0042e624`'s latch: a press
+    /// made during the sequence, released or still held, is no click at
+    /// the next read; once a read has found the button up, the next press
+    /// is one.
+    #[test]
+    fn a_press_during_an_unpolled_sequence_is_no_click() {
+        let sys = Sys::new(Mixer::new());
+        let s = sys.clone();
+        let got = Rc::new(Cell::new(None));
+        let g = got.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut input = PuzzleInput::new(&s);
+            s.frame().await;
+            button(&s, MouseButton::Left, true);
+            let click = input.read(&s).click;
+            // The sequence: released, a whole click, then a press held.
+            for down in [false, true, false, true] {
+                s.frame().await;
+                button(&s, MouseButton::Left, down);
+            }
+            s.frame().await;
+            let held = input.read(&s).click;
+            button(&s, MouseButton::Left, false);
+            s.frame().await;
+            let up = input.read(&s).click;
+            button(&s, MouseButton::Left, true);
+            s.frame().await;
+            let again = input.read(&s).click;
+            g.set(Some((click, held, up, again)));
+        });
+        for t in 0..20 {
+            if !r.step(t * 16) {
+                break;
+            }
+        }
+        assert_eq!(got.get(), Some((true, false, false, true)));
     }
 }

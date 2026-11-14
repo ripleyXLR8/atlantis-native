@@ -73,6 +73,9 @@ struct FrameInput {
     left_press: bool,
     /// Where the first left press was.
     left_at: Option<(i32, i32)>,
+    /// Where the first left press the edge latch did not report was
+    /// ([`Input::MouseDownLatched`]): no click, but Windows posted it.
+    latched_at: Option<(i32, i32)>,
     right_press: bool,
     escape: bool,
     enter: bool,
@@ -89,6 +92,13 @@ fn poll_input(e: &Engine) -> FrameInput {
             } => {
                 fi.left_press = true;
                 fi.left_at.get_or_insert((x, y));
+            }
+            Input::MouseDownLatched {
+                button: MouseButton::Left,
+                x,
+                y,
+            } => {
+                fi.latched_at.get_or_insert((x, y));
             }
             Input::MouseDown {
                 button: MouseButton::Right,
@@ -734,6 +744,12 @@ impl Dialogs {
                             e.turn_double_click.queue_press(now, x, y);
                         }
                         None => {
+                            // A press the latch did not report is no
+                            // click, but Windows still pairs it; this poll
+                            // pumps.
+                            if let Some((x, y)) = fi.latched_at {
+                                e.turn_double_click.queue_press(now, x, y);
+                            }
                             let (mode, menu) = (e.cursor_state.mode, e.menu_request());
                             e.turn_double_click.dispatch(mode, menu);
                         }
@@ -918,8 +934,7 @@ impl Dialogs {
             // (0x004259b6..0x004259cc), and the next voice-only line,
             // narration or video stops at once.
             if fi.escape && !fi.left_press && e.escape_gate_open() {
-                e.escape_request = true;
-                e.menu_request_clear = false;
+                e.latch_escape();
             }
             if !fi.left_press {
                 pointer = e.sys.mouse();

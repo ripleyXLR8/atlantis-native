@@ -277,14 +277,15 @@ pub struct Engine {
     /// voice-only line, the game-over wait) stops at once and puts both
     /// back; the end of a conversation puts them back too (0x00425be5).
     pub escape_request: bool,
-    /// The menu request 0x00496138 is 0 while `escape_request` stands for
-    /// 0x00496124 = 0: the zone-999 scan after the in-game menu's LOAD or
-    /// QUIT, which leaves 0x00496124 = 0 (0x0041c9fc, 0x0041ca61) and
-    /// clears 0x00496138 in its tail (0x0041cbff..0x0041cc09). See
-    /// [`Engine::menu_request`]. An Escape latch sets 0x00496138 = 1 again
-    /// (of the loops that latch one, only the subject menu can run inside
-    /// that scan).
-    pub(crate) menu_request_clear: bool,
+    /// The executor's exit (`FUN_0042844c` @ 0x00428d81) cleared the menu
+    /// request 0x00496138 while 0x00496124 stayed 0: of the latch
+    /// [`Engine::escape_request`] stands for, only the stop half is left
+    /// ([`Engine::menu_request`]). Set again with the latch
+    /// ([`Engine::latch_escape`]). Also set for the zone-999 scan after the
+    /// in-game menu's LOAD or QUIT, which leaves 0x00496124 = 0
+    /// (0x0041c9fc, 0x0041ca61) and clears 0x00496138 in its tail
+    /// (0x0041cbff..0x0041cc09).
+    pub menu_request_cleared: bool,
     /// The warp loop ended without a click, as the original's place loop
     /// then still acts on the zone under the pointer
     /// ([`Engine::no_click_exit`], [`BugFix::GameOverPuzzle`] off): `true`
@@ -525,7 +526,7 @@ impl Engine {
             abort: None,
             section_play: false,
             escape_request: false,
-            menu_request_clear: false,
+            menu_request_cleared: false,
             pending_no_click_exit: None,
             vue_override: None,
             inventory: Vec::new(),
@@ -985,16 +986,6 @@ impl Engine {
         self.arrival_after_load = true;
     }
 
-    /// The menu request 0x00496138, which every Escape latch sets with
-    /// 0x00496124 = 0 (`escape_request`), but which the zone-999 scan after
-    /// the in-game menu's LOAD or QUIT runs with cleared
-    /// (`menu_request_clear`): there a right press of the poll toggles the
-    /// bar request (`FUN_0041a298` @ 0x0041a2f2..0x0041a337), the guests
-    /// are drawn and a double click is dispatched.
-    pub(crate) fn menu_request(&self) -> bool {
-        self.escape_request && !self.menu_request_clear
-    }
-
     /// The timers of `FUN_00423760`, the main loop's boot pass
     /// (0x00419734), which runs before the player screen (`FUN_0041dea4` @
     /// 0x0041974e): TIME1's and TIME2's offsets 0 (0x0042378c, 0x00423796)
@@ -1425,8 +1416,9 @@ impl Engine {
         // loses none: FUN_0042e624 fills the key table from
         // GetAsyncKeyState, so the next video's first FUN_0041a298 poll sees
         // a press made during the wait (a left button: 0x0049611c = 1;
-        // Escape: 0x00496124 = 0), unless it was already down at LOGO15N's
-        // last poll. The input events stay queued for that poll.
+        // Escape: 0x00496124 = 0), unless LOGO15N's last poll saw a press
+        // whose release no poll has seen (the latch, Sys::poll_event). The
+        // input events stay queued for that poll.
         let start = self.sys.millis();
         while self.sys.millis() - start < 1000 && !self.sys.should_quit() {
             self.sys.frame().await;

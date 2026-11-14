@@ -43,6 +43,17 @@ pub enum Input {
         x: i32,
         y: i32,
     },
+    /// A press the engine's edge latch does not report (see
+    /// [`Sys::poll_event`]): [`Sys::poll_event`] gives it in place of the
+    /// [`Input::MouseDown`] a front end pushed. Windows still posted its
+    /// WM_LBUTTONDOWN / WM_LBUTTONDBLCLK, so the loops that follow the
+    /// window messages (double-click pairing, the rat's held flag) read it;
+    /// the others ignore it. Front ends never push it.
+    MouseDownLatched {
+        button: MouseButton,
+        x: i32,
+        y: i32,
+    },
     KeyDown(Key),
     KeyUp(Key),
     Quit,
@@ -120,6 +131,16 @@ pub struct Sys {
     mouse: Cell<(i32, i32)>,
     buttons: Cell<(bool, bool)>,
     events: RefCell<VecDeque<Input>>,
+    /// `FUN_0042e624`'s latch (bit 2 of 0x006140c1 / 0x006140c2) of the
+    /// left and right buttons, see [`Sys::poll_event`].
+    latch: Cell<[bool; 2]>,
+    /// A press of the button since the last read (GetAsyncKeyState's low
+    /// bit), see [`Sys::poll_event`].
+    pressed_since: Cell<[bool; 2]>,
+    /// The events at the back of the queue no read has judged yet.
+    unjudged: Cell<usize>,
+    /// The frame of the last read.
+    read_frame: Cell<Option<u64>>,
     quit: Cell<bool>,
     yielded: Cell<bool>,
     /// The frames presented so far.
@@ -165,6 +186,10 @@ impl Sys {
             mouse: Cell::new((SCREEN_W as i32 / 2, SCREEN_H as i32 / 2)),
             buttons: Cell::new((false, false)),
             events: RefCell::new(VecDeque::new()),
+            latch: Cell::new([false; 2]),
+            pressed_since: Cell::new([false; 2]),
+            unjudged: Cell::new(0),
+            read_frame: Cell::new(None),
             quit: Cell::new(false),
             yielded: Cell::new(false),
             frames: Cell::new(0),
@@ -289,8 +314,61 @@ impl Sys {
 
     /// The next input event, if any (mouse position and buttons are
     /// already up to date when the frame resumes).
+    ///
+    /// The original reads the mouse buttons only through `FUN_0042e624`
+    /// (called by its poll `FUN_0041a298` alone, @ 0x0041a2a6), which
+    /// calls GetAsyncKeyState for each key; VK_LBUTTON and VK_RBUTTON are
+    /// in edge mode (`FUN_0042e6dc`, 0x006140c1 / 0x006140c2 |= 1). For
+    /// such a key (0x0042e624..0x0042e6d9): a nonzero state with the latch
+    /// (bit 2) clear sets the latch and the press bit 4; a nonzero state
+    /// with the latch set gives no press; a zero state clears both. So a
+    /// press is reported only when a read since the previous press found
+    /// the button up: a press made and released, or still held, during a
+    /// stretch with no poll (an animation, a slide) after a press a poll
+    /// saw is none (harness round5/puzzles-2_latch_emu.txt, cases B to D).
+    ///
+    /// Each frame's first call (and a call after new events) is that read:
+    /// the state is the button held now or pressed since the last read
+    /// (GetAsyncKeyState's low bit; that Windows reports it for a press
+    /// and release between two reads is [INFERRED], as the port assumed
+    /// before), and the read's verdict applies to the presses queued since
+    /// the last read: kept as [`Input::MouseDown`] for a press edge, given
+    /// as [`Input::MouseDownLatched`] otherwise. Every loop that drains the
+    /// events makes that read, as every polling loop of the original calls
+    /// `FUN_0041a298`.
     pub fn poll_event(&self) -> Option<Input> {
+        if self.read_frame.get() != Some(self.frames.get()) || self.unjudged.get() > 0 {
+            self.latch_read();
+        }
         self.events.borrow_mut().pop_front()
+    }
+
+    /// One read of `FUN_0042e624` for the two buttons.
+    fn latch_read(&self) {
+        self.read_frame.set(Some(self.frames.get()));
+        let (left, right) = self.buttons.get();
+        let since = self.pressed_since.replace([false; 2]);
+        let mut latch = self.latch.get();
+        let mut q = self.events.borrow_mut();
+        let start = q.len() - self.unjudged.replace(0).min(q.len());
+        for (i, which, held) in [(0, MouseButton::Left, left), (1, MouseButton::Right, right)] {
+            let active = held || since[i];
+            // 0x0042e678..0x0042e6c8: the edge only with the latch clear;
+            // the latch is set by a nonzero state, cleared by a zero one.
+            let edge = active && !latch[i];
+            latch[i] = active;
+            if edge {
+                continue;
+            }
+            for ev in q.range_mut(start..) {
+                if let Input::MouseDown { button, x, y } = *ev {
+                    if button == which {
+                        *ev = Input::MouseDownLatched { button, x, y };
+                    }
+                }
+            }
+        }
+        self.latch.set(latch);
     }
 
     /// The frames presented so far (a loop can tell whether a call it made
@@ -338,11 +416,18 @@ impl Sys {
                     ));
                 }
             }
-            Input::MouseDown { button, x, y } | Input::MouseUp { button, x, y } => {
+            Input::MouseDown { button, x, y }
+            | Input::MouseDownLatched { button, x, y }
+            | Input::MouseUp { button, x, y } => {
                 if !locked {
                     self.mouse.set((x, y));
                 }
-                let down = matches!(input, Input::MouseDown { .. });
+                let down = !matches!(input, Input::MouseUp { .. });
+                if down {
+                    let mut since = self.pressed_since.get();
+                    since[usize::from(button == MouseButton::Right)] = true;
+                    self.pressed_since.set(since);
+                }
                 let (l, r) = self.buttons.get();
                 self.buttons.set(match button {
                     MouseButton::Left => (down, r),
@@ -359,6 +444,7 @@ impl Sys {
             Input::KeyUp(k) => self.keys_held.borrow_mut().retain(|&h| h != k),
         }
         self.events.borrow_mut().push_back(input);
+        self.unjudged.set(self.unjudged.get() + 1);
     }
 
     /// HD rendering (the port's HD mode): the tile size of the HD layer
@@ -573,5 +659,78 @@ mod tests {
         }
         sys.now_ms.set(1300);
         assert!(!sys.takes_key_repeat(Key::Backspace), "the screen has left");
+    }
+
+    /// The left presses one poll (all the events of a frame) reports.
+    fn poll_presses(sys: &Sys) -> (usize, usize) {
+        let (mut edges, mut latched) = (0, 0);
+        while let Some(ev) = sys.poll_event() {
+            match ev {
+                Input::MouseDown { .. } => edges += 1,
+                Input::MouseDownLatched { .. } => latched += 1,
+                _ => {}
+            }
+        }
+        sys.frames.set(sys.frames.get() + 1);
+        (edges, latched)
+    }
+
+    fn left(sys: &Sys, down: bool) {
+        let b = MouseButton::Left;
+        sys.push_input(if down {
+            Input::MouseDown {
+                button: b,
+                x: 1,
+                y: 1,
+            }
+        } else {
+            Input::MouseUp {
+                button: b,
+                x: 1,
+                y: 1,
+            }
+        });
+    }
+
+    /// `FUN_0042e624`'s latch (0x0042e678..0x0042e6c8), the cases of
+    /// round5/harness/puzzles-2_latch_emu.txt: a press a poll saw, then a
+    /// new press before any poll found the button up, is none.
+    #[test]
+    fn a_press_is_an_edge_only_after_a_poll_saw_the_button_up() {
+        let sys = Sys::new(Mixer::new());
+        // A: an ordinary click, held one poll.
+        assert_eq!(poll_presses(&sys), (0, 0));
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        // E: released, seen up by a poll, then pressed: an edge.
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        // B: released and pressed again with no poll between: none, and
+        // none while it is held.
+        left(&sys, false);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (0, 1));
+        assert_eq!(poll_presses(&sys), (0, 0));
+        // C: released, a whole click, no poll between: none; the next poll
+        // (button up) clears the latch.
+        left(&sys, false);
+        left(&sys, true);
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 1));
+        assert_eq!(poll_presses(&sys), (0, 0));
+        // A whole click between two polls with the latch clear is an edge
+        // (the low bit, as before).
+        left(&sys, true);
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        // Frames with no poll do not clear the latch: a press then is none
+        // at the next poll.
+        sys.frames.set(sys.frames.get() + 5);
+        left(&sys, true);
+        left(&sys, false);
+        sys.frames.set(sys.frames.get() + 5);
+        assert_eq!(poll_presses(&sys), (0, 1));
     }
 }

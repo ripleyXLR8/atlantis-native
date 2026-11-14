@@ -1348,6 +1348,14 @@ impl Scripts {
                     }
                 }
             }
+            // The executor's only exit clears the menu request 0x00496138
+            // (0x00428d81) and leaves 0x00496124 as it is: after an Escape
+            // latch the portraits are drawn again and a right press
+            // toggles the bar request, while the loops that run on
+            // 0x00496124 still stop.
+            if e.escape_request {
+                e.menu_request_cleared = true;
+            }
             // No wait for the buttons' release: the executor's exit
             // (0x00428c92..0x00428da4) sets back ClicPerso and the angles,
             // clears the click flag 0x0049611c (0x00428d77) and the menu
@@ -1730,6 +1738,40 @@ mod tests {
     use crate::test_support::with_engine;
     use std::cell::RefCell;
     use std::rc::Rc;
+
+    /// An Escape latch (0x00496124 = 0, 0x00496138 = 1), then a section
+    /// of /set commands: the executor's exit clears the menu request
+    /// (0x00428d81) and leaves 0x00496124 at 0. A right press then toggles
+    /// the bar request (0x0041a2f2..0x0041a337) and the portraits are
+    /// drawn (`FUN_0042bc58`); the loops that run on 0x00496124 still stop.
+    #[test]
+    fn the_executor_exit_clears_the_menu_request_only() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_executor_exit_clears_the_menu_request_only",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                let script = crate::con_script::ConScript::parse(
+                    b"/190\r\n/sel(vue=1)\r\n/set(Flagtemp1=1)\r\n/0\r\n",
+                );
+                let sec = script.sections()[0].clone();
+                s.script = script;
+                e.latch_escape();
+                let before = e.menu_request();
+                s.play_section(&mut e, sec, "tim", None).await;
+                e.bar.request = true;
+                e.bar.right_pressed(e.section_play, e.menu_request());
+                *g2.borrow_mut() =
+                    Some((before, e.escape_request, e.menu_request(), e.bar.request));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, true, false, false)));
+        }
+    }
 
     /// A NewSound that ends during a dialog line is seen as done before the
     /// next item: the line players call FUN_00432178 every frame and the
