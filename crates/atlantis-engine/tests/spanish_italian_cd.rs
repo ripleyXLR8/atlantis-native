@@ -349,8 +349,10 @@ fn quit_click(g: Game, fixes: BugFixes) -> MenuOutcome {
         let outcome = e.ingame_menu().await;
         *o2.borrow_mut() = Some(outcome);
     });
+    // The pointer moves a poll before the press (no pump on a press edge,
+    // 0x0041a2b5).
+    let to = |x: i32, y: i32| sys.push_input(Input::MouseMove { x, y });
     let click = |x: i32, y: i32| {
-        sys.push_input(Input::MouseMove { x, y });
         sys.push_input(Input::MouseDown {
             button: MouseButton::Left,
             x,
@@ -374,6 +376,9 @@ fn quit_click(g: Game, fixes: BugFixes) -> MenuOutcome {
         // Cancel (it leaves the confirmation; the credits ignore it) and
         // Escape (it cuts the credits short; the confirmation reads no key).
         match (stage, n % 60) {
+            (0, 59) if n > 600 => to(quit.0, quit.1),
+            (2, 29) => to(214, 386),
+            (4.., 59) => to(cancel.0, cancel.1),
             (0, 0) if n > 600 => {
                 click(quit.0, quit.1);
                 stage = 1;

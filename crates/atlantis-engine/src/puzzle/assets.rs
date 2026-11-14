@@ -255,7 +255,12 @@ pub enum LeftMessage {
 
 /// The input of a puzzle (the buttons' edges come from [`Sys`]'s latch).
 #[derive(Clone, Copy, Debug, Default)]
-pub struct PuzzleInput;
+pub struct PuzzleInput {
+    /// The game pointer the puzzle started with and the system mouse's
+    /// place then: the pointer stays there until the mouse leaves that
+    /// place (the first WM_MOUSEMOVE, 0x00419c10..0x00419c29).
+    held: Option<((i32, i32), (i32, i32))>,
+}
 
 impl PuzzleInput {
     /// Starts with the button state as it is (a button still down from
@@ -263,7 +268,28 @@ impl PuzzleInput {
     /// original have seen it already) and the events dropped.
     pub fn new(sys: &Sys) -> PuzzleInput {
         while sys.poll_event().is_some() {}
-        PuzzleInput
+        PuzzleInput::default()
+    }
+
+    /// [`PuzzleInput::new`] with the pointer at `pointer` while the
+    /// system mouse stays at `mark`.
+    pub fn with_pointer(sys: &Sys, pointer: (i32, i32), mark: (i32, i32)) -> PuzzleInput {
+        let mut input = PuzzleInput::new(sys);
+        input.held = Some((pointer, mark));
+        input
+    }
+
+    /// The pointer 0x004960ec / 0x004960f0 the puzzles read: the one the
+    /// puzzle started with until the mouse moves, then the mouse.
+    pub fn pointer(&mut self, sys: &Sys) -> (i32, i32) {
+        let m = sys.mouse();
+        match self.held {
+            Some((p, mark)) if m == mark => p,
+            _ => {
+                self.held = None;
+                m
+            }
+        }
     }
 
     /// The events since the last read, then the mouse. A press and its
@@ -320,7 +346,7 @@ impl PuzzleInput {
                 _ => {}
             }
         }
-        let (x, y) = sys.mouse();
+        let (x, y) = self.pointer(sys);
         // The press edge of `FUN_0042e624` (see [`Sys::poll_event`]): a
         // button held since a read that saw it is none, and so is a new
         // press made before any read found the button up.
@@ -443,11 +469,18 @@ pub struct PuzzleHost<'a> {
 
 impl<'a> PuzzleHost<'a> {
     /// The puzzles draw their own cursor into the frame and read the
-    /// pointer where it is: the mouse is not locked.
+    /// pointer where it is: the mouse is not locked. Every puzzle reads
+    /// the game pointer 0x004960ec / 0x004960f0 (eclipse `FUN_00441cd8`,
+    /// crab `FUN_0043e5a4`, rat `FUN_004395f4`, ogre `FUN_004439c4`...),
+    /// which nothing writes between the warp loop's click and the puzzle
+    /// (`FUN_00423ad8` dc:16824-16829, `FUN_004240fc`; no SetCursorPos):
+    /// after a panorama load with the view at rest and the mouse still
+    /// (`FUN_0044a424` @ 0x0044a70b / 0x0044a715) it starts at (0x140,
+    /// 0x140), apart from the Windows cursor, until the first WM_MOUSEMOVE.
     pub fn new(e: &'a mut Engine, hooks: &'a mut dyn ScriptHooks) -> PuzzleHost<'a> {
         e.sys.set_mouse_locked(false);
-        let input = PuzzleInput::new(&e.sys);
-        let pointer = e.sys.mouse();
+        let pointer = e.pointer.pos;
+        let input = PuzzleInput::with_pointer(&e.sys, pointer, e.pointer_mouse_mark);
         PuzzleHost {
             e,
             hooks,
@@ -518,7 +551,7 @@ impl<'a> PuzzleHost<'a> {
         if sys.frames_presented() == frames_before {
             return None;
         }
-        self.pointer = sys.mouse();
+        self.pointer = self.input.pointer(sys);
         Some(self.pointer)
     }
 

@@ -784,11 +784,12 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     // The mouse unlocked. No SetCursorPos before the loop (the import slot
     // 0x00c302f8 has no reader in FUN_004240fc, FUN_0043a1e0, FUN_00448ad0
     // or FUN_0044203c; FUN_004439c4's is the held-piece clamp): the puzzle
-    // starts with the pointer where the warp loop left it at the zone
-    // click. The mouse of the previous pass (0x004960ec / 0x004960f0, as
-    // the FUN_004439c4 clamp at 0x00442178 leaves it) starts there too.
+    // starts with the pointer 0x004960ec / 0x004960f0 where the warp loop
+    // left it at the zone click (PuzzleHost::new), and the mouse of the
+    // previous pass (as the FUN_004439c4 clamp at 0x00442178 leaves it)
+    // starts there too.
     let mut host = Host(PuzzleHost::new(e, hooks));
-    (game.mx, game.my) = host.0.e.sys.mouse();
+    (game.mx, game.my) = host.0.pointer;
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;
     host.0.sounds = sounds;

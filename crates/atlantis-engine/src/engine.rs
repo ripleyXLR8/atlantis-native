@@ -435,6 +435,10 @@ pub struct Engine {
     pub(crate) momentum: WarpMomentum,
     pub(crate) pointer: WarpPointer,
     pub(crate) pointer_mouse_mark: (i32, i32),
+    /// A move's panorama load has set the pointer already, after the turn
+    /// and before the film ([`Engine::execute_transition`]): the place
+    /// entry that loads the picture leaves it alone.
+    pub(crate) move_pointer_loaded: bool,
     pub(crate) cursor_sprites: Vec<SprSprite>,
     pub(crate) cursor_state: WarpCursorState,
     pub(crate) cursor_shown: i32,
@@ -598,6 +602,7 @@ impl Engine {
             momentum: WarpMomentum::default(),
             pointer: WarpPointer::default(),
             pointer_mouse_mark: (0, 0),
+            move_pointer_loaded: false,
             cursor_sprites: Vec::new(),
             cursor_state: WarpCursorState::default(),
             cursor_shown: CURSOR_UNSET,
@@ -1284,6 +1289,11 @@ impl Engine {
         // poll saw a new left press (0x0041a2b5); nothing writes them
         // before the warp loop's first frame, which shows them.
         self.poll_view_keys(left);
+        // Its pump's WM_MOUSEMOVE (0x00419c10..0x00419c29), skipped with a
+        // left press edge.
+        if !left {
+            self.sync_pointer_mouse();
+        }
         self.input_flags_reset();
     }
 
@@ -1791,6 +1801,9 @@ mod boot_pass_tests {
                 },
                 // Five seconds on the player screen, then a new player.
                 Some(f) => match frame - f {
+                    // The pointer there a poll before the press (no pump on
+                    // a press edge, 0x0041a2b5).
+                    299 => sys.push_input(Input::MouseMove { x: 200, y: 259 }),
                     300 => press(true, 200, 259),
                     302 => press(false, 200, 259),
                     310 => key(Key::Char('T'), true),

@@ -200,6 +200,21 @@ impl Engine {
         mi
     }
 
+    /// The point a menu pass hit-tests (`FUN_004210c0`, dc:15546-15551)
+    /// and draws its pointer at (`FUN_0042d558`): the pointer 0x004960ec /
+    /// 0x004960f0, not the Windows cursor, which a panorama load leaves
+    /// apart from it (`FUN_0044a424` @ 0x0044a70b / 0x0044a715, no
+    /// SetCursorPos). The pass's poll moves it by its WM_MOUSEMOVE
+    /// (0x00419c10..0x00419c29) when the mouse moved, unless it saw a left
+    /// press edge: then `FUN_0041a298` returns before its pump (0x0041a2b5)
+    /// and the click is at the previous pass's pointer.
+    pub(crate) fn menu_pointer(&mut self, mi: &MenuInput) -> (i32, i32) {
+        if !mi.left_press {
+            self.sync_pointer_mouse();
+        }
+        self.pointer.pos
+    }
+
     /// The input polls of a menu walk (`FUN_0041fb6c` calls `FUN_0041a298`
     /// once per iteration, @ 0x0041fd03): each, without a new left press,
     /// moves the stored view angles for a held F5..F8 (0x0041a33c..
@@ -383,7 +398,7 @@ impl Engine {
             if let Some(&k) = mi.codes.last() {
                 st.key = k;
             }
-            let (mx, my) = self.sys.mouse();
+            let (mx, my) = self.menu_pointer(&mi);
             let rows = self.players.count as i32;
             let hover_row = menu_grid_hit(grid_x, grid_y, grid_w, grid_h, 1, rows, true, mx, my)
                 .filter(|&r| r < rows);
@@ -494,7 +509,7 @@ impl Engine {
             }
             let mi = self.poll_menu_input();
             self.menu_pair_latched(&mi);
-            let (mx, my) = self.sys.mouse();
+            let (mx, my) = self.menu_pointer(&mi);
             let hit = menu
                 .hit(mx, my, self.menu_table().as_deref())
                 .filter(|&r| r == 3 || r == 4);
@@ -532,7 +547,7 @@ impl Engine {
             }
             let mi = self.poll_menu_input();
             self.menu_pair_latched(&mi);
-            let (mx, my) = self.sys.mouse();
+            let (mx, my) = self.menu_pointer(&mi);
             let hit = menu.hit(mx, my, self.menu_table().as_deref());
             if mi.left_press {
                 // The press ends the loop at once (its poll does not pump,
@@ -602,7 +617,7 @@ impl Engine {
             }
             let mi = self.poll_menu_input();
             self.menu_pair_latched(&mi);
-            let (mx, my) = self.sys.mouse();
+            let (mx, my) = self.menu_pointer(&mi);
             let under = menu.hit(mx, my, self.menu_table().as_deref());
             let hit = under.filter(|r| [1, 3, 5, 6].contains(r));
             if mi.left_press {
@@ -693,7 +708,7 @@ impl Engine {
             set_knobs(self, &mut menu);
             let mi = self.poll_menu_input();
             self.menu_pair_latched(&mi);
-            let (mx, my) = self.sys.mouse();
+            let (mx, my) = self.menu_pointer(&mi);
             let hit = menu.hit(mx, my, self.menu_table().as_deref());
             let down = self.sys.buttons().0;
             if mi.left_press {
@@ -871,7 +886,7 @@ impl Engine {
             }
             let mi = self.poll_menu_input();
             self.menu_pair_latched(&mi);
-            let (mx, my) = self.sys.mouse();
+            let (mx, my) = self.menu_pointer(&mi);
             let down = self.sys.buttons().0;
             // Port keys, with Enhancements::arrow_keys (the original's
             // loop, FUN_0041cf78, reads no key: its exit tests only the
@@ -1534,7 +1549,7 @@ mod double_click_tests {
     use super::MenuOutcome;
     use crate::place::CINEMA_FRAME_MS;
     use crate::sys::{Input, MouseButton};
-    use crate::test_support::{button, press_at, record_centre as centre, with_engine};
+    use crate::test_support::{button, move_to, press_at, record_centre as centre, with_engine};
     use crate::warp::{SCREEN_H, SCREEN_W};
     use atlantis_data::saves::epi_episode_name;
     use std::cell::Cell;
@@ -1673,13 +1688,16 @@ mod double_click_tests {
             move |sys, f| {
                 let (main_load, cancel) = at.get();
                 match f {
-                    10 => press_at(sys, main_load),
+                    9 => move_to(sys, main_load),
+                    10 => button(sys, MouseButton::Left, true),
                     11 => button(sys, MouseButton::Left, false),
                     // Row 0, once.
-                    60 => press_at(sys, (100, 118)),
+                    59 => move_to(sys, (100, 118)),
+                    60 => button(sys, MouseButton::Left, true),
                     61 => button(sys, MouseButton::Left, false),
                     // Not armed: the picker is still up.
-                    100 => press_at(sys, cancel),
+                    99 => move_to(sys, cancel),
+                    100 => button(sys, MouseButton::Left, true),
                     101 => button(sys, MouseButton::Left, false),
                     _ => {}
                 }
@@ -1715,7 +1733,8 @@ mod double_click_tests {
             move |sys, f| {
                 let (track, cancel) = at.get();
                 match f {
-                    10 => press_at(sys, track),
+                    9 => move_to(sys, track),
+                    10 => button(sys, MouseButton::Left, true),
                     11 => button(sys, MouseButton::Left, false),
                     13 => button(sys, MouseButton::Left, true),
                     14..=20 => sys.push_input(Input::MouseMove {
@@ -1723,7 +1742,8 @@ mod double_click_tests {
                         y: track.1,
                     }),
                     21 => button(sys, MouseButton::Left, false),
-                    30 => press_at(sys, cancel),
+                    29 => move_to(sys, cancel),
+                    30 => button(sys, MouseButton::Left, true),
                     31 => button(sys, MouseButton::Left, false),
                     200 => sys.push_input(Input::Quit),
                     _ => {}
@@ -1740,7 +1760,7 @@ mod double_click_tests {
 #[cfg(test)]
 mod delete_pass_tests {
     use crate::sys::{Input, MouseButton};
-    use crate::test_support::{button, press_at, record_centre as centre, with_engine};
+    use crate::test_support::{button, move_to, record_centre as centre, with_engine};
     use crate::ui::player_screen::DELETE;
     use crate::warp::{SCREEN_H, SCREEN_W};
     use std::cell::{Cell, RefCell};
@@ -1779,11 +1799,14 @@ mod delete_pass_tests {
             move |sys, f| {
                 let (delete, cancel) = a3.get();
                 match f {
-                    10 => press_at(sys, (300, 259)),
+                    9 => move_to(sys, (300, 259)),
+                    10 => button(sys, MouseButton::Left, true),
                     11 => button(sys, MouseButton::Left, false),
-                    20 => press_at(sys, delete),
+                    19 => move_to(sys, delete),
+                    20 => button(sys, MouseButton::Left, true),
                     21 => button(sys, MouseButton::Left, false),
-                    40 => press_at(sys, cancel),
+                    39 => move_to(sys, cancel),
+                    40 => button(sys, MouseButton::Left, true),
                     42 => button(sys, MouseButton::Left, false),
                     50 => sys.push_input(Input::Quit),
                     _ => {}
@@ -1823,7 +1846,7 @@ mod delete_pass_tests {
 #[cfg(test)]
 mod load_title_tests {
     use crate::sys::{Input, MouseButton};
-    use crate::test_support::{button, press_at, with_engine};
+    use crate::test_support::{button, with_engine};
     use crate::warp::{SCREEN_H, SCREEN_W};
     use atlantis_data::saves::epi_episode_name;
     use std::cell::RefCell;
@@ -1857,7 +1880,10 @@ mod load_title_tests {
                 match f {
                     5 | 25 => to(pointer),
                     16 | 22 => to(away),
-                    20 => press_at(sys, click),
+                    // The pointer moves to the click a poll before the
+                    // press (no pump on a press edge, 0x0041a2b5).
+                    19 => to(click),
+                    20 => button(sys, MouseButton::Left, true),
                     21 => button(sys, MouseButton::Left, false),
                     40 => sys.push_input(Input::Quit),
                     _ => {}

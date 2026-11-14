@@ -166,7 +166,7 @@ pub(crate) async fn error_box(e: &Engine, font: &SubtitleFont, text: &str) {
                 ok.2,
                 0,
             );
-            Dialogs::draw_arrow(e, &mut s);
+            Dialogs::draw_arrow(e, &mut s, e.sys.mouse());
         }
         e.sys.frame().await;
         let fi = poll_input(e);
@@ -373,10 +373,9 @@ impl Dialogs {
         s
     }
 
-    /// Draws the arrow cursor at the mouse.
-    fn draw_arrow(e: &Engine, screen: &mut [u16]) {
+    /// Draws the arrow cursor at `(x, y)`.
+    fn draw_arrow(e: &Engine, screen: &mut [u16], (x, y): (i32, i32)) {
         if let Some(spr) = e.cursor_sprites.get(ARROW_CURSOR) {
-            let (x, y) = e.sys.mouse();
             spr.draw(screen, SCREEN_W, SCREEN_H, x, y);
         }
     }
@@ -852,8 +851,13 @@ impl Dialogs {
         // FUN_004211f0 hit-tests the pointer 0x004960ec / 0x004960f0
         // (0x00421218, 0x00421236), written only by the message pump
         // (0x00419c14), which the poll that sees the press skips
-        // (0x0041a2b5): the pointer of the previous pass's poll.
-        let mut pointer = e.sys.mouse();
+        // (0x0041a2b5): the pointer of the previous pass's poll. It is not
+        // the Windows cursor: a panorama load (FUN_0044a424 @ 0x0044a70b /
+        // 0x0044a715, no SetCursorPos) leaves it at (0x140, 0x140) until
+        // the first WM_MOUSEMOVE, and FUN_004261a0 draws the arrow there
+        // too (FUN_0042d558 @ 0x0042d5b9..0x0042d5dd).
+        e.sync_pointer_mouse();
+        let mut pointer = e.pointer.pos;
         loop {
             if e.should_abort() {
                 return None;
@@ -892,7 +896,7 @@ impl Dialogs {
                 // follower); none once an Escape set the menu request
                 // 0x00496138 (draw_guests tests it).
                 e.draw_guests(&mut frame, None);
-                Self::draw_arrow(e, &mut frame);
+                Self::draw_arrow(e, &mut frame, pointer);
                 e.sys.screen.borrow_mut().copy_from_slice(&frame);
             }
             e.sys.frame().await;
@@ -916,7 +920,8 @@ impl Dialogs {
                 e.latch_escape();
             }
             if !fi.left_press {
-                pointer = e.sys.mouse();
+                e.sync_pointer_mouse();
+                pointer = e.pointer.pos;
             }
             // The loop ends on the click flag only (0x004259b6..0x004259cc),
             // and FUN_0042844c starts the conversation with no wait for the

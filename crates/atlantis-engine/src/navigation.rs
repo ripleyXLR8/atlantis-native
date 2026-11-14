@@ -461,8 +461,6 @@ impl Engine {
         // No warp frame presented since the loop was entered: the port's
         // pass polls first, the original's polls last (0x0041c5f2).
         let mut entered = true;
-        // An Escape that pass read, for the menu after its frame.
-        let mut menu_after_frame = false;
         while !left_pressed && !exit {
             // Windows sees a press at its cursor (`WarpPointer::cursor`,
             // the loop's pointer once a motion or a SetCursorPos set it):
@@ -470,21 +468,24 @@ impl Engine {
             // (Sys::double_click), the click that ends it, a character
             // click, a bow shot and a press the latch did not report alike.
             self.sys.set_locked_cursor(self.pointer.cursor);
-            // The Escape of the first poll: the original reads it at the
-            // end of the loop's first frame (0x0041c5f2), after the
-            // render, the guests' portraits (0x0041c489), the cursor
-            // (0x0041c535), the copy (0x0041c5a4) and the cursor step
-            // after it (0x0041c5ed), then calls FUN_0041c838 (0x0041c618),
-            // which dims that buffer (FUN_0041cc28 @ 0x0041ccd2). That
-            // pass is the port's first; the menu opens in the next one,
-            // which reads no events: after the menu the original goes to
-            // the loop head with no poll.
-            let deferred = std::mem::take(&mut menu_after_frame);
-            let mut fi = if deferred {
-                FrameInput {
-                    escape: true,
-                    ..FrameInput::default()
-                }
+            // The loop's first frame reads no input: the entry block polls
+            // nothing (0x0041bfb8..0x0041c01e) and the frame's one poll
+            // FUN_0041a298 is its end (0x0041c5f2), after the clocks
+            // (FUN_0041c75c @ 0x0041c086), the timer scan (FUN_0042be3c @
+            // 0x0041c369), the render, the guests' portraits (0x0041c489),
+            // the cursor (0x0041c535), the copy (0x0041c5a4) and the
+            // present (0x0041c5ed). A press, a right press or an Escape
+            // made before the loop (during a follower's slide, ArcMagique,
+            // the pick-up's slide-out, which poll nothing) is still queued
+            // when that frame's timer section runs, whose lines take it;
+            // else the second pass reads it, as the original's loop head
+            // (0x0041c028..0x0041c041) and FUN_0041c838 (0x0041c618, which
+            // dims the frame the first pass presented, FUN_0041cc28 @
+            // 0x0041ccd2) act on it after the first frame. Also after a
+            // character's conversation: the place loop enters the loop
+            // again (0x00423c1c).
+            let fi = if entered {
+                FrameInput::default()
             } else {
                 self.poll_frame_input()
             };
@@ -605,8 +606,9 @@ impl Engine {
             }
             self.update_con_clocks(); // FUN_0041bfa0 @ 0x0041c086
 
-            // The poll's WM_MOUSEMOVE (0x00419c14) moves the pointer.
-            if !fi.left_press {
+            // The poll's WM_MOUSEMOVE (0x00419c14) moves the pointer; the
+            // first frame has had no poll.
+            if !fi.left_press && !entered {
                 let (dx, dy) = std::mem::take(&mut unpumped);
                 self.pointer.follow(dx, dy);
             }
@@ -627,10 +629,6 @@ impl Engine {
             let pending = self.bar.warp_frame_start();
             let toggled = fi.right_press && !fi.left_press;
             let mut bar = !exit && (pending != toggled);
-            if entered && !bar && !exit && fi.escape {
-                fi.escape = false;
-                menu_after_frame = true;
-            }
             if bar && self.bow_mode {
                 // In bow mode the request only lowers the bow
                 // (0x0041c6af..0x0041c6c8: FUN_0042d368).
@@ -727,8 +725,9 @@ impl Engine {
             // port adds the arrow keys (Enhancements::arrow_keys), which the
             // original's view ignores, as the same keys: left F5, right F6,
             // up F7, down F8 (a larger beta looks down).
-            // (The deferred pass's poll is the previous pass's.)
-            if !deferred {
+            // (The first frame's angles are those the polls before the
+            // loop left.)
+            if !entered {
                 self.poll_view_keys_with(fi.left_press, self.enhancements().arrow_keys);
             }
             let (mut alpha, mut beta) = self.stored_view();
@@ -1157,6 +1156,73 @@ mod tests {
             }
         }
         assert!(all > 0 && same == all, "{same}/{all}");
+    }
+
+    /// A timer section due on the warp loop's first frame: its line's polls
+    /// take what is queued (the left presses counted).
+    struct FirstFrameTimer {
+        calls: Rc<Cell<u32>>,
+        presses: Rc<Cell<u32>>,
+    }
+
+    impl ScriptHooks for FirstFrameTimer {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.calls.set(self.calls.get() + 1);
+            if self.calls.get() > 1 {
+                return ready(false);
+            }
+            while let Some(ev) = e.sys.poll_event() {
+                if let Input::MouseDown {
+                    button: MouseButton::Left,
+                    ..
+                } = ev
+                {
+                    self.presses.set(self.presses.get() + 1);
+                }
+            }
+            ready(true)
+        }
+    }
+
+    /// A left press made before the warp loop (during a follower's slide,
+    /// ArcMagique, the pick-up's slide-out, which poll nothing) is still
+    /// queued when the loop's first frame runs its timer scan
+    /// (`FUN_0042be3c` @ 0x0041c369): the loop's first poll is that frame's
+    /// end (0x0041c5f2), so a due /tim section plays first and its line
+    /// takes the press; the loop does not end on it.
+    #[test]
+    fn a_press_queued_before_the_warp_loop_goes_to_the_first_frames_timer() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let calls = Rc::new(Cell::new(0));
+        let presses = Rc::new(Cell::new(0));
+        let (c2, p2) = (calls.clone(), presses.clone());
+        let ran = with_engine(
+            "a_press_queued_before_the_warp_loop_goes_to_the_first_frames_timer",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                button(&e.sys, MouseButton::Left, true);
+                button(&e.sys, MouseButton::Left, false);
+                let mut hooks = FirstFrameTimer {
+                    calls: c2,
+                    presses: p2,
+                };
+                g2.set(Some(e.handle_warp(&mut hooks).await));
+            },
+            |sys, f| {
+                if f == 10 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        assert_eq!(got.get(), Some(WARP_ABORT), "the loop ended on the press");
+        assert!(calls.get() > 1);
+        assert_eq!(presses.get(), 1, "the timer's line did not see the press");
     }
 
     /// A timer section that moved the player while the bar was open (as a

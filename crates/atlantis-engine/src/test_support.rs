@@ -59,6 +59,13 @@ pub(crate) fn button(sys: &Sys, button: MouseButton, down: bool) {
     });
 }
 
+/// The mouse moved to `p`: push it a frame before a press at `p` in the
+/// loops whose poll does not pump on a press edge (`FUN_0041a298` @
+/// 0x0041a2b5), so that the pointer 0x004960ec / 0x004960f0 is there.
+pub(crate) fn move_to(sys: &Sys, (x, y): (i32, i32)) {
+    sys.push_input(Input::MouseMove { x, y });
+}
+
 /// A left press at `(x, y)`.
 pub(crate) fn press_at(sys: &Sys, (x, y): (i32, i32)) {
     sys.push_input(Input::MouseMove { x, y });

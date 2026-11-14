@@ -265,7 +265,10 @@ impl Headless {
 
     fn click(&mut self, x: i32, y: i32) {
         let button = MouseButton::Left;
+        // The pointer moves a poll before the press: a poll that sees a
+        // press edge does not pump the WM_MOUSEMOVE (0x0041a2b5).
         self.sys.push_input(Input::MouseMove { x, y });
+        self.step();
         self.sys.push_input(Input::MouseDown { button, x, y });
         self.step();
         self.sys.push_input(Input::MouseUp { button, x, y });
