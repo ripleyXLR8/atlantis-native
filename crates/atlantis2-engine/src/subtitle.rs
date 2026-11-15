@@ -410,6 +410,11 @@ pub struct SubtitleFont {
     /// A byte with the high bit set is a lead byte (1.00; 1.01 with
     /// `[CharacterSet] MBCS`).
     mbcs: bool,
+    /// The code page a byte's glyph is looked up in: the system code
+    /// page `TextOutA` reads the bytes in (the fonts are made in
+    /// `DEFAULT_CHARSET`), Windows-1250 for the Polish CD, Windows-1252
+    /// for every other edition ([`atlantis2_data::edition`]).
+    code_page: TextCodePage,
 }
 
 impl SubtitleFont {
@@ -426,12 +431,24 @@ impl SubtitleFont {
     }
 
     /// Font `id` of `font_txt` from `ttf` as `release` makes it (see the
-    /// module's notes).
+    /// module's notes), its bytes read as Windows-1252.
     pub fn named_for(
         ttf: Vec<u8>,
         font_txt: &FontTxt,
         id: &str,
         release: Release,
+    ) -> Option<SubtitleFont> {
+        SubtitleFont::named_in(ttf, font_txt, id, release, TextCodePage::Windows1252)
+    }
+
+    /// [`SubtitleFont::named_for`] with the bytes read in `code_page`
+    /// (the edition's: [`atlantis2_data::A2Files::text_code_page`]).
+    pub fn named_in(
+        ttf: Vec<u8>,
+        font_txt: &FontTxt,
+        id: &str,
+        release: Release,
+        code_page: TextCodePage,
     ) -> Option<SubtitleFont> {
         let entry = font_txt.font(id)?;
         let font = FontVec::try_from_vec(ttf.clone()).ok()?;
@@ -470,7 +487,7 @@ impl SubtitleFont {
             }
         };
         let widths = hdmx_widths(&ttf, ppem as u8);
-        let glyphs = gdi_glyphs(&ttf, ppem, &font);
+        let glyphs = gdi_glyphs(&ttf, ppem, &font, code_page);
         Some(SubtitleFont {
             font,
             glyphs,
@@ -481,12 +498,14 @@ impl SubtitleFont {
             line_step,
             breaks: font_txt.breaks.clone(),
             mbcs,
+            code_page,
         })
     }
 
     /// Font `id` of `font_txt` for the game in `files`: its file in
     /// `loc\`, made as the executable's release makes it; a system font
-    /// (the port's Liberation Sans) when the file is missing.
+    /// (the port's Liberation Sans) when the file is missing. The bytes
+    /// are read in the edition's code page ([`A2Files::text_code_page`]).
     pub fn load(files: &A2Files, font_txt: &FontTxt, id: &str) -> Option<SubtitleFont> {
         let release = files.build().release;
         let file = &font_txt.font(id)?.file;
@@ -500,15 +519,20 @@ impl SubtitleFont {
                 atlantis_engine::subtitles::system_font_data().to_vec()
             }
         };
-        SubtitleFont::named_for(ttf, font_txt, id, release)
+        SubtitleFont::named_in(ttf, font_txt, id, release, files.text_code_page())
+    }
+
+    /// The code page its bytes are read in.
+    pub fn code_page(&self) -> TextCodePage {
+        self.code_page
     }
 
     fn glyph(&self, b: u8) -> ab_glyph::GlyphId {
-        self.font.glyph_id(TextCodePage::Windows1252.char_of(b))
+        self.font.glyph_id(self.code_page.char_of(b))
     }
 
-    /// Whether the font has a glyph of its own for byte `b` (Windows-1252),
-    /// not the missing-glyph box.
+    /// Whether the font has a glyph of its own for byte `b` (in the
+    /// font's code page), not the missing-glyph box.
     pub fn has_glyph(&self, b: u8) -> bool {
         self.glyph(b).0 != 0
     }
@@ -757,9 +781,14 @@ struct GlyphBits {
     bits: Vec<bool>,
 }
 
-/// Every byte's glyph ([`gdi_glyph`]) at `ppem`, or `None` when the font
-/// has no hinting program to run.
-fn gdi_glyphs(ttf: &[u8], ppem: u16, font: &FontVec) -> Option<Vec<Option<GlyphBits>>> {
+/// Every byte's glyph ([`gdi_glyph`]) at `ppem`, the byte read in
+/// `code_page`, or `None` when the font has no hinting program to run.
+fn gdi_glyphs(
+    ttf: &[u8],
+    ppem: u16,
+    font: &FontVec,
+    code_page: TextCodePage,
+) -> Option<Vec<Option<GlyphBits>>> {
     use skrifa::instance::{LocationRef, Size};
     use skrifa::outline::{Engine, HintingInstance, HintingOptions, Target};
     use skrifa::{FontRef, MetadataProvider};
@@ -779,7 +808,7 @@ fn gdi_glyphs(ttf: &[u8], ppem: u16, font: &FontVec) -> Option<Vec<Option<GlyphB
     Some(
         (0..=255u8)
             .map(|b| {
-                let id = font.glyph_id(TextCodePage::Windows1252.char_of(b));
+                let id = font.glyph_id(code_page.char_of(b));
                 let g = outlines.get(skrifa::GlyphId::new(u32::from(id.0)))?;
                 gdi_glyph(&g, &hinting)
             })

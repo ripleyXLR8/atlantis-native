@@ -41,11 +41,11 @@ use atlantis_engine::persist::DirStore;
 use atlantis_engine::subtitles::SubtitleFont;
 use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
 use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
-use atlantis_engine::{BugFix, Enhancements, Graphics, Options, SaveStore, Settings, Start};
+use atlantis_engine::{BugFix, Graphics, SaveStore, Settings, Start};
 use atlantis_sdl::buttons::Action;
 use atlantis_sdl::motion::{Motion, Step};
 use sdl2::audio::{AudioCallback, AudioSpecDesired};
-use sdl2::event::Event;
+use sdl2::event::{Event, WindowEvent};
 use sdl2::keyboard::Keycode;
 use sdl2::pixels::PixelFormatEnum;
 
@@ -81,29 +81,6 @@ fn fail(text: &str) -> ! {
     log::error!("{text}");
     eprintln!("{text}");
     std::process::exit(1);
-}
-
-/// The options of a run with its saves in `saves` (as the desktop's
-/// `options_with_settings`).
-fn options(saves: Rc<dyn SaveStore>, original: bool, start: Start) -> Options {
-    let stored = Settings::load(saves.as_ref());
-    let settings = stored.unwrap_or_default();
-    if stored.is_none() {
-        settings.save(saves.as_ref());
-    }
-    Options {
-        enhancements: if original {
-            Enhancements::original()
-        } else {
-            settings.enhancements
-        },
-        // `--original` starts with SUBTITLES off, as every start of the
-        // original (0x004960a8 = 0), whatever settings.ini keeps.
-        subtitles: settings.subtitles && !original,
-        saves,
-        start,
-        ..Options::default()
-    }
 }
 
 /// A keyboard key for the engine (a keyboard on the device's USB port, or
@@ -274,7 +251,7 @@ fn main() {
     } else {
         Start::Boot
     };
-    let opts = options(saves.clone(), original, start);
+    let opts = atlantis_sdl::run_options(saves.clone(), original, start);
 
     let mut menu = PortMenu {
         menu: OptionsMenu::new(),
@@ -357,6 +334,8 @@ fn main() {
     let mut locked = false;
     let mut menu_was_open = false;
     let mut quit_by: Option<Instant> = None;
+    // The window is the active one (the keyboard focus, not minimised).
+    let mut active = true;
     let mut pixels: Vec<u8> = vec![0; SCREEN_W * SCREEN_H * 2];
     let mut frame: Vec<u16> = vec![0; SCREEN_W * SCREEN_H];
     'run: loop {
@@ -366,11 +345,28 @@ fn main() {
         for event in events.poll_iter() {
             match event {
                 Event::Quit { .. } => actions.push(Action::Quit),
+                Event::Window { win_event, .. } => match win_event {
+                    WindowEvent::FocusGained | WindowEvent::Restored => active = true,
+                    WindowEvent::FocusLost | WindowEvent::Minimized => active = false,
+                    _ => {}
+                },
                 Event::KeyDown {
                     keycode: Some(k), ..
                 } if menu.menu.is_open() => {
                     if let Some(k) = engine_key(k) {
                         actions.push(Action::MenuKey(k));
+                    }
+                }
+                // A key's auto-repeat goes to the engine only where the
+                // original gets WM_CHAR repeats (the player screen's name
+                // entry, Sys::takes_key_repeat).
+                Event::KeyDown {
+                    keycode: Some(k),
+                    repeat: true,
+                    ..
+                } => {
+                    if let Some(k) = engine_key(k).filter(|&k| sys.takes_key_repeat(k)) {
+                        sys.push_input(Input::KeyDown(k));
                     }
                 }
                 Event::KeyDown {
@@ -515,6 +511,16 @@ fn main() {
             }
             if let Some(p) = sys.take_warp_request() {
                 motion.set_pointer(p);
+                // The original's SetCursorPos (0x0041c312, the turn frames
+                // 0x00421593 / 0x0042197d, the bar close): the system
+                // pointer goes there too, so the next motion and press
+                // start from it, as the desktop front end does. While
+                // locked the engine follows the relative motion itself.
+                if !locked {
+                    let w = canvas.window();
+                    let (wx, wy) = atlantis_sdl::logical_to_window(p, w.size());
+                    sdl.mouse().warp_mouse_in_window(w, wx, wy);
+                }
             }
             pad.buttons.tick(pad.stick());
             let dt = now.duration_since(last_motion).as_secs_f32();
@@ -526,6 +532,15 @@ fn main() {
             }
 
             let ms = now.duration_since(t0).as_millis() as u64;
+            // With `--original` (`Enhancements::background_run` off), the
+            // original's hold while its window is not the active one (its
+            // input poll `FUN_0041a298` pumps messages while the
+            // WM_ACTIVATEAPP flag 0x00496128 is 0, @ 0x0041a42d): no step,
+            // the clock and the 200 Hz timer go on (`Runner::hold`).
+            if !active && !sys.enhancements().background_run {
+                runner.hold(ms);
+                continue;
+            }
             if !runner.step(ms) {
                 break 'run;
             }

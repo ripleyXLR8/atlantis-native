@@ -14,7 +14,7 @@ use atlantis_data::saves::{Checkpoint, InventoryRecord, Players, CHECKPOINT_GUES
 use crate::engine::Engine;
 use crate::hooks::ScriptHooks;
 use crate::persist::Settings;
-use crate::ui::{object_icon, Guests};
+use crate::ui::Guests;
 
 /// The player list file.
 pub const PLAYERS_FILE: &str = "players.atl";
@@ -157,7 +157,6 @@ impl Engine {
     pub fn write_checkpoint(&mut self, script: &ScriptState) {
         let player = self.player.min(MAX_PLAYERS - 1);
         let chapter = self.chapter as u8;
-        let table = &self.game.exe.inventory_object_ids;
         let index = self.current_place.unwrap_or(0) as i32;
         let place = i32::from(self.current_place_id.unwrap_or(0));
         let mut guests = [(0, 0); CHECKPOINT_GUESTS];
@@ -177,11 +176,13 @@ impl Engine {
             last_vue: i32::from(self.last_vue),
             requested_vue: place,
             inc_perso: script.inc_perso,
+            // The records as they are, icon bytes included (dc:23472).
             inventory: self
                 .inventory
                 .iter()
-                .map(|&id| InventoryRecord {
-                    sprite: object_icon(table, id).unwrap_or(0) as u8,
+                .enumerate()
+                .map(|(r, &id)| InventoryRecord {
+                    sprite: self.record_icon(r).unwrap_or(0) as u8,
                     id,
                     present: 1,
                 })
@@ -227,22 +228,22 @@ impl Engine {
         // set `abort`; the rebuild runs with it cleared, so that the
         // /INIT's commands (a Vue=, a video) are not cut short.
         self.abort = None;
+        // A move the abort cut short leaves no panorama name behind.
+        self.move_cyclo = None;
+        self.move_pointer_loaded = false;
         self.stop_ambient();
         self.bar_first = 0; // 0x0042e2ec
         self.vars.set("objetenmain", 0);
-        self.bow_mode = false;
-        self.bow_sprites.clear();
+        // Bow mode 0x00496164 and its sprite 0x006cd888 are kept: only the
+        // bar's FUN_0042d098 (@ 0x0042d155) and the lower-bow FUN_0042d368
+        // (@ 0x0042d51d) write the flag; neither FUN_0042de5c nor
+        // FUN_00423760 touches them.
         let Some(cp) = self.player_checkpoint() else {
-            self.new_game(hooks, in_play).await;
+            self.new_game_from_load(hooks, in_play).await;
             return;
         };
-        if !in_play {
-            // FUN_00423760 on the boot pass restarts the timers.
-            let now = self.now();
-            self.clocks.time1_offset = 0;
-            self.clocks.time2_offset = 0;
-            self.clocks.time1_start = now;
-        }
+        // The timers are not touched: FUN_00423760 restarted them on the
+        // boot pass, before the player screen (see `boot_pass_clocks`).
         self.disc = cp.disc.max(1);
         // The 25 fields: the hidden persos before the WAM's sprite list.
         self.hidden_persos = cp.hidden.iter().map(|&h| i32::from(h)).collect();
@@ -254,7 +255,7 @@ impl Engine {
         self.wam_path[..n].copy_from_slice(&cp.wam_path[..n]);
         if !self.load_wam(&wam).await {
             log::error!("checkpoint: {wam} missing, new game");
-            self.new_game(hooks, in_play).await;
+            self.new_game_from_load(hooks, in_play).await;
             return;
         }
         self.last_vue = cp.last_vue.clamp(0, i32::from(u16::MAX)) as u16;
@@ -262,7 +263,10 @@ impl Engine {
         self.chapter = u32::from(cp.chapter);
         self.current_place = None;
         self.current_place_id = None;
+        // The records with their icon bytes: the bar draws the file's
+        // bytes.
         self.inventory = cp.inventory.iter().map(|r| r.id).collect();
+        self.inventory_icons = cp.inventory.iter().map(|r| Some(r.sprite)).collect();
         // The follower-talk flag 0x00496144 is not in the checkpoint and the
         // reader leaves it as it was (no reference in `FUN_0042de5c`).
         let mut g = Guests {
@@ -284,9 +288,11 @@ impl Engine {
         self.apply_volumes();
         // Step 8: the current music volume 0x00495e71 = the music volume.
         self.music.with_fade(|f| f.cur = f.vol);
-        // Step 4: ZOOM = NEWSOUND = 0, the last NewSound 0.
+        // Step 4: ZOOM = NEWSOUND = 0, the last NewSound 0 and its playing
+        // flag 0 (0x0042e2db, 0x0042e2e5).
         self.zoom = false;
         self.music.new_sound_last = 0;
+        self.music.new_sound_playing = false;
         hooks.restore_script_state(
             self,
             &ScriptState {
@@ -312,7 +318,33 @@ impl Engine {
         self.emit(crate::engine::Event::CheckpointLoaded(name));
     }
 
+    /// `FUN_0042de5c` without a checkpoint: the new game, with the tail
+    /// both branches share (dc:23603..23653): the last NewSound 0x006cd87c
+    /// and its playing flag 0x00772912 cleared (0x0042e2db, 0x0042e2e5)
+    /// before the chapter change, and at the end the music sample set to
+    /// the music volume and the current music volume 0x00495e71 =
+    /// 0x00495e72 (0x0042e494..0x0042e499): a volume the in-game menu
+    /// lowered is back at once.
+    async fn new_game_from_load(&mut self, hooks: &mut dyn ScriptHooks, in_play: bool) {
+        self.music.new_sound_last = 0;
+        self.music.new_sound_playing = false;
+        self.new_game(hooks, in_play).await;
+        self.music.with_fade(|f| f.cur = f.vol);
+    }
+
     /// The settings of the store, or those of the options.
+    /// The original's start values of the options `settings.ini` keeps:
+    /// 0x004960ac = 0 (OMNI 3D MODE 1) and the volumes 0x00495e70.. =
+    /// `7f 6e 6e 6e` are data bytes of the executable, written only by the
+    /// OPTMENU toggle (@ 0x0041d794), the sound menu's OK (@ 0x0041d813..
+    /// 0x0041d926) and the checkpoint reader, so every run starts with
+    /// them. Not written back to `settings.ini`.
+    pub(crate) fn original_start_values(&mut self) {
+        self.settings.omni3d_mode2 = false;
+        self.settings.volumes = crate::persist::DEFAULT_VOLUMES;
+        self.apply_volumes();
+    }
+
     pub(crate) fn load_settings(&mut self, fallback: Settings) {
         let s = Settings::load(self.saves.as_ref()).unwrap_or(fallback);
         self.settings = Settings {
@@ -358,6 +390,86 @@ mod tests {
         let got = got.borrow();
         if !got.is_empty() {
             assert_eq!(&got[..], &b"wam\\trone.wam\0am\0\0\0\0"[..]);
+        }
+    }
+
+    /// A reload in play with no checkpoint (a new player in chapter 1, the
+    /// in-game menu's LOAD) runs FUN_0042de5c's common tail too: the music
+    /// back at its volume (0x00495e71 = 0x00495e72 @ 0x0042e499) after the
+    /// menu lowered it, the last NewSound and its flag cleared (0x0042e2db,
+    /// 0x0042e2e5).
+    #[test]
+    fn reload_without_checkpoint_restores_the_music_volume() {
+        let got = Rc::new(std::cell::RefCell::new(None));
+        let g2 = got.clone();
+        with_engine(
+            "reload_without_checkpoint_restores_the_music_volume",
+            move |mut e| async move {
+                e.saves = Rc::new(MemStore::new());
+                let vol = e.music.with_fade(|f| {
+                    f.cur = 22;
+                    f.vol
+                });
+                e.music.new_sound_last = 14;
+                e.music.new_sound_playing = true;
+                e.load_checkpoint(&mut crate::hooks::NoScripts, true).await;
+                *g2.borrow_mut() = Some((
+                    e.music.with_fade(|f| f.cur) == vol,
+                    e.music.new_sound_last,
+                    e.music.new_sound_playing,
+                ));
+            },
+            |_, _| {},
+        );
+        let got = *got.borrow();
+        if let Some(got) = got {
+            assert_eq!(got, (true, 0, false));
+        }
+    }
+
+    /// `--original` starts at the original's OMNI 3D MODE 1 and volumes
+    /// `7f 6e 6e 6e` (0x004960ac, 0x00495e70.. data bytes) whatever
+    /// `settings.ini` keeps, and leaves the file as it is; the default run
+    /// takes the stored values.
+    #[test]
+    fn original_starts_at_the_original_options() {
+        let got = Rc::new(std::cell::RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        with_engine(
+            "original_starts_at_the_original_options",
+            move |mut e| async move {
+                let store = Rc::new(MemStore::new());
+                let stored = Settings {
+                    omni3d_mode2: true,
+                    volumes: [10, 20, 30, 40],
+                    ..Settings::default()
+                };
+                stored.save(store.as_ref());
+                e.saves = store.clone();
+                for original in [false, true] {
+                    e.load_settings(Settings::default());
+                    if original {
+                        e.original_start_values();
+                    }
+                    g2.borrow_mut().push((
+                        e.settings.omni3d_mode2,
+                        e.settings.volumes,
+                        e.ambient.effects_volume,
+                        Settings::load(store.as_ref()) == Some(stored),
+                    ));
+                }
+            },
+            |_, _| {},
+        );
+        let got = got.borrow();
+        if !got.is_empty() {
+            assert_eq!(
+                *got,
+                [
+                    (true, [10, 20, 30, 40], 30, true),
+                    (false, crate::persist::DEFAULT_VOLUMES, 0x6e, true),
+                ]
+            );
         }
     }
 

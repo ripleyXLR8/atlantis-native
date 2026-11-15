@@ -118,6 +118,11 @@ pub trait MetaIo {
     fn start_input(&mut self) -> (i32, i32, bool, bool);
     /// `FUN_0043318c`: a frame boundary.
     fn boundary(&mut self, g: &MetaGame) -> (i32, i32, bool, bool);
+    /// The boundary of a win-animation frame (`FUN_00447ad0`), which polls
+    /// once (0x00447bea, 0x00447cc4) where the main loop polls twice.
+    fn frame_boundary(&mut self, g: &MetaGame) -> (i32, i32, bool, bool) {
+        self.boundary(g)
+    }
     /// `FUN_00447834`'s picture 1..4.
     fn load_picture(&mut self, n: i32);
     fn draw_background(&mut self);
@@ -234,7 +239,11 @@ impl MetaGame {
     }
 
     fn read_boundary(&mut self, io: &mut impl MetaIo) {
-        let (mx, my, c, r) = io.boundary(self);
+        let m = io.boundary(self);
+        self.take_input(m);
+    }
+
+    fn take_input(&mut self, (mx, my, c, r): (i32, i32, bool, bool)) {
         self.mx = mx;
         self.my = my;
         if c {
@@ -255,19 +264,31 @@ impl MetaGame {
     }
 
     /// The covered map cells of frame `f` drawn at (x, y), clipped to the
-    /// screen.
+    /// screen, as the histogram `FUN_00410eb5` and the mark writer
+    /// `FUN_00410e35` visit them over the 0x4b000 words: a run of covered
+    /// words is followed with a count in ECX that ends the helper when it
+    /// reaches 0 before the word is taken (`dec ecx` / `jz` @
+    /// 0x00410efe..0x00410eff, 0x00410e80..0x00410e81, 0x00410ead..
+    /// 0x00410eae), so the last word (639, 479) is left out when (638, 479)
+    /// is covered too.
     pub(crate) fn cells(coverage: &[Coverage], f: i32, x: i32, y: i32) -> Vec<usize> {
+        const LAST: usize = 640 * 480 - 1;
         let Some(c) = usize::try_from(f).ok().and_then(|f| coverage.get(f)) else {
             return Vec::new();
         };
-        c.dx.iter()
-            .zip(&c.dy)
-            .filter_map(|(&dx, &dy)| {
-                let (px, py) = (x + i32::from(dx), y + i32::from(dy));
-                ((0..640).contains(&px) && (0..480).contains(&py))
-                    .then_some((py * 640 + px) as usize)
-            })
-            .collect()
+        let mut cells: Vec<usize> =
+            c.dx.iter()
+                .zip(&c.dy)
+                .filter_map(|(&dx, &dy)| {
+                    let (px, py) = (x + i32::from(dx), y + i32::from(dy));
+                    ((0..640).contains(&px) && (0..480).contains(&py))
+                        .then_some((py * 640 + px) as usize)
+                })
+                .collect();
+        if cells.contains(&(LAST - 1)) {
+            cells.retain(|&k| k != LAST);
+        }
+        cells
     }
 
     /// `FUN_00448404`: piece `i` dropped at (x, y), true when it lies
@@ -543,13 +564,15 @@ impl MetaGame {
         io.draw_sprite('C', self.mx, self.my, if b == 0x1f { 10 } else { 5 });
     }
 
-    /// A pass of the win animation.
+    /// A pass of the win animation: one poll after the present
+    /// (0x00447bea, 0x00447cc4).
     async fn frame(&mut self, io: &mut impl MetaIo) {
         self.draw(io);
         io.draw_background();
         io.present(self).await;
         self.click = false;
-        self.read_boundary(io);
+        let m = io.frame_boundary(self);
+        self.take_input(m);
     }
 
     /// `FUN_00447ad0`.
@@ -602,15 +625,28 @@ struct Host<'a> {
 }
 
 impl MetaIo for Host<'_> {
+    /// The port's entry read: no F5..F8 step (FUN_0044763c's two polls a
+    /// pass are the boundary's).
     fn start_input(&mut self) -> (i32, i32, bool, bool) {
-        let m = self.host.read_input();
+        let m = self.host.read_entry();
         (m.x, m.y, m.click, m.right)
     }
     fn right_handled(&mut self) {
         self.host.e.bar.request = false;
     }
+    /// The poll after the present (0x004477d8) and the next pass's top
+    /// one (0x004476f9) ([`PuzzleHost::second_poll`]).
     fn boundary(&mut self, _g: &MetaGame) -> (i32, i32, bool, bool) {
-        self.start_input()
+        let m = self.host.read_input();
+        self.host.second_poll();
+        (m.x, m.y, m.click, m.right)
+    }
+    /// `FUN_00447ad0` polls once a frame (0x00447bea after the frame
+    /// without the piece, 0x00447cc4 after the frame with it): one F5..F8
+    /// step.
+    fn frame_boundary(&mut self, _g: &MetaGame) -> (i32, i32, bool, bool) {
+        let m = self.host.read_input();
+        (m.x, m.y, m.click, m.right)
     }
     fn load_picture(&mut self, n: i32) {
         let pic = usize::try_from(n - 1)
@@ -669,6 +705,11 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, stage: i32) -> i3
         game.restore(m);
     }
     game.object_in_hand = e.vars.get("objetenmain");
+    // FUN_004478d4, before the loop and before any poll, sets OBJETENMAIN
+    // to 0 (0x00447951): the Escape test of FUN_0041a298
+    // (0x0041a3fc..0x0041a415) sees an empty hand whatever stage piece the
+    // player entered with.
+    e.vars.set("objetenmain", 0);
     game.cursor = e.puzzles.cursor;
     let mut host = Host {
         host: PuzzleHost::new(e, hooks),
@@ -680,8 +721,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, stage: i32) -> i3
     let e = host.host.e;
     e.puzzles.cursor = game.cursor;
     e.puzzles.meta = Some(game.memory());
-    // FUN_004478d4 emptied the hand and may have set FlagTemp6.
-    e.vars.set("objetenmain", 0);
+    // FUN_004478d4 may have set FlagTemp6.
     if game.brought_flag != 0 {
         e.vars.set("flagtemp6", 1);
     }
@@ -689,5 +729,40 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks, stage: i32) -> i3
         1
     } else {
         r
+    }
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+
+    /// FUN_0044763c polls twice a pass (0x004476f9, 0x004477d8): a pass
+    /// steps F5 twice, the port's entry read not at all.
+    #[test]
+    fn f5_steps_twice_a_pass() {
+        fn host(h: PuzzleHost<'_>) -> Host<'_> {
+            Host {
+                host: h,
+                pictures: Default::default(),
+            }
+        }
+        let Some(entry) = f5_steps("meta_f5_entry", move |h| {
+            host(h).start_input();
+        }) else {
+            return;
+        };
+        let pass = f5_steps("meta_f5_pass", move |h| {
+            let mut io = host(h);
+            io.start_input();
+            io.boundary(&MetaGame::new(Vec::new(), Vec::new()));
+        });
+        // A win-animation frame (FUN_00447ad0) polls once.
+        let frame = f5_steps("meta_f5_frame", move |h| {
+            let mut io = host(h);
+            io.start_input();
+            io.frame_boundary(&MetaGame::new(Vec::new(), Vec::new()));
+        });
+        assert_eq!((entry, pass, frame), (0, Some(2), Some(1)));
     }
 }

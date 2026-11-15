@@ -214,7 +214,9 @@ pub struct PuzzleMouse {
     pub y: i32,
     /// The left button went down since the last read.
     pub click: bool,
-    /// The right button went down at this read (see [`right_press`]).
+    /// The right button went down since the last read, as the edge latch
+    /// reports it ([`Sys::poll_event`]), with no left press at this read
+    /// (see [`right_press`]).
     pub right: bool,
     /// Escape went down since the last read, with no left press at this
     /// read: Escape is an edge-mode key (`FUN_0042e6dc`) and
@@ -230,18 +232,34 @@ pub struct PuzzleMouse {
 /// press, lost when the left button goes down on the same poll; a held
 /// button counts once. `down`: the right button at this poll; `prev_down`:
 /// at the previous poll (updated); `left_press`: the left button went down
-/// at this poll.
+/// at this poll. The rule for a button state read at each poll; the engine
+/// takes the edge from [`Sys::poll_event`]'s latch, which also counts a
+/// press made and released between two polls ([`PuzzleInput::read_with`]).
 pub fn right_press(down: bool, prev_down: &mut bool, left_press: bool) -> bool {
     let press = down && !*prev_down && !left_press;
     *prev_down = down;
     press
 }
 
-/// The input of a puzzle: the buttons' state at the last read.
+/// The window message of a left button event ([`PuzzleInput::read_with`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LeftMessage {
+    /// WM_LBUTTONDOWN.
+    Down,
+    /// WM_LBUTTONDBLCLK: the second press of a pair (the window class has
+    /// CS_DBLCLKS, style 0xb @ `FUN_0042e4b4`).
+    DoubleClick,
+    /// WM_LBUTTONUP.
+    Up,
+}
+
+/// The input of a puzzle (the buttons' edges come from [`Sys`]'s latch).
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PuzzleInput {
-    prev_left: bool,
-    prev_right: bool,
+    /// The game pointer the puzzle started with and the system mouse's
+    /// place then: the pointer stays there until the mouse leaves that
+    /// place (the first WM_MOUSEMOVE, 0x00419c10..0x00419c29).
+    held: Option<((i32, i32), (i32, i32))>,
 }
 
 impl PuzzleInput {
@@ -250,25 +268,53 @@ impl PuzzleInput {
     /// original have seen it already) and the events dropped.
     pub fn new(sys: &Sys) -> PuzzleInput {
         while sys.poll_event().is_some() {}
-        let (left, right) = sys.buttons();
-        PuzzleInput {
-            prev_left: left,
-            prev_right: right,
+        PuzzleInput::default()
+    }
+
+    /// [`PuzzleInput::new`] with the pointer at `pointer` while the
+    /// system mouse stays at `mark`.
+    pub fn with_pointer(sys: &Sys, pointer: (i32, i32), mark: (i32, i32)) -> PuzzleInput {
+        let mut input = PuzzleInput::new(sys);
+        input.held = Some((pointer, mark));
+        input
+    }
+
+    /// The pointer 0x004960ec / 0x004960f0 the puzzles read: the one the
+    /// puzzle started with until the mouse moves, then the mouse.
+    pub fn pointer(&mut self, sys: &Sys) -> (i32, i32) {
+        let m = sys.mouse();
+        match self.held {
+            Some((p, mark)) if m == mark => p,
+            _ => {
+                self.held = None;
+                m
+            }
         }
     }
 
     /// The events since the last read, then the mouse. A press and its
-    /// release between two reads still count as a click.
+    /// release between two reads count as a click when the edge latch
+    /// reports it ([`Sys::poll_event`]).
     pub fn read(&mut self, sys: &Sys) -> PuzzleMouse {
         self.read_with(sys, |_| {})
     }
 
-    /// [`PuzzleInput::read`], with each left press (true) and release
-    /// (false) since the last read passed to `on_left` in order.
-    pub fn read_with(&mut self, sys: &Sys, mut on_left: impl FnMut(bool)) -> PuzzleMouse {
+    /// [`PuzzleInput::read`], with the window message of each left press
+    /// and release since the last read passed to `on_left` in order.
+    pub fn read_with(&mut self, sys: &Sys, mut on_left: impl FnMut(LeftMessage)) -> PuzzleMouse {
         let mut pressed = false;
+        let mut right = false;
         let mut escape = false;
-        while let Some(ev) = sys.poll_event() {
+        // Windows' message for a left press: WM_LBUTTONDBLCLK for the
+        // second of a pair (Sys's pairing), else WM_LBUTTONDOWN.
+        let press = |double: bool| {
+            if double {
+                LeftMessage::DoubleClick
+            } else {
+                LeftMessage::Down
+            }
+        };
+        while let Some((ev, double)) = sys.poll_event_paired() {
             match ev {
                 Input::KeyDown(Key::Escape) => escape = true,
                 Input::MouseDown {
@@ -276,25 +322,43 @@ impl PuzzleInput {
                     ..
                 } => {
                     pressed = true;
-                    on_left(true);
+                    on_left(press(double));
                 }
+                // No click (`FUN_0042e624`'s latch), but Windows posted
+                // its WM_LBUTTONDOWN.
+                Input::MouseDownLatched {
+                    button: MouseButton::Left,
+                    ..
+                } => on_left(press(double)),
                 Input::MouseUp {
                     button: MouseButton::Left,
                     ..
-                } => on_left(false),
+                } => on_left(LeftMessage::Up),
+                // VK_RBUTTON is an edge key too (`FUN_0042e6dc`,
+                // 0x006140c2): `FUN_0042e624` tests the whole
+                // GetAsyncKeyState word (`test ax, ax` @ 0x0042e664), so a
+                // right click made and released between two polls is a
+                // press at the next one, as for the left button.
+                Input::MouseDown {
+                    button: MouseButton::Right,
+                    ..
+                } => right = true,
                 _ => {}
             }
         }
-        let (left, right) = sys.buttons();
-        let (x, y) = sys.mouse();
-        let click = (left && !self.prev_left) || pressed;
-        self.prev_left = left;
-        let right = right_press(right, &mut self.prev_right, click);
+        let (x, y) = self.pointer(sys);
+        // The press edge of `FUN_0042e624` (see [`Sys::poll_event`]): a
+        // button held since a read that saw it is none, and so is a new
+        // press made before any read found the button up.
+        let click = pressed;
         PuzzleMouse {
             x,
             y,
             click,
-            right,
+            // `FUN_0041a298` returns on a left press edge before it tests
+            // the right one (0x0041a2b5..0x0041a2e9): that poll set the
+            // right latch, so the press is lost.
+            right: right && !click,
             escape: escape && !click,
         }
     }
@@ -315,14 +379,25 @@ impl PuzzleInput {
 /// latched: nothing in a puzzle reads the latch, which only stops the
 /// hexagon's right presses and cuts the first line after the puzzle.
 pub(crate) fn poll_flags(e: &mut Engine, m: &PuzzleMouse) {
+    poll_flags_with(e, m, true);
+}
+
+/// [`poll_flags`]; `view_keys` false for a read the original does not make
+/// (a puzzle's entry read): F5..F8 are not polled.
+fn poll_flags_with(e: &mut Engine, m: &PuzzleMouse, view_keys: bool) {
     if m.click {
         return;
     }
+    // F5..F8 move the stored view angles (0x0041a33c..0x0041a3ba); no
+    // puzzle function reads them, the view after the puzzle does.
+    if view_keys {
+        e.poll_view_keys(false);
+    }
     if m.right {
-        e.bar.right_pressed(e.section_play, e.escape_request);
+        e.bar.right_pressed(e.section_play, e.menu_request());
     }
     if m.escape && e.escape_gate_open() && e.puzzle_escape_latches() {
-        e.escape_request = true;
+        e.latch_escape();
     }
 }
 
@@ -394,11 +469,18 @@ pub struct PuzzleHost<'a> {
 
 impl<'a> PuzzleHost<'a> {
     /// The puzzles draw their own cursor into the frame and read the
-    /// pointer where it is: the mouse is not locked.
+    /// pointer where it is: the mouse is not locked. Every puzzle reads
+    /// the game pointer 0x004960ec / 0x004960f0 (eclipse `FUN_00441cd8`,
+    /// crab `FUN_0043e5a4`, rat `FUN_004395f4`, ogre `FUN_004439c4`...),
+    /// which nothing writes between the warp loop's click and the puzzle
+    /// (`FUN_00423ad8` dc:16824-16829, `FUN_004240fc`; no SetCursorPos):
+    /// after a panorama load with the view at rest and the mouse still
+    /// (`FUN_0044a424` @ 0x0044a70b / 0x0044a715) it starts at (0x140,
+    /// 0x140), apart from the Windows cursor, until the first WM_MOUSEMOVE.
     pub fn new(e: &'a mut Engine, hooks: &'a mut dyn ScriptHooks) -> PuzzleHost<'a> {
         e.sys.set_mouse_locked(false);
-        let input = PuzzleInput::new(&e.sys);
-        let pointer = e.sys.mouse();
+        let pointer = e.pointer.pos;
+        let input = PuzzleInput::with_pointer(&e.sys, pointer, e.pointer_mouse_mark);
         PuzzleHost {
             e,
             hooks,
@@ -418,6 +500,34 @@ impl<'a> PuzzleHost<'a> {
         m
     }
 
+    /// The port's read at a puzzle's entry, for the pointer and a click
+    /// made during the set-up. The original's main loops make no poll
+    /// before their first present (crab 0x0043d3c8, hexagon 0x004406a7,
+    /// Muria 0x0043f004, taquins 6 / 7 0x00446545 / 0x004467e6, ogre
+    /// 0x00442230, each after the present; meta and taquin 14 poll twice a
+    /// pass, [`PuzzleHost::second_poll`]): no F5..F8 step.
+    pub fn read_entry(&mut self) -> PuzzleMouse {
+        let m = self.input.read(&self.e.sys);
+        poll_flags_with(self.e, &m, false);
+        m
+    }
+
+    /// [`PuzzleHost::read_entry`] with the pointer of
+    /// [`PuzzleHost::read_input_held_pointer`].
+    pub fn read_entry_held_pointer(&mut self) -> PuzzleMouse {
+        let m = self.read_entry();
+        self.held_pointer(m)
+    }
+
+    /// The second poll of a pass of the loops that poll twice (meta
+    /// `FUN_0044763c` @ 0x004476f9 and 0x004477d8, taquin 14
+    /// `FUN_00446830` @ 0x0044699e and 0x00446a7a): the port reads the
+    /// events once a pass; of the two polls one sees a press edge (and
+    /// returns before the keys, 0x0041a2b5), the other steps F5..F8.
+    pub fn second_poll(&mut self) {
+        self.e.poll_view_keys(false);
+    }
+
     /// [`PuzzleHost::read_input`] for a loop whose click handler reads the
     /// pointer 0x004960ec / 0x004960f0 after the poll: on the pass that
     /// raises the click flag `FUN_0041a298` returns before its message pump
@@ -425,7 +535,27 @@ impl<'a> PuzzleHost<'a> {
     /// (0x00419bfa), so the click and that pass's cursor are at the
     /// previous pass's pointer.
     pub fn read_input_held_pointer(&mut self) -> PuzzleMouse {
-        let mut m = self.read_input();
+        let m = self.read_input();
+        self.held_pointer(m)
+    }
+
+    /// After a script the puzzle ran (Muria's `FUN_004277c8`): when it
+    /// ran frames, a line's player polled `FUN_0041a298` on each one
+    /// (`FUN_004305e8` @ 0x00430807), so the edge-mode latch `FUN_0042e624`
+    /// has seen the buttons as they are (a press still down is no new
+    /// click, 0x0043f004) and the pumps' WM_MOUSEMOVE (0x00419bfa) have
+    /// moved the pointer 0x004960ec / 0x004960f0. The pointer after the
+    /// script, `None` when it ran no frame (no poll: nothing changes).
+    pub fn after_script(&mut self, frames_before: u64) -> Option<(i32, i32)> {
+        let sys = &self.e.sys;
+        if sys.frames_presented() == frames_before {
+            return None;
+        }
+        self.pointer = self.input.pointer(sys);
+        Some(self.pointer)
+    }
+
+    fn held_pointer(&mut self, mut m: PuzzleMouse) -> PuzzleMouse {
         if m.click {
             (m.x, m.y) = self.pointer;
         } else {
@@ -510,5 +640,143 @@ impl<'a> PuzzleHost<'a> {
     /// The game was quit (or the place loop has to end).
     pub fn aborted(&self) -> bool {
         self.e.should_abort()
+    }
+}
+
+/// A test that a puzzle host hands a click at the pointer `$expect` of
+/// the read: (100, 100) the pointer of the pass before the click
+/// ([`PuzzleHost::read_input_held_pointer`]), (300, 200) the pointer of
+/// the click's own pass. `$wrap` makes the host of a [`PuzzleHost`],
+/// `$read` reads (x, y, click) from it.
+#[cfg(test)]
+macro_rules! click_pointer_test {
+    ($name:ident, $wrap:expr, $read:expr, $expect:expr) => {
+        #[test]
+        fn $name() {
+            use crate::sys::{Input, MouseButton};
+            use crate::test_support::with_engine;
+            let got = std::rc::Rc::new(std::cell::Cell::new(None));
+            let g2 = got.clone();
+            let ran = with_engine(
+                stringify!($name),
+                move |mut e| async move {
+                    let sys = e.sys.clone();
+                    let mut hooks = crate::hooks::NoScripts;
+                    let mut h = $wrap(crate::puzzle::PuzzleHost::new(&mut e, &mut hooks));
+                    for _ in 0..8 {
+                        let (x, y, click) = $read(&mut h);
+                        if click {
+                            g2.set(Some((x, y)));
+                        }
+                        sys.frame().await;
+                    }
+                },
+                |sys, f| {
+                    let b = MouseButton::Left;
+                    match f {
+                        1 => sys.push_input(Input::MouseMove { x: 100, y: 100 }),
+                        4 => {
+                            sys.push_input(Input::MouseMove { x: 300, y: 200 });
+                            sys.push_input(Input::MouseDown {
+                                button: b,
+                                x: 300,
+                                y: 200,
+                            });
+                        }
+                        6 => sys.push_input(Input::MouseUp {
+                            button: b,
+                            x: 300,
+                            y: 200,
+                        }),
+                        _ => {}
+                    }
+                },
+            );
+            if ran {
+                assert_eq!(got.get(), Some($expect));
+            }
+        }
+    };
+}
+#[cfg(test)]
+pub(crate) use click_pointer_test;
+
+/// The F5 steps (`FUN_0041a298` @ 0x0041a33c) that `polls` makes on a
+/// puzzle host, F5 held. None without the game.
+#[cfg(test)]
+pub(crate) fn f5_steps(
+    test: &str,
+    polls: impl for<'a> FnOnce(PuzzleHost<'a>) + 'static,
+) -> Option<i32> {
+    use std::cell::Cell;
+    use std::rc::Rc;
+    let got = Rc::new(Cell::new(None));
+    let g2 = got.clone();
+    let ran = crate::test_support::with_engine(
+        test,
+        move |mut e| async move {
+            e.set_view(1.0, 0.0);
+            e.sys.push_input(Input::KeyDown(Key::F(5)));
+            let mut hooks = crate::hooks::NoScripts;
+            polls(PuzzleHost::new(&mut e, &mut hooks));
+            let steps = (f64::from(e.stored_view().0) - 1.0) / 0.034906;
+            g2.set(Some(steps.round() as i32));
+        },
+        |_, _| {},
+    );
+    if ran {
+        got.get()
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::Runner;
+    use crate::test_support::button;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// A click handler that runs a sequence with no poll (the hens'
+    /// weighing `FUN_00444d80`, the ogre's drop `FUN_00443c3c`) follows the
+    /// poll that saw its press, which set `FUN_0042e624`'s latch: a press
+    /// made during the sequence, released or still held, is no click at
+    /// the next read; once a read has found the button up, the next press
+    /// is one.
+    #[test]
+    fn a_press_during_an_unpolled_sequence_is_no_click() {
+        let sys = Sys::new(Mixer::new());
+        let s = sys.clone();
+        let got = Rc::new(Cell::new(None));
+        let g = got.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut input = PuzzleInput::new(&s);
+            s.frame().await;
+            button(&s, MouseButton::Left, true);
+            let click = input.read(&s).click;
+            // The sequence: released, a whole click, then a press held.
+            for down in [false, true, false, true] {
+                s.frame().await;
+                button(&s, MouseButton::Left, down);
+            }
+            s.frame().await;
+            let held = input.read(&s).click;
+            button(&s, MouseButton::Left, false);
+            s.frame().await;
+            let up = input.read(&s).click;
+            button(&s, MouseButton::Left, true);
+            s.frame().await;
+            let again = input.read(&s).click;
+            g.set(Some((click, held, up, again)));
+        });
+        for t in 0..20 {
+            if !r.step(t * 16) {
+                break;
+            }
+        }
+        assert_eq!(got.get(), Some((true, false, false, true)));
     }
 }

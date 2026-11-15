@@ -43,6 +43,17 @@ pub enum Input {
         x: i32,
         y: i32,
     },
+    /// A press the engine's edge latch does not report (see
+    /// [`Sys::poll_event`]): [`Sys::poll_event`] gives it in place of the
+    /// [`Input::MouseDown`] a front end pushed. Windows still posted its
+    /// WM_LBUTTONDOWN / WM_LBUTTONDBLCLK, so the loops that follow the
+    /// window messages (double-click pairing, the rat's held flag) read it;
+    /// the others ignore it. Front ends never push it.
+    MouseDownLatched {
+        button: MouseButton,
+        x: i32,
+        y: i32,
+    },
     KeyDown(Key),
     KeyUp(Key),
     Quit,
@@ -119,9 +130,32 @@ pub struct Sys {
     now_ms: Cell<u64>,
     mouse: Cell<(i32, i32)>,
     buttons: Cell<(bool, bool)>,
-    events: RefCell<VecDeque<Input>>,
+    /// The input events, each with the time it came (the message time
+    /// Windows pairs the left presses by) and, once a read judged it,
+    /// whether a left press came as WM_LBUTTONDBLCLK.
+    events: RefCell<VecDeque<(Input, u64, bool)>>,
+    /// Windows' double-click pairing of the left presses and the flag
+    /// 0x00496118 the window procedure sets on WM_LBUTTONDBLCLK, see
+    /// [`Sys::double_click`].
+    double_click: RefCell<crate::turn::TurnDoubleClick>,
+    /// The Windows cursor while the mouse is locked (the warp loop's
+    /// pointer), where Windows sees a left press then, see
+    /// [`Sys::set_locked_cursor`].
+    locked_cursor: Cell<(i32, i32)>,
+    /// `FUN_0042e624`'s latch (bit 2 of 0x006140c1 / 0x006140c2) of the
+    /// left and right buttons, see [`Sys::poll_event`].
+    latch: Cell<[bool; 2]>,
+    /// A press of the button since the last read (GetAsyncKeyState's low
+    /// bit), see [`Sys::poll_event`].
+    pressed_since: Cell<[bool; 2]>,
+    /// The events at the back of the queue no read has judged yet.
+    unjudged: Cell<usize>,
+    /// The frame of the last read.
+    read_frame: Cell<Option<u64>>,
     quit: Cell<bool>,
     yielded: Cell<bool>,
+    /// The frames presented so far.
+    frames: Cell<u64>,
     rel: Cell<(i32, i32)>,
     locked: Cell<bool>,
     warp_request: Cell<Option<(i32, i32)>>,
@@ -135,6 +169,8 @@ pub struct Sys {
     /// When a game menu last read the keyboard (its text entry takes every
     /// letter: the front end's letter keys stay off then).
     menu_input_ms: Cell<Option<u64>>,
+    /// When the player screen's name entry last read the keys.
+    text_entry_ms: Cell<Option<u64>>,
 }
 
 impl Sys {
@@ -161,8 +197,15 @@ impl Sys {
             mouse: Cell::new((SCREEN_W as i32 / 2, SCREEN_H as i32 / 2)),
             buttons: Cell::new((false, false)),
             events: RefCell::new(VecDeque::new()),
+            double_click: RefCell::new(Default::default()),
+            locked_cursor: Cell::new((SCREEN_W as i32 / 2, SCREEN_H as i32 / 2)),
+            latch: Cell::new([false; 2]),
+            pressed_since: Cell::new([false; 2]),
+            unjudged: Cell::new(0),
+            read_frame: Cell::new(None),
             quit: Cell::new(false),
             yielded: Cell::new(false),
+            frames: Cell::new(0),
             rel: Cell::new((0, 0)),
             locked: Cell::new(false),
             warp_request: Cell::new(None),
@@ -171,6 +214,7 @@ impl Sys {
             view_renderer: RefCell::new(None),
             view_check: Cell::new(false),
             menu_input_ms: Cell::new(None),
+            text_entry_ms: Cell::new(None),
         })
     }
 
@@ -219,6 +263,33 @@ impl Sys {
             .is_some_and(|t| self.now_ms.get().saturating_sub(t) <= 250)
     }
 
+    /// The player screen reads the keys this frame (see
+    /// [`Sys::takes_key_repeat`]).
+    pub fn mark_text_entry(&self) {
+        self.text_entry_ms.set(Some(self.now_ms.get()));
+    }
+
+    /// Whether the front end passes on a key's auto-repeat: the original's
+    /// window procedure stores every WM_CHAR, repeats included, in
+    /// 0x006ce262 while 0x0049614c == 1 (@ 0x00419c9a..0x00419cb4; the
+    /// player screen clears it at its exit, @ 0x0041e88a), and only the
+    /// player screen's name entry reads it (0x0041e212..0x0041e4cc). So
+    /// only the keys that give a WM_CHAR repeat, and only while the player
+    /// screen reads the keys (within the last quarter second); every other
+    /// loop reads key edges (`FUN_0042e624`) or held keys, for which a
+    /// repeat is no new press.
+    pub fn takes_key_repeat(&self, key: Key) -> bool {
+        let entry = self
+            .text_entry_ms
+            .get()
+            .is_some_and(|t| self.now_ms.get().saturating_sub(t) <= 250);
+        entry
+            && matches!(
+                key,
+                Key::Char(_) | Key::Space | Key::Backspace | Key::Enter | Key::Escape
+            )
+    }
+
     pub fn key_held(&self, key: Key) -> bool {
         self.keys_held.borrow().contains(&key)
     }
@@ -250,14 +321,136 @@ impl Sys {
         self.warp_request.set(Some((x, y)));
     }
 
+    /// Where Windows sees a left press while the mouse is locked: the
+    /// warp loop keeps the Windows cursor as its own pointer (the original
+    /// moves it with SetCursorPos), not as [`Sys::mouse`].
+    pub fn set_locked_cursor(&self, p: (i32, i32)) {
+        self.locked_cursor.set(p);
+    }
+
+    /// Windows' double-click pairing and the flag 0x00496118
+    /// ([`crate::turn::TurnDoubleClick`]): each read of the buttons (see
+    /// [`Sys::poll_event`]) pairs the left presses queued since the last
+    /// one, latched or not, as Windows pairs every WM_LBUTTONDOWN it
+    /// posts whatever loop polls, and pumps a queued WM_LBUTTONDBLCLK when
+    /// it saw no left press edge (`FUN_0041a298` returns before its
+    /// message pump on one, 0x0041a2b5). The loops that test the message
+    /// (the turn, a film, a line) call
+    /// [`crate::turn::TurnDoubleClick::dispatch`] after their poll.
+    pub fn double_click(&self) -> std::cell::RefMut<'_, crate::turn::TurnDoubleClick> {
+        self.double_click.borrow_mut()
+    }
+
     pub fn should_quit(&self) -> bool {
         self.quit.get()
     }
 
     /// The next input event, if any (mouse position and buttons are
     /// already up to date when the frame resumes).
+    ///
+    /// The original reads the mouse buttons only through `FUN_0042e624`
+    /// (called by its poll `FUN_0041a298` alone, @ 0x0041a2a6), which
+    /// calls GetAsyncKeyState for each key; VK_LBUTTON and VK_RBUTTON are
+    /// in edge mode (`FUN_0042e6dc`, 0x006140c1 / 0x006140c2 |= 1). For
+    /// such a key (0x0042e624..0x0042e6d9): a nonzero state with the latch
+    /// (bit 2) clear sets the latch and the press bit 4; a nonzero state
+    /// with the latch set gives no press; a zero state clears both. So a
+    /// press is reported only when a read since the previous press found
+    /// the button up: a press made and released, or still held, during a
+    /// stretch with no poll (an animation, a slide) after a press a poll
+    /// saw is none (harness round5/puzzles-2_latch_emu.txt, cases B to D).
+    ///
+    /// Each frame's first call (and a call after new events) is that read:
+    /// the state is the button held now or pressed since the last read
+    /// (GetAsyncKeyState's low bit; that Windows reports it for a press
+    /// and release between two reads is [INFERRED], as the port assumed
+    /// before), and the read's verdict applies to the presses queued since
+    /// the last read: kept as [`Input::MouseDown`] for a press edge, given
+    /// as [`Input::MouseDownLatched`] otherwise. Every loop that drains the
+    /// events makes that read, as every polling loop of the original calls
+    /// `FUN_0041a298`.
     pub fn poll_event(&self) -> Option<Input> {
-        self.events.borrow_mut().pop_front()
+        self.poll_event_paired().map(|(ev, _)| ev)
+    }
+
+    /// [`Sys::poll_event`], with whether a left press (latched or not)
+    /// came as WM_LBUTTONDBLCLK, the second press of a pair
+    /// ([`crate::turn::TurnDoubleClick::queue_press`]), not as
+    /// WM_LBUTTONDOWN.
+    pub fn poll_event_paired(&self) -> Option<(Input, bool)> {
+        if self.read_frame.get() != Some(self.frames.get()) || self.unjudged.get() > 0 {
+            self.latch_read();
+        }
+        self.events
+            .borrow_mut()
+            .pop_front()
+            .map(|(ev, _, double)| (ev, double))
+    }
+
+    /// One read of `FUN_0042e624` for the two buttons.
+    fn latch_read(&self) {
+        self.read_frame.set(Some(self.frames.get()));
+        let (left, right) = self.buttons.get();
+        let since = self.pressed_since.replace([false; 2]);
+        let mut latch = self.latch.get();
+        let mut q = self.events.borrow_mut();
+        let start = q.len() - self.unjudged.replace(0).min(q.len());
+        for (i, which, held) in [(0, MouseButton::Left, left), (1, MouseButton::Right, right)] {
+            let active = held || since[i];
+            // 0x0042e678..0x0042e6c8: the edge only with the latch clear;
+            // the latch is set by a nonzero state, cleared by a zero one.
+            let edge = active && !latch[i];
+            latch[i] = active;
+            if edge {
+                continue;
+            }
+            for (ev, _, _) in q.range_mut(start..) {
+                if let Input::MouseDown { button, x, y } = *ev {
+                    if button == which {
+                        *ev = Input::MouseDownLatched { button, x, y };
+                    }
+                }
+            }
+        }
+        self.latch.set(latch);
+        // Windows' pairing of the left presses this read judged, and the
+        // poll's message pump when it saw no left press edge.
+        let mut dc = self.double_click.borrow_mut();
+        dc.poll_started();
+        let mut edge = false;
+        for (ev, ms, double) in q.range_mut(start..) {
+            let (x, y) = match *ev {
+                Input::MouseDown {
+                    button: MouseButton::Left,
+                    x,
+                    y,
+                } => {
+                    edge = true;
+                    (x, y)
+                }
+                Input::MouseDownLatched {
+                    button: MouseButton::Left,
+                    x,
+                    y,
+                } => (x, y),
+                _ => continue,
+            };
+            let (x, y) = if self.locked.get() {
+                self.locked_cursor.get()
+            } else {
+                (x, y)
+            };
+            *double = dc.queue_press(*ms, x, y);
+        }
+        if !edge {
+            dc.pump();
+        }
+    }
+
+    /// The frames presented so far (a loop can tell whether a call it made
+    /// ran frames, and so read the input).
+    pub fn frames_presented(&self) -> u64 {
+        self.frames.get()
     }
 
     /// Shows `screen` and waits for the next frame: the engine's
@@ -299,11 +492,18 @@ impl Sys {
                     ));
                 }
             }
-            Input::MouseDown { button, x, y } | Input::MouseUp { button, x, y } => {
+            Input::MouseDown { button, x, y }
+            | Input::MouseDownLatched { button, x, y }
+            | Input::MouseUp { button, x, y } => {
                 if !locked {
                     self.mouse.set((x, y));
                 }
-                let down = matches!(input, Input::MouseDown { .. });
+                let down = !matches!(input, Input::MouseUp { .. });
+                if down {
+                    let mut since = self.pressed_since.get();
+                    since[usize::from(button == MouseButton::Right)] = true;
+                    self.pressed_since.set(since);
+                }
                 let (l, r) = self.buttons.get();
                 self.buttons.set(match button {
                     MouseButton::Left => (down, r),
@@ -319,7 +519,10 @@ impl Sys {
             }
             Input::KeyUp(k) => self.keys_held.borrow_mut().retain(|&h| h != k),
         }
-        self.events.borrow_mut().push_back(input);
+        self.events
+            .borrow_mut()
+            .push_back((input, self.now_ms.get(), false));
+        self.unjudged.set(self.unjudged.get() + 1);
     }
 
     /// HD rendering (the port's HD mode): the tile size of the HD layer
@@ -416,6 +619,7 @@ impl Future for FrameFuture<'_> {
         } else {
             self.started = true;
             self.sys.yielded.set(true);
+            self.sys.frames.set(self.sys.frames.get() + 1);
             // The HD layer and a video's mark stand for later frames too
             // while the screen stays the same: a frame presented without a
             // redraw (the click that starts a move, the destination's
@@ -468,6 +672,7 @@ impl Runner {
             return false;
         };
         self.sys.now_ms.set(now_ms);
+        self.sys.mixer.set_loops_held(false);
         for t in self.sys.timers.borrow_mut().iter_mut() {
             t(now_ms);
         }
@@ -483,6 +688,26 @@ impl Runner {
             // poll again at the next frame.
             Poll::Pending => true,
         }
+    }
+
+    /// The engine held at time `now_ms` instead of a step, as the original
+    /// is while its window is not the active one (its input poll
+    /// `FUN_0041a298` pumps messages while 0x00496128 is 0, @ 0x0041a42d;
+    /// [`crate::enhancements::Enhancements::background_run`] off): the
+    /// clock goes on (timeGetTime counts the time away), the 200 Hz timer
+    /// callbacks run, the task is not polled, and the music ring gets no
+    /// refill until the next step ([`crate::audio::Mixer::set_loops_held`]).
+    /// False once the engine has returned.
+    pub fn hold(&mut self, now_ms: u64) -> bool {
+        if self.task.is_none() {
+            return false;
+        }
+        self.sys.now_ms.set(now_ms);
+        self.sys.mixer.set_loops_held(true);
+        for t in self.sys.timers.borrow_mut().iter_mut() {
+            t(now_ms);
+        }
+        true
     }
 
     /// Whether the last step presented a new frame (false while the engine
@@ -512,5 +737,207 @@ mod tests {
         assert_eq!(sys.screen.borrow()[0], 1);
         assert!(r.step(33));
         assert!(!r.step(50));
+    }
+
+    /// A hold (the window not the active one, `background_run` off): the
+    /// task stays where it is, the clock and the timers go on, the music
+    /// ring's refills stop until the next step.
+    #[test]
+    fn a_hold_keeps_the_task_and_runs_the_timers() {
+        let sys = Sys::new(Mixer::new());
+        let s = sys.clone();
+        let ticks = Rc::new(Cell::new(Vec::new()));
+        let t2 = ticks.clone();
+        sys.add_timer(Box::new(move |now| {
+            let mut v = t2.take();
+            v.push(now);
+            t2.set(v);
+        }));
+        let held = sys.mixer.loops_held_flag();
+        let mut r = Runner::new(sys.clone(), async move {
+            for i in 0..3u16 {
+                s.screen.borrow_mut()[0] = i;
+                s.frame().await;
+            }
+        });
+        let is_held = || held.load(std::sync::atomic::Ordering::Relaxed);
+        assert!(r.step(0));
+        assert!(r.hold(16) && r.hold(5000));
+        assert_eq!(sys.screen.borrow()[0], 0);
+        assert_eq!(sys.millis(), 5000);
+        assert!(is_held());
+        assert!(r.step(5016));
+        assert_eq!(sys.screen.borrow()[0], 1);
+        assert!(!is_held());
+        assert_eq!(ticks.take(), [0, 16, 5000, 5016]);
+    }
+
+    /// A key's auto-repeat reaches the engine only while the player
+    /// screen's name entry reads the keys, and only for the keys that give
+    /// WM_CHAR (0x00419c9a..0x00419cb4).
+    #[test]
+    fn key_repeats_only_for_the_name_entry() {
+        let sys = Sys::new(Mixer::new());
+        sys.now_ms.set(1000);
+        assert!(!sys.takes_key_repeat(Key::Char('a')));
+        sys.mark_menu_input();
+        assert!(!sys.takes_key_repeat(Key::Char('a')), "any other menu");
+        sys.mark_text_entry();
+        for k in [Key::Char('a'), Key::Space, Key::Backspace, Key::Enter] {
+            assert!(sys.takes_key_repeat(k), "{k:?}");
+        }
+        for k in [Key::Up, Key::Left, Key::F(5), Key::F(10)] {
+            assert!(!sys.takes_key_repeat(k), "{k:?}");
+        }
+        sys.now_ms.set(1300);
+        assert!(!sys.takes_key_repeat(Key::Backspace), "the screen has left");
+    }
+
+    /// The left presses one poll (all the events of a frame) reports.
+    fn poll_presses(sys: &Sys) -> (usize, usize) {
+        let (mut edges, mut latched) = (0, 0);
+        while let Some(ev) = sys.poll_event() {
+            match ev {
+                Input::MouseDown { .. } => edges += 1,
+                Input::MouseDownLatched { .. } => latched += 1,
+                _ => {}
+            }
+        }
+        sys.frames.set(sys.frames.get() + 1);
+        (edges, latched)
+    }
+
+    fn left(sys: &Sys, down: bool) {
+        let b = MouseButton::Left;
+        sys.push_input(if down {
+            Input::MouseDown {
+                button: b,
+                x: 1,
+                y: 1,
+            }
+        } else {
+            Input::MouseUp {
+                button: b,
+                x: 1,
+                y: 1,
+            }
+        });
+    }
+
+    /// `FUN_0042e624`'s latch (0x0042e678..0x0042e6c8), the cases of
+    /// round5/harness/puzzles-2_latch_emu.txt: a press a poll saw, then a
+    /// new press before any poll found the button up, is none.
+    #[test]
+    fn a_press_is_an_edge_only_after_a_poll_saw_the_button_up() {
+        let sys = Sys::new(Mixer::new());
+        // A: an ordinary click, held one poll.
+        assert_eq!(poll_presses(&sys), (0, 0));
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        // E: released, seen up by a poll, then pressed: an edge.
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        // B: released and pressed again with no poll between: none, and
+        // none while it is held.
+        left(&sys, false);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (0, 1));
+        assert_eq!(poll_presses(&sys), (0, 0));
+        // C: released, a whole click, no poll between: none; the next poll
+        // (button up) clears the latch.
+        left(&sys, false);
+        left(&sys, true);
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 1));
+        assert_eq!(poll_presses(&sys), (0, 0));
+        // A whole click between two polls with the latch clear is an edge
+        // (the low bit, as before).
+        left(&sys, true);
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        // Frames with no poll do not clear the latch: a press then is none
+        // at the next poll.
+        sys.frames.set(sys.frames.get() + 5);
+        left(&sys, true);
+        left(&sys, false);
+        sys.frames.set(sys.frames.get() + 5);
+        assert_eq!(poll_presses(&sys), (0, 1));
+    }
+
+    /// Windows pairs every left press it posts, whatever loop polls (a
+    /// bar's, a puzzle's, the end of a move's, the game over's) and
+    /// whether the latch reports it or not: the second comes as
+    /// WM_LBUTTONDBLCLK, which a poll pumps unless it saw a left press
+    /// edge (0x0041a2b5), and the window procedure sets 0x00496118 with
+    /// the cursor state 5 (0x00419c79).
+    #[test]
+    fn every_left_press_feeds_the_double_click_pairing() {
+        let sys = Sys::new(Mixer::new());
+        sys.now_ms.set(1000);
+        // Any loop's poll reads the first press; it pairs with the next.
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.now_ms.set(1200);
+        left(&sys, true);
+        // The poll that reads the second press (an edge) does not pump.
+        assert_eq!(poll_presses(&sys), (1, 0));
+        sys.double_click().dispatch(5, false);
+        assert!(!sys.double_click().flag);
+        // The next poll pumps it.
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.double_click().dispatch(5, false);
+        assert!(sys.double_click().flag);
+        sys.double_click().clear();
+        // A latched press pairs too, and its poll pumps at once.
+        sys.now_ms.set(3000);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        left(&sys, false);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (0, 1));
+        sys.double_click().dispatch(5, false);
+        assert!(sys.double_click().flag);
+        // A pumped message no loop tested is gone at the next poll.
+        sys.double_click().clear();
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.now_ms.set(5000);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        left(&sys, false);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (0, 1));
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.double_click().dispatch(5, false);
+        assert!(!sys.double_click().flag);
+    }
+
+    /// While the mouse is locked (the warp loop) Windows sees a press at
+    /// its cursor, the loop's pointer, not at the locked mouse.
+    #[test]
+    fn a_locked_press_pairs_at_the_windows_cursor() {
+        let sys = Sys::new(Mixer::new());
+        sys.now_ms.set(1000);
+        sys.double_click().first_press(1000, 320, 240);
+        sys.set_mouse_locked(true);
+        sys.set_locked_cursor((320, 240));
+        // The press event carries (1, 1).
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        assert!(sys.double_click().menu_press());
+        sys.set_locked_cursor((100, 100));
+        left(&sys, false);
+        assert_eq!(poll_presses(&sys), (0, 0));
+        sys.now_ms.set(1100);
+        sys.double_click().first_press(1100, 320, 240);
+        left(&sys, true);
+        assert_eq!(poll_presses(&sys), (1, 0));
+        assert!(!sys.double_click().menu_press());
     }
 }

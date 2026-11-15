@@ -1569,6 +1569,51 @@ fn music_ring_matches_original() {
     assert!(bad.is_empty(), "{bad:?}");
 }
 
+/// While the game's loops are held (the original's input poll blocked
+/// while its window is not the active one, `Runner::hold`), the ring gets
+/// no refill (`FUN_0043318c` is the loops'), only the 200 Hz timer's
+/// releases: the driver loops the ring's 8 blocks as they stand, the
+/// second pass of the ring the first again; running, the refills go on.
+#[test]
+fn a_held_game_refills_no_music_block() {
+    use atlantis_engine::audio::Source;
+    use atlantis_engine::music::MusicRingSource;
+    let Some(g) = game("a_held_game_refills_no_music_block") else {
+        return;
+    };
+    let name = &g.exe.music_names[0];
+    let data = Arc::new(read(&g, &format!("WAV\\{name}")));
+    const PASS: usize = (MusicRing::RING_SIZE / 4) as usize;
+    let passes = |held: bool| {
+        let mixer = Mixer::new();
+        mixer.set_loops_held(held);
+        let mut ring = MusicRing::wine(data.clone());
+        assert!(ring.start());
+        let mut src = MusicRingSource::new(ring).held_by(mixer.loops_held_flag());
+        let mut out = vec![0i16; 2 * 2 * PASS];
+        for chunk in out.chunks_mut(2 * 1024) {
+            assert_eq!(src.read(chunk), chunk.len() / 2);
+        }
+        out[..2 * PASS] == out[2 * PASS..]
+    };
+    assert!(passes(true), "held: the ring as it stood");
+    assert!(!passes(false), "running: refilled");
+    // A sequence that makes no refill call (the snakes' win animation,
+    // `Mixer::set_refill_held`) holds it the same way.
+    let mixer = Mixer::new();
+    mixer.set_refill_held(true);
+    let mut ring = MusicRing::wine(data.clone());
+    assert!(ring.start());
+    let mut src = MusicRingSource::new(ring)
+        .held_by(mixer.loops_held_flag())
+        .held_by(mixer.refill_held_flag());
+    let mut out = vec![0i16; 2 * 2 * PASS];
+    for chunk in out.chunks_mut(2 * 1024) {
+        assert_eq!(src.read(chunk), chunk.len() / 2);
+    }
+    assert!(out[..2 * PASS] == out[2 * PASS..], "refill held");
+}
+
 /// Every StartMusik / NewSound value of the scripts names an entry of the
 /// executable's tables, and the file is in the archives.
 #[test]
@@ -1709,8 +1754,8 @@ fn new_game_plays_the_intro() {
 }
 
 /// Chapter=2 from chapter 1: the next CON loaded and its /INIT run, the
-/// arrival scan with ArriveeVue = LastVue, and the place loop's own arrival
-/// scan queued (LastVue != 0).
+/// arrival scan with ArriveeVue = LastVue, which stays set, and the place
+/// loop's own arrival scan queued (LastVue != 0).
 #[test]
 fn chapter_change_loads_the_next_con() {
     let Some(g) = game("chapter_change_loads_the_next_con") else {
@@ -1733,6 +1778,7 @@ fn chapter_change_loads_the_next_con() {
             scripts.script.sections().len(),
             e.arrival_scan_pending,
             e.arrival_from_vue,
+            e.vars.get("arriveevue"),
         ));
     };
     let mut runner = Runner::new(sys, task);
@@ -1741,11 +1787,15 @@ fn chapter_change_loads_the_next_con() {
         frame += 1;
         assert!(frame < 100_000);
     }
-    let (chapter, var, sections, pending, from) = result.borrow().unwrap();
+    let (chapter, var, sections, pending, from, arrivee) = result.borrow().unwrap();
     assert_eq!((chapter, var), (2, 2));
     assert!(sections > 0);
     assert!(pending);
     assert_eq!(from, 1);
+    // ARRIVEEVUE = LastVue (FUN_00427634 @ 0x00427782) is not cleared by
+    // the chapter's /sel scan: the place loop clears it before the warp
+    // loop (@ 0x00423be7).
+    assert_eq!(arrivee, 1);
     let ev = trace.borrow();
     find(&ev, 0, |e| *e == Event::ChapterLoaded(2));
 }

@@ -423,16 +423,23 @@ impl HexaGame {
 struct Host<'a>(PuzzleHost<'a>);
 
 impl HexaIo for Host<'_> {
+    /// FUN_004404fc polls once a pass (0x004406a7); FUN_00441390 then
+    /// reads the pointer for the drop, the pick and the grab offsets
+    /// (0x004413be..0x004414a1) and the cursor FUN_00440cb8 draws there,
+    /// with no pump in between: a click is at the previous pass's pointer
+    /// ([`PuzzleHost::read_input_held_pointer`]), so a dropped piece lands
+    /// where the last frame showed it.
     fn start_input(&mut self) -> (i32, i32, bool, bool) {
-        let m = self.0.read_input();
-        // The handler reads the bar request the poll toggled.
+        let m = self.0.read_entry_held_pointer();
         (m.x, m.y, m.click, self.0.e.bar.request)
     }
     fn right_handled(&mut self) {
         self.0.e.bar.request = false;
     }
     fn boundary(&mut self, _g: &HexaGame) -> (i32, i32, bool, bool) {
-        self.start_input()
+        let m = self.0.read_input_held_pointer();
+        // The handler reads the bar request the poll toggled.
+        (m.x, m.y, m.click, self.0.e.bar.request)
     }
     fn draw_background(&mut self) {
         self.0.draw_background();
@@ -479,6 +486,11 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     game.force_held_402 = e.hexa_forces_402();
     game.object_in_hand = e.vars.get("objetenmain");
     game.flag_temp6 = e.vars.get("flagtemp6");
+    // FUN_004406fc, before the loop and before any poll, sets OBJETENMAIN
+    // to 0x192 (0x0044076e) and then to 0 (0x00440883): the Escape test of
+    // FUN_0041a298 (0x0041a3fc..0x0041a415) sees an empty hand whatever
+    // the player entered with.
+    e.vars.set("objetenmain", 0);
     let mut host = Host(PuzzleHost::new(e, hooks));
     host.0.screen.pictures = vec![bg];
     host.0.screen.frames = frames;
@@ -486,9 +498,8 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     let r = game.run(&mut host).await;
     let e = host.0.e;
     e.puzzles.cursor = game.cursor;
-    // FUN_004406fc set OBJETENMAIN to 0 and FlagTemp6 to 1 (the 1997
-    // build: to 1 when 402 was in hand, else left).
-    e.vars.set("objetenmain", 0);
+    // FUN_004406fc set FlagTemp6 to 1 (the 1997 build: to 1 when 402 was
+    // in hand, else left).
     e.vars.set("flagtemp6", game.flag_temp6);
     if e.should_abort() {
         1
@@ -513,6 +524,44 @@ mod tests {
             g.flag_temp6,
             g.object_in_hand,
         )
+    }
+
+    /// FUN_00410eb5 / FUN_00410e35 leave out the last word (639, 479)
+    /// when (638, 479) is covered too (0x00410efe / 0x00410e80, 0x00410ead):
+    /// a piece off the board over the bottom-right corner, with that cell
+    /// of class 31, takes the first largest class of the other cells (a
+    /// tie: 0), not 31. Without (638, 479) the corner still counts.
+    #[test]
+    fn corner_word_left_out_after_a_covered_word() {
+        let place = |dx: Vec<i16>| {
+            let mut map = vec![0u8; 640 * 480];
+            map[479 * 640 + 637] = 0x1f;
+            map[479 * 640 + 639] = 0x1f;
+            let n = dx.len();
+            let cov = Coverage { dx, dy: vec![0; n] };
+            let mut g = HexaGame::new(map.clone(), vec![cov]);
+            g.map = map;
+            g.pieces[0].base = 0;
+            g.pieces[0].orient = 0;
+            assert!(g.place_piece(0, 637, 479));
+            g.pieces[0].cls
+        };
+        // (637, 638, 639): 0x1f, 0, 0x1f; the corner is not counted.
+        assert_eq!(place(vec![0, 1, 2]), 0);
+        // (635, 637, 639): no covered word before the corner: counted.
+        assert_eq!(place(vec![-2, 0, 2]), 0x1f);
+        assert_eq!(
+            MetaGame::cells(
+                &[Coverage {
+                    dx: vec![0, 1],
+                    dy: vec![0, 0]
+                }],
+                0,
+                638,
+                479
+            ),
+            vec![479 * 640 + 638]
+        );
     }
 
     /// FUN_004406fc places the three pieces whatever the player holds;
@@ -594,5 +643,112 @@ mod latch_tests {
         assert_eq!(free, 3);
         assert_eq!(turns(true, true), Some(0));
         assert_eq!(turns(true, false), Some(3));
+    }
+
+    /// The turns of a held piece over 20 hexagon reads with the input
+    /// `push` gives at each frame.
+    fn turns_with(test: &str, push: impl FnMut(&Rc<crate::sys::Sys>, u64)) -> Option<i16> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            test,
+            move |mut e| async move {
+                let mut hooks = crate::hooks::NoScripts;
+                let mut host = Host(PuzzleHost::new(&mut e, &mut hooks));
+                let mut g = HexaGame::new(Vec::new(), Vec::new());
+                g.held = 1;
+                for _ in 0..20 {
+                    g.read_boundary(&mut host);
+                    g.right_button(&mut host);
+                    host.0.e.sys.frame().await;
+                }
+                g2.set(Some(g.pieces[0].orient - PIECES[0].orient));
+            },
+            push,
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// FUN_0042e624 tests the whole GetAsyncKeyState word (0x0042e664),
+    /// so a right click pressed and released between two polls is a press
+    /// at the next one (VK_RBUTTON in edge mode, FUN_0042e6dc): the held
+    /// piece turns once.
+    #[test]
+    fn a_right_click_between_two_reads_turns_the_piece() {
+        let got = turns_with("hexa_right_click_between_reads", |sys, frame| {
+            if frame == 5 {
+                button(sys, MouseButton::Right, true);
+                button(sys, MouseButton::Right, false);
+            }
+        });
+        if let Some(t) = got {
+            assert_eq!(t, 1);
+        }
+    }
+
+    /// A right press on the poll a left press edge returns from
+    /// (0x0041a2b5) is lost: that poll set the right latch, and the
+    /// button still held at the next polls is no press.
+    #[test]
+    fn a_right_press_with_a_left_click_turns_nothing() {
+        let got = turns_with(
+            "hexa_right_press_with_left_click",
+            |sys, frame| match frame {
+                5 => {
+                    button(sys, MouseButton::Left, true);
+                    button(sys, MouseButton::Right, true);
+                }
+                7 => button(sys, MouseButton::Left, false),
+                12 => button(sys, MouseButton::Right, false),
+                _ => {}
+            },
+        );
+        if let Some(t) = got {
+            assert_eq!(t, 0);
+        }
+    }
+}
+
+#[cfg(test)]
+mod click_pointer_tests {
+    use super::*;
+
+    // FUN_00441390 reads the pointer the pass's poll (0x004406a7) left
+    // unpumped on a press.
+    crate::puzzle::assets::click_pointer_test!(
+        hexa_click_at_the_previous_pointer,
+        Host,
+        |h: &mut Host<'_>| {
+            let (x, y, click, _) = h.start_input();
+            (x, y, click)
+        },
+        (100, 100)
+    );
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+
+    /// The original polls only after each present (one poll a pass): the
+    /// port's entry read steps no F5, a pass's read one.
+    #[test]
+    fn f5_steps_once_a_pass_and_not_at_entry() {
+        let Some(entry) = f5_steps("hexa_f5_entry", |h| {
+            Host(h).start_input();
+        }) else {
+            return;
+        };
+        let pass = f5_steps("hexa_f5_pass", |h| {
+            let mut io = Host(h);
+            io.start_input();
+            io.boundary(&HexaGame::new(Vec::new(), Vec::new()));
+        });
+        assert_eq!((entry, pass), (0, Some(1)));
     }
 }

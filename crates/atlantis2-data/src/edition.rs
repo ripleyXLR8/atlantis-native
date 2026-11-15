@@ -15,7 +15,18 @@
 //! on the four languages' installations. The North American CD's differs
 //! from GOG's English by one line. The Italian *Atlantis Collection*'s is
 //! Italian's only known one: no GOG.com depot of Atlantis II holds Italian.
+//! The Polish CD's (1999) is Polish's only known one.
+//!
+//! The language also tells the code page the texts are read in
+//! ([`Language::text_code_page`]): the original passes the bytes of
+//! `loc\*.txt` to `TextOutA` with fonts made in `DEFAULT_CHARSET`
+//! (`CreateFontA` @ 0x00404cc8; atlantis2-cd-pl-2183168 @ 0x0046f2a1), so
+//! they are read in the system's ANSI code page, the one each edition was
+//! made for: Windows-1252 for the Western ones, Windows-1250 for the
+//! Polish CD (atlantis2-re `binaries/atlantis2-cd-pl-2183168.md`, "Text
+//! code page").
 
+use atlantis_data::TextCodePage;
 use md5::{Digest, Md5};
 
 use crate::exe::Build;
@@ -28,6 +39,7 @@ pub enum Language {
     German,
     Spanish,
     Italian,
+    Polish,
 }
 
 impl Language {
@@ -39,12 +51,36 @@ impl Language {
             Language::German => "German",
             Language::Spanish => "Spanish",
             Language::Italian => "Italian",
+            Language::Polish => "Polish",
+        }
+    }
+
+    /// The code page its texts are read in: the system code page of the
+    /// Windows the edition was sold for. Windows-1250 for Polish (the
+    /// Polish CD's `loc\*.txt` use 0xb9 `ą`, 0xb3 `ł`, 0xbf `ż`, 0x9c `ś`,
+    /// 0xe6 `ć`, 0xf1 `ń`, 0xea `ę`, 0x9f `ź`...), Windows-1252 for the
+    /// others.
+    pub fn text_code_page(self) -> TextCodePage {
+        match self {
+            Language::Polish => TextCodePage::Windows1250,
+            Language::English
+            | Language::French
+            | Language::German
+            | Language::Spanish
+            | Language::Italian => TextCodePage::Windows1252,
         }
     }
 }
 
+/// The code page of the texts of a folder whose language is `language`:
+/// the language's, Windows-1252 when it is not known (every edition but
+/// the Polish CD).
+pub fn text_code_page(language: Option<Language>) -> TextCodePage {
+    language.map_or(TextCodePage::Windows1252, Language::text_code_page)
+}
+
 /// The known `loc\Menu.txt` files: size, MD5, language.
-pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 7] = [
+pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 8] = [
     // The French CD's (1999), installed.
     (
         1371,
@@ -109,6 +145,15 @@ pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 7] = [
         ],
         Language::Italian,
     ),
+    // The Polish CD (1999), installed (`loc\MENU.TXT`, Windows-1250).
+    (
+        1106,
+        [
+            0x12, 0xeb, 0x5e, 0x1c, 0x33, 0x79, 0xda, 0xc9, 0xe2, 0xcc, 0xb1, 0x61, 0x56, 0xa9,
+            0x71, 0xc1,
+        ],
+        Language::Polish,
+    ),
 ];
 
 /// The language of a `loc\Menu.txt`, `None` when it is no known file.
@@ -160,6 +205,7 @@ mod tests {
                 "6eb362c3e9ca619762b1779957cd52c4",
                 "67bb8bd3b2dc54ec76676c0001dd1c7d",
                 "785dd7a466785197b81418b08c69bdef",
+                "12eb5e1c3379dac9e2ccb16156a971c1",
             ]
         );
         // A file of a known size but other bytes names no language.
@@ -191,7 +237,7 @@ mod tests {
 
     #[test]
     fn labels() {
-        let [cd, patch, gog, w10, _, us, collection] = &KNOWN_BUILDS;
+        let [cd, patch, gog, w10, _, us, collection, pl] = &KNOWN_BUILDS;
         assert_eq!(
             edition_label(gog, Some(Language::German)),
             "Atlantis II, GOG.com, German (patch 1.01)"
@@ -220,5 +266,33 @@ mod tests {
             edition_label(collection, Some(Language::Italian)),
             "Atlantis II, Italian Collection (patch 1.01)"
         );
+        assert_eq!(
+            edition_label(pl, Some(Language::Polish)),
+            "Atlantis II, Polish CD (1999)"
+        );
+    }
+
+    #[test]
+    fn code_pages() {
+        assert_eq!(
+            text_code_page(Some(Language::Polish)),
+            TextCodePage::Windows1250
+        );
+        for l in [
+            Language::English,
+            Language::French,
+            Language::German,
+            Language::Spanish,
+            Language::Italian,
+        ] {
+            assert_eq!(text_code_page(Some(l)), TextCodePage::Windows1252);
+        }
+        assert_eq!(text_code_page(None), TextCodePage::Windows1252);
+        // The Polish letters at their Windows-1250 bytes.
+        let pl = TextCodePage::Windows1250.decode(&[
+            0xb9, 0xea, 0xb3, 0xbf, 0x9c, 0xe6, 0xf1, 0xf3, 0x9f, 0xa5, 0xca, 0xa3, 0xaf, 0x8c,
+            0xc6, 0xd1, 0xd3, 0x8f,
+        ]);
+        assert_eq!(pl, "ąęłżśćńóźĄĘŁŻŚĆŃÓŹ");
     }
 }

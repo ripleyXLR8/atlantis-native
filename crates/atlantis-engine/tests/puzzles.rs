@@ -866,9 +866,14 @@ impl CrabIo for CrabReplay<'_> {
         let (x, y, c, _) = self.r.input();
         (x, y, c)
     }
-    fn boundary(&mut self, g: &CrabGame) -> (i32, i32, bool) {
+    /// The harness stubs FUN_0041a298 and writes the next pass's input at
+    /// the boundary FUN_0043318c.
+    fn poll(&mut self) -> Option<(i32, i32, bool)> {
+        None
+    }
+    fn boundary(&mut self, g: &CrabGame) -> Option<(i32, i32, bool)> {
         self.r.close(&crab_state(g));
-        self.start_input()
+        Some(self.start_input())
     }
     fn load_picture(&mut self, name: &str) {
         self.r.add(&format!("picture {name}"));
@@ -964,8 +969,9 @@ impl MuriaIo for MuriaReplay<'_> {
     fn play_sound(&mut self, slot: i32) {
         self.0.sound(&slot.to_string());
     }
-    async fn script_hook(&mut self, _flag_temp3: i32) {
+    async fn script_hook(&mut self, _flag_temp3: i32) -> Option<(i32, i32)> {
         self.0.sound("script");
+        None
     }
     fn aborted(&self) -> bool {
         self.0.aborted()
@@ -1089,13 +1095,31 @@ impl Engine {
 /// the input of pass i is in the queue when the engine reads it. The first
 /// pass's click cannot be (a button already down when a puzzle starts is
 /// no click): the scenarios used have none.
+///
+/// The golden sets the pointer of every pass; through the engine's input
+/// a click is handled at the pointer of the pass before it in the puzzles
+/// whose handler reads the pointer after their one poll a pass
+/// (FUN_0041a298 returns before its message pump on a press edge), so the
+/// mouse moves to a click's place one pass early.
 fn replay_in_engine(g: Game, id: i32, object: i32, s: &Scenario) -> i32 {
     let mut e = Engine::new(g, id, object);
     let mut colours = 0;
-    for (i, l) in s.lines.iter().enumerate() {
+    let pass = |l: &str| -> (i32, i32, bool, bool) {
         let tok: Vec<&str> = l[..l.find('|').unwrap()].split_whitespace().collect();
-        let (x, y) = (tok[1].parse().unwrap(), tok[2].parse().unwrap());
-        e.pass(x, y, tok[3] == "1", tok.get(4) == Some(&"1"));
+        (
+            tok[1].parse().unwrap(),
+            tok[2].parse().unwrap(),
+            tok[3] == "1",
+            tok.get(4) == Some(&"1"),
+        )
+    };
+    for (i, l) in s.lines.iter().enumerate() {
+        let (x, y, click, right) = pass(l);
+        let (x, y) = match s.lines.get(i + 1).map(|n| pass(n)) {
+            Some((nx, ny, true, _)) if !click => (nx, ny),
+            _ => (x, y),
+        };
+        e.pass(x, y, click, right);
         if e.result().is_some() {
             break;
         }

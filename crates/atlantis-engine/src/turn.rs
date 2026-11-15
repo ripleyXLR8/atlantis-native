@@ -76,6 +76,9 @@ pub struct TransitionTurn {
     stall_b: u8, // [EBP-0xc]
     phase: u8,
     n: u8,
+    /// A phase-1 frame whose stop test is still to come (it follows the
+    /// frame's poll: the call @ 0x00421670, the test from 0x00421675).
+    test_pending: bool,
 }
 
 impl TransitionTurn {
@@ -104,12 +107,28 @@ impl TransitionTurn {
             stall_b: 0,
             phase: 1,
             n: 0,
+            test_pending: false,
         }
+    }
+
+    /// The stored angles 0x00bcb59c / 0x00bcb598 as the poll after a frame
+    /// left them: `FUN_00451915` stores the frame's angles wrapped and
+    /// clamped, and `FUN_0041a298` (@ 0x00421670 / 0x00421a5a) adds
+    /// 0.034906 rad per held view key (0x0041a33c..0x0041a3ba). Phase 1's
+    /// stop test after that poll (from 0x00421675) and the next frame's
+    /// step read these. A caller that sets nothing keeps the frame's own
+    /// angles (the emulated golden stubs `FUN_00451915` and the poll).
+    pub fn set_angles(&mut self, alpha: f32, beta: f32) {
+        self.alpha = alpha;
+        self.beta = beta;
     }
 
     /// The next frame, `running` the flag 0x00496124 as the input poll
     /// after the previous frame left it; `None` once the turn is over.
     pub fn next_frame(&mut self, running: bool) -> Option<TurnFrame> {
+        if std::mem::take(&mut self.test_pending) && self.phase1_ends() {
+            self.phase = 2;
+        }
         if self.phase == 1 && !running {
             self.phase = 2;
         }
@@ -138,13 +157,13 @@ impl TransitionTurn {
             fov_set: self.zoom,
             fov: self.fov,
         };
-        if self.phase == 1 && self.phase1_ends() {
-            self.phase = 2;
-        }
+        // The stop test comes after the frame's poll: at the next call,
+        // after [`TransitionTurn::set_angles`].
+        self.test_pending = self.phase == 1;
         Some(frame)
     }
 
-    /// Phase 1's stop tests after a frame.
+    /// Phase 1's stop tests after a frame and its poll.
     fn phase1_ends(&mut self) -> bool {
         let mut da = (f64::from(self.alpha) - f64::from(self.src_alpha)) as f32;
         if 0.0 > da {
@@ -239,23 +258,55 @@ fn step(
 /// WM_LBUTTONDBLCLK (0x00419b49 -> 0x00419c79..0x00419c8b) when the cursor
 /// state 0x004968ac is 5 (`FUN_00422fcc`'s navigate cursor, zone 1..511) or
 /// the menu request 0x00496138 is 1; the window class has CS_DBLCLKS
-/// (style 0xb @ 0x0042e4eb). The turn `FUN_004212cc` pumps the messages on
-/// every frame (`FUN_0041a298` @ 0x00421670 / 0x00421a5a) and does not call
+/// (style 0xb @ 0x0042e4eb). The turn `FUN_004212cc` polls after every
+/// frame (`FUN_0041a298` @ 0x00421670 / 0x00421a5a) and does not call
 /// `FUN_00422fcc` (0x0049616c = 1), so the navigate state of the clicked
 /// zone holds through it: a double click whose second press comes during
-/// the turn skips the video.
+/// the turn skips the video. The poll that reads the second press returns
+/// before its pump (0x0041a2b5), so the next poll of the turn dispatches
+/// it; after the turn's last poll nothing pumps before the test
+/// (0x00423f8a), so a second press read there leaves the flag at 0.
+///
+/// A double click whose second press ends a dialog line of the departure
+/// scan (`FUN_00427814` @ 0x00423dd4) does the same: the press is a new
+/// edge that ends the line, and `FUN_0041a298` returns at once without
+/// pumping (0x0041a2b5), so the WM_LBUTTONDBLCLK stays queued until a
+/// later poll pumps it: a following line's, or the turn's. The window
+/// procedure then tests the cursor state of that moment; a talking-head
+/// line clears the flag at its end (`FUN_0042ee88` @ 0x0042f78c), before
+/// the next pump ([`TurnDoubleClick::queue_press`],
+/// [`TurnDoubleClick::dispatch`]).
 ///
 /// When Windows sends WM_LBUTTONDBLCLK is the system's rule, not the
 /// binary's: a second press within the double-click time of the first,
 /// inside a rectangle centred on it (GetDoubleClickTime, SM_CXDOUBLECLK /
 /// SM_CYDOUBLECLK), 500 ms and 4 x 4 pixels by default (inferred: the
-/// Windows defaults; the player's setting is not known).
+/// Windows defaults; the player's setting is not known). Windows pairs
+/// every left press it sees, whatever loop of the game reads it (the
+/// buttons are read only through `FUN_0042e624`'s GetAsyncKeyState, which
+/// does not take the messages), so the pairing is [`crate::sys::Sys`]'s:
+/// each poll's read pairs the left presses queued since the previous one,
+/// latched or not, in order ([`TurnDoubleClick::queue_press`]), and
+/// pumps the queued WM_LBUTTONDBLCLK when it saw no left press edge
+/// (`FUN_0041a298` returns before PeekMessageA on an edge, 0x0041a2b5;
+/// [`TurnDoubleClick::pump`]). Whether the window procedure set the flag
+/// on it is the polling loop's test ([`TurnDoubleClick::dispatch`]), made
+/// where the flag can still be read: the turn, a move's film, a line of
+/// the departure scan. The stores `0x00496118 = 0` ([`TurnDoubleClick::clear`])
+/// pump nothing: a message no poll pumped stays queued.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TurnDoubleClick {
     /// 0x00496118.
     pub flag: bool,
     /// A first press is kept.
     armed: bool,
+    /// A WM_LBUTTONDBLCLK is queued, not yet pumped.
+    queued: bool,
+    /// The last poll pumped a WM_LBUTTONDBLCLK; the window procedure's
+    /// test is the polling loop's ([`TurnDoubleClick::dispatch`]).
+    pumped: bool,
+    /// The last press paired came as WM_LBUTTONDBLCLK.
+    last_double: bool,
     first_ms: u64,
     first: (i32, i32),
 }
@@ -266,18 +317,38 @@ impl TurnDoubleClick {
     /// SM_CXDOUBLECLK / SM_CYDOUBLECLK's default.
     pub const RECT_SIZE: i32 = 4;
 
-    /// A left press that is not the second of a pair (the click that ends
-    /// the warp loop).
+    /// A left press that starts a pair (not the second of one).
     pub fn first_press(&mut self, ms: u64, x: i32, y: i32) {
         self.armed = true;
         self.first_ms = ms;
         self.first = (x, y);
     }
 
-    /// A later left press; `cursor_mode` is 0x004968ac, `menu_request`
-    /// 0x00496138. True when it is a double click (whether or not it sets
-    /// the flag); the press after a double click starts a new pair.
+    /// A later left press read by a poll that pumps
+    /// ([`TurnDoubleClick::queue_press`], [`TurnDoubleClick::pump`], then
+    /// [`TurnDoubleClick::dispatch`]); `cursor_mode` is 0x004968ac,
+    /// `menu_request` 0x00496138. True when it is a double click (whether
+    /// or not it sets the flag); the press after a double click starts a
+    /// new pair.
     pub fn press(&mut self, ms: u64, x: i32, y: i32, cursor_mode: u8, menu_request: bool) -> bool {
+        let double = self.queue_press(ms, x, y);
+        self.pump();
+        self.dispatch(cursor_mode, menu_request);
+        double
+    }
+
+    /// The store `0x00496118 = 0` (the warp loop's entry and frames, the
+    /// end of a film, of a move, of a talking-head line, StartMusik /
+    /// StopMusik): a message the last poll pumped went before it; one no
+    /// poll pumped is still queued.
+    pub fn clear(&mut self) {
+        self.flag = false;
+        self.pumped = false;
+    }
+
+    /// A left press, in the order Windows saw them: queues
+    /// WM_LBUTTONDBLCLK when it is the second of a pair. True when it is.
+    pub fn queue_press(&mut self, ms: u64, x: i32, y: i32) -> bool {
         let (dx, dy) = (x - self.first.0, y - self.first.1);
         let half = Self::RECT_SIZE / 2;
         let double = self.armed
@@ -286,13 +357,109 @@ impl TurnDoubleClick {
             && (-half..=half).contains(&dy);
         if double {
             self.armed = false;
+            self.queued = true;
+        } else {
+            self.first_press(ms, x, y);
+        }
+        self.last_double = double;
+        double
+    }
+
+    /// A poll starts: the message the previous one pumped is gone (its
+    /// loop made no test of it).
+    pub fn poll_started(&mut self) {
+        self.pumped = false;
+    }
+
+    /// A poll without a left press edge pumps the queue (`FUN_0041a298`
+    /// @ 0x0041a2be).
+    pub fn pump(&mut self) {
+        if std::mem::take(&mut self.queued) {
+            self.pumped = true;
+        }
+    }
+
+    /// The menu loops (`FUN_0041c838`, `FUN_0041d5f4`, `FUN_0041d940`,
+    /// `FUN_0041ec7c`, `FUN_0041cf78`, `FUN_0041dea4`) pump at their walk's
+    /// polls and apply the message themselves: true when the left press
+    /// they just read came as WM_LBUTTONDBLCLK (not WM_LBUTTONDOWN); the
+    /// queue is pumped and the flag 0x00496118 is the caller's.
+    pub fn menu_press(&mut self) -> bool {
+        self.queued = false;
+        self.pumped = false;
+        self.last_double
+    }
+
+    /// The window procedure on a WM_LBUTTONDBLCLK the last poll pumped:
+    /// it sets the flag when the cursor state 0x004968ac is 5 or the menu
+    /// request 0x00496138 is 1.
+    pub fn dispatch(&mut self, cursor_mode: u8, menu_request: bool) {
+        if std::mem::take(&mut self.pumped) {
             // 0x00419c79: CMP byte [0x004968ac],5 / CMP [0x00496138],1
             if cursor_mode == 5 || menu_request {
                 self.flag = true;
             }
-        } else {
-            self.first_press(ms, x, y);
         }
-        double
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn pair(d: &mut TurnDoubleClick, ms: u64, x: i32, y: i32) -> bool {
+        d.queue_press(ms, x, y);
+        d.menu_press()
+    }
+
+    #[test]
+    fn menu_presses_pair_as_windows_does() {
+        let mut d = TurnDoubleClick::default();
+        assert!(!pair(&mut d, 1000, 10, 10));
+        assert!(pair(&mut d, 1400, 12, 8));
+        // The press after a double click starts a new pair.
+        assert!(!pair(&mut d, 1500, 12, 8));
+        // Too late, too far.
+        assert!(!pair(&mut d, 2000, 12, 8));
+        assert!(!pair(&mut d, 2100, 15, 8));
+        assert!(pair(&mut d, 2200, 15, 8));
+        // A menu's own walk dispatches the message: nothing stays queued
+        // for a later pump, and the flag is the caller's.
+        d.pump();
+        d.dispatch(5, true);
+        assert!(!d.flag);
+        // The click that ended the warp loop pairs with a menu press.
+        d.first_press(3000, 100, 100);
+        assert!(pair(&mut d, 3100, 101, 99));
+    }
+
+    /// A store `0x00496118 = 0` pumps nothing: a WM_LBUTTONDBLCLK no poll
+    /// pumped is still queued for the next pumping poll; one a poll pumped
+    /// went with it.
+    #[test]
+    fn a_clear_keeps_an_unpumped_double_click() {
+        let mut d = TurnDoubleClick::default();
+        d.first_press(1000, 320, 240);
+        assert!(d.queue_press(1100, 320, 240));
+        d.clear();
+        d.pump();
+        d.dispatch(5, false);
+        assert!(d.flag);
+        let mut d = TurnDoubleClick::default();
+        d.first_press(1000, 320, 240);
+        assert!(d.queue_press(1100, 320, 240));
+        d.pump();
+        d.clear();
+        d.dispatch(5, false);
+        assert!(!d.flag);
+        // A pumped message the polling loop did not test is gone at the
+        // next poll.
+        let mut d = TurnDoubleClick::default();
+        d.first_press(1000, 320, 240);
+        assert!(d.queue_press(1100, 320, 240));
+        d.pump();
+        d.poll_started();
+        d.dispatch(5, false);
+        assert!(!d.flag);
     }
 }

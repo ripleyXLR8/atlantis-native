@@ -531,6 +531,8 @@ impl MenuRules {
 /// 22), or a FONTMAX glyph. The build's and the port's rules are `rules`
 /// ([`MenuRules`]). The records are the walk's own
 /// ([`walk_menu_text_in`] keeps them in the session's table).
+/// Returns the walk's iterations: it calls the input poll `FUN_0041a298`
+/// once per iteration (@ 0x0041fd03), after the `/fin` test.
 pub fn walk_menu_text(
     t: &[u8],
     menu: i32,
@@ -539,15 +541,16 @@ pub fn walk_menu_text(
     toggle_b: i32,
     rules: MenuRules,
     walk: &mut MenuWalk,
-) {
-    walk_menu_text_in(t, menu, hover_line, toggle_a, toggle_b, rules, walk, None);
+) -> usize {
+    walk_menu_text_in(t, menu, hover_line, toggle_a, toggle_b, rules, walk, None)
 }
 
 /// [`walk_menu_text`] with the session's record table: the walk reads the
 /// stored records from the menu's block (whatever an earlier walk, another
 /// menu's overflow or the LOAD picker left there) and writes them back;
 /// `walk.records` then receives the menu's count records. Without a table
-/// (or a menu number), the walk's own records, unbounded.
+/// (or a menu number), the walk's own records, unbounded. Returns the
+/// walk's iterations, as [`walk_menu_text`].
 #[allow(clippy::too_many_arguments)]
 pub fn walk_menu_text_in(
     t: &[u8],
@@ -558,7 +561,7 @@ pub fn walk_menu_text_in(
     rules: MenuRules,
     walk: &mut MenuWalk,
     table: Option<&mut MenuRecordTable>,
-) {
+) -> usize {
     let table_menu = usize::try_from(menu)
         .ok()
         .filter(|&m| m < MenuRecordTable::MENUS);
@@ -589,7 +592,9 @@ pub fn walk_menu_text_in(
         }
         q
     };
+    let mut polls = 0;
     while p < size && !walk_at(t, p, b"/fin") {
+        polls += 1; // FUN_0041a298 @ 0x0041fd03
         let mut draw = true;
         // The hovered line's flag 0x004860a0 (atlantis-cd-zh-tw-696832
         // FUN_0041f5a0 @ 0x0041f6c9..0x0041f707): menu 2's lines 2 and 4
@@ -791,6 +796,7 @@ pub fn walk_menu_text_in(
             walk.records.resize(rec.count, MenuRecord::default());
         }
     }
+    polls
 }
 
 /// `FUN_004210c0`: the first record strictly containing the point, its

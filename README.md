@@ -45,15 +45,23 @@ been checked mostly by automated replays against the original's code and
 by the developer's own play, not yet by many players: reports are
 welcome.
 
-*Atlantis Evolution* (2004) is new in 0.7.0: GOG.com's edition, in its five
+*Atlantis Evolution* (2004) is new in 0.7.0 in GOG.com's edition, in its five
 languages, from the splash screens and the main menu through the whole
 story to the end, with its dialogs, inventory, documents, saves and
-puzzles, its videos and sounds decoded as the original decodes them. Its
-engine is a new one (the GOG.com edition is a Tetraedge Engine program,
-not Cryo's), drawn by the graphics card with OpenGL (or WebGL 2 in the
-browser), or by the processor. It has been checked by automated replays
-of the whole story against the original's scripts and by the developer's
-own play (see [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution)).
+puzzles, its videos and sounds decoded as the original decodes them.
+GOG.com does not sell the 2004 program: its edition is a 2012 version of
+the game on the Tetraedge Engine, not on Cryo's engine, so Atlantis Native
+has a new engine for it, drawn by the graphics card with OpenGL (or WebGL 2
+in the browser), or by the processor. It has been checked by automated
+replays of the whole story against the original's scripts and by the
+developer's own play (see [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution)).
+
+**In progress:** the original 2004 CD program of *Atlantis Evolution*
+(Cryo's own engine, grown from *Atlantis III*'s), on a development branch
+(`a4cd/m0`). Its panoramas, chapter scripts, music, Bink films and the
+ship's pitching already run on the *Atlantis III* engine, each traced
+to the original's code; its menus, dialogs, inventory, saves and
+puzzles do not yet. It is not playable yet and not in the releases.
 
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
@@ -260,6 +268,7 @@ For *Atlantis II*:
 | CD (1999, version 1.00) | French | the folder of the installed game (with `atlantis2.exe`), the images of its four CDs (or copies of the CDs) in it or in a folder inside it; in the browser, copies of the CDs (folders `CD1` to `CD4`, say, each holding the disc's `DATAS_A2`): it reads files, not images |
 | CD with the official patch 1.01 | French or English (one executable for both; tested with the French CD) | the same, with the patched `atlantis2.exe` |
 | CD, North American release (*Beyond Atlantis*, DreamCatcher, 2000, 4 CDs; its own program, version 1.01's code) | English | the same as the French CD; in the browser, copies of the CDs |
+| CD, Polish release (1999, 4 CDs; its own program, version 1.01's code; texts in Windows-1250) | Polish | the same as the French CD (the installed folder, with the images or copies of the four CDs); in the browser, copies of the CDs |
 | [GOG.com](https://www.gog.com/) (version 1.01; the builds of 2018, June 2022 and July 2022) | English, French, German, Spanish (one executable for all four) | the installation folder |
 | *Atlantis Collection*, Italian DVD compilation (2014; shown as *Italian Collection (patch 1.01)*, its program being version 1.01 patched almost as GOG's 2018 build) | Italian | the folder its installer creates for *Atlantis 2 - Beyond Atlantis* (with `Game.exe` and `DATAS_A2`) |
 
@@ -448,6 +457,13 @@ The subtitle font, Liberation Sans Regular
 (`assets/fonts/LiberationSans-Regular.ttf`, Copyright (c) 2010 Google
 Corporation, Copyright (c) 2012 Red Hat, Inc.), is licensed under the SIL
 Open Font License, version 1.1 (see `assets/fonts/LICENSE-LiberationSans`).
+
+The game library's font, P052 Roman and Italic
+(`assets/fonts/P052-Roman.otf`, `P052-Italic.otf`, URW's Palatino-style
+face from the urw-base35-fonts, Copyright 2015 URW Software, 2013, 2014
+(URW)++ Design & Development), is licensed under the GNU Affero General
+Public License, version 3, with a font exception (see
+`assets/fonts/LICENSE-P052`).
 
 The Chinese subtitle fonts, subsets of Noto Serif TC Regular and Noto
 Serif SC Regular (`assets/fonts/NotoSerifTC-Subset.otf`,

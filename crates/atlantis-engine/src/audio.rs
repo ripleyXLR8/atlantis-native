@@ -1,11 +1,13 @@
 //! The sound mixer: the engine starts, stops and adjusts voices; the front
 //! end pulls mixed samples at its device rate.
 //!
-//! Volumes and balance follow ScummVM's mixer, which the C++ port's sound
-//! levels were written for: volume 0..255, balance -127 (left) .. 127
-//! (right), the far side attenuated linearly; rate conversion by linear
-//! interpolation (ScummVM's default converter).
+//! Volumes are the original's Miles values 0..127 (the sample volume and
+//! the digital master volume), turned into a gain by Miles' DirectSound law
+//! ([`miles_gain`]); balance -127 (left) .. 127 (right), the far side
+//! attenuated linearly (the pan law is `ambient::miles_pan_balance`); rate
+//! conversion by linear interpolation (ScummVM's default converter).
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 /// Decoded PCM: interleaved 16-bit samples.
@@ -91,15 +93,25 @@ struct State {
 }
 
 /// Shared between the engine (control) and the audio thread (`fill`).
+///
+/// The second field: the game's loops are held (the original's input poll
+/// blocked while its window is not the active one, [`crate::sys::Runner::hold`]),
+/// read by the music ring, whose refills those loops run. The third: a
+/// sequence of the game that runs no refill is playing
+/// ([`Mixer::set_refill_held`]).
 #[derive(Clone)]
-pub struct Mixer(Arc<Mutex<State>>);
+pub struct Mixer(Arc<Mutex<State>>, Arc<AtomicBool>, Arc<AtomicBool>);
 
 impl Default for Mixer {
     fn default() -> Self {
-        Mixer(Arc::new(Mutex::new(State {
-            master: 255,
-            ..State::default()
-        })))
+        Mixer(
+            Arc::new(Mutex::new(State {
+                master: 127,
+                ..State::default()
+            })),
+            Arc::new(AtomicBool::new(false)),
+            Arc::new(AtomicBool::new(false)),
+        )
     }
 }
 
@@ -182,6 +194,32 @@ impl Mixer {
         self.0.lock().unwrap().master = master;
     }
 
+    /// The game's loops held (`true`) or running: the original's input
+    /// poll blocked while its window is not the active one, so that no
+    /// loop refills the music ring ([`crate::music::MusicRingSource`]);
+    /// the voices play on.
+    pub fn set_loops_held(&self, held: bool) {
+        self.1.store(held, Ordering::Relaxed);
+    }
+
+    /// The flag [`Mixer::set_loops_held`] sets, for a source to read on
+    /// the audio thread.
+    pub fn loops_held_flag(&self) -> Arc<AtomicBool> {
+        self.1.clone()
+    }
+
+    /// A sequence of the game that makes no `FUN_0043318c` call runs
+    /// (`true`) or has ended: the music ring gets no refill meanwhile
+    /// ([`crate::music::MusicRingSource`]), its release goes on.
+    pub fn set_refill_held(&self, held: bool) {
+        self.2.store(held, Ordering::Relaxed);
+    }
+
+    /// The flag [`Mixer::set_refill_held`] sets.
+    pub fn refill_held_flag(&self) -> Arc<AtomicBool> {
+        self.2.clone()
+    }
+
     /// Pauses (silence, nothing advances) or resumes every voice.
     pub fn set_paused(&self, paused: bool) {
         self.0.lock().unwrap().paused = paused;
@@ -195,9 +233,9 @@ impl Mixer {
         if s.paused {
             return;
         }
-        let master = f32::from(s.master) / 255.0;
+        let master = s.master;
         s.voices.retain_mut(|v| {
-            let vol = f32::from(v.volume) / 255.0 * master;
+            let vol = miles_gain(master, v.volume);
             let b = i32::from(v.balance);
             let (lg, rg) = if b < 0 {
                 (vol, vol * (127 + b) as f32 / 127.0)
@@ -267,6 +305,28 @@ impl Mixer {
     }
 }
 
+/// The amplitude Miles gives a sample of volume `volume` under the digital
+/// master volume `master` (both 0..127), MSS32.DLL's DirectSound back-end:
+/// 0x2000dc60 clamps the sample volume to 0..127 (0x2000dc71..0x2000dc86),
+/// computes v = master x volume / 127 with `idiv` (truncated,
+/// 0x2000dc8d..0x2000dc9d), clamps v to 0..127, and passes
+/// IDirectSoundBuffer::SetVolume (0x2000dcc7) the centibels of helper
+/// 0x2000dcd0: -10000 for v = 0, 0 for v = 127, else
+/// trunc(-2000 x log10(127 / v)) (fyl2x, x -2000.0 @ 0x2001e008, ftol
+/// 0x20016458 with the rounding control set to chop). DirectSound's
+/// attenuation is in hundredths of a decibel: amplitude 10^(cb / 2000).
+/// So master x volume < 127 is silent.
+pub fn miles_gain(master: u8, volume: u8) -> f32 {
+    let volume = i32::from(volume).min(127);
+    let v = (i32::from(master) * volume / 127).clamp(0, 127);
+    let cb = match v {
+        0 => -10000.0,
+        127 => 0.0,
+        v => (-2000.0 * libm::log10(127.0 / f64::from(v))).trunc(),
+    };
+    libm::pow(10.0, cb / 2000.0) as f32
+}
+
 /// Adds one frame (left, right) to `frame` (1 or 2 channels).
 fn mix(frame: &mut [f32], channels: usize, l: f32, r: f32) {
     if channels == 1 {
@@ -289,7 +349,7 @@ mod tests {
             channels: 1,
             samples: Arc::new(vec![16384; 10]),
         };
-        let id = m.play(pcm, false, 255, 127);
+        let id = m.play(pcm, false, 127, 127);
         let mut out = vec![0.0; 2 * 8];
         m.fill(&mut out, 100, 2);
         assert_eq!(out[0], 0.0); // left silent at full right
@@ -321,7 +381,7 @@ mod tests {
     #[test]
     fn stream_plays_to_its_end() {
         let m = Mixer::new();
-        let id = m.play_source(Box::new(Ramp(0)), 255, 0);
+        let id = m.play_source(Box::new(Ramp(0)), 127, 0);
         let mut out = vec![0.0; 2 * 2000];
         m.fill(&mut out, 100, 2);
         assert_eq!(out[2 * 1999], 1999.0 / 32768.0);
@@ -329,5 +389,25 @@ mod tests {
         assert!(m.is_playing(id));
         m.fill(&mut out, 100, 2);
         assert!(!m.is_playing(id));
+    }
+
+    /// MSS32.DLL 0x2000dc60 + 0x2000dcd0: the product truncated by 127, the
+    /// centibels truncated; master x volume < 127 is silent.
+    #[test]
+    fn volume_follows_the_miles_law() {
+        let db = |m, v| 20.0 * f64::from(miles_gain(m, v)).log10();
+        assert_eq!(miles_gain(127, 127), 1.0);
+        // The sample volume clamped.
+        assert_eq!(miles_gain(127, 200), 1.0);
+        // Silent where master x volume < 127 (Native once played at -42 dB).
+        assert_eq!(miles_gain(126, 1), 10f32.powf(-5.0));
+        assert_eq!(miles_gain(0, 127), 10f32.powf(-5.0));
+        // master 11 x volume 23 / 127 = 1: trunc(-2000 log10 127) = -4207.
+        assert!((db(11, 23) - -42.07).abs() < 1e-3, "{}", db(11, 23));
+        // The default levels: 127 x 0x6e / 127 = 110: trunc(-124.8) = -124.
+        assert!((db(127, 0x6e) - -1.24).abs() < 1e-4, "{}", db(127, 0x6e));
+        // master 64 x 0x6e / 127 = 55 (55.4 truncated).
+        let cb = (-2000.0 * (127.0f64 / 55.0).log10()).trunc();
+        assert!((db(64, 0x6e) - cb / 100.0).abs() < 1e-4);
     }
 }

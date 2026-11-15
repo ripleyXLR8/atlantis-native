@@ -163,6 +163,7 @@ with three groups, those of the ScummVM port:
 | `restored_content` | off | CHAPI063's timer lines of Anna can play (each condition starts from a clear key buffer); with the 2001 and May 1997 English and French builds, a second death in a section plays the next narrator line, as the 1999 and August 1997 French builds do |
 | `ui_ux` | off | the error box of the seven lines whose talking head the original cannot open is not shown (the line is skipped either way) |
 | `arrow_keys` | on | the arrow keys turn the view as F5 to F8 do in the warp loop (the original's input poll reads F5 to F8 only), and the LOAD list takes Enter as OK and Up / Down as a row click (the original's list reads no key); off with `--original` |
+| `background_run` | on | the game goes on while its window is not the active one; off with `--original`, as the original: its input poll pumps the window's messages while the window is not the active, foreground, unminimised one (the WM_ACTIVATEAPP flag 0x00496128), so no frame, film, line or music refill runs until it is again; its 200 Hz timer still runs (the music ring's releases, so the ring's blocks repeat, the fades), the sounds playing go on and the clocks count the time away (`Runner::hold`). Read by the desktop front ends, `atlantis-app` and `atlantis-sdl`; the browser build holds a hidden page whatever this says (see the web build) |
 
 The bug fixes, each with its `settings.ini` key; the last nine fix a
 bug of some games only (`BugFix::applies`: the build's tables, and for
@@ -184,6 +185,8 @@ its executable's language:
 | `fix_snakes_first_win` | all | `SnakesGame::frame` | the four snakes puzzle is won only with every snake released (on a first run the original's snakes not yet released hold zeroed memory, so the first piece carried to the screen's top left corner wins) |
 | `fix_puzzle_escape` | all | `puzzle::assets::poll_flags`, `Engine::puzzle_escape_latches` | an Escape inside a puzzle is not latched (the original clears its run flag and sets the menu request, which no puzzle reads and the place loop clears only after the puzzle's /sel scan: the hexagon then turns no piece on a right click, and the first voice-only line or game-over narration after the puzzle stops at once: Muria's hint, the rat's meow, the crab's /941 narration) |
 | `fix_gameover_puzzle` | all | `Engine::no_click_exit`, `Scripts::play_section`, `Engine::game_over_cleared_at_once` | a game over that leaves the warp loop without a click (a timer section's, one after the inventory bar) ends the place loop's pass at once, GAMEOVER cleared as its screen ends (the original's warp loop returns the zone under the pointer whatever ended it, and its place loop runs the puzzle armed there, the view reload and a /sel scan, or the zone-999 scan, before it tests GAMEOVER, which stays set until the reload: the scan's section meets the executor's game-over test after its first line and shows the picture again; reachable in CHAPI044, whose guards' timer can fire with the throne lock armed under the pointer at view 281; the in-game menu's LOAD and QUIT take the same exit, without the puzzle: a zone 999 under the pointer runs its scan, its lines cut at their first poll) |
+| `fix_any_disc` | all | `Engine::load_wam`, `Engine::read_from_drive`, `BigArchive::on_disc` | a WAM is read from whichever disc's archive holds it (the original has one archive open, the disc in the drive's, then looks in the file system: its WAM loader shows an error box "Fichier introuvable : wam\\..." for a file that disc lacks and keeps the WAM in memory; reachable in CHAPI079, disc 4, whose back gate in PALAIS3 runs `ChangeWam=atlan4.wam`, a WAM of disc 1: the original shows the box and stays in PALAIS3, with the fix the player enters the day city). The WAM loads only: the panoramas and films of a move that crosses to another disc's files are read from any disc either way (no shipped script reaches one) |
+| `fix_load_order` | all | `Engine::player_checkpoints`, `ui::menus::original_load_order` | the LOAD list shows the player's checkpoints in ascending chapters, each once (the original copies the names `p<letter>*.gam` in the folder's FindFirstFile order, the first 0x80, then runs a swap pass whose two tests, strcmp and then the lengths, disagree on names of different lengths: `pa1` .. `pa6`, `pa9`, `pa11` written in that order are listed 1 to 6, 11, 9); either way the same files are listed, a chapter-0 file left out |
 | `fix_hexagon_pieces` | the 1997, Chinese, DVD and Perfect Edition builds (`hexa_forces_402` false) | `puzzle::hexa`, `force_held_402` | the hexagon puzzle always shows its pieces, as the later builds do (those builds place them only when the player enters holding object 402 or with FLAGTEMP6 = 2) |
 | `fix_loadmusik` | May 1997 French (`music_load_all_or_nothing`) | `Engine::music_list_command` | LOADMUSIK copies its tracks one by one, as the other builds do, but still nothing below a current music volume of 5 (see [Game builds](#game-builds)) |
 | `fix_sharp_s` | (not the Czech and Brazilian CDs, whose 0xe1 is `á` with a glyph) a text the sprite fonts draw holds 0xe1 (`FixData::sharp_s`: the credits, the menus (`*MENU.TXT`, `ERRORn.TXT`, `WAIT.TXT`; not the developers' leftovers of the Japanese DVD's `SPRLIST`) but where the build draws bytes above 0xa8 as spaces, EPI.TXT but where the LOAD list is sprites, whose Chinese double-byte names hold 0xe1): of the known data, the German CD's and the German DVD's EPI.TXT | `ui::layout::spell_sharp_s`, `MenuRules::sharp_s_as_ss` | the `ß` of the LOAD list's names (byte 0xe1, which no sprite font has a glyph for: the original draws nothing and moves on 7 pixels) is drawn as two `s` ("verläßt" reads "verlässt"), in the rows and in the centred title, and so in every text drawn with the menu, player-name and credits fonts |
@@ -265,7 +268,13 @@ rules:
 [Atlantis II](#atlantis-ii-in-progress).
 
 `--original` turns every fix and the two other groups off, for the run
-only. Otherwise they are read from
+only. In the first game it also starts the run with the original's
+values of the menu options `settings.ini` keeps: SUBTITLES off
+(0x004960a8), OMNI 3D MODE 1 (0x004960ac = 0) and the volumes `7f 6e 6e
+6e` (0x00495e70..), data bytes that only the menus and the checkpoint
+reader write, so every run of the original starts with them
+(`Options::original_start_values`, not written back; a checkpoint load
+sets its own). Otherwise they are read from
 `settings.ini` (see [Players, checkpoints and settings](GUIDE.md#players-checkpoints-and-settings)),
 which the first start writes with the defaults; the options menu (F10)
 turns them on and off: Fix original bugs (On, Off, or Custom (n/N) over
@@ -297,9 +306,11 @@ the run without writing it; the browser goes full screen only on a user
 gesture). With both, the menu's rows are 20 pixels high instead of 24
 (`OptionsMenu::layout`), to keep a margin on the 640 x 480 screen. The
 bug fixes' box does the same with its rows (`OptionsMenu::fix_layout`):
-24 pixels high, else 20, else 18 (`DENSE_ROW_H`: only the boxes of the
-Simplified Chinese CD and the May 1997 German CD, which list the most
-fixes), the first height that leaves 8 pixels around the box. The
+24 pixels high, else 20, else 18 (`DENSE_ROW_H`), else 17
+(`TIGHT_ROW_H`), with 8-pixel gaps between its groups, else 17 with
+4-pixel gaps (`NARROW_GAP_H`: only the Simplified Chinese CD's box with
+one of the data's fixes, sixteen fixes), the first of those
+(`FIX_STEPS`) that leaves 8 pixels around the box. The
 engine's own save of `settings.ini` (the game's options page) keeps the
 front end's keys as stored: the graphics mode, the HD options, the
 enhancements and full screen.
@@ -1430,7 +1441,25 @@ back) into `yucatan-*.png`.
   `cine019/055/066` in `DATAS_A2\APC\`, the ones films read, match none of
   GOG's four languages' voices nor its own `APC\DIAL\CINE*`, which the
   original never reads; by ear the former sound Russian and the latter are
-  Italian (`fix_film_language` plays the latter). The languages differ only in data: `loc\` (texts,
+  Italian (`fix_film_language` plays the latter). The Polish CD's
+  `atlantis2.exe` (4 CDs, 1999; `atlantis2-cd-pl-2183168`, 2183168 bytes,
+  PE timestamp 0x3815d8ef, MD5 `f2b6f7bfa3c1952dceddfa1a662ebb84`) carries
+  the French CD's version string 3.15 but is 1.01's code and link layout,
+  built three weeks before the patch: `Release::V101`, none of GOG's
+  patches, 1.01's listener table (atlantis2-re
+  `binaries/atlantis2-cd-pl-2183168.md`). Its install (`data1.cab` of
+  CD1) is the French CD's but for `atlantis2.exe` and `loc\` (Polish
+  texts, GOG's `Atl_Font.ttf` and `Font.txt` heights, no
+  `[CharacterSet]`); its discs are the French CD's but for the dubbed
+  voices of `datas_a2\apc\dial\`, two film tracks and seven `pz_araig`
+  files (the spider's textures renamed without accents and its models
+  rewritten to them). Its texts are Windows-1250: the original passes them
+  to `TextOutA` in fonts made in `DEFAULT_CHARSET`, so they are read in the
+  system's code page, 1250 on the Polish Windows the edition was sold for.
+  The port reads the code page from the language
+  (`edition::Language::text_code_page`, `A2Files::text_code_page`):
+  `SubtitleFont::load` looks each byte's glyph up in it, Windows-1250 for
+  Polish, Windows-1252 for every other edition (`tests/pl_cd.rs`). The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
@@ -3602,7 +3631,8 @@ back) into `yucatan-*.png`.
   (the port does not), and what Direct3D, which the original calls only
   at start-up and when the display is set up, does to the word.
 - **Dialogs** (`dialog.rs`, `hnm_stream.rs`, `subtitle.rs`, `sound.rs`):
-  a world's `loc\Dial<XX>.txt` (the texts, Windows-1252),
+  a world's `loc\Dial<XX>.txt` (the texts, Windows-1252; Windows-1250 for
+  the Polish CD),
   `scenar\com<XX>.txt` (speaker, mood, stand, camera, kind of each line)
   and `scenar\info<XX>.txt` (the speakers) are read with the world; a
   dialog collects its lines, loads each speaker's head per stand, and
@@ -4491,6 +4521,15 @@ one byte against GOG's 2018 `Game.exe`, the `loc` files, every subtitle against
 the executable's layout, every letter, the voices, the film tracks, the three
 intro films, the music, a subtitle, the menu and a save; `tests/flow.rs`'s whole
 game with the mouse played again on it, `it-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_PL`, `ATLANTIS2_DISCS_PL` the Polish CD's installed folder
+(`data1.cab` of its first disc extracted) and its CDs (`tests/pl_cd.rs`: the
+executable by its MD5, the edition's name and language, Windows-1250, the
+`loc` files, every subtitle laid out, every letter a glyph unlike its base
+letter and unlike its Windows-1252 reading, the Polish letters in every font,
+the spider's renamed textures and its web drawn as on the French CD, a
+subtitle, the main menu's tooltip and a save, the browser's way of opening
+it; `tests/flow.rs`'s whole game with the mouse played again on it;
+`pl-*.png` with `ATLANTIS2_PNG_DIR`),
 `ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
 German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
 `1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older

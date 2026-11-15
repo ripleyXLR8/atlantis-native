@@ -146,7 +146,8 @@ pub struct Line {
     pub video: Option<String>,
     /// The voice, in `datas_a2\apc\dial\`: `<NNN_MM>.apc`.
     pub voice: String,
-    /// The subtitle (Windows-1252).
+    /// The subtitle, bytes in the edition's code page (Windows-1252;
+    /// Windows-1250 for the Polish CD).
     pub text: Vec<u8>,
     /// The tick range of a `cinema` line's subtitle.
     pub from: i32,

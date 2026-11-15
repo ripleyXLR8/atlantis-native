@@ -63,7 +63,8 @@ pub struct WarpLookFrame {
 
 /// `FUN_0041bfa0` steps 2..5 on the stored view angles (0x00bcb59c /
 /// 0x00bcb598): ANGLEWARPX / ANGLEWARPY from the angles as the frame
-/// starts, then the mouse deltas of the pointer motion (x right, y down):
+/// starts, then the mouse deltas of the pointer motion (x right, y down;
+/// [`WarpPointer::motion`]):
 /// dx = -motion x; dy = -motion y in OMNI 3D MODE 1 (0x004960ac == 0, the
 /// default), +motion y in MODE 2 (0x0041c1c3..0x0041c20d); the momentum;
 /// and, when the new angles differ from the previous frame's,
@@ -102,24 +103,55 @@ pub fn warp_look_frame(
 }
 
 /// The pointer that the warp loop hit-tests at its exit (`FUN_00422bb0`
-/// reads 0x004960ec / 0x004960f0) and the previous frame's view angles it
-/// compares with (0x0049698c / 0x00496990). Both live across warp loops:
+/// reads 0x004960ec / 0x004960f0), the previous point the look delta is
+/// taken from (0x006ce074 / 0x006ce02c) and the previous frame's view
+/// angles it compares with (0x0049698c / 0x00496990). They live across
+/// warp loops:
 ///
-/// - the loop does not set the pointer at entry (0x0041bfa0 entry block);
-/// - every frame, when alpha or beta differs from the stored angles, the
-///   pointer is recentred at (320, 240) (0x0041c2bb..0x0041c301), then the
-///   angles are stored (0x0041c357 / 0x0041c363). They start at -1.0 in
-///   the image, so the first loop of a session always recentres;
-/// - the panorama load `FUN_0044a424` leaves it at (0x140, 0x140)
+/// - the loop does not set the pointer at entry (0x0041bfa0 entry block),
+///   it sets the previous point to it (0x0041c003 / 0x0041c00d);
+/// - every frame, step 3 takes the delta previous point minus pointer
+///   (0x0041c1c3..0x0041c20d, [`WarpPointer::motion`]); step 5 recentres
+///   the pointer at (320, 240) when alpha or beta differs from the stored
+///   angles (0x0041c2bb..0x0041c301), then sets the previous point to the
+///   pointer (0x0041c32c..0x0041c34c) and stores the angles (0x0041c357 /
+///   0x0041c363). The angles start at -1.0 in the image, so the first loop
+///   of a session always recentres;
+/// - the previous point has no other writer than the bar close
+///   (`FUN_0042c098` @ 0x0042c28e / 0x0042c298, with the pointer at
+///   (320, 240) @ 0x0042c275): the motion of the mouse during a timer
+///   section's lines or the in-game menu (which write neither) is in the
+///   next frame's delta;
+/// - the panorama load `FUN_0044a424` leaves the pointer at (0x140, 0x140)
 ///   (0x0044a70b / 0x0044a715, no SetCursorPos);
-/// - the WM_MOUSEMOVE handler (0x00419c14) sets it to the mouse position,
-///   so after a dialog or a video during which the mouse moved it is the
-///   last mouse position.
+/// - the WM_MOUSEMOVE handler (0x00419bfa, stores @ 0x00419c10..0x00419c29)
+///   sets it to the message's point, the Windows cursor's, so after a
+///   dialog or a video during which the mouse moved it is the last mouse
+///   position.
+///
+/// The Windows cursor is kept apart ([`WarpPointer::cursor`]): only
+/// SetCursorPos moves it besides the mouse, at the step-5 recentre
+/// (0x0041c312), on every turn frame (0x00421593, 0x0042197d), at the bar
+/// close (`FUN_0042c098`, dc:22557) and in the ogre puzzle (dc:37103);
+/// each of them writes the pointer too. So after a panorama load the
+/// pointer is (0x140, 0x140) while the cursor stays where it was, and the
+/// first WM_MOUSEMOVE puts the pointer at the cursor plus the motion: the
+/// look delta of that frame is the whole distance (round 7, navigation).
+/// That Windows reports the cursor's real position in WM_MOUSEMOVE, and
+/// not one relative to the game's pointer, is [INFERRED] (the system's
+/// rule; the program side is static).
 ///
 /// The pointer is (0, 0) in the image.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WarpPointer {
+    /// 0x004960ec / 0x004960f0.
     pub pos: (i32, i32),
+    /// The Windows cursor (GetCursorPos's point, SetCursorPos's target),
+    /// in screen coordinates; outside the warp loop it is the system mouse
+    /// ([`crate::sys::Sys::mouse`]).
+    pub cursor: (i32, i32),
+    /// 0x006ce074 / 0x006ce02c.
+    pub prev: (i32, i32),
     pub prev_alpha: f32,
     pub prev_beta: f32,
 }
@@ -128,6 +160,8 @@ impl Default for WarpPointer {
     fn default() -> Self {
         WarpPointer {
             pos: (0, 0),
+            cursor: (0, 0),
+            prev: (0, 0),
             prev_alpha: -1.0,
             prev_beta: -1.0,
         }
@@ -135,41 +169,80 @@ impl Default for WarpPointer {
 }
 
 impl WarpPointer {
-    /// `FUN_0044a424` @ 0x0044a70b / 0x0044a715.
+    /// `FUN_0044a424` @ 0x0044a70b / 0x0044a715: the pointer only, no
+    /// SetCursorPos.
     pub fn panorama_loaded(&mut self) {
         self.pos = (0x140, 0x140);
     }
 
-    /// WM_MOUSEMOVE (0x00419c14).
+    /// WM_MOUSEMOVE (0x00419c14): the cursor moved to `p`, the pointer
+    /// with it.
     pub fn mouse_moved(&mut self, p: (i32, i32)) {
+        self.cursor = p;
         self.pos = p;
     }
 
-    /// The bar close `FUN_0042c098` and the step-5 recentre.
-    pub fn recentre(&mut self) {
-        self.pos = (320, 240);
+    /// The Windows cursor where the system mouse is, the pointer left as
+    /// it is (no WM_MOUSEMOVE: the mouse did not move).
+    pub fn cursor_at(&mut self, p: (i32, i32)) {
+        self.cursor = p;
     }
 
-    /// One warp frame: the pointer follows the motion (relative look,
-    /// clamped to the screen), then step 5 recentres it when the new angles
-    /// differ from the stored ones. The stored angles are those the frame
-    /// ends with (after the clamp `FUN_00451915`, @ 0x0041c351..0x0041c363).
-    /// True when recentred.
-    pub fn frame(
-        &mut self,
-        dx: i32,
-        dy: i32,
-        new_alpha: f32,
-        new_beta: f32,
-        end_alpha: f32,
-        end_beta: f32,
-    ) -> bool {
-        self.pos.0 = i32::from(self.pos.0.saturating_add(dx).clamp(0, 639) as i16);
-        self.pos.1 = i32::from(self.pos.1.saturating_add(dy).clamp(0, 479) as i16);
+    /// The pointer at (320, 240) and SetCursorPos(320, 240): the step-5
+    /// recentre (0x0041c2e6..0x0041c312), the turn frames (0x0042156a..
+    /// 0x00421593, 0x00421954..0x0042197d).
+    pub fn recentre(&mut self) {
+        self.pos = (320, 240);
+        self.cursor = self.pos;
+    }
+
+    /// The warp loop's entry (0x0041c003 / 0x0041c00d): the previous point
+    /// is the pointer.
+    pub fn loop_entry(&mut self) {
+        self.prev = self.pos;
+    }
+
+    /// The bar close `FUN_0042c098`: the pointer at (320, 240) (@
+    /// 0x0042c275), SetCursorPos(320, 240) (dc:22557) and the previous
+    /// point with it (@ 0x0042c28e / 0x0042c298).
+    pub fn bar_closed(&mut self) {
+        self.recentre();
+        self.prev = self.pos;
+    }
+
+    /// The relative motion of the mouse (x right, y down): it moves the
+    /// Windows cursor, clamped to the screen (Windows keeps it on the
+    /// 640x480 screen in fullscreen [INFERRED: the system's rule; the game
+    /// imports no ClipCursor]), and WM_MOUSEMOVE sets the pointer to it
+    /// (0x00419c10..0x00419c29). No motion, no message: the pointer
+    /// stays.
+    pub fn follow(&mut self, dx: i32, dy: i32) {
+        if (dx, dy) == (0, 0) {
+            return;
+        }
+        self.cursor.0 = i32::from(self.cursor.0.saturating_add(dx).clamp(0, 639) as i16);
+        self.cursor.1 = i32::from(self.cursor.1.saturating_add(dy).clamp(0, 479) as i16);
+        self.pos = self.cursor;
+    }
+
+    /// The motion step 3 reads (x right, y down): the pointer minus the
+    /// previous point, so dx = prevX - x is its negation
+    /// (0x0041c1c3..0x0041c20d; [`warp_look_frame`]).
+    pub fn motion(&self) -> (i32, i32) {
+        (self.pos.0 - self.prev.0, self.pos.1 - self.prev.1)
+    }
+
+    /// Step 5 of one warp frame: the pointer recentred when the new
+    /// angles differ from the stored ones, the previous point set to the
+    /// pointer either way, and the stored angles those the frame ends with
+    /// (after the clamp `FUN_00451915`, @ 0x0041c351..0x0041c363). True
+    /// when recentred.
+    pub fn frame(&mut self, new_alpha: f32, new_beta: f32, end_alpha: f32, end_beta: f32) -> bool {
         let moved = new_alpha != self.prev_alpha || new_beta != self.prev_beta;
         if moved {
             self.recentre();
         }
+        self.prev = self.pos;
         self.prev_alpha = end_alpha;
         self.prev_beta = end_beta;
         moved
@@ -213,32 +286,95 @@ mod tests {
         // The first loop of a session: any view differs from -1.0.
         p.panorama_loaded();
         assert_eq!(p.pos, (320, 320));
-        assert!(p.frame(0, 0, 0.0, 0.0, 0.0, 0.0));
+        assert!(p.frame(0.0, 0.0, 0.0, 0.0));
         assert_eq!(p.pos, (320, 240));
         // A motion that does not turn the view moves the pointer.
-        assert!(!p.frame(15, -7, 0.0, 0.0, 0.0, 0.0));
+        p.follow(15, -7);
+        assert!(!p.frame(0.0, 0.0, 0.0, 0.0));
         assert_eq!(p.pos, (335, 233));
         // A checkpoint reload at the same angles: the loop keeps (320, 320).
         p.panorama_loaded();
-        assert!(!p.frame(0, 0, 0.0, 0.0, 0.0, 0.0));
+        assert!(!p.frame(0.0, 0.0, 0.0, 0.0));
         assert_eq!(p.pos, (320, 320));
         // After a dialog the last mouse position, kept while the view rests.
         p.mouse_moved((500, 400));
-        assert!(!p.frame(0, 0, 0.0, 0.0, 0.0, 0.0));
+        assert!(!p.frame(0.0, 0.0, 0.0, 0.0));
         assert_eq!(p.pos, (500, 400));
         // The pointer is clamped to the screen.
-        assert!(!p.frame(400, 400, 0.0, 0.0, 0.0, 0.0));
+        p.follow(400, 400);
+        assert!(!p.frame(0.0, 0.0, 0.0, 0.0));
         assert_eq!(p.pos, (639, 479));
         // Momentum moves the view: recentred; the stored angles are the
         // frame's end ones (after the pitch clamp), the test uses the new.
-        assert!(p.frame(0, 0, 0.01, 0.9, 0.01, 0.785398));
+        assert!(p.frame(0.01, 0.9, 0.01, 0.785398));
         assert_eq!(p.pos, (320, 240));
         assert_eq!(p.prev_beta, 0.785398);
         p.mouse_moved((10, 20));
-        assert!(p.frame(0, 0, 0.01, 0.9, 0.01, 0.785398));
-        // The bar close recentres.
+        assert!(p.frame(0.01, 0.9, 0.01, 0.785398));
+        // The bar close recentres, the previous point with it.
         p.mouse_moved((10, 20));
-        p.recentre();
-        assert_eq!(p.pos, (320, 240));
+        p.bar_closed();
+        assert_eq!((p.pos, p.prev), ((320, 240), (320, 240)));
+        assert_eq!(p.cursor, (320, 240));
+    }
+
+    // After a panorama load the Windows cursor is not at the pointer:
+    // FUN_0044a424 writes 0x004960ec / 0x004960f0 only (0x0044a70b /
+    // 0x0044a715), the loop's entry takes the previous point from the
+    // pointer (0x0041c003 / 0x0041c00d), and the first WM_MOUSEMOVE
+    // (0x00419c10..0x00419c29) sets the pointer to the cursor moved by the
+    // motion: the frame's delta is the whole distance (round 7).
+    #[test]
+    fn the_first_motion_after_a_load_takes_the_cursor() {
+        let mut p = WarpPointer {
+            prev_alpha: 0.0,
+            prev_beta: 0.0,
+            ..WarpPointer::default()
+        };
+        // A puzzle left the mouse at (600, 450).
+        p.cursor_at((600, 450));
+        p.panorama_loaded();
+        assert_eq!((p.pos, p.cursor), ((320, 320), (600, 450)));
+        p.loop_entry();
+        // A frame at rest (no motion, no WM_MOUSEMOVE) keeps both.
+        p.follow(0, 0);
+        assert!(!p.frame(0.0, 0.0, 0.0, 0.0));
+        assert_eq!((p.pos, p.cursor), ((320, 320), (600, 450)));
+        p.follow(1, 0);
+        assert_eq!(p.pos, (601, 450));
+        assert_eq!(p.motion(), (601 - 320, 450 - 320));
+        // A recentre (SetCursorPos) brings the cursor with the pointer.
+        assert!(p.frame(0.5, 0.0, 0.5, 0.0));
+        assert_eq!((p.pos, p.cursor), ((320, 240), (320, 240)));
+    }
+
+    // The look delta is previous point minus pointer (0x0041c1c3..
+    // 0x0041c20d), the previous point set at the loop entry, at step 5 and
+    // by the bar close only: a mouse motion during a timer section's lines
+    // or the in-game menu (the WM_MOUSEMOVE syncs) is in the next frame's
+    // delta, and a motion past the screen's edge is not (N7).
+    #[test]
+    fn the_look_delta_is_taken_from_the_previous_point() {
+        let mut p = WarpPointer {
+            prev_alpha: 0.0,
+            prev_beta: 0.0,
+            ..WarpPointer::default()
+        };
+        p.mouse_moved((320, 240));
+        p.loop_entry();
+        p.follow(5, -3);
+        assert_eq!(p.motion(), (5, -3));
+        assert!(!p.frame(0.0, 0.0, 0.0, 0.0));
+        assert_eq!(p.motion(), (0, 0));
+        // A menu or a timer dialog during which the mouse went to (600, 40).
+        p.mouse_moved((600, 40));
+        assert_eq!(p.motion(), (600 - 325, 40 - 237));
+        assert!(!p.frame(0.0, 0.0, 0.0, 0.0));
+        assert_eq!(p.motion(), (0, 0));
+        // At the right edge a motion further right gives no delta.
+        p.mouse_moved((639, 240));
+        p.loop_entry();
+        p.follow(100, 0);
+        assert_eq!(p.motion(), (0, 0));
     }
 }

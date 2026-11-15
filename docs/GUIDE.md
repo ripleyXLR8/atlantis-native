@@ -104,7 +104,7 @@ Italian, Swedish and Japanese; the drive, a copy of a side or the images
 of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 1.00), a CD installation with the official
 patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
-the GOG.com edition and the Italian *Atlantis Collection* DVD (see
+the Polish CD (1999), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
 English, French, German or Spanish; other editions are unknown and
 untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
@@ -161,7 +161,11 @@ last played selected. Each game is shown as its name and edition,
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
-German* or *Atlantis Evolution, GOG.com, English*, and its folder.
+German* or *Atlantis Evolution, GOG.com, English*, and its folder: the
+game's name in gold capitals, the edition beside it (why the folder does
+not open, in red, when it does not). The screen has the look of the web
+version's page, and its text and ornaments are drawn at the window's
+resolution, so they stay smooth in a large window or in full screen.
 
 | Action | Mouse | Keyboard |
 |---|---|---|
@@ -262,8 +266,8 @@ What to pick:
   cannot be read in the browser.
 - *Atlantis II*, GOG.com or the Italian *Atlantis Collection*: the
   installation folder (the one holding `Game.exe` and `DATAS_A2`).
-- *Atlantis II*, CD (the French CD, also patched to 1.01, or the North
-  American *Beyond Atlantis*): the folder of the
+- *Atlantis II*, CD (the French CD, also patched to 1.01, the North
+  American *Beyond Atlantis* or the Polish CD): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
   with a copy of each of the four CDs in it, for example in folders
   `CD1` to `CD4`, each holding the disc's `DATAS_A2` folder (copy the
@@ -538,6 +542,12 @@ with the images or copies of its four CDs. Its program has 1.01's code, so
 it plays as 1.01 too. Its intro starts with DreamCatcher's logo, and its
 second film ends without the *Atlantis II* title: that is how the disc has
 them.
+
+The Polish CD (1999, 4 CDs, Polish) installs and opens as the French CD
+does too: the installed folder with the images or copies of its four CDs.
+Its program has 1.01's code, so it plays as 1.01. Its texts are drawn with
+the Polish letters (ą ć ę ł ń ó ś ź ż), as on the Polish Windows the edition
+was made for.
 
 The Italian *Atlantis Collection* (DVD, 2014) installs one folder as GOG.com's
 does, Italian only: point Atlantis Native at it (no disc is needed). Its
@@ -949,7 +959,9 @@ the DVD's root alone lists its languages' paths.
 the player screen.
 
 `atlantis-native --original /path/to/game` plays the original game, bug for
-bug (see [Enhancements](TECHNICAL.md#enhancements)); with Atlantis II too
+bug (see [Enhancements](TECHNICAL.md#enhancements)), and starts with the
+original's options (SUBTITLES off, OMNI 3D MODE 1, the volumes 127, 110,
+110 and 110) whatever `settings.ini` keeps; with Atlantis II too
 (its music tracks then lose their last ~5.8 s when another follows, as
 in the original) and Atlantis III (GOG.com's Spanish edition then starts
 with the texture size its `Atlantis3.cfg` asks for, 1024).
@@ -1043,15 +1055,22 @@ them in each checkpoint and sets them again when one is loaded) and the [enhance
 each: one per bug fix (`fix_music_loop`, `fix_cinema_sound`, `fix_head_overlay`,
 `fix_bar_slide_out`, `fix_pickup_icon`,
 `fix_menu_records`, `fix_fifth_player`, `fix_snakes_first_win`,
-`fix_puzzle_escape`, `fix_gameover_puzzle`,
-`fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
+`fix_puzzle_escape`, `fix_gameover_puzzle`, `fix_any_disc`,
+`fix_load_order`, `fix_hexagon_pieces`, `fix_loadmusik`, `fix_sharp_s`,
 `fix_disc_revision`, `fix_menu_line_width`, `fix_chinese_rows`,
-`fix_subtitles_toggle`, `fix_dos_letters`, `fix_startup_logos`), `restored_content`, `ui_ux` and `arrow_keys`
+`fix_subtitles_toggle`, `fix_dos_letters`, `fix_startup_logos`), `restored_content`, `ui_ux`, `arrow_keys`
 (the arrow keys turn the view and the LOAD list takes Enter and ↑ ↓,
-`on` by default). SUBTITLES is off at first, as every start of the
+`on` by default) and `background_run` (the game goes on while its
+window is not the active one, `on` by default; off, and with
+`--original`, it stops as the original does, its clocks still counting
+the time away; the desktop builds only). SUBTITLES is off at first, as every start of the
 original; `--original` starts with it off whatever `settings.ini`
 keeps (a `settings.ini` written by an earlier version keeps the `on`
-it was written with). A
+it was written with), and also with OMNI 3D MODE 1 and the volumes
+127, 110, 110 and 110, as every start of the original; a checkpoint
+loaded then sets the ones it holds, and a choice confirmed in the
+menus is saved as usual. Without `--original` the OMNI 3D mode and the
+volumes start as `settings.ini` keeps them. A
 `settings.ini` written by an earlier version, with its single
 `minor_bug_fixes` line, is still read: that line sets every fix. It also keeps `music_on_disk`, the music tracks the original game
 would have copied to its folder (it reads them from the archives here),

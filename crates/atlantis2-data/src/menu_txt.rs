@@ -4,7 +4,8 @@
 //! `;` lines are comments; each section `[Name]` collects the lines after
 //! it, one string per line, up to `[EndMenu]`. A section with fewer lines
 //! than the pages need at the least gets a warning and is padded with
-//! copies of its last line. The texts are Windows-1252 bytes.
+//! copies of its last line. The texts are bytes in the edition's code
+//! page: Windows-1252, Windows-1250 for the Polish CD ([`crate::edition`]).
 
 /// The sections, in the order the reader pads them, and their minimum
 /// line counts (the pages use more lines than the minimum of the options

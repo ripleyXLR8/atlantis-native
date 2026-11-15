@@ -28,7 +28,7 @@ use crate::look::{WarpMomentum, WarpPointer};
 use crate::music::Music;
 use crate::persist::{MemStore, SaveStore, Settings};
 use crate::scripts::Scripts;
-use crate::sys::Sys;
+use crate::sys::{Input, MouseButton, Sys};
 use crate::ui::menus::MenuOutcome;
 use crate::ui::{BarSession, Guests, UiAssets};
 use crate::warp::Warp;
@@ -141,6 +141,9 @@ pub enum Abort {
     /// Exit was set: the end of the game for 86 (CHAPI085's, the only
     /// value shipped), the player screen again for any other value.
     Finished,
+    /// A command the original ends in a crash ([`Engine::original_fault`]):
+    /// the player screen again.
+    Fault,
 }
 
 /// How [`run`] starts.
@@ -173,6 +176,11 @@ pub struct Options {
     /// Where the players, the checkpoints and the settings are kept.
     pub saves: Rc<dyn SaveStore>,
     pub start: Start,
+    /// `--original`: OMNI 3D MODE 1 and the volumes `7f 6e 6e 6e` at the
+    /// start, as every run of the original (0x004960ac = 0, 0x00495e70..
+    /// data bytes), whatever `settings.ini` keeps; a checkpoint load still
+    /// sets the ones it holds.
+    pub original_start_values: bool,
 }
 
 impl Default for Options {
@@ -185,6 +193,7 @@ impl Default for Options {
             subtitles: true,
             saves: Rc::new(MemStore::new()),
             start: Start::default(),
+            original_start_values: false,
         }
     }
 }
@@ -213,6 +222,19 @@ pub struct Engine {
     /// A script Vue= entered a place: the place loop runs its arrival scan.
     pub arrival_scan_pending: bool,
     pub arrival_from_vue: u16,
+    /// The place a script Vue= entered, which the Vue= handler also stores
+    /// as the place loop's zone 0x006cd7f4 (`FUN_0042a100` @ 0x0042a659):
+    /// after a click section or a departure scan that ran it, the place
+    /// loop goes on with that value.
+    pub(crate) script_vue_place: Option<u16>,
+    /// 0x004960c0: set around the /con click scan of a character clicked
+    /// with an object in hand (`FUN_00425828` @ 0x00425882..0x004258ad);
+    /// `FUN_0041afd0` then draws no cursor (@ 0x0041afe8).
+    pub(crate) give_scan: bool,
+    /// 0x00496154: set by `FUN_004240fc` around a puzzle and its /sel scan
+    /// (@ 0x00424166, cleared @ 0x00424242); `FUN_0041afd0` then steps no
+    /// cursor (@ 0x0041b03a).
+    pub(crate) puzzle_scan: bool,
     /// A move ended: the place loop polls the input once and clears every
     /// input flag before the next arrival scan ([`Engine::end_of_move_input`]).
     pub move_input_poll: bool,
@@ -220,6 +242,14 @@ pub struct Engine {
     /// 0x006cd288 from the destination's record in the WAM being left; see
     /// [`Engine::execute_transition`]).
     pub move_cyclo: Option<(u16, String)>,
+    /// The panorama path buffer 0x006cd288, as the last writer left it:
+    /// every place load (`FUN_00421b4c` @ 0x00421bf9, the current record's
+    /// name) and the destination lookup of every exit click (`FUN_00421cfc`
+    /// @ 0x00423dc5, the destination's record in the current WAM, before
+    /// the departure scan). An AbortDepart ends the move with no place
+    /// load, so it keeps the destination's name; `FUN_004240fc` reloads it
+    /// after a puzzle (@ 0x004241dd). None before the first place load.
+    pub(crate) cyclo_path: Option<String>,
     /// The first arrival scan after a chapter load reads ArriveeVue =
     /// LastVue.
     pub(crate) arrival_after_load: bool,
@@ -250,6 +280,15 @@ pub struct Engine {
     /// voice-only line, the game-over wait) stops at once and puts both
     /// back; the end of a conversation puts them back too (0x00425be5).
     pub escape_request: bool,
+    /// The executor's exit (`FUN_0042844c` @ 0x00428d81) cleared the menu
+    /// request 0x00496138 while 0x00496124 stayed 0: of the latch
+    /// [`Engine::escape_request`] stands for, only the stop half is left
+    /// ([`Engine::menu_request`]). Set again with the latch
+    /// ([`Engine::latch_escape`]). Also set for the zone-999 scan after the
+    /// in-game menu's LOAD or QUIT, which leaves 0x00496124 = 0
+    /// (0x0041c9fc, 0x0041ca61) and clears 0x00496138 in its tail
+    /// (0x0041cbff..0x0041cc09).
+    pub menu_request_cleared: bool,
     /// The warp loop ended without a click, as the original's place loop
     /// then still acts on the zone under the pointer
     /// ([`Engine::no_click_exit`], [`BugFix::GameOverPuzzle`] off): `true`
@@ -262,12 +301,32 @@ pub struct Engine {
     /// The inventory records (0x006ce138): the object id of each, in
     /// order. The object in hand is OBJETENMAIN.
     pub inventory: Vec<i32>,
+    /// The records' icon bytes (0x006ce138 + 9 r), by index: `Some` for an
+    /// icon taken from a sprite-list row or a checkpoint, `None` (or no
+    /// entry) for the table's index of the id (`FUN_0042b328`). See
+    /// [`Engine::record_icon`].
+    pub inventory_icons: Vec<Option<u8>>,
+    /// The icon of the object in hand (0x006cd7ec) with the id it was set
+    /// for: a pick-up's row icon or a bar record's byte. For another id the
+    /// hand shows the table's index of the id. See [`Engine::held_icon`].
+    pub held_icon: Option<(i32, u8)>,
     /// The first record the bar shows (0x00496924).
     pub bar_first: usize,
     /// The visible slot whose x the last pick-up set (`FUN_004278a0` @
     /// 0x00427ae2, [`crate::ui::bar::pickup_slot_x`]), until the next
     /// slide-in resets the slot table.
     pub bar_pickup_slot: Option<usize>,
+    /// The slots' y, one per visible slot (the table 0x00611788) as the
+    /// last slide left them: the slide-in sets 499 and lowers each 7 a
+    /// frame to 443 (`FUN_0042c2c4` @ 0x0042c31b), the slide-out raises
+    /// each 7 a frame (`FUN_0042c59c` @ 0x0042c789), a pick-up puts its
+    /// slot back to 443 after the slide-in (`FUN_004278a0` @ 0x00427af0).
+    /// The bar loop and the hold loop draw the bar at slot 0's y and each
+    /// icon at its slot's (@ 0x0042c97d, 0x0042c9eb; 0x0042cdb4,
+    /// 0x0042ce2c) and the slide-out starts from them (@ 0x0042c65c,
+    /// 0x0042c6c9): 443 after a full slide-in, higher after one a GameOver
+    /// or an Exit cut short.
+    pub(crate) bar_slot_ys: [i32; crate::ui::bar::BAR_CELLS],
     /// The bar request and the right-press flag.
     pub bar: BarSession,
     /// The guests following the player, and whether they are shown
@@ -295,13 +354,17 @@ pub struct Engine {
     pub con_text_reload: bool,
     /// The sound menu's knobs, kept for the session (0 = the file's).
     pub son_knob_x: [i32; 4],
+    /// The LOAD rows' widths 0x00611e80, by chapter - 1 (atoi of the
+    /// checkpoint's name): written only by the rows drawer `FUN_00420b48`
+    /// for the rows it draws, zero at launch, kept for the process; the
+    /// picker's title is centred by it (0x0041d431..0x0041d44d).
+    pub(crate) load_row_widths: [i32; 256],
     /// The menus' record table, one for the session as the original's
     /// (zeroed at start-up; see [`crate::ui::layout::MenuRecordTable`]);
     /// not used with the minor bug fixes ([`Engine::menu_table`]).
     pub(crate) menu_records: crate::ui::layout::MenuRecordTable,
     /// The captions of the CINEMA video playing (`ExeBuild::cinema_captions`).
     pub(crate) cinema_captions: Option<crate::place::CinemaCaptionState>,
-    pub(crate) channel_test_voice: Option<crate::audio::VoiceId>,
     /// The voices' volume, 0..255.
     pub voice_volume: u8,
     /// The players, and the current one's row (0x00496607).
@@ -339,6 +402,10 @@ pub struct Engine {
     pub sprite_anim_current: Vec<usize>,
     pub(crate) sprite_anim_last: [u32; atlantis_data::sprite_anim::SPRITE_ANIM_SLOTS],
     pub(crate) sprite_anim_tick: u32,
+    /// A step of [`Engine::animate_sprites`] changed a frame or an active
+    /// flag that the panorama's sprite layer does not show yet: the next
+    /// call draws it before it steps (`FUN_00425304` draws, then steps).
+    pub(crate) sprite_layer_stale: bool,
     /// WSPRFRAME.
     pub wspr_frame: i32,
     /// F9 during navigation: the diagnostic overlay (port-only).
@@ -368,18 +435,39 @@ pub struct Engine {
     pub(crate) momentum: WarpMomentum,
     pub(crate) pointer: WarpPointer,
     pub(crate) pointer_mouse_mark: (i32, i32),
+    /// A move's panorama load has set the pointer already, after the turn
+    /// and before the film ([`Engine::execute_transition`]): the place
+    /// entry that loads the picture leaves it alone.
+    pub(crate) move_pointer_loaded: bool,
     pub(crate) cursor_sprites: Vec<SprSprite>,
     pub(crate) cursor_state: WarpCursorState,
-    /// The double-click flag 0x00496118 and the press Windows pairs with
-    /// the next for WM_LBUTTONDBLCLK (set during the turn, tested before a
-    /// move's video @ 0x00423f8a).
-    pub(crate) turn_double_click: crate::turn::TurnDoubleClick,
     pub(crate) cursor_shown: i32,
+    /// The sprite the frame of cursor calls drew into the back buffer after
+    /// the copy ([`crate::cursor::warp_cursor_frame_drawn`]), -1 for none.
+    pub(crate) cursor_after_copy: i32,
+    /// The warp frame's back buffer `[0x004960d8]` beyond what it showed:
+    /// that sprite and the pointer it was drawn at, when the frame drew the
+    /// cursor.
+    pub(crate) warp_buffer_cursor: Option<(i32, (i32, i32))>,
+    /// `Sys::frames_presented` after the last warp frame's present: while
+    /// nothing else was presented, the screen holds that frame as composed.
+    pub(crate) warp_frame_presented: Option<u64>,
     pub(crate) cursor_next_ms: u64,
+    /// The view keys F5..F8 held at the polls (`FUN_0041a298`) of the loops
+    /// other than the warp loop's look, one mask per poll
+    /// ([`Engine::poll_view_keys`]): they move the stored view angles
+    /// 0x00bcb59c / 0x00bcb598, which the port's warp holds only once the
+    /// view is set again ([`Engine::stored_view`]).
+    pub(crate) view_key_polls: RefCell<Vec<u8>>,
 
     /// The two IX frame buffers, kept from video to video (malloc(0x12c000)
     /// @ 0x00418f83).
     pub(crate) ix_buffers: Vec<u16>,
+    /// The frame count of the header the last film open read (0x00896c50,
+    /// header + 0x10 read to 0x00896c40 by `FUN_00448c70`): a move whose
+    /// film is missing reads no header and divides its ambient glide by
+    /// this one (`FUN_0043259c`). 0 before any film.
+    pub(crate) last_film_frames: i32,
 
     // The ambient sounds.
     pub(crate) ambient: AmbientSounds,
@@ -438,8 +526,12 @@ impl Engine {
             next_place_id: None,
             arrival_scan_pending: false,
             arrival_from_vue: 0,
+            script_vue_place: None,
+            give_scan: false,
+            puzzle_scan: false,
             move_input_poll: false,
             move_cyclo: None,
+            cyclo_path: None,
             arrival_after_load: false,
             last_vue: 0,
             chapter: 0,
@@ -450,11 +542,15 @@ impl Engine {
             abort: None,
             section_play: false,
             escape_request: false,
+            menu_request_cleared: false,
             pending_no_click_exit: None,
             vue_override: None,
             inventory: Vec::new(),
+            inventory_icons: Vec::new(),
+            held_icon: None,
             bar_first: 0,
             bar_pickup_slot: None,
+            bar_slot_ys: [crate::ui::bar::BAR_HOTSPOT_Y; crate::ui::bar::BAR_CELLS],
             bar: BarSession::default(),
             guests: Guests::default(),
             guests_shown: true,
@@ -467,9 +563,9 @@ impl Engine {
             subtitle_clicks: 0,
             con_text_reload: false,
             son_knob_x: [0; 4],
+            load_row_widths: [0; 256],
             menu_records,
             cinema_captions: None,
-            channel_test_voice: None,
             voice_volume: crate::persist::mixer_volume(crate::persist::DEFAULT_VOLUMES[3]),
             players: Players::new(b"#New Player"),
             player: 0,
@@ -490,6 +586,7 @@ impl Engine {
             sprite_anim_current: vec![0; 512],
             sprite_anim_last: [0; atlantis_data::sprite_anim::SPRITE_ANIM_SLOTS],
             sprite_anim_tick: 0,
+            sprite_layer_stale: false,
             wspr_frame: 0,
             debug_overlay: std::cell::Cell::new(false),
             debug_font: std::cell::OnceCell::new(),
@@ -505,12 +602,17 @@ impl Engine {
             momentum: WarpMomentum::default(),
             pointer: WarpPointer::default(),
             pointer_mouse_mark: (0, 0),
+            move_pointer_loaded: false,
             cursor_sprites: Vec::new(),
             cursor_state: WarpCursorState::default(),
-            turn_double_click: Default::default(),
             cursor_shown: CURSOR_UNSET,
+            cursor_after_copy: -1,
+            warp_buffer_cursor: None,
+            warp_frame_presented: None,
             cursor_next_ms: 0,
+            view_key_polls: RefCell::new(Vec::new()),
             ix_buffers: Vec::new(),
+            last_film_frames: 0,
             ambient,
             ambient_out,
             centres: BTreeMap::new(),
@@ -532,6 +634,21 @@ impl Engine {
         if data.is_none() {
             log::warn!("{name} not found");
         }
+        data
+    }
+
+    /// An archive member as the original opens it, from the disc in the
+    /// drive only (`self.disc`: the one archive `FUN_0041eda8` opened, then
+    /// the file system; [`atlantis_data::big::BigArchive::on_disc`]): that
+    /// disc's copy, `None` when that disc lacks it.
+    pub async fn read_from_drive(&self, name: &str) -> Option<Vec<u8>> {
+        if !self.game.big.on_disc(name, self.disc) {
+            log::warn!("{name} not on disc {}", self.disc);
+            return None;
+        }
+        self.game.big.set_disc_copy(Some(self.disc));
+        let data = self.read(name).await;
+        self.game.big.set_disc_copy(None);
         data
     }
 
@@ -729,6 +846,17 @@ impl Engine {
         }
     }
 
+    /// A fault the original cannot survive (an access violation, which
+    /// ends its process): the port shows `text` in the error box, then the
+    /// game ends there and the player screen comes back
+    /// ([`Abort::Fault`]).
+    pub(crate) async fn original_fault(&mut self, text: &str) {
+        log::error!("{text}: the original ends here; back to the player screen");
+        let font = crate::subtitles::SubtitleFont::new();
+        crate::dialog::error_box(self, &font, text).await;
+        self.abort = Some(Abort::Fault);
+    }
+
     pub fn should_abort(&self) -> bool {
         self.sys.should_quit() || self.abort.is_some()
     }
@@ -756,8 +884,11 @@ impl Engine {
         self.vars.set("time2", self.clocks.timer_value(2, now));
     }
 
-    /// Sets the view angles (an /INIT AngleWarpX / AngleWarpY, a test).
+    /// Sets the view angles (an /INIT AngleWarpX / AngleWarpY, a test). It
+    /// writes 0x00bcb59c / 0x00bcb598: the view keys polled before it are
+    /// overwritten.
     pub fn set_view(&mut self, alpha: f32, beta: f32) {
+        self.view_key_polls.borrow_mut().clear();
         self.warp.set_alpha(alpha);
         self.warp.set_beta(beta);
     }
@@ -792,8 +923,26 @@ impl Engine {
     /// `FUN_00421ebc`). The loader writes the fixed place records on every
     /// load, the chapter's WAM included (a new game @ 0x004237b5, a load
     /// @ 0x0042e354): the place table slots.
+    ///
+    /// Without [`BugFix::AnyDisc`], as the original, the file is read from
+    /// the disc in the drive only (`self.disc`, the archive `FUN_0041eda8`
+    /// opened); when it cannot be opened `FUN_00421ebc` shows its error box
+    /// (FUN_0041a1d4, 0x006ce134 = 0xc, DialogBoxParamA 0x65 with the path
+    /// @ 0x00421eed..0x00421f30) and returns 0, the WAM in memory kept.
     pub async fn load_wam(&mut self, name: &str) -> bool {
-        let Some(data) = self.read(&format!("WAM\\{name}")).await else {
+        let path = format!("WAM\\{name}");
+        let any_disc = self.enhancements().fix(BugFix::AnyDisc);
+        let data = if any_disc {
+            self.read(&path).await
+        } else {
+            self.read_from_drive(&path).await
+        };
+        let Some(data) = data else {
+            if !any_disc {
+                let text = wam_open_fail_text(&self.wam_path);
+                let font = crate::subtitles::SubtitleFont::new();
+                crate::dialog::error_box(self, &font, &text).await;
+            }
             return false;
         };
         self.wam = Wam::parse(&data);
@@ -883,13 +1032,10 @@ impl Engine {
         self.chapter = 1;
         if !in_play {
             // The record FUN_0042c054 sets up before the player menu: object
-            // 257 alone. FUN_00423760 zeroes the timer offsets and restarts
-            // Time1 when a game starts.
+            // 257 alone. The timers were restarted by FUN_00423760 on the
+            // boot pass, before the player screen (`boot_pass_clocks`).
             self.inventory = vec![257];
-            let now = self.now();
-            self.clocks.time1_offset = 0;
-            self.clocks.time2_offset = 0;
-            self.clocks.time1_start = now;
+            self.inventory_icons.clear();
         }
         // LastVue = 1 (0x004195fb, 0x0042e285).
         self.last_vue = 1;
@@ -901,6 +1047,20 @@ impl Engine {
         // ARRIVEEVUE = LastVue (FUN_00427634 @ 0x0042777d), whatever the
         // /INIT Vue= of chapter 1 did.
         self.arrival_after_load = true;
+    }
+
+    /// The timers of `FUN_00423760`, the main loop's boot pass
+    /// (0x00419734), which runs before the player screen (`FUN_0041dea4` @
+    /// 0x0041974e): TIME1's and TIME2's offsets 0 (0x0042378c, 0x00423796)
+    /// and Time1 restarted (0x006ce088 = now @ 0x004237f0). Neither the
+    /// player screen nor the checkpoint loader `FUN_0042de5c` writes them,
+    /// so the loaded game's TIME1 includes the time spent on the player
+    /// screen.
+    pub fn boot_pass_clocks(&mut self) {
+        let now = self.now();
+        self.clocks.time1_offset = 0;
+        self.clocks.time2_offset = 0;
+        self.clocks.time1_start = now;
     }
 
     /// The first arrival scan after a chapter load: ARRIVEEVUE = LastVue,
@@ -960,6 +1120,9 @@ impl Engine {
             if self.should_abort() {
                 break;
             }
+            // ArriveeVue = 0 before the warp loop (@ 0x00423be7), whatever
+            // set it: a Vue= or a chapter= of the arrival scan.
+            self.vars.set("arriveevue", 0);
             if !self.warp_loaded {
                 // Nowhere to look (a missing panorama): wait for the quit.
                 self.sys.frame().await;
@@ -995,14 +1158,31 @@ impl Engine {
                     break;
                 }
             }
+            // FUN_004278a0 starts the cursor's click animation on every
+            // click it gets (0x004968b8 = 1 @ 0x004278df): a zone, nothing,
+            // before a move; the animation plays on in the next warp loop.
+            self.cursor_state.click_anim = true;
+            self.script_vue_place = None;
             hooks.zone_click(self, action).await;
             if self.should_abort() {
                 break;
             }
             self.vars.set("cliczone", 0);
-            if self.arrival_scan_pending {
-                continue; // a Vue= in a section entered another place
+            // A Vue= of the click section left its place as the zone
+            // (0x006cd7f4 @ 0x0042a659), which the move test below compares
+            // with the destinations of that place (no shipped click section
+            // enters a place with an exit to itself).
+            if let Some(n) = self.script_vue_place.take() {
+                zone = u32::from(n);
             }
+            // No ARRIVEEVUE test here: the place loop tests it only at the
+            // top of the pass (@ 0x00423b4d). An arrival scan queued since
+            // (a Vue= or a chapter= of this click's section, or of a timer
+            // section during the warp loop or the bar, which goes on in the
+            // new place) runs on the next pass only when the click does not
+            // move; a click on an exit of the place now shown moves at once
+            // (0x00423d17..0x00423db5 on the current record 0x006cd7a8), and
+            // the move's ARRIVEEVUE (0x00423def) replaces the pending one.
             // A move needs an empty hand (0x00423d2b)...
             if self.vars.get("objetenmain") != 0 {
                 continue;
@@ -1023,6 +1203,7 @@ impl Engine {
             };
             let dest = zone as u16;
             self.next_place_id = Some(dest);
+            self.look_up_place_cyclo(dest);
             // LastVue = the place being left (0x00423dcf), before the
             // departure scan.
             self.last_vue = self.current_place_id.unwrap_or(0);
@@ -1031,12 +1212,17 @@ impl Engine {
             // arrival preparation, ends the move with ArriveeVue, AbortDepart
             // and DepartVue cleared, so a Vue= of the scan gets no arrival
             // scan (0x00423e2b..0x00423e7e).
+            // The departure scan runs with ArriveeVue as the timer's Vue=
+            // (the place it left) or chapter= (LastVue) left it.
+            self.arrival_scan_pending = false;
+            self.script_vue_place = None;
             let outcome = hooks.departure_scan(self, dest).await;
             let game_over = outcome == Departure::GameOver;
+            let vue_ran = self.script_vue_place.take().is_some();
             if outcome == Departure::Abort {
                 self.arrival_scan_pending = false;
             }
-            if self.arrival_scan_pending {
+            if vue_ran && self.arrival_scan_pending {
                 // A Vue= inside a departure section already entered its
                 // place (CHAPI005 /113, CHAPI062 /864, CHAPI077 /010); the
                 // place loop goes on with the turn and video of entry i of
@@ -1056,6 +1242,11 @@ impl Engine {
                 }
                 continue;
             }
+            // A chapter= of the departure scan (an arrival section such as
+            // CHAPI059 /010 `/sel(arriveeVue>0)&(Vue=26)`, matched after a
+            // timer's Vue=) queued an arrival scan; the move goes on and its
+            // ARRIVEEVUE = the place left (0x00423def) replaces it.
+            self.arrival_scan_pending = false;
             match (outcome, self.next_place_id.take()) {
                 (Departure::Go, Some(dest)) if !self.should_abort() => {
                     // A departure that is not aborted stops timer 1 and
@@ -1084,8 +1275,41 @@ impl Engine {
         if !std::mem::take(&mut self.move_input_poll) {
             return;
         }
-        while self.sys.poll_event().is_some() {}
-        self.turn_double_click.flag = false;
+        let mut left = false;
+        while let Some(ev) = self.sys.poll_event() {
+            if let Input::MouseDown {
+                button: MouseButton::Left,
+                ..
+            } = ev
+            {
+                left = true;
+            }
+        }
+        // F5..F8 move the stored angles (0x0041a33c..0x0041a3ba) unless the
+        // poll saw a new left press (0x0041a2b5); nothing writes them
+        // before the warp loop's first frame, which shows them.
+        self.poll_view_keys(left);
+        // Its pump's WM_MOUSEMOVE (0x00419c10..0x00419c29), skipped with a
+        // left press edge.
+        if !left {
+            self.sync_pointer_mouse();
+        }
+        self.input_flags_reset();
+    }
+
+    /// The input flags reset the original writes in one block at the end
+    /// of a move (0x00424098..0x004240ca), in StartMusik and StopMusik when
+    /// they close the open stream (`FUN_0042a100` @ 0x0042add3..0x0042ae05,
+    /// 0x0042af26..0x0042af58) and at the end of the disc prompt
+    /// (`FUN_0041eda8` @ 0x0041f032..0x0041f064): 0x00496118 (the double
+    /// click), 0x0049611c, 0x00496120, 0x00496138 = 0, 0x00496124 = 1 (the
+    /// Escape latch) and 0x004960c4 = 0. Stores only: StartMusik and
+    /// StopMusik pump no message (their fade wait calls `FUN_0043318c`
+    /// alone), so a WM_LBUTTONDBLCLK a line's press edge left queued
+    /// stays for the turn's first pumping poll
+    /// ([`crate::turn::TurnDoubleClick::clear`]).
+    pub(crate) fn input_flags_reset(&mut self) {
+        self.sys.double_click().clear();
         self.escape_request = false;
         self.bar.flags_reset();
     }
@@ -1096,6 +1320,25 @@ impl Engine {
             self.ambient.stop_all(&mut self.ambient_out);
         }
     }
+}
+
+/// The text of the error box of a WAM `FUN_00421ebc` cannot open: the
+/// error code 0xc's "Fichier introuvable : " (0x004bbf18) and the path
+/// buffer 0x006cdce0 up to its NUL ("" + `wam\` + the name as the script
+/// line or the WAM record writes it, [`Engine::set_wam_path`]).
+pub fn wam_open_fail_text(wam_path: &[u8]) -> String {
+    let end = wam_path
+        .iter()
+        .position(|&b| b == 0)
+        .unwrap_or(wam_path.len());
+    let path: String = wam_path[..end].iter().map(|&b| char::from(b)).collect();
+    format!("Fichier introuvable : {path}")
+}
+
+/// The box [`Engine::original_fault`] shows for a `Vue=N` whose place the
+/// WAM in memory lacks: the original crashes at 0x0044a453.
+pub fn vue_fault_text(place: u16) -> String {
+    format!("Atlantis crashes here (0x0044a453): no view {place}")
 }
 
 /// The text of the error box of a missing start-up logo film `name`
@@ -1125,6 +1368,7 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
         subtitles,
         saves,
         start,
+        original_start_values,
     } = opts;
     let mut e = Engine::new(sys, game, loader);
     e.trace = trace;
@@ -1140,11 +1384,16 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
         enhancements,
         ..Settings::default()
     });
+    if original_start_values {
+        e.original_start_values();
+    }
     e.load_interface().await;
     if start == Start::Boot {
         e.play_startup().await;
-        // The player screen (FUN_0041dea4), then FUN_0042de5c on the
-        // player's resume chapter; the boot pass runs FUN_00423760.
+        // The boot pass FUN_00423760 (0x00419734) restarts the timers, then
+        // the player screen (FUN_0041dea4), then FUN_0042de5c on the
+        // player's resume chapter.
+        e.boot_pass_clocks();
         match e.player_screen().await {
             Some(p) => e.player = p,
             None => {
@@ -1165,6 +1414,7 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
                 return;
             }
         }
+        e.boot_pass_clocks();
         e.new_game(hooks.as_mut(), false).await;
     }
     let finished = loop {
@@ -1183,15 +1433,26 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
             }
             Some(Abort::Finished) if e.vars.get("exit") == 86 => break true,
             // Any other Exit value (none is shipped): the main loop ends
-            // the game only for 86 (0x00419775); otherwise Exit = 0 and the
+            // the game only for 86 (0x00419787); here Exit = 0 and the
             // player screen again, then the chosen player's checkpoint as
-            // at boot.
-            Some(Abort::Finished) if !e.sys.should_quit() => {
-                log::warn!(
-                    "Exit={}: only 86 ends the game; back to the player screen",
-                    e.vars.get("exit")
-                );
+            // at boot. The original instead runs FUN_00423760 with no
+            // player screen (0x0049614c is never 1 again, its only store
+            // the clear @ 0x0041e88c): on CD 1 the chapter restarts in
+            // place (WAM and LastVue's place reloaded, play counters and
+            // hidden ids zeroed, CON and /INIT run again); on CDs 2..4 EXIT
+            // stays set and, by static reading, the main loop spins. Not
+            // modelled (no data reaches it).
+            Some(abort @ (Abort::Finished | Abort::Fault)) if !e.sys.should_quit() => {
+                if abort == Abort::Finished {
+                    log::warn!(
+                        "Exit={}: only 86 ends the game; back to the player screen",
+                        e.vars.get("exit")
+                    );
+                }
                 e.vars.set("exit", 0);
+                // The original runs FUN_00423760 there (0x00419734), which
+                // restarts the timers as on the boot pass.
+                e.boot_pass_clocks();
                 match e.player_screen().await {
                     Some(p) => e.player = p,
                     None => break false,
@@ -1215,7 +1476,6 @@ impl Engine {
     /// cinema pace, a 200-tick (1 s) wait between them; the Dutch build
     /// plays LOGORP.HNM after the wait.
     pub async fn play_startup(&mut self) {
-        use crate::place::CINEMA_FRAME_MS;
         // The Japanese DVD build: its publishers' logos first, through
         // LOGO15N's player (WinMain @ 0x00419713..0x00419772). The disc has
         // neither film: the player's open fails and it shows its error box
@@ -1226,8 +1486,9 @@ impl Engine {
         for name in self.game.exe.build.startup_logos {
             let path = format!("UBB_VUE\\{name}");
             if self.game.big.contains(&path) {
-                self.play_transition_video(name, None, CINEMA_FRAME_MS)
-                    .await;
+                // NEWSOUND is not written before them (0x00419713..
+                // 0x00419772): 0 at boot, no sound.
+                self.play_startup_film(name, None).await;
             } else if !self.enhancements().fix(BugFix::StartupLogos) {
                 log::warn!("{path}: missing, the original's error box");
                 let text = startup_logo_error_text(self.game.exe.build, name);
@@ -1240,14 +1501,17 @@ impl Engine {
                 return;
             }
         }
-        self.play_transition_video("LOGO15N.HNM", None, CINEMA_FRAME_MS)
-            .await;
+        // NEWSOUND = 0x12 (0x00419653; every build stores it, e.g.
+        // atlantis-cd-en-688128 @ 0x00419535 on its own array):
+        // logo15n.apc from the table.
+        self.play_startup_film("LOGO15N.HNM", Some(0x12)).await;
         // The busy wait (0x00419662..0x0041967c, no call) reads no input but
         // loses none: FUN_0042e624 fills the key table from
         // GetAsyncKeyState, so the next video's first FUN_0041a298 poll sees
         // a press made during the wait (a left button: 0x0049611c = 1;
-        // Escape: 0x00496124 = 0), unless it was already down at LOGO15N's
-        // last poll. The input events stay queued for that poll.
+        // Escape: 0x00496124 = 0), unless LOGO15N's last poll saw a press
+        // whose release no poll has seen (the latch, Sys::poll_event). The
+        // input events stay queued for that poll.
         let start = self.sys.millis();
         while self.sys.millis() - start < 1000 && !self.sys.should_quit() {
             self.sys.frame().await;
@@ -1256,11 +1520,12 @@ impl Engine {
         // player at the cinema pace, its NEWSOUND left as it is (WinMain @
         // 0x0041958d..0x004195bf; the archives hold no LOGORP.APC).
         if self.game.exe.build.startup_logo_rp {
-            self.play_transition_video("LOGORP.HNM", None, CINEMA_FRAME_MS)
-                .await;
+            self.play_startup_film("LOGORP.HNM", None).await;
         }
-        self.play_transition_video("PREINTRO.HNM", None, CINEMA_FRAME_MS)
-            .await;
+        // NEWSOUND = 0x13 (0x004196bd): another value than LOGO15N's, so
+        // the film loop's first poll stops LOGO15N's sound, playing or
+        // fading, and starts preintro.apc (FUN_00432a64, dc:26175..26198).
+        self.play_startup_film("PREINTRO.HNM", Some(0x13)).await;
     }
 
     /// The in-game menu from the warp loop: a reload or a quit ends the
@@ -1457,6 +1722,109 @@ mod exit_and_menu_tests {
 }
 
 #[cfg(test)]
+mod boot_pass_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::hooks::{ready, HookFuture};
+    use crate::sys::{Input, Key, MouseButton, Runner};
+    use std::cell::Cell;
+
+    /// Time1's origin at the first chapter load.
+    struct Time1At(Rc<Cell<Option<u32>>>);
+
+    impl ScriptHooks for Time1At {
+        fn chapter_loaded<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _chapter: u32,
+            _keep_state: bool,
+        ) -> HookFuture<'a, ()> {
+            if self.0.get().is_none() {
+                self.0.set(Some(e.clocks.time1_start));
+            }
+            ready(())
+        }
+    }
+
+    /// Time1 starts at the boot pass FUN_00423760 (0x00419734), before the
+    /// player screen (FUN_0041dea4 @ 0x0041974e), which does not restart
+    /// it: the game's Time1 includes the time spent on the player screen.
+    #[test]
+    fn time1_starts_before_the_player_screen() {
+        let Some(dir) = std::env::var_os("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: time1_starts_before_the_player_screen skipped");
+            return;
+        };
+        let g = Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir))).unwrap();
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        let start = Rc::new(Cell::new(None));
+        let sys = Sys::new(Mixer::new());
+        let opts = Options {
+            trace: Some(trace.clone()),
+            hooks: Box::new(Time1At(start.clone())),
+            start: Start::Boot,
+            ..Options::default()
+        };
+        let mut runner = Runner::new(sys.clone(), run(sys.clone(), g, opts));
+        let mut frame = 0u64;
+        let mut screen_at = None;
+        let press = |down: bool, x: i32, y: i32| {
+            let button = MouseButton::Left;
+            sys.push_input(Input::MouseMove { x, y });
+            sys.push_input(if down {
+                Input::MouseDown { button, x, y }
+            } else {
+                Input::MouseUp { button, x, y }
+            });
+        };
+        let key = |k: Key, down: bool| {
+            sys.push_input(if down {
+                Input::KeyDown(k)
+            } else {
+                Input::KeyUp(k)
+            });
+        };
+        while runner.step(frame * 16) && start.get().is_none() {
+            frame += 1;
+            assert!(frame < 40_000, "player screen at {screen_at:?}");
+            let seen = trace
+                .borrow()
+                .iter()
+                .any(|e| *e == Event::Menu("SELEMENU.TXT".into()));
+            match screen_at {
+                None if seen => screen_at = Some(frame),
+                // The start-up films cut short.
+                None => match frame % 30 {
+                    0 => press(true, 320, 240),
+                    2 => press(false, 320, 240),
+                    _ => {}
+                },
+                // Five seconds on the player screen, then a new player.
+                Some(f) => match frame - f {
+                    // The pointer there a poll before the press (no pump on
+                    // a press edge, 0x0041a2b5).
+                    299 => sys.push_input(Input::MouseMove { x: 200, y: 259 }),
+                    300 => press(true, 200, 259),
+                    302 => press(false, 200, 259),
+                    310 => key(Key::Char('T'), true),
+                    312 => key(Key::Char('T'), false),
+                    320 => key(Key::Enter, true),
+                    322 => key(Key::Enter, false),
+                    _ => {}
+                },
+            }
+        }
+        let screen_at = screen_at.expect("no player screen");
+        let t1 = start.get().expect("no chapter load");
+        assert!(
+            u64::from(t1) <= screen_at * 16,
+            "Time1 started at {t1} ms, the player screen came at {} ms",
+            screen_at * 16
+        );
+    }
+}
+
+#[cfg(test)]
 mod end_of_move_tests {
     use super::*;
     use crate::hooks::{ready, HookFuture};
@@ -1519,5 +1887,87 @@ mod end_of_move_tests {
         assert_eq!(moved.0, 0, "a click after the move was handled");
         let not_moved = after_load(false).unwrap();
         assert_eq!(not_moved.0, 1);
+    }
+}
+
+#[cfg(test)]
+mod startup_tests {
+    use super::*;
+    use crate::test_support::with_engine;
+    use std::cell::RefCell;
+
+    /// FUN_0041bc74's pass decodes the next frame, polls NewSound
+    /// (FUN_00432a64 @ 0x0041bdcb), then presents the frame decoded before
+    /// (FUN_0041b064 @ 0x0041bdec): LOGO15N's sound (NEWSOUND 0x12) starts
+    /// before its first picture is shown, not one film frame later.
+    #[test]
+    fn startup_film_sound_starts_with_its_first_picture() {
+        use std::cell::Cell;
+        let trace = Rc::new(RefCell::new(Vec::new()));
+        let before = Rc::new(Cell::new(None));
+        let seen = Rc::new(Cell::new(None));
+        let (t2, b2) = (trace.clone(), before.clone());
+        let (t3, b3, s3) = (trace.clone(), before.clone(), seen.clone());
+        let ran = with_engine(
+            "startup_film_sound_starts_with_its_first_picture",
+            move |mut e| async move {
+                e.trace = Some(t2);
+                e.set_enhancements(crate::enhancements::Enhancements::original());
+                b2.set(Some(e.sys.frames_presented()));
+                e.play_startup_film("LOGO15N.HNM", Some(0x12)).await;
+            },
+            move |sys, _| {
+                let started = t3
+                    .borrow()
+                    .iter()
+                    .any(|ev| matches!(ev, Event::NewSound(0x12, _)));
+                if started && s3.get().is_none() {
+                    s3.set(Some(sys.frames_presented() - b3.get().unwrap()));
+                }
+            },
+        );
+        if ran {
+            // Seen after the runner's first step: the film's first present.
+            assert_eq!(seen.get(), Some(1));
+        }
+    }
+
+    /// WinMain stores NEWSOUND = 0x12 before LOGO15N (0x00419653) and 0x13
+    /// before PREINTRO (0x004196bd); each film's first poll of
+    /// `FUN_00432a64` starts that table entry, so PREINTRO has its sound
+    /// also without `BugFix::CinemaSound` (LOGO15N's sound outlasts its
+    /// film).
+    #[test]
+    fn startup_films_play_their_table_sounds() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "startup_films_play_their_table_sounds",
+            move |mut e| async move {
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                e.set_enhancements(crate::enhancements::Enhancements::original());
+                e.play_startup().await;
+                let sounds: Vec<(i32, String)> = trace
+                    .borrow()
+                    .iter()
+                    .filter_map(|ev| match ev {
+                        Event::NewSound(v, n) => Some((*v, n.to_ascii_lowercase())),
+                        _ => None,
+                    })
+                    .collect();
+                *g2.borrow_mut() = sounds;
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(
+                *got.borrow(),
+                [
+                    (0x12, "logo15n.apc".to_string()),
+                    (0x13, "preintro.apc".to_string())
+                ]
+            );
+        }
     }
 }

@@ -54,7 +54,8 @@ fn atof_double(s: &str) -> f64 {
 }
 
 fn text(data: &[u8]) -> String {
-    // The files are Windows-1252; only ASCII matters here.
+    // The files are Windows-1252 (Windows-1250 for the Polish CD); only
+    // ASCII matters here.
     data.iter().map(|&c| char::from(c)).collect()
 }
 
@@ -202,7 +203,8 @@ pub struct DialLine {
     /// `NNN_MM`, as in `com<world>.txt`.
     pub id: String,
     pub speaker: String,
-    /// The subtitle, Windows-1252 bytes as the file has them: the
+    /// The subtitle, bytes as the file has them (Windows-1252, or
+    /// Windows-1250 for the Polish CD: [`crate::edition`]): the
     /// subtitle code works on bytes (@ 0x004611e0).
     pub text: Vec<u8>,
 }

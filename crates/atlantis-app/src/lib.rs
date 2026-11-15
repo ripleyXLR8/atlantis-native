@@ -58,6 +58,8 @@ pub mod guide;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod launcher;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod launcher_art;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod library;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod session;
@@ -255,6 +257,13 @@ pub struct App {
     menu_frame: Vec<u16>,
     /// The game library's screen (desktop).
     launcher_frame: Vec<u16>,
+    /// Its text and ornaments, drawn at the window's resolution, and the
+    /// window's last picture of the screen with what it was drawn from
+    /// (the items, the window's size), shown again while they hold.
+    #[cfg(not(target_arch = "wasm32"))]
+    launcher_text: Vec<launcher_art::Item>,
+    #[cfg(not(target_arch = "wasm32"))]
+    launcher_shown: (Vec<launcher_art::Item>, usize, usize, Vec<u32>),
     paused_at: Option<Instant>,
     graphics: Graphics,
     /// Where the graphics mode is saved (`settings.ini`).
@@ -389,6 +398,10 @@ impl App {
             menu_font: None,
             menu_frame: Vec::new(),
             launcher_frame: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            launcher_text: Vec::new(),
+            #[cfg(not(target_arch = "wasm32"))]
+            launcher_shown: (Vec::new(), 0, 0, Vec::new()),
             paused_at: None,
             graphics: Graphics::Original,
             saves: None,
@@ -812,6 +825,7 @@ impl App {
     /// The desktop's pace: a step when the window's timer says one is due.
     #[cfg(not(target_arch = "wasm32"))]
     fn step_paced(&mut self) -> bool {
+        let held = self.held_by_inactive_window();
         let Some(runner) = &mut self.runner else {
             return true;
         };
@@ -824,6 +838,13 @@ impl App {
             self.next_frame = now + FRAME; // fell behind: do not catch up
         }
         let ms = now.duration_since(self.start).as_millis() as u64;
+        // With `--original` (`Enhancements::background_run` off), the
+        // original's hold while its window is not the active one: no step,
+        // the clock and the 200 Hz timer go on (`Runner::hold`).
+        if held {
+            runner.hold(ms);
+            return true;
+        }
         let alive = runner.step(ms);
         let took = now.elapsed();
         self.tick_play_time(now);
@@ -834,6 +855,15 @@ impl App {
         }
         self.apply_pointer();
         alive
+    }
+
+    /// The game is held because its window is not the active one, as the
+    /// original holds (its input poll `FUN_0041a298` pumps messages while
+    /// the WM_ACTIVATEAPP flag 0x00496128 is 0, @ 0x0041a42d): without the
+    /// focus, with `Enhancements::background_run` off (`--original`).
+    #[cfg(not(target_arch = "wasm32"))]
+    fn held_by_inactive_window(&self) -> bool {
+        !self.focused && !self.sys.enhancements().background_run
     }
 
     /// The browser's pace: it asks for a redraw per screen refresh
@@ -1040,12 +1070,17 @@ impl App {
         };
         // The support screen or the game library's screen, drawn in
         // `launcher_frame`.
+        // The library's text is drawn after the frame is scaled to the
+        // window, sharp at its resolution (in the frame when the options
+        // menu is open over it).
+        #[cfg(not(target_arch = "wasm32"))]
+        self.launcher_text.clear();
         #[cfg(not(target_arch = "wasm32"))]
         let launcher = support::draw_support(self.support.as_ref(), &mut self.launcher_frame)
             || session::draw_launcher(
                 self.session.as_ref(),
                 &mut self.launcher_frame,
-                &mut self.menu_font,
+                (!self.menu.is_open()).then_some(&mut self.launcher_text),
             );
         #[cfg(target_arch = "wasm32")]
         let launcher = false;
@@ -1239,6 +1274,18 @@ impl App {
             );
             return;
         }
+        // The library's screen as last shown: shown again.
+        #[cfg(not(target_arch = "wasm32"))]
+        if launcher && !self.launcher_text.is_empty() {
+            let (items, w, h, px) = &self.launcher_shown;
+            if (*w, *h) == (sw, sh) && *items == self.launcher_text && px.len() == buf.len() {
+                buf.copy_from_slice(px);
+                if let Some(b) = soft_buf {
+                    b.present().unwrap();
+                }
+                return;
+            }
+        }
         // RGB565 -> XRGB8888 table and source column per window column,
         // built once (the per-pixel arithmetic was the cost in the browser).
         let lut = hd::rgb565_to_888();
@@ -1259,6 +1306,18 @@ impl App {
             for (d, &x) in buf[start..start + dw].iter_mut().zip(&self.col_map) {
                 *d = lut[usize::from(src_row[x])];
             }
+        }
+        #[cfg(not(target_arch = "wasm32"))]
+        if launcher && !self.launcher_text.is_empty() {
+            let mut win = launcher_art::Window {
+                px: &mut buf[..],
+                stride: sw,
+                rect: (ox, oy, dw, dh),
+            };
+            for item in &self.launcher_text {
+                launcher_art::draw(&mut win, item);
+            }
+            self.launcher_shown = (self.launcher_text.clone(), sw, sh, buf.to_vec());
         }
         if let Some(b) = soft_buf {
             b.present().unwrap();
@@ -1615,7 +1674,10 @@ impl ApplicationHandler for App {
                     }
                     return;
                 }
-                if event.repeat {
+                // A key's auto-repeat goes to the engine only where the
+                // original gets WM_CHAR repeats (the player screen's name
+                // entry, Sys::takes_key_repeat).
+                if event.repeat && !key.is_some_and(|k| pressed && self.sys.takes_key_repeat(k)) {
                     return;
                 }
                 // O too, for keyboards without function keys, but not while
@@ -1652,7 +1714,8 @@ impl ApplicationHandler for App {
 /// The options of a run with its saves in `saves`: the subtitles and the
 /// enhancements read from the store's `settings.ini` (written with the
 /// defaults when there is none); `original` turns the enhancements and
-/// the subtitles off.
+/// the subtitles off and starts at the original's OMNI 3D mode and
+/// volumes.
 pub fn options_with_settings(
     saves: Rc<dyn SaveStore>,
     original: bool,
@@ -1670,8 +1733,10 @@ pub fn options_with_settings(
             settings.enhancements
         },
         // `--original` starts with SUBTITLES off, as every start of the
-        // original (0x004960a8 = 0), whatever settings.ini keeps.
+        // original (0x004960a8 = 0), whatever settings.ini keeps; OMNI 3D
+        // MODE 1 and the volumes 7f 6e 6e 6e too (0x004960ac, 0x00495e70..).
         subtitles: settings.subtitles && !original,
+        original_start_values: original,
         saves,
         start,
         ..atlantis_engine::Options::default()
@@ -1821,6 +1886,32 @@ pub(crate) fn compose_on_card(
     true
 }
 
+#[cfg(test)]
+mod original_options_tests {
+    use super::*;
+    use atlantis_engine::MemStore;
+
+    /// `--original` asks the engine for the original's start values of
+    /// the options (OMNI 3D MODE 1, volumes 7f 6e 6e 6e) and SUBTITLES
+    /// off; the default run keeps `settings.ini`'s.
+    #[test]
+    fn original_run_starts_at_the_original_options() {
+        let store = Rc::new(MemStore::new());
+        Settings {
+            subtitles: true,
+            omni3d_mode2: true,
+            volumes: [10, 20, 30, 40],
+            ..Settings::default()
+        }
+        .save(store.as_ref());
+        let saves: Rc<dyn SaveStore> = store.clone();
+        let o = options_with_settings(saves.clone(), true, Start::Boot);
+        assert!(o.original_start_values && !o.subtitles);
+        let o = options_with_settings(saves, false, Start::Boot);
+        assert!(!o.original_start_values && o.subtitles);
+    }
+}
+
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod fullscreen_tests {
     use super::*;
@@ -1905,6 +1996,45 @@ mod fullscreen_tests {
         assert!(stored(&store) && app_on(&store).opens_fullscreen());
         app.store_fullscreen(false);
         assert!(!stored(&store) && !app_on(&store).opens_fullscreen());
+    }
+
+    /// Without the focus and with `background_run` off (`--original`),
+    /// the engine is held (`Runner::hold`: the clock goes on, no step);
+    /// with the focus, or the switch on, it steps.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn an_inactive_window_holds_the_game_with_original() {
+        use std::sync::atomic::Ordering;
+        let sys = Sys::new(Mixer::new());
+        let steps = Rc::new(std::cell::Cell::new(0));
+        let (s2, n2) = (sys.clone(), steps.clone());
+        let runner = Runner::new(sys.clone(), async move {
+            loop {
+                n2.set(n2.get() + 1);
+                s2.frame().await;
+            }
+        });
+        let held = sys.mixer.loops_held_flag();
+        let mut app = App::new(sys.clone(), Some(runner));
+        let step = |app: &mut App| {
+            app.next_frame = Instant::now();
+            assert!(app.step_paced());
+        };
+        sys.set_enhancements(Enhancements::original());
+        step(&mut app);
+        assert_eq!(steps.get(), 1);
+        app.focused = false;
+        step(&mut app);
+        assert_eq!(steps.get(), 1, "held");
+        assert!(held.load(Ordering::Relaxed));
+        sys.set_enhancements(Enhancements::default());
+        step(&mut app);
+        assert_eq!(steps.get(), 2, "background_run on: it goes on");
+        assert!(!held.load(Ordering::Relaxed));
+        sys.set_enhancements(Enhancements::original());
+        app.focused = true;
+        step(&mut app);
+        assert_eq!(steps.get(), 3);
     }
 
     /// A full screen change made outside the port's keys (macOS's green

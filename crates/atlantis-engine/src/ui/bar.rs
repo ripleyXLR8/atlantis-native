@@ -10,8 +10,8 @@
 
 use atlantis_data::sprite::{limits, read_spr_file, SprSprite};
 
-use super::{draw_sprite, draw_sprite_below, object_icon};
-use crate::engine::Engine;
+use super::{draw_sprite, draw_sprite_below};
+use crate::engine::{Abort, Engine};
 use crate::enhancements::BugFix;
 use crate::hooks::ScriptHooks;
 use crate::warp::SCREEN_H;
@@ -49,16 +49,27 @@ pub fn scroll_step(x: i32, y: i32, count: usize, first: usize) -> i32 {
     }
 }
 
-/// `FUN_0042c59c` @ 0x0042c643: on a slide-out frame drawn at slot y
-/// `slot_y`, record `record` is drawn when the int32 at 0x00611788 + 4 *
-/// record is below 0x1fa. That is the slot y itself for a record below 9;
-/// for a record from 9 on it lies past the 9-entry slot table, where the
-/// only store is `FUN_004278a0`'s 0x1bb (@ 0x00427af0) and .bss holds 0,
-/// so such a record is drawn on every frame (1..4 rows of its icon at
-/// 506). `fix` (`BugFix::BarSlideOut`) gates every record on the slot y.
-pub fn slide_out_record_drawn(record: usize, slot_y: i32, fix: bool) -> bool {
-    if record < BAR_CELLS || fix {
-        slot_y < SLIDE_OUT_GATE_Y
+/// `FUN_0042c59c` @ 0x0042c643: on a slide-out frame drawn with the slot
+/// y table `slot_ys`, record `record` is drawn when the int32 at
+/// 0x00611788 + 4 * record is below 0x1fa: the y of slot `record` (the
+/// table is indexed by the record, not by its visible slot) for a record
+/// below 9; for a record from 9 on it lies past the 9-entry slot table,
+/// where the only store is `FUN_004278a0`'s 0x1bb (@ 0x00427af0) and .bss
+/// holds 0, so such a record is drawn on every frame (1..4 rows of its
+/// icon at 506). `fix` (`BugFix::BarSlideOut`) gates every record on the
+/// y of its visible slot (`record - first`).
+pub fn slide_out_record_drawn(
+    record: usize,
+    first: usize,
+    slot_ys: &[i32; BAR_CELLS],
+    fix: bool,
+) -> bool {
+    if fix {
+        slot_ys
+            .get(record.saturating_sub(first))
+            .is_none_or(|&y| y < SLIDE_OUT_GATE_Y)
+    } else if record < BAR_CELLS {
+        slot_ys[record] < SLIDE_OUT_GATE_Y
     } else {
         true
     }
@@ -90,6 +101,16 @@ pub fn slot_x(slot: usize, pickup: Option<usize>, fix: bool) -> i32 {
     }
 }
 
+/// How the bar loop `FUN_0042c8ac` ended: the guest talked to on its
+/// guest path (0 for none), the click flag 0x0049611c and the pointer
+/// 0x004960ec / 0x004960f0 its item test reads.
+#[derive(Clone, Copy, Debug)]
+struct BarExit {
+    guest: i32,
+    left: bool,
+    pointer: (i32, i32),
+}
+
 /// The inventory as a bar frame draws it.
 #[derive(Clone, Copy, Debug)]
 pub struct BarState<'a> {
@@ -107,6 +128,27 @@ pub struct BarState<'a> {
     pub pickup_fix: bool,
 }
 
+/// What a presented bar frame shows at the pointer. The pointer of the bar
+/// loops, `FUN_0042d558`, draws into the work buffer `[0x004960d8]`
+/// (pushes @ 0x0042d5d1, 0x0042d61b), which reaches the screen only by the
+/// next copy `FUN_00410f36`; each loop renders the whole view into that
+/// buffer again before its next copy (`FUN_00451d8b`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum BarPointer {
+    /// The slide-in `FUN_0042c2c4` and the slide-out `FUN_0042c59c` call
+    /// `FUN_0042d558` only after their copy (@ 0x0042c518 after 0x0042c4cf,
+    /// @ 0x0042c7c0 after 0x0042c728): no pointer is presented, and the
+    /// present's warp cursor is off (0x004960c4 set).
+    None,
+    /// The pick-up's hold loop `FUN_0042cc98`: the new record's icon at the
+    /// pointer before the copy (@ 0x0042ce6a..0x0042ce98, copy @
+    /// 0x0042cec1); its `FUN_0042d558` follows the copy (@ 0x0042cf05).
+    HeldIcon,
+    /// The bar loop `FUN_0042c8ac`: `FUN_0042d558` before the copy
+    /// (@ 0x0042ca65, copy @ 0x0042cad4).
+    Pointer,
+}
+
 /// An icon of a bar frame: the record, its visible slot and the hotspot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BarIcon {
@@ -116,10 +158,10 @@ pub struct BarIcon {
     pub y: i32,
 }
 
-/// What a frame of the bar loops draws with the slots at y `slot_y`.
+/// What a frame of the bar loops draws with the slot y table `slot_ys`.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct BarFrame {
-    /// OBJETS0 sprite 0 at (0, slot y).
+    /// OBJETS0 sprite 0 at (0, slot 0's y) (@ 0x0042c65c, 0x0042cdb4).
     pub background: bool,
     /// The icons, in drawing order.
     pub icons: Vec<BarIcon>,
@@ -130,14 +172,16 @@ pub struct BarFrame {
 /// `FUN_0042c59c` (each record gated by [`slide_out_record_drawn`], the
 /// background with slot 0 under record first's gate, @ 0x0042c643..
 /// 0x0042c674). A shown record with no entry, or whose id is OBJETENMAIN,
-/// gets no icon (@ 0x0042c682..0x0042c6b1).
-pub fn bar_frame_layout(st: &BarState, slot_y: i32, slide_out: bool) -> BarFrame {
-    let drawn = |r: usize| !slide_out || slide_out_record_drawn(r, slot_y, st.slide_out_fix);
+/// gets no icon (@ 0x0042c682..0x0042c6b1). Each icon is at its slot's y
+/// (@ 0x0042c6c9, 0x0042ce2c).
+pub fn bar_frame_layout(st: &BarState, slot_ys: &[i32; BAR_CELLS], slide_out: bool) -> BarFrame {
+    let drawn =
+        |r: usize| !slide_out || slide_out_record_drawn(r, st.first, slot_ys, st.slide_out_fix);
     let mut f = BarFrame {
         background: drawn(st.first),
         icons: Vec::new(),
     };
-    for slot in 0..BAR_CELLS {
+    for (slot, &y) in slot_ys.iter().enumerate() {
         let record = st.first + slot;
         if !drawn(record) {
             continue;
@@ -152,29 +196,29 @@ pub fn bar_frame_layout(st: &BarState, slot_y: i32, slide_out: bool) -> BarFrame
             record,
             slot,
             x: slot_x(slot, st.pickup_slot, st.pickup_fix),
-            y: slot_y,
+            y,
         });
     }
     f
 }
 
-/// Draws a bar frame: the background (`bar`), then each icon (`icon` gives
-/// a record id's OBJETS1 sprite), with `FUN_00410430`'s clipping.
+/// Draws a bar frame: the background (`bar`) at y `bar_y` (slot 0's), then
+/// each icon (`icon` gives a record's OBJETS1 sprite, from its icon byte),
+/// with `FUN_00410430`'s clipping.
 pub fn draw_bar_frame<'a>(
     screen: &mut [u16],
     frame: &BarFrame,
-    st: &BarState,
-    slot_y: i32,
+    bar_y: i32,
     bar: Option<&SprSprite>,
-    icon: impl Fn(i32) -> Option<&'a SprSprite>,
+    icon: impl Fn(usize) -> Option<&'a SprSprite>,
 ) {
     if frame.background {
         if let Some(bar) = bar {
-            draw_sprite_below(screen, bar, 0, slot_y, BAR_TOP);
+            draw_sprite_below(screen, bar, 0, bar_y, BAR_TOP);
         }
     }
     for i in &frame.icons {
-        if let Some(spr) = st.records.get(i.record).and_then(|&id| icon(id)) {
+        if let Some(spr) = icon(i.record) {
             draw_sprite_below(screen, spr, i.x, i.y, BAR_TOP);
         }
     }
@@ -193,33 +237,67 @@ impl Engine {
         }
     }
 
-    /// A frame of the bar loops with the slots at y `slot_y`: the view
+    /// A frame of the bar loops with the slots at their y (`bar_slot_ys`):
+    /// the view
     /// rendered anew (`FUN_00451d8b`), the bar ([`bar_frame_layout`];
     /// `slide_out` for `FUN_0042c59c`), then the guests' portraits
     /// (`FUN_0042bc58`, after the bar: `FUN_0042c2c4` @ 0x0042c4a9,
-    /// `FUN_0042c59c` @ 0x0042c702), the pointer on top.
-    fn bar_frame(&mut self, slot_y: i32, slide_out: bool) {
+    /// `FUN_0042c59c` @ 0x0042c702), then what the frame shows at the
+    /// pointer ([`BarPointer`]).
+    fn bar_frame(&mut self, slide_out: bool, at_pointer: BarPointer) {
         if self.warp_loaded {
             self.render_view();
         }
-        let table = &self.game.exe.inventory_object_ids;
         let mut s = self.sys.screen.borrow().clone();
         let st = self.bar_state();
-        let frame = bar_frame_layout(&st, slot_y, slide_out);
-        draw_bar_frame(&mut s, &frame, &st, slot_y, self.ui.bar.as_ref(), |id| {
-            object_icon(table, id).and_then(|k| self.ui.object(k))
+        let ys = self.bar_slot_ys;
+        let frame = bar_frame_layout(&st, &ys, slide_out);
+        // Each record with its own icon byte (@ 0x0042c445, 0x0042c6b9,
+        // 0x0042c9db, 0x0042ce1c).
+        draw_bar_frame(&mut s, &frame, ys[0], self.ui.bar.as_ref(), |r| {
+            self.record_icon(r).and_then(|k| self.ui.object(k))
         });
         self.draw_guests(&mut s, None);
-        self.draw_pointer(&mut s);
+        match at_pointer {
+            BarPointer::None => {}
+            // FUN_0042cc98 draws the new record's icon at the pointer
+            // 0x004960ec / 0x004960f0 (0x0042ce7a..0x0042ce98): the
+            // slide-in pumps no message, so its first frame shows it where
+            // the pointer was before the slide.
+            BarPointer::HeldIcon => {
+                let (x, y) = self.pointer.pos;
+                if let Some(spr) = self.held_icon().and_then(|i| self.ui.object(i)) {
+                    draw_sprite(&mut s, spr, x, y);
+                }
+            }
+            BarPointer::Pointer => self.draw_pointer(&mut s),
+        }
         *self.sys.screen.borrow_mut() = s;
     }
 
-    /// One frame of the bar loops' engine work: the place sprites, the CON
-    /// timers; true when the bar has to close (GameOver, Exit, quit).
-    async fn bar_tick(&mut self, hooks: &mut dyn ScriptHooks) -> bool {
-        self.animate_sprites();
-        hooks.bar_timers(self).await;
-        self.should_abort() || self.vars.get("gameover") != 0 || self.vars.get("exit") != 0
+    /// The CON timers of a bar frame (`FUN_0042be3c`, after the frame's
+    /// present): (a section ran, the bar has to close: GameOver, Exit,
+    /// quit). The place sprites are stepped once a frame, before its
+    /// render, by the loops themselves (`FUN_00425304`: no timer path steps
+    /// them).
+    /// A section's line loops pump the messages (`FUN_0041a298`), so the
+    /// pointer 0x004960ec that the next scroll or item test reads is where
+    /// those pumps left it: `pointer` follows the mouse when the section
+    /// played frames.
+    async fn bar_tick(
+        &mut self,
+        hooks: &mut dyn ScriptHooks,
+        pointer: &mut (i32, i32),
+    ) -> (bool, bool) {
+        let t0 = self.sys.millis();
+        let ran = hooks.bar_timers(self).await;
+        if self.sys.millis() != t0 {
+            self.sync_pointer_mouse();
+            *pointer = self.pointer.pos;
+        }
+        let close =
+            self.should_abort() || self.vars.get("gameover") != 0 || self.vars.get("exit") != 0;
+        (ran, close)
     }
 
     /// `FUN_00432178` in the bar loops: the NewSound poll `FUN_00432a64`,
@@ -232,52 +310,87 @@ impl Engine {
     /// `FUN_0042c2c4`: the slots from y 499 up 7 a frame to 443 (8 frames),
     /// the portraits up with them (-7 before the frame, @ 0x0042c4a2). Each
     /// frame: the place sprites (`FUN_00425304` @ 0x0042c327), the view,
-    /// the bar, the guests; the timers (`FUN_0042be3c`); then, unless
-    /// GameOver or Exit ended the slide (@ 0x0042c55d), `FUN_00432178`
+    /// the bar, the guests, the present `FUN_0041afd0` (@ 0x0042c51d,
+    /// whose cursor step [`Engine::still_frame_cursor_step`] the bar
+    /// request gates until a timer section's line clears it); the timers
+    /// (`FUN_0042be3c` @ 0x0042c522); then, unless GameOver or Exit ended
+    /// the slide (the request off, @ 0x0042c55d), `FUN_00432178`
     /// (@ 0x0042c569). True when a timer closed the bar.
-    async fn bar_slide_in(&mut self, hooks: &mut dyn ScriptHooks) -> bool {
+    async fn bar_slide_in(
+        &mut self,
+        hooks: &mut dyn ScriptHooks,
+        pointer: &mut (i32, i32),
+    ) -> bool {
         // slotX[s] = 70 s + 42 (@ 0x0042c30f): a pick-up's slot x is undone.
         self.bar_pickup_slot = None;
         let mut slot_y = 499 - 7;
+        let mut closed = false;
         while slot_y >= BAR_HOTSPOT_Y && !self.should_abort() {
+            // The table 0x00611788 as drawn (-7 before the frame): a timer
+            // that ends the slide leaves it there.
+            self.bar_slot_ys = [slot_y; BAR_CELLS];
             self.slide_guest_portraits(-7);
             self.animate_sprites();
-            self.bar_frame(slot_y, false);
+            self.bar_frame(false, BarPointer::None);
+            self.still_frame_cursor_step();
             self.sys.frame().await;
-            if self.bar_tick(hooks).await {
-                return true;
+            if self.bar_tick(hooks, pointer).await.1 {
+                self.bar.request = false;
+                closed = true;
+                break;
             }
             self.bar_sounds().await;
             slot_y -= 7;
         }
-        false
+        // The click and right-press flags cleared (0x0042c57e, 0x0042c588).
+        self.bar.right_press = false;
+        closed
     }
 
     /// `FUN_0042c59c`: the slots from 443 down 7 a frame until 0x208 (11
     /// frames), each record gated at 0x0042c643 ([`slide_out_record_drawn`]);
     /// the portraits back down to 350 (+7 after the frame, @ 0x0042c7b4).
     /// Each frame: the place sprites (@ 0x0042c5b4), the view, the bar, the
-    /// guests; the timers; then, unless GameOver or Exit ended the slide
-    /// (@ 0x0042c805), `FUN_00432178` (@ 0x0042c811).
-    async fn bar_slide_out(&mut self, hooks: &mut dyn ScriptHooks) -> bool {
-        let mut slot_y = BAR_HOTSPOT_Y;
-        while slot_y < 0x208 && !self.should_abort() {
+    /// guests, the present `FUN_0041afd0` (@ 0x0042c7c5, its cursor step
+    /// gated as in the slide-in); the timers; then, unless GameOver or Exit
+    /// ended the slide (the request off, @ 0x0042c805), `FUN_00432178`
+    /// (@ 0x0042c811). `game_over`: a game over the bar loop's timers ran
+    /// (GAMEOVER set, the reload held for the guest path), which ends the
+    /// slide after its first frame (0x0042c7e1). Then the click and
+    /// right-press flags are cleared (0x0042c826, 0x0042c830) and the
+    /// timers resume from their values, ChapterTime from 0 (0x0042c844).
+    /// It starts from the slots' y the last slide left (`bar_slot_ys`):
+    /// 443, or higher after a slide-in cut short (a pick-up's slot back at
+    /// 443); its end test reads slot 0's (@ 0x0042c816).
+    async fn bar_slide_out(&mut self, hooks: &mut dyn ScriptHooks, game_over: bool) -> bool {
+        let mut pointer = self.pointer.pos;
+        let mut closed = false;
+        while self.bar_slot_ys[0] < 0x208 && !self.should_abort() {
             self.animate_sprites();
-            self.bar_frame(slot_y, true);
+            self.bar_frame(true, BarPointer::None);
+            self.still_frame_cursor_step();
             self.sys.frame().await;
             self.slide_guest_portraits(7);
-            if self.bar_tick(hooks).await {
-                return true;
+            // +7 to each slot after the frame (@ 0x0042c789), before the
+            // timers.
+            for y in &mut self.bar_slot_ys {
+                *y += 7;
+            }
+            if self.bar_tick(hooks, &mut pointer).await.1 || game_over {
+                self.bar.request = false;
+                closed = true;
+                break;
             }
             self.bar_sounds().await;
-            slot_y += 7;
         }
-        false
+        self.bar.right_press = false;
+        self.rebase_con_clocks();
+        closed
     }
 
-    /// The edge scroll of the bar loops, at the port's pace.
-    fn bar_scroll(&mut self, next_ms: &mut u64) {
-        let (mx, my) = self.sys.mouse();
+    /// The edge scroll of the bar loops at the pointer (`mx`, `my`), at the
+    /// port's pace.
+    fn bar_scroll(&mut self, (mx, my): (i32, i32), next_ms: &mut u64) {
         let now = self.sys.millis();
         if now < *next_ms {
             return;
@@ -289,130 +402,345 @@ impl Engine {
         }
     }
 
+    /// What a `FUN_0041a298` poll of the bar loops sets, for a poll without
+    /// a left press edge (that one returns before the rest, 0x0041a2b5):
+    /// the message pump moves the pointer; a right press sets 0x00496120
+    /// and toggles the request (0x0041a2f2..0x0041a337); then Escape, with
+    /// no talking head, no bow mode, the request off (a right press of the
+    /// same poll may just have toggled it) and an empty hand, clears
+    /// 0x00496124 and sets the menu request 0x00496138 (0x0041a3e8..
+    /// 0x0041a423): the portraits are no longer drawn (`FUN_0042bc58` @
+    /// 0x0042bc79), a right press no longer toggles the request, and a
+    /// timer section's voice-only lines stop at once, until the bar's end
+    /// clears it (0x0042c29d, 0x0042c2a7).
+    fn bar_poll_flags(&mut self, mi: &super::menus::MenuInput, pointer: &mut (i32, i32)) {
+        if mi.left_press {
+            return;
+        }
+        // The pump's WM_MOUSEMOVE (0x00419c10..0x00419c29), if the mouse
+        // moved: 0x004960ec / 0x004960f0, which the slides' cursor steps
+        // read too (FUN_00422bb0 @ 0x00422bd5, FUN_00422d5c @ 0x00422d7a).
+        self.sync_pointer_mouse();
+        *pointer = self.pointer.pos;
+        if mi.right_press {
+            self.bar
+                .right_pressed(self.section_play, self.menu_request());
+        }
+        if mi.escape && self.escape_gate_open() {
+            self.latch_escape();
+        }
+    }
+
+    /// The pointer a bar starts from: 0x004960ec / 0x004960f0 (the bar
+    /// session's item test reads it, dc:22515, and FUN_0042c8ac's scroll,
+    /// dc:22949), not the Windows cursor, which a panorama load leaves
+    /// apart from it (`FUN_0044a424` @ 0x0044a70b / 0x0044a715, no
+    /// SetCursorPos). From the warp loop (the mouse locked) the mouse goes
+    /// to the Windows cursor, as at the loop's other exits; elsewhere (a
+    /// pick-up after a dialog) a motion since the last mark is the
+    /// WM_MOUSEMOVE that set the pointer (0x00419c10..0x00419c29).
+    fn bar_entry_pointer(&mut self) -> (i32, i32) {
+        if self.sys.mouse_locked() {
+            self.sys.set_mouse_locked(false);
+            self.sys
+                .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
+            self.mark_pointer_mouse();
+        } else {
+            self.sync_pointer_mouse();
+        }
+        self.pointer.pos
+    }
+
     /// A bar session (`FUN_0042c098`): the slide-in, the bar loop
     /// `FUN_0042c8ac` (the timers run every frame; it ends on a left or a
     /// right press, GameOver / Exit, or when a timer section cleared the
-    /// request), the item click, the slide-out. Returns the guest whose
-    /// portrait was under the pointer at the end (other than 592), whom the
-    /// caller talks to; 0 for none.
+    /// request; with a guest's portrait under the pointer it slides the
+    /// bar out and runs the conversation itself), the item click, the
+    /// slide-out. Returns the guest talked to (other than 592), 0 for
+    /// none.
     pub async fn display_bar(&mut self, hooks: &mut dyn ScriptHooks) -> i32 {
-        self.sys.set_mouse_locked(false);
-        let closed = self.bar_slide_in(hooks).await;
+        // The warp loop opens the bar on 0x004960c4 = 1 (0x0041c6d2), and
+        // FUN_0042c2c4 clears it only when GameOver or Exit ends the slide
+        // (0x0042c55d): the slide-in's timer sections run their lines and
+        // videos with the request on (a right press toggles it off, Escape
+        // does nothing, the still frames step no cursor).
+        self.bar.request = true;
+        // The pointer 0x004960ec / 0x004960f0 as the warp loop's last pump
+        // left it: the slide-in pumps no message.
+        let mut pointer = self.bar_entry_pointer();
+        self.bar_slide_in(hooks, &mut pointer).await;
         if self.should_abort() {
+            self.bar_end();
             return 0;
         }
-        let mut guest = 0;
-        if !closed {
-            self.wait_buttons_up().await;
-            while self.sys.poll_event().is_some() {}
-            guest = self.bar_loop(hooks).await;
+        // FUN_0042c2c4 polls no input, but the warp loop polls once after
+        // it, between two clears of the click flag (0x0041c6e0..0x0041c6ef),
+        // before FUN_0042c098: the press edges made during the slide-in are
+        // taken there (FUN_0042e624 gives an edge-mode key its edge on the
+        // first poll that sees it down). A left press is lost; a right
+        // press sets 0x00496120 and toggles the request, which the bar loop
+        // turns on again at its entry (0x0042c8c4); Escape latches the menu
+        // request when the request is off then ([`Engine::bar_poll_flags`]).
+        // That poll pumps a message unless it saw a left press (0x0041a2b5):
+        // the pointer the bar loop starts from.
+        let mi = self.poll_menu_input();
+        self.bar_poll_flags(&mi, &mut pointer);
+        // FUN_0042c098 runs the bar loop unless GameOver is set (@
+        // 0x0042c0c9); an Exit set by the slide-in ends its first pass.
+        let mut exit = BarExit {
+            guest: 0,
+            left: false,
+            pointer,
+        };
+        if self.vars.get("gameover") == 0 {
+            exit = self.bar_loop(hooks, pointer).await;
         }
         if self.should_abort() {
-            return 0;
+            self.bar_end();
+            return exit.guest;
         }
-        // FUN_0042c098 slides the bar out on every exit without GameOver
-        // (0x0042c219). GameOver set by the slide-in (tested @ 0x0042c0c9)
-        // or by the bar loop (@ 0x0042c0ed) skips to its tail with no
-        // slide-out, except that the bar loop's exit with a guest's
-        // portrait under the pointer runs FUN_0042c59c itself (0x0042cbfe,
-        // before the conversation).
-        if self.vars.get("gameover") == 0 || guest != 0 {
-            self.bar_slide_out(hooks).await;
+        // GameOver set by the slide-in (tested @ 0x0042c0c9) or by the bar
+        // loop (@ 0x0042c0ed) skips to FUN_0042c098's tail (0x0042c22d): no
+        // item click, no bow, no slide-out, no poll.
+        if self.vars.get("gameover") == 0 {
+            // The guest path already slid the bar out (0x00496148 = 0
+            // @ 0x0042cc78); its item test finds the request off
+            // (0x0042cc2c) and can only empty a hand the conversation left
+            // empty, so it is not made.
+            if exit.guest == 0 {
+                self.bar_item_click(exit.left, exit.pointer);
+            }
+            // FUN_0042d098 (@ 0x0042c201) enters bow mode with the bow in
+            // hand, before the slide-out: the hand is empty while the bar
+            // slides down, the bow back among the bar's icons. On the guest
+            // path it comes after the conversation.
+            self.take_bow().await;
+            // 0x0042c206: the request on for the slide-out (0x0042c219),
+            // which runs unless the guest path ran it.
+            self.bar.request = true;
+            if exit.guest == 0 {
+                self.bar_slide_out(hooks, false).await;
+            }
+            // Then FUN_0042c098 polls once (0x0042c228, after the click flag
+            // is cleared @ 0x0042c21e) and clears the flags at once
+            // (0x0042c22d..0x0042c255): the press edges of a left press, a
+            // right press or Escape made during the slide-out are taken
+            // there and never reach the warp loop; its view keys move the
+            // stored angles.
+            if !self.should_abort() {
+                self.drop_press_edges();
+            }
         }
-        guest
+        self.bar_end();
+        // FUN_0042d198 (@ 0x0042c25f) on every exit: the bow rises when bow
+        // mode is on.
+        if self.bow_mode {
+            self.raise_bow().await;
+        }
+        exit.guest
     }
 
-    async fn bar_loop(&mut self, hooks: &mut dyn ScriptHooks) -> i32 {
+    /// The tail of `FUN_0042c098` on every exit: the request off
+    /// (0x0042c237), the cursor's click animation cancelled (0x004968b8 = 0
+    /// @ 0x0042c241), the click and right-press flags cleared (0x0042c24b,
+    /// 0x0042c255), 0x00496124 = 1 and the menu request 0 (0x0042c29d,
+    /// 0x0042c2a7).
+    fn bar_end(&mut self) {
+        self.bar.flags_reset();
+        self.cursor_state.click_anim = false;
+        self.escape_request = false;
+    }
+
+    /// `FUN_0042c098`'s item click (0x0042c0f3..0x0042c1f7) after the bar
+    /// loop: the cell at the pointer `pointer`, read at once with no wait
+    /// for the release, when the request is still on (a left press ended
+    /// the loop; an Exit, a right press or a timer section turned it off);
+    /// else either press flag (the click `left`, 0x00496120) empties the
+    /// hand (0x0042c1c9). A cell past the last record reads 0, which
+    /// empties the hand; the record in hand empties it too.
+    fn bar_item_click(&mut self, left: bool, (mx, my): (i32, i32)) {
+        let held = self.vars.get("objetenmain");
+        match clicked_record(mx, my, self.bar_first).filter(|_| self.bar.request) {
+            Some(r) => {
+                let id = self.inventory.get(r).copied().unwrap_or(0);
+                if id == held {
+                    self.vars.set("objetenmain", 0);
+                } else {
+                    // The hand's icon is the record's byte (@ 0x0042c18f).
+                    self.vars.set("objetenmain", id);
+                    self.held_icon = self.record_icon(r).map(|k| (id, k as u8));
+                }
+            }
+            None if left || self.bar.right_press => self.vars.set("objetenmain", 0),
+            None => {}
+        }
+    }
+
+    /// `FUN_0041a298` after the bar's slide-out (`FUN_0042c098` @
+    /// 0x0042c228; on the guest path, after the conversation): the press
+    /// edges queued since the last poll are taken and dropped (the flags
+    /// they set are cleared right after, 0x0042c22d..0x0042c255), and,
+    /// without a new left press, a held F5..F8 moves the stored view
+    /// angles (0x0041a33c..0x0041a3ba).
+    pub(crate) fn drop_press_edges(&self) {
+        let mut left = false;
+        while let Some(ev) = self.sys.poll_event() {
+            if let crate::sys::Input::MouseDown {
+                button: crate::sys::MouseButton::Left,
+                ..
+            } = ev
+            {
+                left = true;
+            }
+        }
+        self.poll_view_keys(left);
+    }
+
+    /// The bar loop `FUN_0042c8ac` from the pointer `pointer` of the last
+    /// pump. Each pass: the exit test of the click flag (0x0042c8ce), the
+    /// place sprites (`FUN_00425304` @ 0x0042c8e5), the view, the bar, the
+    /// portraits and the pointer, the present (`FUN_0041afd0` @
+    /// 0x0042cb22), the input (`FUN_0041a298` @ 0x0042cb27), the timers
+    /// (`FUN_0042be3c` @ 0x0042cb2c) with the GameOver / Exit exit, the
+    /// exit when the request is off (a right press toggled it or a timer
+    /// section cleared it, 0x0042cb76), the edge scroll (0x0042cb83..
+    /// 0x0042cbee) and `FUN_00432178` (@ 0x0042cbf4). A left press ends the
+    /// loop at the next pass's test: its own pass runs the timers, the
+    /// scroll and the sounds; a section those timers ran clears the click
+    /// flag at its end (`FUN_0042844c` @ 0x00428d77), so that click is
+    /// lost. Every exit then runs the exit test (0x0042cbfe): a guest's
+    /// portrait under the pointer, other than 592, gets the slide-out and
+    /// the conversation here.
+    async fn bar_loop(&mut self, hooks: &mut dyn ScriptHooks, mut pointer: (i32, i32)) -> BarExit {
         let mut next_scroll = 0u64;
-        let (mut left, mut game_over, mut section_closed) = (false, false, false);
+        // The click flag 0x0049611c.
+        let mut left = false;
         self.bar.opened(); // 0x0042c8c4
         loop {
-            if self.should_abort() {
-                return 0;
-            }
-            let mi = self.poll_menu_input();
-            if mi.left_press {
-                left = true;
+            if self.should_abort() || left {
                 break;
             }
-            if mi.right_press {
-                break; // the right button empties the hand below
-            }
-            if self.bar_tick(hooks).await {
-                game_over = true;
-                break;
-            }
-            // A timer section that played a video, a voice-only line or a
-            // music change (or saw a right press) cleared the request
-            // (0x0042cb76).
-            if !self.bar.request {
-                section_closed = true;
-                break;
-            }
-            self.bar_scroll(&mut next_scroll);
-            self.bar_frame(BAR_HOTSPOT_Y, false);
-            // FUN_00432178 ends each bar frame (FUN_0042c8ac step 5).
-            self.bar_sounds().await;
+            self.animate_sprites();
+            // The slots at the y the slide-in left (@ 0x0042c97d, 0x0042c9eb).
+            self.bar_frame(false, BarPointer::Pointer);
             self.sys.frame().await;
+            let mi = self.poll_menu_input();
+            // The left-press branch of FUN_0041a298 sets the flag and
+            // returns before its pump (0x0041a2b5): the pass keeps the
+            // previous pass's pointer.
+            left = mi.left_press;
+            self.bar_poll_flags(&mi, &mut pointer);
+            let (ran, close) = self.bar_tick(hooks, &mut pointer).await;
+            if ran {
+                left = false; // 0x00428d77
+            }
+            if close {
+                // 0x0042cb3c..0x0042cb6b: the request off, then the exit.
+                self.bar.request = false;
+                break;
+            }
+            if !self.bar.request {
+                break;
+            }
+            self.bar_scroll(pointer, &mut next_scroll);
+            // FUN_00432178 ends each bar pass.
+            self.bar_sounds().await;
         }
-        // FUN_0042c098 step 6 clears both flags whatever the exit.
-        let session = self.bar;
-        self.bar.flags_reset();
-        // The exit test of FUN_0042c8ac (0x0042cbfe): the portrait under
-        // the pointer, other than 592.
-        let (mx, my) = self.sys.mouse();
+        let mut exit = BarExit {
+            guest: 0,
+            left,
+            pointer,
+        };
+        if self.sys.should_quit() {
+            return exit;
+        }
+        // The exit test (0x0042cbfe) runs on every exit, a GameOver's too
+        // (0x0042cb71): FUN_0042bdb8, the portrait under the pointer, with
+        // no GameOver test.
+        let (mx, my) = pointer;
         let guest = match self.guest_at(mx, my) {
             592 => 0,
             g => g,
         };
-        self.wait_buttons_up().await;
-        if game_over || guest != 0 {
-            return guest;
+        if guest == 0 {
+            return exit;
         }
-        // Left by a timer section: no item click; the hand is emptied only
-        // by a right press seen during it (0x0042c1c9).
-        if section_closed && !session.right_press {
-            return 0;
+        // 0x0042cc1d..0x0042cc78: the slide-out FUN_0042c59c with the
+        // loop's request, the request off (0x0042cc2c), then the
+        // conversation FUN_00425828 (ClicPerso the guest), which has no
+        // GameOver test: after a game over a timer section ran (the
+        // game-over screen is behind, GAMEOVER still set), the bar still
+        // slides out (one frame: its GameOver exit, 0x0042c7e1) and the
+        // conversation runs before the reload. The port's reload request
+        // is held meanwhile.
+        let held = match self.abort {
+            Some(Abort::NewGame) => self.abort.take(),
+            _ => None,
+        };
+        self.bar_slide_out(hooks, held.is_some()).await;
+        self.bar.request = false;
+        if !self.sys.should_quit() {
+            hooks.talk_to_guest(self, guest).await;
         }
-        let (mx, my) = self.sys.mouse();
-        let held = self.vars.get("objetenmain");
-        // FUN_0042c098 compares ids; a cell past the last record reads 0,
-        // which empties the hand.
-        let taken = left
-            .then(|| clicked_record(mx, my, self.bar_first))
-            .flatten()
-            .and_then(|r| self.inventory.get(r).copied())
-            .filter(|&id| id != 0 && id != held);
-        self.vars.set("objetenmain", taken.unwrap_or(0));
-        0
+        if held.is_some() && !self.sys.should_quit() {
+            self.abort = held;
+        }
+        exit.guest = guest;
+        exit.left = false;
+        exit
     }
 
     /// `FUN_004278a0` after a pick-up: the bar slides in, `FUN_0042cc98`
     /// shows the new object in hand until a left or a right press, the bar
     /// slides out. True for a right press (the object stays in hand).
     pub async fn display_pickup(&mut self, hooks: &mut dyn ScriptHooks) -> bool {
-        self.sys.set_mouse_locked(false);
-        self.bar_slide_in(hooks).await;
-        // The new record's slot x = index * 0x46 + 0x23, stored after the
-        // slide-in (@ 0x00427ae2); a record from 9 on lands past the slots.
+        // 0x004960c4 = 1 (@ 0x004279e8) for the slides and the hold loop,
+        // cleared after the slide-out (@ 0x00427b53).
+        self.bar.request = true;
+        let mut pointer = self.bar_entry_pointer();
+        self.bar_slide_in(hooks, &mut pointer).await;
+        // FUN_004278a0 goes from the slide-in to the hold loop with no
+        // GameOver test (dc:19317-19326), and the hold loop runs no timers
+        // and tests only the presses (0x0042cd05): after a game over a
+        // slide-in timer ran (the game-over screen behind, GAMEOVER set),
+        // the hold loop still runs at the slots' y the cut slide-in left,
+        // the object on the pointer, until a press; the slide-out then
+        // ends after its first frame (its GameOver exit, 0x0042c7e1), and
+        // the reload follows. The port's reload request is held meanwhile.
+        let held_reload = match self.abort {
+            Some(Abort::NewGame) => self.abort.take(),
+            _ => None,
+        };
+        // The new record's slot x = index * 0x46 + 0x23 and slot y = 0x1bb,
+        // stored after the slide-in (@ 0x00427ae2, 0x00427af0): after a
+        // slide-in cut short that slot is back at 443, the others stay at
+        // the cut y. A record from 9 on lands past the slots.
         let held = self.vars.get("objetenmain");
         self.bar_pickup_slot = match self.inventory.len() {
             n if n > 0 && self.inventory[n - 1] == held => pickup_slot(n - 1),
             _ => None,
         };
+        if let Some(slot) = self.bar_pickup_slot {
+            self.bar_slot_ys[slot] = BAR_HOTSPOT_Y;
+        }
         let mut right = false;
         let mut next_scroll = 0u64;
-        // The loop ends on a press edge of either button.
-        while self.sys.poll_event().is_some() {}
+        // The loop ends on a press edge of either button; a press made
+        // during the slide-in (which polls no input) is its first poll's.
         while !self.should_abort() {
             // FUN_0042cc98 animates the place sprites (@ 0x0042cd1c) and
             // draws like the bar loop; it runs no timers.
             self.animate_sprites();
-            self.bar_frame(BAR_HOTSPOT_Y, false);
+            // The bar at slot 0's y, each icon at its slot's (@ 0x0042cdb4,
+            // 0x0042ce2c).
+            self.bar_frame(false, BarPointer::HeldIcon);
             self.sys.frame().await;
             let mi = self.poll_menu_input();
+            // Its poll (@ 0x0042cf14) toggles the request on a right press:
+            // the slide-out then runs with it off.
+            self.bar_poll_flags(&mi, &mut pointer);
             match self
-                .hold_pass(mi.left_press, mi.right_press, &mut next_scroll)
+                .hold_pass(mi.left_press, mi.right_press, pointer, &mut next_scroll)
                 .await
             {
                 0 => {}
@@ -422,26 +750,41 @@ impl Engine {
                 }
             }
         }
-        self.wait_buttons_up().await;
+        // FUN_004278a0 goes from FUN_0042cc98 to the slide-out
+        // FUN_0042c59c (dc:19326-19333) with no wait for the release.
         if !right {
             self.vars.set("objetenmain", 0);
         }
-        self.bar_slide_out(hooks).await;
-        // The timers resume from their values, ChapterTime from 0, as after
-        // the inventory bar (FUN_0042c59c @ 0x0042c844 ends the slide-out).
-        self.rebase_con_clocks();
+        // The slide-out ends with the timers resuming from their values,
+        // ChapterTime from 0 (FUN_0042c59c @ 0x0042c844).
+        self.bar_slide_out(hooks, held_reload.is_some()).await;
+        if held_reload.is_some() && !self.sys.should_quit() {
+            self.abort = held_reload;
+        }
+        // FUN_004278a0 then clears the request (@ 0x00427b53), cancels the
+        // cursor's click animation (0x004968b8 = 0 @ 0x00427b5d) and the
+        // click and right-press flags (@ 0x00427b67, 0x00427b71).
+        self.bar.flags_reset();
+        self.cursor_state.click_anim = false;
         right
     }
 
     /// One pass of the hold loop `FUN_0042cc98` after its frame, with the
     /// press edges the input `FUN_0041a298` read (@ 0x0042cf14):
-    /// `FUN_00432178` (@ 0x0042cf19), the edge scroll (@ 0x0042cf1e..
-    /// 0x0042cf8f, at the port's pace), then the loop test on the edges
+    /// `FUN_00432178` (@ 0x0042cf19), the edge scroll at the pointer
+    /// 0x004960ec / 0x004960f0 (@ 0x0042cf1e..0x0042cf8f, at the port's
+    /// pace), then the loop test on the edges
     /// (@ 0x0042cd05): 1 for a left press, 2 for a right one, else 0. The
     /// pass that reads the click runs the sounds and the scroll too.
-    async fn hold_pass(&mut self, left: bool, right: bool, next_scroll: &mut u64) -> i32 {
+    async fn hold_pass(
+        &mut self,
+        left: bool,
+        right: bool,
+        pointer: (i32, i32),
+        next_scroll: &mut u64,
+    ) -> i32 {
         self.bar_sounds().await;
-        self.bar_scroll(next_scroll);
+        self.bar_scroll(pointer, next_scroll);
         if left {
             1
         } else if right {
@@ -453,9 +796,8 @@ impl Engine {
 
     /// `FUN_0042d098`, closing the bar: the bow (object 334) in hand with
     /// ArcMagique set, not yet in bow mode: `SPRITE\2D\ARCWARP.SPR`, bow
-    /// mode, the hand emptied; then the bow rises (`FUN_0042d198`: frame 0
-    /// from y 0x1e1 to 0x83, 10 px a frame).
-    pub(crate) async fn enter_bow_mode(&mut self) {
+    /// mode, the hand emptied.
+    async fn take_bow(&mut self) {
         if self.vars.get("objetenmain") != 0x14e
             || self.vars.get("arcmagique") == 0
             || self.bow_mode
@@ -472,6 +814,11 @@ impl Engine {
         }
         self.bow_mode = true;
         self.vars.set("objetenmain", 0);
+    }
+
+    /// `FUN_0042d198`: the bow rises, frame 0 from y 0x1e1 to 0x83, 10 px
+    /// a frame.
+    async fn raise_bow(&mut self) {
         let mut y = 0x1e1;
         while y != 0x79 && !self.should_abort() {
             self.show_bow_at(y).await;
@@ -491,6 +838,9 @@ impl Engine {
         self.bow_sprites.clear();
     }
 
+    /// One frame of the bow rising or lowering. `FUN_0042d198` /
+    /// `FUN_0042d368` poll no input: a press made meanwhile is the next
+    /// poll's press edge.
     async fn show_bow_at(&mut self, y: i32) {
         self.animate_sprites();
         if !self.warp_loaded {
@@ -502,12 +852,16 @@ impl Engine {
             draw_sprite(&mut s, spr, 0x2e, y);
         }
         self.sys.frame().await;
-        while self.sys.poll_event().is_some() {}
     }
 
     /// ArcMagique=N (`FUN_0042a100` @ 0x0042aa21..0x0042ac2b):
-    /// `SPRITE\2D\ARCANIM.SPR` frames 0..19 at the mouse over the view, the
-    /// place sprites animating; nothing without the file.
+    /// `SPRITE\2D\ARCANIM.SPR` frames 0..19 at the pointer over the view, the
+    /// place sprites animating; nothing without the file. Each frame is
+    /// presented by `FUN_0041afd0` (@ 0x0042ac17), which steps the warp
+    /// cursor under its gates ([`Engine::still_frame_cursor_step`]; its
+    /// sprite goes to the back buffer after the copy @ 0x0042abd3). The
+    /// loop polls no input (no `FUN_0041a298` from 0x0042aa88 to
+    /// 0x0042ac1c): a press made meanwhile is the next poll's edge.
     pub(crate) async fn play_arc_magique(&mut self) {
         let (w, h) = limits::DEFAULT;
         let anim = match self.read("SPRITE\\2D\\ARCANIM.SPR").await {
@@ -517,7 +871,12 @@ impl Engine {
         if anim.is_empty() {
             return;
         }
-        let (mx, my) = self.sys.mouse();
+        // The steps test the pointer where the section's last pump left
+        // it (FUN_00422bb0 / FUN_00422d5c read 0x004960ec / 0x004960f0,
+        // @ 0x00422bd5, 0x00422d7a); the loop pumps none itself.
+        // Frame i is drawn at that pointer (0x0042ab02..0x0042ab20).
+        self.sync_pointer_mouse();
+        let (mx, my) = self.pointer.pos;
         for i in 0..20 {
             if self.should_abort() || !self.warp_loaded {
                 break;
@@ -528,33 +887,49 @@ impl Engine {
                 let mut s = self.sys.screen.borrow_mut();
                 draw_sprite(&mut s, spr, mx, my);
             }
+            self.still_frame_cursor_step();
             self.sys.frame().await;
-            while self.sys.poll_event().is_some() {}
         }
     }
 
     /// The guests' portraits sliding in from the right edge (`FUN_0042b480`)
-    /// or out to it (`FUN_0042b6c0`), one redrawn view per 10 px.
+    /// or out to it (`FUN_0042b6c0`), one redrawn view per 10 px. Each
+    /// frame: the place sprites (`FUN_00425304` @ 0x0042b51b / 0x0042b754),
+    /// the view, the moving portrait at the portraits' y (`FUN_00410430` @
+    /// 0x0042b5ab / 0x0042b7d7, whatever 0x0049613c), then `FUN_0042bc58`
+    /// (@ 0x0042b5b3 / 0x0042b7df), the other portraits on top; the present
+    /// `FUN_0041afd0` (@ 0x0042b6a7 / 0x0042b8d3), which steps the warp
+    /// cursor under its gates ([`Engine::still_frame_cursor_step`]; its
+    /// sprite goes to the back buffer after the copy).
     pub(crate) async fn slide_guest(&mut self, sprite: u8, from: i32, to: i32, step: i32) {
         if !self.warp_loaded {
             return;
         }
+        // The steps test the pointer where the section's last pump left
+        // it (0x004960ec / 0x004960f0, @ 0x00422bd5, 0x00422d7a); the slide
+        // pumps none itself.
+        self.sync_pointer_mouse();
         let mut x = from;
         while if step < 0 { x > to } else { x < to } {
             if self.should_abort() {
                 return;
             }
+            self.animate_sprites();
             self.render_view();
             let mut s = self.sys.screen.borrow().clone();
-            self.draw_guests(&mut s, Some((usize::from(sprite), x)));
+            if let Some(spr) = self.ui.guests.get(usize::from(sprite)) {
+                draw_sprite(&mut s, spr, x, self.guests.portrait_y);
+            }
+            self.draw_guests(&mut s, None);
             *self.sys.screen.borrow_mut() = s;
+            self.still_frame_cursor_step();
             self.sys.frame().await;
             x += step;
         }
     }
 
-    /// AddGuest=N (`FUN_0042b480`): the record, the portrait sliding in,
-    /// then the count grows.
+    /// AddGuest=N (`FUN_0042b480`): the record, the portrait sliding in
+    /// (shown or hidden, 0x0049613c is not tested), then the count grows.
     pub async fn add_guest(&mut self, guest: i32) {
         if self.guests.count >= super::Guests::SLOTS {
             return;
@@ -562,27 +937,23 @@ impl Engine {
         let mut next = self.guests.clone();
         next.add(guest, &self.game.exe.guest_sprite_ids);
         let n = self.guests.count;
-        if self.guests_shown {
-            self.slide_guest(next.sprite[n], 640, 540 - 100 * n as i32, -10)
-                .await;
-        }
+        self.slide_guest(next.sprite[n], 640, 540 - 100 * n as i32, -10)
+            .await;
         let y = self.guests.portrait_y;
         self.guests = next;
         self.guests.portrait_y = y;
     }
 
     /// SubGuest=N (`FUN_0042b6c0`): each matching record hidden, sliding
-    /// out to the right, then the following records move down; after a
-    /// removal the scan goes on at the next index.
+    /// out to the right (shown or hidden), then the following records move
+    /// down; after a removal the scan goes on at the next index.
     pub async fn sub_guest(&mut self, guest: i32) {
         let mut i = 0;
         while i < self.guests.count {
             if self.guests.id[i] == guest {
                 let s = self.guests.sprite[i];
                 self.guests.sprite[i] = super::Guests::HIDDEN;
-                if self.guests_shown {
-                    self.slide_guest(s, 540 - 100 * i as i32, 640, 10).await;
-                }
+                self.slide_guest(s, 540 - 100 * i as i32, 640, 10).await;
                 self.guests.remove_at(i);
             }
             i += 1;
@@ -593,8 +964,8 @@ impl Engine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hooks::NoScripts;
-    use crate::sys::MouseButton;
+    use crate::hooks::{ready, HookFuture, NoScripts};
+    use crate::sys::{Input, MouseButton};
     use crate::test_support::{button, with_engine};
     use crate::warp::SCREEN_W;
     use md5::{Digest, Md5};
@@ -608,6 +979,91 @@ mod tests {
             42 => button(sys, MouseButton::Left, false),
             _ => {}
         }
+    }
+
+    /// The hand and bow mode each bar frame's timers see; `game_over`: the
+    /// first timer pass sets GameOver.
+    struct BowProbe {
+        seen: Rc<RefCell<Vec<(i32, bool)>>>,
+        game_over: bool,
+    }
+
+    impl ScriptHooks for BowProbe {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            if self.game_over {
+                e.vars.set("gameover", 1);
+            }
+            self.seen
+                .borrow_mut()
+                .push((e.vars.get("objetenmain"), e.bow_mode));
+            ready(self.game_over)
+        }
+    }
+
+    /// ObjetEnMain and bow mode.
+    type HandBow = (i32, bool);
+
+    /// The inventory bar (`FUN_0042c098`) with the bow (object 334) in it
+    /// and ArcMagique set, a click on the bow; `held`: the object in hand
+    /// at the start. The hand and bow mode the timers saw on each frame,
+    /// then after the bar.
+    fn bow_from_the_bar(held: i32, game_over: bool) -> Option<(Vec<HandBow>, HandBow)> {
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let got = Rc::new(RefCell::new(None));
+        let (s2, g2) = (seen.clone(), got.clone());
+        let ran = with_engine(
+            "bow_mode_starts_before_the_slide_out",
+            move |mut e| async move {
+                e.inventory.push(334);
+                e.vars.set("arcmagique", 1);
+                e.vars.set("objetenmain", held);
+                let mut hooks = BowProbe {
+                    seen: s2,
+                    game_over,
+                };
+                e.display_bar(&mut hooks).await;
+                *g2.borrow_mut() = Some((e.vars.get("objetenmain"), e.bow_mode));
+            },
+            |sys, f| match f {
+                // The bow's cell, record 0.
+                39 => sys.push_input(crate::sys::Input::MouseMove { x: 35, y: 420 }),
+                40 => button(sys, MouseButton::Left, true),
+                42 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let after = got.borrow().unwrap();
+        let seen = seen.borrow().clone();
+        Some((seen, after))
+    }
+
+    /// `FUN_0042c098` enters bow mode (`FUN_0042d098` @ 0x0042c201) before
+    /// the slide-out (`FUN_0042c59c` @ 0x0042c219): the 11 slide-out
+    /// frames run with the hand empty and bow mode on.
+    #[test]
+    fn bow_mode_starts_before_the_slide_out() {
+        let Some((seen, after)) = bow_from_the_bar(0, false) else {
+            return;
+        };
+        assert_eq!(after, (0, true));
+        assert!(seen.len() > 11, "{seen:?}");
+        assert!(
+            seen[seen.len() - 11..].iter().all(|&s| s == (0, true)),
+            "{seen:?}"
+        );
+    }
+
+    /// A GameOver set during the bar skips `FUN_0042d098` (0x0042c0ed ->
+    /// 0x0042c22d): the bow stays in hand, no bow mode.
+    #[test]
+    fn no_bow_mode_after_a_game_over_in_the_bar() {
+        let Some((_, after)) = bow_from_the_bar(334, true) else {
+            return;
+        };
+        assert_eq!(after, (334, false));
     }
 
     /// The pick-up bar ends like the inventory bar: Time1 / Time2 resume
@@ -640,6 +1096,33 @@ mod tests {
         assert_eq!(got, Some((7, 9, true, true)));
     }
 
+    /// Closing the bar (`FUN_0042c098` @ 0x0042c241) and the pick-up
+    /// (`FUN_004278a0` @ 0x00427b5d) cancel the cursor's click animation.
+    #[test]
+    fn the_bars_cancel_the_click_animation() {
+        for pickup in [false, true] {
+            let got = Rc::new(RefCell::new(None));
+            let g2 = got.clone();
+            let ran = with_engine(
+                "the_bars_cancel_the_click_animation",
+                move |mut e| async move {
+                    e.cursor_state.click_anim = true;
+                    if pickup {
+                        e.display_pickup(&mut NoScripts).await;
+                    } else {
+                        e.display_bar(&mut NoScripts).await;
+                    }
+                    *g2.borrow_mut() = Some(e.cursor_state.click_anim);
+                },
+                click_at_40,
+            );
+            if !ran {
+                return;
+            }
+            assert_eq!(*got.borrow(), Some(false), "pickup {pickup}");
+        }
+    }
+
     /// Each bar frame polls NewSound (FUN_00432178): a sample that ended
     /// while the bar is open sets NEWSOUND back to 0.
     #[test]
@@ -662,6 +1145,1219 @@ mod tests {
         }
         let got = *got.borrow();
         assert_eq!(got, Some(0));
+    }
+
+    /// `FUN_0042c098` takes the cell under the pointer of the press
+    /// (0x0042c0f8), with no wait for the release: a click that moves to
+    /// another cell before its release takes the first one.
+    #[test]
+    fn bar_item_is_read_at_the_press() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "bar_item_is_read_at_the_press",
+            move |mut e| async move {
+                e.inventory = vec![1001, 1002, 1003];
+                e.vars.set("objetenmain", 0);
+                e.display_bar(&mut NoScripts).await;
+                *g2.borrow_mut() = Some(e.vars.get("objetenmain"));
+            },
+            |sys, f| match f {
+                30 => sys.push_input(Input::MouseMove { x: 35, y: 450 }),
+                40 => button(sys, MouseButton::Left, true),
+                41 => sys.push_input(Input::MouseMove { x: 105, y: 450 }),
+                45 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some(1001));
+        }
+    }
+
+    /// The slide-ins (`FUN_0042c2c4`) poll no input. After the inventory
+    /// bar's, the warp loop polls once (0x0041c6ea) between two clears of
+    /// the click flag: a left press made during the slide-in is lost, a
+    /// right press toggles the request, which the bar loop turns on again
+    /// (0x0042c8c4); the bar stays up. The pick-up (`FUN_004278a0`) has no
+    /// such poll: the press is the hold loop's (`FUN_0042cc98`) first
+    /// poll's edge, which ends it on its first pass.
+    #[test]
+    fn press_during_the_slide_in() {
+        for (pickup, b) in [
+            (false, MouseButton::Left),
+            (false, MouseButton::Right),
+            (true, MouseButton::Right),
+        ] {
+            let got = Rc::new(RefCell::new(None));
+            let g2 = got.clone();
+            let ran = with_engine(
+                "press_during_the_slide_in",
+                move |mut e| async move {
+                    e.inventory = vec![1001];
+                    e.vars.set("objetenmain", 1001);
+                    if pickup {
+                        e.display_pickup(&mut NoScripts).await;
+                    } else {
+                        e.display_bar(&mut NoScripts).await;
+                    }
+                    *g2.borrow_mut() = Some(e.sys.millis());
+                },
+                move |sys, f| match f {
+                    3 => button(sys, b, true),
+                    4 => button(sys, b, false),
+                    // Without the press edge the bar stays up until this.
+                    300 => button(sys, MouseButton::Left, true),
+                    301 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                },
+            );
+            if !ran {
+                return;
+            }
+            // 8 slide-in frames, one loop pass, 11 slide-out frames.
+            let ms = got.borrow().expect("the bar did not end");
+            if pickup {
+                assert!(ms < 40 * 16, "pickup: ended at {ms} ms");
+            } else {
+                assert!(ms > 300 * 16, "{b:?}: ended at {ms} ms");
+            }
+        }
+    }
+
+    /// The object click is the warp poll's press edge (0x0041c5f2), which
+    /// sets `FUN_0042e624`'s latch; the slide-in (`FUN_0042c2c4`) and the
+    /// slide-out (`FUN_0042c59c`) poll nothing. A second click during the
+    /// slide-in is no edge at the hold loop's first poll (0x0042cf14): the
+    /// object stays on the pointer until a later click. A click during the
+    /// slide-out after the hold's click is none at the next poll either.
+    #[test]
+    fn clicks_during_the_pickup_slides_are_no_presses() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "clicks_during_the_pickup_slides_are_no_presses",
+            move |mut e| async move {
+                e.inventory = vec![1001];
+                e.vars.set("objetenmain", 1001);
+                // The warp loop's poll that read the object click.
+                button(&e.sys, MouseButton::Left, true);
+                while e.sys.poll_event().is_some() {}
+                e.display_pickup(&mut NoScripts).await;
+                let end = e.sys.millis();
+                // The next poll (the warp loop's).
+                let mut presses = 0;
+                while let Some(ev) = e.sys.poll_event() {
+                    presses += usize::from(matches!(ev, Input::MouseDown { .. }));
+                }
+                *g2.borrow_mut() = Some((end, presses, e.vars.get("objetenmain")));
+            },
+            |sys, f| match f {
+                1 => button(sys, MouseButton::Left, false),
+                // In the slide-in.
+                3 => button(sys, MouseButton::Left, true),
+                4 => button(sys, MouseButton::Left, false),
+                // The click that ends the hold.
+                300 => button(sys, MouseButton::Left, true),
+                301 => button(sys, MouseButton::Left, false),
+                // In the slide-out.
+                304 => button(sys, MouseButton::Left, true),
+                305 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (ms, presses, held) = got.borrow().expect("the pick-up did not end");
+        assert!(ms > 300 * 16, "the hold ended at {ms} ms");
+        assert_eq!((presses, held), (0, 0));
+    }
+
+    /// A line's click (its poll's press edge) sets `FUN_0042e624`'s latch;
+    /// the executor, the /set dispatcher and the portrait's slide
+    /// (`FUN_0042b6c0` / `FUN_0042b480`) poll nothing: a click during the
+    /// slide is no press at the next poll (a film's, 0x0041bdf7).
+    #[test]
+    fn a_click_during_a_guest_slide_is_no_press() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let start = Rc::new(std::cell::Cell::new(None::<u64>));
+        let s2 = start.clone();
+        let done = Rc::new(std::cell::Cell::new(0u64));
+        let ran = with_engine(
+            "a_click_during_a_guest_slide_is_no_press",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                // The line's poll that read its click.
+                button(&e.sys, MouseButton::Left, true);
+                while e.sys.poll_event().is_some() {}
+                let f0 = e.sys.frames_presented();
+                s2.set(Some(f0));
+                e.add_guest(1).await;
+                let mut presses = 0;
+                while let Some(ev) = e.sys.poll_event() {
+                    presses += usize::from(matches!(ev, Input::MouseDown { .. }));
+                }
+                *g2.borrow_mut() = Some((e.sys.frames_presented() - f0, presses));
+            },
+            move |sys, _| {
+                // The line's click released, then a whole click, within
+                // the slide's 10 frames.
+                let Some(f0) = start.get() else {
+                    return;
+                };
+                let k = sys.frames_presented() - f0;
+                if k == done.get() {
+                    return;
+                }
+                done.set(k);
+                match k {
+                    1 | 6 => button(sys, MouseButton::Left, false),
+                    4 => button(sys, MouseButton::Left, true),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (frames, presses) = got.borrow().expect("no result");
+        assert_eq!(frames, 10);
+        assert_eq!(presses, 0);
+    }
+
+    /// `FUN_0042c098` polls once after the slide-out (0x0042c228) and
+    /// clears the flags: a press made during the slide-out never reaches
+    /// the warp loop.
+    #[test]
+    fn presses_during_the_slide_out_are_taken() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "presses_during_the_slide_out_are_taken",
+            move |mut e| async move {
+                e.inventory = vec![1001];
+                e.display_bar(&mut NoScripts).await;
+                let mut presses = 0;
+                while let Some(ev) = e.sys.poll_event() {
+                    presses += usize::from(matches!(ev, Input::MouseDown { .. }));
+                }
+                *g2.borrow_mut() = Some((presses, e.sys.millis()));
+            },
+            |sys, f| match f {
+                // A click off the bar's cells closes it, then a right and a
+                // left press during the 11 slide-out frames.
+                30 => sys.push_input(Input::MouseMove { x: 300, y: 200 }),
+                40 => button(sys, MouseButton::Left, true),
+                41 => button(sys, MouseButton::Left, false),
+                44 => button(sys, MouseButton::Right, true),
+                45 => button(sys, MouseButton::Right, false),
+                47 => button(sys, MouseButton::Left, true),
+                48 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (presses, ms) = got.borrow().expect("the bar did not end");
+        assert!(ms > 48 * 16, "the bar ended at {ms} ms, before the presses");
+        assert_eq!(presses, 0);
+    }
+
+    /// GameOver set by a timer section while the left button is down.
+    struct GameOverWhileHeld;
+
+    impl ScriptHooks for GameOverWhileHeld {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            let over = e.sys.buttons().0;
+            if over {
+                e.vars.set("gameover", 1);
+            }
+            ready(over)
+        }
+    }
+
+    /// The pass of `FUN_0042c8ac` whose poll (0x0042cb27) sees the left
+    /// press still runs the timers (0x0042cb2c); the loop ends at the next
+    /// pass's test (0x0042c8ce). A GameOver they set takes no item
+    /// (0x0042c0ed).
+    #[test]
+    fn the_click_pass_runs_the_timers() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_click_pass_runs_the_timers",
+            move |mut e| async move {
+                e.inventory = vec![1001];
+                e.display_bar(&mut GameOverWhileHeld).await;
+                *g2.borrow_mut() = Some((e.vars.get("gameover"), e.vars.get("objetenmain")));
+            },
+            |sys, f| match f {
+                30 => sys.push_input(Input::MouseMove { x: 35, y: 450 }),
+                40 => button(sys, MouseButton::Left, true),
+                45 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((1, 0)));
+        }
+    }
+
+    /// `FUN_004278a0` goes from the hold loop to the slide-out with no wait
+    /// for the release (dc:19326-19333): the pick-up ends while the button
+    /// is still held.
+    #[test]
+    fn the_pickup_does_not_wait_for_the_release() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_pickup_does_not_wait_for_the_release",
+            move |mut e| async move {
+                e.inventory = vec![1001];
+                e.vars.set("objetenmain", 1001);
+                e.display_pickup(&mut NoScripts).await;
+                *g2.borrow_mut() = Some(e.sys.millis());
+            },
+            |sys, f| match f {
+                40 => button(sys, MouseButton::Left, true),
+                300 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if ran {
+            let ms = got.borrow().expect("the pick-up did not end");
+            assert!(ms < 80 * 16, "ended at {ms} ms");
+        }
+    }
+
+    /// A timer section that plays on the pass whose poll sees the first
+    /// press (it reports a section ran, once, while the button is held).
+    struct SectionOnClick(bool);
+
+    impl ScriptHooks for SectionOnClick {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            let ran = !self.0 && e.sys.buttons().0;
+            self.0 |= ran;
+            ready(ran)
+        }
+    }
+
+    /// A section run by the timers of the bar loop's click pass clears the
+    /// click flag at its end (`FUN_0042844c` @ 0x00428d77): the loop's
+    /// test (0x0042c8ce) finds no click, the bar stays up and the cell
+    /// under the pointer is not taken; the next click takes it.
+    #[test]
+    fn a_click_on_a_pass_whose_timers_run_a_section_is_lost() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_click_on_a_pass_whose_timers_run_a_section_is_lost",
+            move |mut e| async move {
+                e.inventory = vec![1001];
+                e.vars.set("objetenmain", 0);
+                e.display_bar(&mut SectionOnClick(false)).await;
+                *g2.borrow_mut() = Some((e.vars.get("objetenmain"), e.sys.millis()));
+            },
+            |sys, f| match f {
+                30 => sys.push_input(Input::MouseMove { x: 35, y: 450 }),
+                40 => button(sys, MouseButton::Left, true),
+                42 => button(sys, MouseButton::Left, false),
+                300 => button(sys, MouseButton::Left, true),
+                302 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (held, ms) = got.borrow().expect("the bar did not end");
+        assert_eq!(held, 1001);
+        assert!(ms > 300 * 16, "the bar ended at {ms} ms, on the lost click");
+    }
+
+    /// The conversations asked for, with the reload request then.
+    type Talks = Rc<RefCell<Vec<(i32, Option<Abort>)>>>;
+    /// The frames of each phase.
+    type Shots = Rc<RefCell<Vec<(u8, Vec<u16>)>>>;
+
+    /// A game over run by the bar loop's timers on its 4th pass (the
+    /// executor's game-over screen sets GAMEOVER and the port's reload);
+    /// the conversations it is asked for, with the reload request then.
+    struct GameOverThenTalk {
+        passes: u32,
+        talks: Talks,
+    }
+
+    impl ScriptHooks for GameOverThenTalk {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.passes += 1;
+            let over = self.passes == 8 + 4;
+            if over {
+                e.vars.set("gameover", 1);
+                e.abort = Some(Abort::NewGame);
+            }
+            ready(over)
+        }
+
+        fn talk_to_guest<'a>(&'a mut self, e: &'a mut Engine, id: i32) -> HookFuture<'a, ()> {
+            self.talks.borrow_mut().push((id, e.abort));
+            ready(())
+        }
+    }
+
+    /// The bar loop's exit test (0x0042cbfe) runs on its GameOver exit too
+    /// (0x0042cb71): with a follower's portrait under the pointer the bar
+    /// slides out and the conversation `FUN_00425828` runs (it has no
+    /// GameOver test) before the reload.
+    #[test]
+    fn a_game_over_in_the_bar_still_talks_to_the_guest_under_the_pointer() {
+        let talks: Talks = Rc::default();
+        let got = Rc::new(RefCell::new(None));
+        let (t2, g2) = (talks.clone(), got.clone());
+        let ran = with_engine(
+            "a_game_over_in_the_bar_still_talks_to_the_guest_under_the_pointer",
+            move |mut e| async move {
+                e.guests.id[0] = 600;
+                e.guests.sprite[0] = 0;
+                e.guests.count = 1;
+                e.guests_shown = true;
+                let mut hooks = GameOverThenTalk {
+                    passes: 0,
+                    talks: t2,
+                };
+                let guest = e.display_bar(&mut hooks).await;
+                *g2.borrow_mut() = Some((guest, e.abort));
+            },
+            |sys, f| {
+                if f == 0 {
+                    // On the portrait once the bar is up (x 540.., y 294..).
+                    sys.push_input(Input::MouseMove { x: 560, y: 320 });
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        assert_eq!(*talks.borrow(), [(600, None)]);
+        assert_eq!(*got.borrow(), Some((600, Some(Abort::NewGame))));
+    }
+
+    /// The conversations a bar asks for.
+    struct TalkProbe(Rc<RefCell<Vec<i32>>>);
+
+    impl ScriptHooks for TalkProbe {
+        fn talk_to_guest<'a>(&'a mut self, _e: &'a mut Engine, id: i32) -> HookFuture<'a, ()> {
+            self.0.borrow_mut().push(id);
+            ready(())
+        }
+    }
+
+    /// The bar opened from the warp loop starts from the pointer
+    /// 0x004960ec / 0x004960f0 (its tests read it, dc:22515, dc:22949),
+    /// not the Windows cursor: after a panorama load (`FUN_0044a424` @
+    /// 0x0044a70b / 0x0044a715, no SetCursorPos) the two differ until the
+    /// mouse moves. Here the pointer is on a follower's portrait, the
+    /// cursor away from it, and the mouse does not move: the bar's click
+    /// talks to the follower (round 7, cu's leftover).
+    #[test]
+    fn the_bar_starts_from_the_game_pointer() {
+        let talks = Rc::new(RefCell::new(Vec::new()));
+        let t2 = talks.clone();
+        let ran = with_engine(
+            "the_bar_starts_from_the_game_pointer",
+            move |mut e| async move {
+                e.guests.id[0] = 600;
+                e.guests.sprite[0] = 0;
+                e.guests.count = 1;
+                e.guests_shown = true;
+                // The warp loop's state: the mouse locked, the pointer on
+                // the portrait (x 540.., y 294..), the cursor elsewhere.
+                e.sys.set_mouse_pos(100, 100);
+                e.sys.set_mouse_locked(true);
+                e.pointer.pos = (560, 320);
+                e.pointer.cursor = (100, 100);
+                e.display_bar(&mut TalkProbe(t2)).await;
+            },
+            click_at_40,
+        );
+        if ran {
+            assert_eq!(*talks.borrow(), [600]);
+        }
+    }
+
+    /// The cursor state 0x004968ac after a follower's portrait slid in
+    /// (`FUN_0042b480`), the pointer over a navigation zone of place 1
+    /// before it, the mouse moved off every zone when `moved`.
+    fn guest_slide_cursor_mode(moved: bool) -> Option<u8> {
+        let got = Rc::new(std::cell::Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_guest_slide_steps_the_cursor_at_the_mouse",
+            move |mut e| async move {
+                e.load_interface().await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let points: Vec<(i32, i32)> = (0..48)
+                    .flat_map(|j| (0..64).map(move |i| (i * 10, j * 10)))
+                    .collect();
+                let mut find = |want: &dyn Fn((u32, u32)) -> bool| {
+                    points.iter().copied().find(|&p| {
+                        e.pointer.pos = p;
+                        want(e.pointer_targets())
+                    })
+                };
+                let at = find(&|(z, _)| (1..0x200).contains(&z)).expect("a navigation zone");
+                let off = find(&|t| t == (0, 0)).expect("a point over nothing");
+                e.sys.set_mouse_pos(at.0, at.1);
+                e.pointer.mouse_moved(at);
+                e.mark_pointer_mouse();
+                if moved {
+                    // A motion an earlier line's poll pumped.
+                    e.sys.push_input(Input::MouseMove { x: off.0, y: off.1 });
+                }
+                e.load_cursor_sprites().await;
+                e.cursor_state = Default::default();
+                e.add_guest(600).await;
+                g2.set(Some(e.cursor_state.mode));
+            },
+            |_, _| {},
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// The guests' slides present through `FUN_0041afd0` (@ 0x0042b6a7 /
+    /// 0x0042b8d3), whose step `FUN_00422fcc` hit-tests the pointer
+    /// 0x004960ec / 0x004960f0 (`FUN_00422bb0` @ 0x00422bd5,
+    /// `FUN_00422d5c` @ 0x00422d7a) that every WM_MOUSEMOVE sets
+    /// (0x00419c10..0x00419c29): with the mouse moved off the zone, the
+    /// step finds no zone (state 0), not the zone of the old pointer
+    /// (state 5) (round 7, cu's leftover).
+    #[test]
+    fn a_guest_slide_steps_the_cursor_at_the_mouse() {
+        let Some(still) = guest_slide_cursor_mode(false) else {
+            return;
+        };
+        assert_eq!(still, 5);
+        assert_eq!(guest_slide_cursor_mode(true), Some(0));
+    }
+
+    /// The bar request each timer pass sees.
+    struct RequestProbe(Rc<RefCell<Vec<bool>>>);
+
+    impl ScriptHooks for RequestProbe {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.0.borrow_mut().push(e.bar.request);
+            ready(false)
+        }
+    }
+
+    /// 0x004960c4 is 1 during the slides: the warp loop opens the bar on it
+    /// (0x0041c6d2), FUN_0042c098 sets it before the slide-out
+    /// (0x0042c206), FUN_004278a0 before the pick-up's slide-in
+    /// (0x004279e8); both clear it at their end (0x0042c237, 0x00427b53).
+    #[test]
+    fn the_bar_request_is_on_during_the_slides() {
+        for pickup in [false, true] {
+            let seen: Rc<RefCell<Vec<bool>>> = Rc::default();
+            let got = Rc::new(RefCell::new(None));
+            let (s2, g2) = (seen.clone(), got.clone());
+            let ran = with_engine(
+                "the_bar_request_is_on_during_the_slides",
+                move |mut e| async move {
+                    e.inventory = vec![1001];
+                    let mut hooks = RequestProbe(s2);
+                    if pickup {
+                        e.vars.set("objetenmain", 1001);
+                        e.display_pickup(&mut hooks).await;
+                    } else {
+                        e.display_bar(&mut hooks).await;
+                    }
+                    *g2.borrow_mut() = Some(e.bar.request);
+                },
+                |sys, f| match f {
+                    30 => sys.push_input(Input::MouseMove { x: 300, y: 200 }),
+                    40 => button(sys, MouseButton::Left, true),
+                    42 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                },
+            );
+            if !ran {
+                return;
+            }
+            let seen = seen.borrow();
+            assert!(seen.len() >= 8 + 11, "pickup {pickup}: {seen:?}");
+            assert!(seen.iter().all(|&r| r), "pickup {pickup}: {seen:?}");
+            assert_eq!(*got.borrow(), Some(false), "pickup {pickup}");
+        }
+    }
+
+    /// The menu request each timer pass sees.
+    struct MenuRequestProbe(Rc<RefCell<Vec<bool>>>);
+
+    impl ScriptHooks for MenuRequestProbe {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.0.borrow_mut().push(e.escape_request);
+            ready(false)
+        }
+    }
+
+    /// A right press and Escape in one poll (`FUN_0041a298`): the right
+    /// press toggles the request off, then Escape, with the request off
+    /// and an empty hand, sets the menu request (0x0041a3e8..0x0041a423).
+    /// In the bar loop's poll the bar then slides out with the menu
+    /// request set (no portraits); in the poll after the slide-in the
+    /// whole bar session runs with it, a right press no longer closes the
+    /// bar, only a left click does. The bar's end clears it (0x0042c2a7).
+    #[test]
+    fn right_press_and_escape_in_one_bar_poll() {
+        for slide_in in [false, true] {
+            let seen: Rc<RefCell<Vec<bool>>> = Rc::default();
+            let got = Rc::new(RefCell::new(None));
+            let (s2, g2) = (seen.clone(), got.clone());
+            let at = if slide_in { 3 } else { 40 };
+            let ran = with_engine(
+                "right_press_and_escape_in_one_bar_poll",
+                move |mut e| async move {
+                    e.inventory = vec![1001];
+                    e.display_bar(&mut MenuRequestProbe(s2)).await;
+                    *g2.borrow_mut() = Some((e.escape_request, e.sys.millis()));
+                },
+                move |sys, f| {
+                    if f == at {
+                        button(sys, MouseButton::Right, true);
+                        sys.push_input(Input::KeyDown(crate::sys::Key::Escape));
+                    } else if f == at + 1 {
+                        button(sys, MouseButton::Right, false);
+                        sys.push_input(Input::KeyUp(crate::sys::Key::Escape));
+                    } else if f == 100 {
+                        button(sys, MouseButton::Right, true);
+                    } else if f == 101 {
+                        button(sys, MouseButton::Right, false);
+                    } else if f == 300 {
+                        sys.push_input(Input::MouseMove { x: 300, y: 200 });
+                        button(sys, MouseButton::Left, true);
+                    } else if f == 301 {
+                        button(sys, MouseButton::Left, false);
+                    }
+                },
+            );
+            if !ran {
+                return;
+            }
+            let seen = seen.borrow();
+            let (menu, ms) = got.borrow().expect("the bar did not end");
+            assert!(!menu, "slide_in {slide_in}: the bar's end clears it");
+            if slide_in {
+                // Set from the first bar pass on; the right press at 100 is
+                // no toggle, the click at 300 closes the bar.
+                assert!(ms > 300 * 16, "ended at {ms} ms");
+                assert!(seen[8..].iter().all(|&m| m), "{seen:?}");
+            } else {
+                // The bar loop's pass at 40 sees both, the slide-out runs
+                // with the menu request.
+                assert!(ms < 100 * 16, "ended at {ms} ms");
+                assert!(seen[seen.len() - 11..].iter().all(|&m| m), "{seen:?}");
+            }
+        }
+    }
+
+    /// The poll after the slide-out (`FUN_0042c098` @ 0x0042c228) is a whole
+    /// `FUN_0041a298`: a held F5 moves the stored angles once there.
+    #[test]
+    fn the_poll_after_the_slide_out_takes_the_view_keys() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_poll_after_the_slide_out_takes_the_view_keys",
+            move |mut e| async move {
+                e.inventory = vec![1001];
+                e.display_bar(&mut NoScripts).await;
+                *g2.borrow_mut() = Some(e.view_key_polls.borrow().clone());
+            },
+            |sys, f| match f {
+                30 => sys.push_input(Input::MouseMove { x: 300, y: 200 }),
+                40 => button(sys, MouseButton::Left, true),
+                41 => button(sys, MouseButton::Left, false),
+                // During the slide-out (no poll), held until the end.
+                45 => sys.push_input(Input::KeyDown(crate::sys::Key::F(5))),
+                _ => {}
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some(vec![1]));
+        }
+    }
+
+    /// Pixels where both portraits are opaque and differ: (the still one
+    /// shows, the moving one shows).
+    fn portrait_on_top(
+        s: &[u16],
+        still: &SprSprite,
+        sx: i32,
+        moving: &SprSprite,
+        mx: i32,
+        y: i32,
+    ) -> (usize, usize) {
+        use atlantis_data::sprite_blend::SPR_NO_BLEND;
+        let at = |spr: &SprSprite, x0: i32, px: i32, py: i32| {
+            let (c, r) = (
+                px - (x0 - i32::from(spr.xoff)),
+                py - (y - i32::from(spr.yoff)),
+            );
+            if c < 0 || r < 0 || c >= i32::from(spr.w) || r >= i32::from(spr.h) {
+                return None;
+            }
+            let k = r as usize * usize::from(spr.w) + c as usize;
+            (spr.blend[k] == SPR_NO_BLEND).then(|| spr.pixels[k])
+        };
+        let (mut still_top, mut moving_top) = (0, 0);
+        for py in 0..SCREEN_H as i32 {
+            for px in 0..SCREEN_W as i32 {
+                if let (Some(a), Some(b)) = (at(still, sx, px, py), at(moving, mx, px, py)) {
+                    let d = s[py as usize * SCREEN_W + px as usize];
+                    if a != b && d == a {
+                        still_top += 1;
+                    } else if a != b && d == b {
+                        moving_top += 1;
+                    }
+                }
+            }
+        }
+        (still_top, moving_top)
+    }
+
+    /// The pixels of `spr` drawn at (`x`, `y`) where it is opaque and on
+    /// screen: (equal on `s`, all).
+    fn opaque_shown(s: &[u16], spr: &SprSprite, x: i32, y: i32) -> (usize, usize) {
+        use atlantis_data::sprite_blend::SPR_NO_BLEND;
+        let (bx, by) = (x - i32::from(spr.xoff), y - i32::from(spr.yoff));
+        let (mut same, mut all) = (0, 0);
+        for r in 0..i32::from(spr.h) {
+            for c in 0..i32::from(spr.w) {
+                let (px, py) = (bx + c, by + r);
+                if px < 0 || py < 0 || px >= SCREEN_W as i32 || py >= SCREEN_H as i32 {
+                    continue;
+                }
+                let k = (r * i32::from(spr.w) + c) as usize;
+                if spr.blend[k] != SPR_NO_BLEND {
+                    continue;
+                }
+                all += 1;
+                same += usize::from(s[py as usize * SCREEN_W + px as usize] == spr.pixels[k]);
+            }
+        }
+        (same, all)
+    }
+
+    /// A follower's slide (`FUN_0042b480`): each frame draws the moving
+    /// portrait (`FUN_00410430` @ 0x0042b5ab), then the other followers
+    /// (`FUN_0042bc58` @ 0x0042b5b3) on top of it; it steps the place
+    /// sprites (@ 0x0042b51b) and, through `FUN_0041afd0` (@ 0x0042b6a7),
+    /// the warp cursor. With the portraits hidden the moving one is still
+    /// drawn (`AddGuest=` / `SubGuest=` do not test 0x0049613c).
+    #[test]
+    fn a_follower_slides_behind_the_others() {
+        let phase = Rc::new(std::cell::Cell::new(0u8));
+        let shots: Shots = Rc::default();
+        let got = Rc::new(RefCell::new(None));
+        let (p2, g2) = (phase.clone(), got.clone());
+        let ran = with_engine(
+            "a_follower_slides_behind_the_others",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.current_place = Some(0);
+                e.current_place_id = Some(e.wam.places[0].id);
+                e.reload_current_view().await;
+                e.load_ui_assets().await;
+                e.guests.id[0] = 600;
+                e.guests.sprite[0] = 0;
+                e.guests.count = 1;
+                e.guests_shown = true;
+                e.guests.portrait_y = 350;
+                e.cursor_state.click_anim = true;
+                let (cursor, tick) = (e.cursor_state, e.sprite_anim_tick);
+                p2.set(1);
+                e.slide_guest(1, 640, 440, -10).await;
+                let stepped = (e.cursor_state != cursor, e.sprite_anim_tick != tick);
+                e.guests_shown = false;
+                p2.set(2);
+                e.add_guest(e.game.exe.guest_sprite_ids[1]).await;
+                p2.set(0);
+                let sprites = (e.ui.guests[0].clone(), e.ui.guests[1].clone());
+                *g2.borrow_mut() = Some((stepped, sprites, e.guests.count));
+            },
+            {
+                let shots = shots.clone();
+                move |sys, _| {
+                    if phase.get() != 0 {
+                        shots
+                            .borrow_mut()
+                            .push((phase.get(), sys.screen.borrow().clone()));
+                    }
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (stepped, (still, moving), count) = got.borrow_mut().take().unwrap();
+        assert_eq!(stepped, (true, true), "cursor, place sprites");
+        assert_eq!(count, 2);
+        let shots = shots.borrow();
+        let (mut still_top, mut moving_top) = (0, 0);
+        let mut k = 0;
+        for (p, s) in shots.iter().filter(|(p, _)| *p == 1) {
+            let _ = p;
+            let (a, b) = portrait_on_top(s, &still, 540, &moving, 640 - 10 * k, 350);
+            still_top += a;
+            moving_top += b;
+            k += 1;
+        }
+        assert_eq!(k, 20);
+        assert!(still_top > 0 && moving_top == 0, "{still_top} {moving_top}");
+        // Hidden: the slide of AddGuest's record 1 (640 down to 450), the
+        // moving portrait drawn on every frame.
+        let hidden: Vec<&Vec<u16>> = shots
+            .iter()
+            .filter(|(p, _)| *p == 2)
+            .map(|(_, s)| s)
+            .collect();
+        assert_eq!(hidden.len(), 20);
+        let mut drawn = 0;
+        for (k, s) in hidden.iter().enumerate() {
+            let (same, all) = opaque_shown(s, &moving, 640 - 10 * k as i32, 350);
+            assert_eq!(same, all, "frame {k}");
+            drawn += usize::from(all > 0);
+        }
+        assert!(drawn > 10, "{drawn} frames with the portrait on screen");
+    }
+
+    /// The screen each timer pass sees (the frame just presented); a
+    /// timer section on pass `at` sets Exit, or GameOver with the port's
+    /// reload (`game_over`).
+    struct CutSlideIn {
+        at: u32,
+        game_over: bool,
+        shots: Rc<RefCell<Vec<Vec<u16>>>>,
+    }
+
+    impl ScriptHooks for CutSlideIn {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.shots.borrow_mut().push(e.sys.screen.borrow().clone());
+            let fire = self.shots.borrow().len() as u32 == self.at;
+            if fire && self.game_over {
+                e.vars.set("gameover", 1);
+                e.abort = Some(Abort::NewGame);
+            } else if fire {
+                e.vars.set("exit", 1);
+            }
+            ready(fire)
+        }
+    }
+
+    /// A view of ATLAN1's first place with the bar's sprites, the pointer
+    /// out of the bar's way.
+    async fn bar_test_view(e: &mut Engine) {
+        assert!(e.load_wam("ATLAN1.WAM").await);
+        e.current_place = Some(0);
+        e.current_place_id = Some(e.wam.places[0].id);
+        e.reload_current_view().await;
+        e.load_ui_assets().await;
+        e.sys.set_mouse_pos(320, 100);
+    }
+
+    /// For each frame presented by the bar (`pickup`: the pick-up) with
+    /// the mouse at (320, 100): whether CURSEURS frame 6 (its pixels the
+    /// held icon does not cover) and the held icon are at the pointer.
+    fn pointer_per_frame(pickup: bool) -> Option<Vec<(bool, bool)>> {
+        type Sprites = Option<(SprSprite, Option<SprSprite>, u64)>;
+        let sprites: Rc<RefCell<Sprites>> = Rc::default();
+        let seen: Rc<RefCell<Vec<(bool, bool)>>> = Rc::default();
+        let (sp2, sp3, se2) = (sprites.clone(), sprites, seen.clone());
+        let mut last = None;
+        let ran = with_engine(
+            "bar_pointer_per_frame",
+            move |mut e| async move {
+                bar_test_view(&mut e).await;
+                e.load_cursor_sprites().await;
+                let held = if pickup {
+                    let id = e
+                        .game
+                        .exe
+                        .inventory_object_ids
+                        .iter()
+                        .enumerate()
+                        .find(|&(k, &id)| id != 0 && e.ui.object(k).is_some())
+                        .map(|(_, &id)| id)
+                        .unwrap();
+                    e.inventory = vec![id];
+                    id
+                } else {
+                    0
+                };
+                e.vars.set("objetenmain", held);
+                let icon = e.held_icon().and_then(|k| e.ui.object(k)).cloned();
+                *sp2.borrow_mut() =
+                    Some((e.cursor_sprites[6].clone(), icon, e.sys.frames_presented()));
+                if pickup {
+                    e.display_pickup(&mut NoScripts).await;
+                } else {
+                    e.display_bar(&mut NoScripts).await;
+                }
+                *sp2.borrow_mut() = None;
+            },
+            move |sys, _| {
+                let Some((cursor, icon, base)) = sp3.borrow().clone() else {
+                    return;
+                };
+                let now = sys.frames_presented();
+                if *last.get_or_insert(base) == now {
+                    return;
+                }
+                last = Some(now);
+                let s = sys.screen.borrow();
+                let (x, y) = (320, 100);
+                let covered = |px: i32, py: i32| {
+                    icon.as_ref().is_some_and(|i| {
+                        let (c, r) = (px - x + i32::from(i.xoff), py - y + i32::from(i.yoff));
+                        c >= 0
+                            && r >= 0
+                            && c < i32::from(i.w)
+                            && r < i32::from(i.h)
+                            && i.blend[(r * i32::from(i.w) + c) as usize]
+                                == atlantis_data::sprite_blend::SPR_NO_BLEND
+                    })
+                };
+                let (mut same, mut all) = (0, 0);
+                for r in 0..i32::from(cursor.h) {
+                    for c in 0..i32::from(cursor.w) {
+                        let (px, py) = (
+                            x - i32::from(cursor.xoff) + c,
+                            y - i32::from(cursor.yoff) + r,
+                        );
+                        let k = (r * i32::from(cursor.w) + c) as usize;
+                        if cursor.blend[k] != atlantis_data::sprite_blend::SPR_NO_BLEND
+                            || covered(px, py)
+                        {
+                            continue;
+                        }
+                        all += 1;
+                        same += usize::from(
+                            s[py as usize * SCREEN_W + px as usize] == cursor.pixels[k],
+                        );
+                    }
+                }
+                let icon_shown = icon.as_ref().is_some_and(|i| {
+                    let (same, all) = opaque_shown(&s, i, x, y);
+                    all > 0 && same == all
+                });
+                drop(s);
+                let mut seen = se2.borrow_mut();
+                seen.push((all > 0 && same == all, icon_shown));
+                // A left click in the bar loop (on the view: the bar
+                // closes) or the hold loop.
+                match seen.len() {
+                    30 => button(sys, MouseButton::Left, true),
+                    32 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                }
+            },
+        );
+        ran.then(|| seen.borrow().clone())
+    }
+
+    /// The slide-in `FUN_0042c2c4` and the slide-out `FUN_0042c59c` draw
+    /// the pointer `FUN_0042d558` after their copy (@ 0x0042c518,
+    /// 0x0042c7c0): none of their frames shows it. The bar loop draws it
+    /// before its copy (@ 0x0042ca65); the pick-up's hold loop draws the
+    /// new record's icon alone before its copy (@ 0x0042ce98).
+    #[test]
+    fn only_the_bar_loop_shows_the_pointer() {
+        let Some(bar) = pointer_per_frame(false) else {
+            return;
+        };
+        let n = bar.len();
+        assert!(n > 8 + 11 + 1, "{bar:?}");
+        assert!(bar[..8].iter().all(|&f| f == (false, false)), "{bar:?}");
+        assert!(
+            bar[n - 11..].iter().all(|&f| f == (false, false)),
+            "{bar:?}"
+        );
+        assert!(
+            bar[8..n - 11].iter().all(|&f| f == (true, false)),
+            "{bar:?}"
+        );
+        let pickup = pointer_per_frame(true).unwrap();
+        let n = pickup.len();
+        assert!(n > 8 + 11 + 1, "{pickup:?}");
+        assert!(
+            pickup[..8].iter().all(|&f| f == (false, false)),
+            "{pickup:?}"
+        );
+        assert!(
+            pickup[n - 11..].iter().all(|&f| f == (false, false)),
+            "{pickup:?}"
+        );
+        assert!(
+            pickup[8..n - 11].iter().all(|&f| f == (false, true)),
+            "{pickup:?}"
+        );
+    }
+
+    /// Whether the bar sprite is on `s` with its hotspot at y `y`.
+    fn bar_at(e_bar: &SprSprite, s: &[u16], y: i32) -> bool {
+        let (same, all) = opaque_shown(s, e_bar, 0, y);
+        all > 0 && same == all
+    }
+
+    /// An Exit set by a slide-in timer (its 3rd frame, slots at 478) ends
+    /// the slide-in with the slot y table 0x00611788 there
+    /// (0x0042c55b..0x0042c567); FUN_0042c098 still runs one pass of the
+    /// bar loop and one slide-out frame, both drawn from that table
+    /// (@ 0x0042c97d, 0x0042c65c), not at 443.
+    #[test]
+    fn after_a_slide_in_cut_by_exit_the_bar_stays_at_its_y() {
+        let shots: Rc<RefCell<Vec<Vec<u16>>>> = Rc::default();
+        let got = Rc::new(RefCell::new(None));
+        let (s2, g2) = (shots.clone(), got.clone());
+        let ran = with_engine(
+            "after_a_slide_in_cut_by_exit_the_bar_stays_at_its_y",
+            move |mut e| async move {
+                bar_test_view(&mut e).await;
+                let mut hooks = CutSlideIn {
+                    at: 3,
+                    game_over: false,
+                    shots: s2,
+                };
+                e.display_bar(&mut hooks).await;
+                *g2.borrow_mut() = e.ui.bar.clone();
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let bar = got.borrow_mut().take().expect("the bar sprite");
+        let shots = shots.borrow();
+        // 3 slide-in frames, 1 bar-loop pass, 1 slide-out frame.
+        assert_eq!(shots.len(), 5);
+        assert!(bar_at(&bar, &shots[2], 478));
+        assert!(bar_at(&bar, &shots[3], 478), "the bar loop's pass");
+        assert!(!bar_at(&bar, &shots[3], 443));
+        assert!(bar_at(&bar, &shots[4], 478), "the slide-out's frame");
+    }
+
+    /// A GameOver set by a slide-in timer of a pick-up (its 3rd frame):
+    /// `FUN_004278a0` still runs the hold loop `FUN_0042cc98` (no timers,
+    /// no GameOver test, 0x0042cd05) until a press, then one slide-out
+    /// frame (its GameOver exit, 0x0042c7e1); the reload follows. The new
+    /// record is record 0, whose slot y the pick-up puts back to 443 after
+    /// the slide-in (@ 0x00427af0): the hold loop and the slide-out draw
+    /// the bar at slot 0's y (@ 0x0042cdb4, 0x0042c65c), 443.
+    #[test]
+    fn a_game_over_in_the_pickup_slide_in_still_holds_until_a_click() {
+        let shots: Rc<RefCell<Vec<Vec<u16>>>> = Rc::default();
+        let held: Rc<RefCell<Vec<Vec<u16>>>> = Rc::default();
+        let got = Rc::new(RefCell::new(None));
+        let (s2, h2, g2) = (shots.clone(), held.clone(), got.clone());
+        let ran = with_engine(
+            "a_game_over_in_the_pickup_slide_in_still_holds_until_a_click",
+            move |mut e| async move {
+                bar_test_view(&mut e).await;
+                e.inventory = vec![1001];
+                e.vars.set("objetenmain", 1001);
+                let mut hooks = CutSlideIn {
+                    at: 3,
+                    game_over: true,
+                    shots: s2,
+                };
+                e.display_pickup(&mut hooks).await;
+                *g2.borrow_mut() = Some((e.ui.bar.clone(), e.abort, e.sys.millis()));
+            },
+            move |sys, f| match f {
+                50 => h2.borrow_mut().push(sys.screen.borrow().clone()),
+                60 => button(sys, MouseButton::Left, true),
+                62 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (bar, abort, ms) = got.borrow_mut().take().unwrap();
+        let bar = bar.expect("the bar sprite");
+        assert_eq!(abort, Some(Abort::NewGame));
+        assert!(ms >= 60 * 16, "the hold loop waited for the click: {ms} ms");
+        // 3 slide-in frames, 1 slide-out frame (no timers in the hold).
+        assert_eq!(shots.borrow().len(), 4);
+        let held = held.borrow();
+        assert!(bar_at(&bar, &shots.borrow()[2], 478), "the cut slide-in");
+        assert!(bar_at(&bar, &held[0], 443), "the hold loop's frame");
+        assert!(!bar_at(&bar, &held[0], 478));
+        assert!(
+            bar_at(&bar, &shots.borrow()[3], 443),
+            "the slide-out's frame"
+        );
+    }
+
+    /// As above with the new record at index 1: the pick-up puts slot 1's
+    /// y back to 443 (@ 0x00427af0), the other slots stay at the cut y
+    /// (478). The hold loop and the slide-out draw the bar at slot 0's y
+    /// and each icon at its slot's (@ 0x0042ce2c, 0x0042c6c9): after the
+    /// left click empties the hand, the slide-out's frame shows the bar at
+    /// 478 and the new icon at 443.
+    #[test]
+    fn a_pickup_after_a_cut_slide_in_puts_its_slot_back_at_443() {
+        let shots: Rc<RefCell<Vec<Vec<u16>>>> = Rc::default();
+        let got = Rc::new(RefCell::new(None));
+        let (s2, g2) = (shots.clone(), got.clone());
+        let ran = with_engine(
+            "a_pickup_after_a_cut_slide_in_puts_its_slot_back_at_443",
+            move |mut e| async move {
+                bar_test_view(&mut e).await;
+                let ids: Vec<i32> = e
+                    .game
+                    .exe
+                    .inventory_object_ids
+                    .iter()
+                    .enumerate()
+                    .filter(|&(k, &id)| id != 0 && e.ui.object(k).is_some())
+                    .map(|(_, &id)| id)
+                    .take(2)
+                    .collect();
+                e.inventory = ids.clone();
+                e.vars.set("objetenmain", ids[1]);
+                let mut hooks = CutSlideIn {
+                    at: 3,
+                    game_over: true,
+                    shots: s2,
+                };
+                e.display_pickup(&mut hooks).await;
+                let icon = e.record_icon(1).and_then(|k| e.ui.object(k)).cloned();
+                let x = slot_x(1, Some(1), e.enhancements().fix(BugFix::PickupIcon));
+                *g2.borrow_mut() = Some((e.ui.bar.clone(), icon, x));
+            },
+            move |sys, f| match f {
+                60 => button(sys, MouseButton::Left, true),
+                62 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (bar, icon, x) = got.borrow_mut().take().unwrap();
+        let (bar, icon) = (bar.expect("the bar sprite"), icon.expect("the icon"));
+        let shots = shots.borrow();
+        assert_eq!(shots.len(), 4);
+        let out = &shots[3];
+        assert!(bar_at(&bar, out, 478), "the bar at slot 0's y");
+        let (same, all) = opaque_shown(out, &icon, x, 443);
+        assert!(all > 0 && same == all, "the new icon at 443: {same}/{all}");
+    }
+
+    /// Counts the timer passes.
+    struct TimerCount(Rc<std::cell::Cell<u32>>);
+
+    impl ScriptHooks for TimerCount {
+        fn bar_timers<'a>(&'a mut self, _e: &'a mut Engine) -> HookFuture<'a, bool> {
+            self.0.set(self.0.get() + 1);
+            ready(false)
+        }
+    }
+
+    /// Each pass of the bar loop `FUN_0042c8ac` presents its frame
+    /// (`FUN_0041afd0` @ 0x0042cb22) before its timers (`FUN_0042be3c` @
+    /// 0x0042cb2c), as each slide frame does: at every present the timers
+    /// have run once for each earlier frame, so a timer's change is drawn
+    /// on the next frame.
+    #[test]
+    fn the_bar_loop_runs_the_timers_after_the_present() {
+        let timers = Rc::new(std::cell::Cell::new(0));
+        let seen: Rc<RefCell<Vec<(u32, u32)>>> = Rc::default();
+        let done = Rc::new(std::cell::Cell::new(false));
+        let (t2, s2, d2) = (timers.clone(), seen.clone(), done.clone());
+        let ran = with_engine(
+            "the_bar_loop_runs_the_timers_after_the_present",
+            move |mut e| async move {
+                e.inventory = vec![1001];
+                e.display_bar(&mut TimerCount(t2)).await;
+                d2.set(true);
+            },
+            move |sys, f| {
+                if !done.get() {
+                    s2.borrow_mut().push((f as u32 + 1, timers.get()));
+                }
+                match f {
+                    40 => button(sys, MouseButton::Left, true),
+                    41 => button(sys, MouseButton::Left, false),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let seen = seen.borrow();
+        assert!(seen.len() > 40);
+        assert!(
+            seen.iter()
+                .all(|&(presents, timers)| timers + 1 == presents),
+            "{seen:?}"
+        );
+    }
+
+    /// The sprite-animation tick each slide frame's timers see, and the
+    /// clock's tick then.
+    struct SpriteTicks(Rc<RefCell<Vec<(u32, u32)>>>);
+
+    impl ScriptHooks for SpriteTicks {
+        fn bar_timers<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            let now =
+                (e.sys.millis() / u64::from(atlantis_data::sprite_anim::SPRITE_TICK_MS)) as u32;
+            self.0.borrow_mut().push((e.sprite_anim_tick, now));
+            ready(false)
+        }
+    }
+
+    /// The slides step the place sprites once a frame, before the render
+    /// (`FUN_0042c2c4` @ 0x0042c327, `FUN_0042c59c` @ 0x0042c5b4); their
+    /// timers (`FUN_0042be3c`, after the present) step none, so they see
+    /// the step of the frame's start, not one made after the present.
+    #[test]
+    fn the_slides_step_the_sprites_once_a_frame() {
+        let got: Rc<RefCell<Vec<(u32, u32)>>> = Rc::default();
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_slides_step_the_sprites_once_a_frame",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.current_place = Some(0);
+                e.current_place_id = Some(e.wam.places[0].id);
+                e.reload_current_view().await;
+                assert!(e.warp_loaded);
+                let mut hooks = SpriteTicks(g2);
+                assert!(!e.bar_slide_in(&mut hooks, &mut (0, 0)).await);
+                assert!(!e.bar_slide_out(&mut hooks, false).await);
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        assert_eq!(got.len(), 8 + 11);
+        assert!(got.iter().all(|&(step, now)| step < now), "{got:?}");
     }
 
     /// The view the goldens' harness renders: u16 pixel i = (i *
@@ -720,7 +2416,6 @@ mod tests {
         let icons = spr("OBJETS1.SPR", limits::DEFAULT);
         let view = hash_view();
         let view_only = md5_rows(&view, BAR_TOP..SCREEN_H);
-        let icon = |id: i32| icons.get((id - 1000) as usize);
         let (mut frames, mut slivers, mut pickups) = (0, 0, 0);
         let mut bad = Vec::new();
         for (slide_out_fix, pickup_fix) in
@@ -765,9 +2460,11 @@ mod tests {
                     slide_out_fix,
                     pickup_fix,
                 };
-                let f = bar_frame_layout(&st, slot_y, true);
+                let f = bar_frame_layout(&st, &[slot_y; BAR_CELLS], true);
                 let mut screen = view.clone();
-                draw_bar_frame(&mut screen, &f, &st, slot_y, bar.first(), icon);
+                draw_bar_frame(&mut screen, &f, slot_y, bar.first(), |r| {
+                    icons.get((records[r] - 1000) as usize)
+                });
                 let got_icons = f
                     .icons
                     .iter()
@@ -890,9 +2587,9 @@ mod tests {
                     e.guests.count = sprites.len();
                     e.guests_shown = shown;
                     shot2.borrow_mut().clear();
-                    assert!(!e.bar_slide_in(&mut NoScripts).await);
+                    assert!(!e.bar_slide_in(&mut NoScripts, &mut (0, 0)).await);
                     let slide_in = std::mem::take(&mut *shot2.borrow_mut());
-                    assert!(!e.bar_slide_out(&mut NoScripts).await);
+                    assert!(!e.bar_slide_out(&mut NoScripts, false).await);
                     let slide_out = std::mem::take(&mut *shot2.borrow_mut());
                     assert_eq!(e.guests.portrait_y, 350);
                     got2.borrow_mut().push((name, slide_in, slide_out));
@@ -1029,12 +2726,12 @@ mod tests {
                             unsettled: None,
                         };
                         AmbientProbe::arm(&mut e);
-                        let closed = e.bar_slide_in(&mut probe).await;
+                        let closed = e.bar_slide_in(&mut probe, &mut (0, 0)).await;
                         probe.settle(&e);
                         if !closed {
                             probe.phase = "out";
                             AmbientProbe::arm(&mut e);
-                            e.bar_slide_out(&mut probe).await;
+                            e.bar_slide_out(&mut probe, false).await;
                             probe.settle(&e);
                         }
                         for (phase, frame, ambient) in probe.rows {
@@ -1064,11 +2761,12 @@ mod tests {
                                 break;
                             }
                             let (x, y) = field(&r, "mouse").split_once(',').unwrap();
-                            e.sys.set_mouse_pos(x.parse().unwrap(), y.parse().unwrap());
+                            let p = (x.parse().unwrap(), y.parse().unwrap());
+                            e.sys.set_mouse_pos(p.0, p.1);
                             let edge = field(&r, "edge");
                             AmbientProbe::arm(&mut e);
                             let end = e
-                                .hold_pass(edge == "left", edge == "right", &mut next_scroll)
+                                .hold_pass(edge == "left", edge == "right", p, &mut next_scroll)
                                 .await;
                             passes += 1;
                             let edge = ["-", "left", "right"][end as usize];

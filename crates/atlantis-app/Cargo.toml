@@ -49,6 +49,8 @@ rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 # The OpenGL context of Atlantis Evolution's window.
 glutin = "0.32"
 glutin-winit = "0.5"
+# The game library's text, drawn from the outlines of its own font.
+ab_glyph = "0.2"
 
 # The local time of the Atlantis II saves (`GetLocalTime` in the original).
 [target.'cfg(all(unix, not(target_arch = "wasm32")))'.dependencies]

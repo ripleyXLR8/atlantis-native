@@ -155,6 +155,10 @@ pub enum BoxInput {
 /// A gap between two groups of rows of a box ([`BoxLayout::gaps`]).
 pub const GAP_H: i32 = 8;
 
+/// The gaps of a bug fixes' box too high for [`TIGHT_ROW_H`] rows with
+/// [`GAP_H`] gaps (the Simplified Chinese CD's, sixteen fixes).
+pub const NARROW_GAP_H: i32 = 4;
+
 /// The layout of an options box: its title, its width, its rows' height,
 /// the gaps between groups of rows and the height of its foot.
 /// [`BoxLayout::OPTIONS`] is the options menu's (both games').
@@ -164,8 +168,10 @@ pub struct BoxLayout<'a> {
     pub width: i32,
     /// A row's height ([`ROW_H`] but in a box of many rows).
     pub row_h: i32,
-    /// The rows that start a group: a [`GAP_H`]-pixel gap above each.
+    /// The rows that start a group: a `gap_h`-pixel gap above each.
     pub gaps: &'a [usize],
+    /// The gaps' height ([`GAP_H`] but in a box of many rows).
+    pub gap_h: i32,
     pub footer_h: i32,
 }
 
@@ -176,13 +182,14 @@ impl BoxLayout<'_> {
         width: BOX_W,
         row_h: ROW_H,
         gaps: &[],
+        gap_h: GAP_H,
         footer_h: FOOTER_H,
     };
 
     /// The height of a box of `n` rows.
     pub fn box_h(&self, n: usize) -> i32 {
         let gaps = self.gaps.iter().filter(|&&g| g < n).count() as i32;
-        TITLE_H + n as i32 * self.row_h + gaps * GAP_H + self.footer_h
+        TITLE_H + n as i32 * self.row_h + gaps * self.gap_h + self.footer_h
     }
 
     /// The top left corner of a box of `n` rows on a `w` x `h` screen
@@ -194,7 +201,7 @@ impl BoxLayout<'_> {
     /// The top of row `i`, from the box's top.
     pub fn row_y(&self, i: usize) -> i32 {
         let gaps = self.gaps.iter().filter(|&&g| g <= i).count() as i32;
-        TITLE_H + i as i32 * self.row_h + gaps * GAP_H
+        TITLE_H + i as i32 * self.row_h + gaps * self.gap_h
     }
 
     /// The row under a point of a `w` x `h` screen, for `n` rows.
@@ -543,13 +550,28 @@ const FIX_FOOTER_H: i32 = 12 + FIX_TEXT_LINES as i32 * 18 + 32;
 
 /// The space kept around the bug fixes' box on the 640x480 screen; its
 /// rows are 20 pixels high when 24 would not leave it, 18 when 20 would
-/// not ([`DENSE_ROW_H`]).
+/// not ([`DENSE_ROW_H`]), 17 when 18 would not ([`TIGHT_ROW_H`]), and its
+/// gaps 4 pixels high when 8 would not either ([`NARROW_GAP_H`]).
 const FIX_MARGIN: i32 = 8;
 
 /// The rows' height of a bug fixes' box too high for [`SMALL_ROW_H`] (the
 /// boxes with the most fixes): the 16-pixel text keeps a pixel above and
 /// below.
 pub const DENSE_ROW_H: i32 = 18;
+
+/// The rows' height of a bug fixes' box too high for [`DENSE_ROW_H`]
+/// (fifteen fixes and more): the 16-pixel text keeps a pixel below.
+pub const TIGHT_ROW_H: i32 = 17;
+
+/// The bug fixes' box's rows and gaps, from the highest: the first that
+/// leaves [`FIX_MARGIN`] around the box is taken (the last one whatever).
+pub const FIX_STEPS: [(i32, i32); 5] = [
+    (ROW_H, GAP_H),
+    (SMALL_ROW_H, GAP_H),
+    (DENSE_ROW_H, GAP_H),
+    (TIGHT_ROW_H, GAP_H),
+    (TIGHT_ROW_H, NARROW_GAP_H),
+];
 
 /// The keys' line of the bug fixes' box.
 pub const FIX_KEYS: &str = "Arrows, Enter or click; Escape goes back";
@@ -568,6 +590,8 @@ impl BugFix {
             BugFix::SnakesFirstWin => "Snakes puzzle: the false first win",
             BugFix::PuzzleEscape => "Puzzles: Escape stays without effect",
             BugFix::GameOverPuzzle => "Game over: nothing after the picture",
+            BugFix::AnyDisc => "Discs: a file another disc holds",
+            BugFix::LoadOrder => "LOAD list: the chapters in order",
             BugFix::HexagonPieces => "Hexagon puzzle: its pieces always there",
             BugFix::LoadMusik => "Music: tracks copied one by one",
             BugFix::SharpS => "German: the sharp s in the LOAD list",
@@ -633,6 +657,16 @@ impl BugFix {
                 "After a timed game over, the original still opens",
                 "a puzzle left under the pointer, then shows the",
                 "game over picture again (the throne room).",
+            ],
+            BugFix::AnyDisc => &[
+                "The original reads from the disc in the drive only:",
+                "in the last palace chapter, the back gate's file is",
+                "disc 1's, so it shows an error box and stays put.",
+            ],
+            BugFix::LoadOrder => &[
+                "The original sorts the LOAD list with two tests that",
+                "disagree on chapters of one and two digits: chapters",
+                "1 to 6, 9 and 11 are listed 1 to 6, 11, 9.",
             ],
             BugFix::HexagonPieces => &[
                 "This build places the hexagon puzzle's pieces only",
@@ -869,21 +903,25 @@ impl OptionsMenu {
 
     /// The bug fixes' box's layout: rows of 24 pixels, or of 20 when that
     /// would not leave [`FIX_MARGIN`] around it on the screen, or of 18
-    /// ([`DENSE_ROW_H`]) when 20 would not either.
+    /// ([`DENSE_ROW_H`]) when 20 would not either, else of 17
+    /// ([`TIGHT_ROW_H`]), with gaps of 8 pixels ([`GAP_H`]), else of 4
+    /// ([`NARROW_GAP_H`]): [`FIX_STEPS`], the first that fits.
     pub fn fix_layout(&self) -> BoxLayout<'_> {
         let mut l = BoxLayout {
             title: &self.fix_title,
             width: FIX_BOX_W,
             row_h: ROW_H,
             gaps: &self.fix_gaps,
+            gap_h: GAP_H,
             footer_h: FIX_FOOTER_H,
         };
         let n = self.fix_rows().len();
-        for row_h in [SMALL_ROW_H, DENSE_ROW_H] {
+        for (row_h, gap_h) in FIX_STEPS {
+            l.row_h = row_h;
+            l.gap_h = gap_h;
             if l.box_h(n) + 2 * FIX_MARGIN <= SCREEN_H as i32 {
                 break;
             }
-            l.row_h = row_h;
         }
         l
     }
@@ -1230,6 +1268,7 @@ mod tests {
         restored_content: false,
         ui_ux: false,
         arrow_keys: true,
+        background_run: true,
     };
     const HD_OPTS: HdOptions = HdOptions {
         panorama: PanoFilter::Bicubic,
@@ -1320,7 +1359,7 @@ mod tests {
                 ..DEFAULTS
             }
         );
-        assert_eq!(x.fixes.count(), BugFix::ALL.len() - 10);
+        assert_eq!(x.fixes.count(), BugFix::ALL.len() - 12);
         // "Choose the bug fixes...": a button, its box.
         m.key(Key::Down, ORIG);
         assert_eq!(m.selected(), Entry::ChooseFixes);
@@ -1547,9 +1586,9 @@ mod tests {
         assert_eq!(value(BugFixes::NONE), "Off");
         assert_eq!(
             value(BugFixes::all_but(BugFix::SnakesFirstWin)),
-            "Custom (11/12)"
+            "Custom (13/14)"
         );
-        assert_eq!(value(BugFixes::only(BugFix::LoadMusik)), "Custom (1/12)");
+        assert_eq!(value(BugFixes::only(BugFix::LoadMusik)), "Custom (1/14)");
         // The fixes of other builds do not count.
         assert_eq!(value(BugFixes::all_but(BugFix::SharpS)), "On");
         assert_eq!(value(BugFixes::only(BugFix::SharpS)), "Off");
@@ -1563,10 +1602,10 @@ mod tests {
         let off = game_fixes_set(&m, BugFixes::ALL, false);
         assert_eq!(press(&mut m, BugFixes::ALL), off);
         assert!(off.get(BugFix::SharpS) && !off.get(BugFix::LoadMusik));
-        assert_eq!(off.count(), BugFix::ALL.len() - 12);
+        assert_eq!(off.count(), BugFix::ALL.len() - 14);
         let on = game_fixes_set(&m, BugFixes::NONE, true);
         assert_eq!(press(&mut m, BugFixes::NONE), on);
-        assert_eq!(on.count(), 12);
+        assert_eq!(on.count(), 14);
         assert!(!on.get(BugFix::SharpS) && on.get(BugFix::LoadMusik));
         let mix = BugFixes::all_but(BugFix::HexagonPieces);
         assert_eq!(press(&mut m, mix), BugFixes::ALL);
@@ -1578,7 +1617,7 @@ mod tests {
         let mut s = vec![0u16; SCREEN_W * SCREEN_H];
         let mut t = HdText::default();
         m.draw_recording(&mut s, &font, with_fixes(mix), Some(&mut t));
-        assert!(t.items.iter().any(|i| i.text == b"< Custom (11/12) >"));
+        assert!(t.items.iter().any(|i| i.text == b"< Custom (13/14) >"));
     }
 
     /// The bug fixes' box by the keys: its rows (the game's fixes only),
@@ -1607,7 +1646,7 @@ mod tests {
             game_fixes_set(&m, BugFixes::ALL, false)
         );
         let fixes = m.game_fixes().to_vec();
-        assert_eq!(fixes.len(), 12);
+        assert_eq!(fixes.len(), 14);
         for &f in &fixes {
             m.key(Key::Down, ORIG);
             assert_eq!(m.fix_selected(), FixRow::Fix(f));
@@ -1654,8 +1693,11 @@ mod tests {
         let rows = m.fix_rows();
         let (fx, fy, row_y) = {
             let layout = m.fix_layout();
-            assert_eq!(layout.row_h, SMALL_ROW_H, "twelve fixes: rows of 20 pixels");
-            assert_eq!(layout.row_y(2), TITLE_H + 2 * SMALL_ROW_H + GAP_H);
+            assert_eq!(
+                layout.row_h, DENSE_ROW_H,
+                "fourteen fixes: rows of 18 pixels"
+            );
+            assert_eq!(layout.row_y(2), TITLE_H + 2 * DENSE_ROW_H + GAP_H);
             let (fx, fy) = layout.origin(rows.len(), SCREEN_W, SCREEN_H);
             let row_y: Vec<i32> = (0..rows.len()).map(|i| layout.row_y(i)).collect();
             (fx, fy, row_y)
@@ -1665,7 +1707,7 @@ mod tests {
             assert_eq!(m.fix_selected(), row);
         }
         // The gap above the fixes is no row.
-        m.pointer(fx + 30, fy + TITLE_H + 2 * SMALL_ROW_H + 2);
+        m.pointer(fx + 30, fy + TITLE_H + 2 * DENSE_ROW_H + 2);
         assert_eq!(m.fix_selected(), FixRow::Back);
         let i = rows
             .iter()
@@ -1738,16 +1780,39 @@ mod tests {
                 let (bx, by) = layout.origin(n, SCREEN_W, SCREEN_H);
                 assert!(bx >= 8 && by >= 8, "{}", b.name);
                 assert!(by + layout.box_h(n) + 8 <= SCREEN_H as i32, "{}", b.name);
-                // The highest rows that fit: 24, else 20, else 18 pixels.
-                let fits = |row_h| {
-                    let l = BoxLayout { row_h, ..layout };
+                // The highest rows that fit: 24, else 20, else 18, else 17
+                // pixels, with gaps of 8, else 17 with gaps of 4; every
+                // build fits one of them.
+                let fits = |(row_h, gap_h)| {
+                    let l = BoxLayout {
+                        row_h,
+                        gap_h,
+                        ..layout
+                    };
                     l.box_h(n) + 2 * FIX_MARGIN <= SCREEN_H as i32
                 };
-                let want = [ROW_H, SMALL_ROW_H, DENSE_ROW_H]
-                    .into_iter()
-                    .find(|&h| fits(h))
-                    .unwrap();
-                assert_eq!(layout.row_h, want, "{}", b.name);
+                let want = [
+                    (ROW_H, GAP_H),
+                    (SMALL_ROW_H, GAP_H),
+                    (DENSE_ROW_H, GAP_H),
+                    (TIGHT_ROW_H, GAP_H),
+                    (TIGHT_ROW_H, NARROW_GAP_H),
+                ]
+                .into_iter()
+                .find(|&h| fits(h))
+                .unwrap();
+                assert_eq!((layout.row_h, layout.gap_h), want, "{}", b.name);
+                // The narrow gaps for the most fixes only: the Simplified
+                // Chinese build's three with one of the data's.
+                assert_eq!(
+                    want.1 == NARROW_GAP_H,
+                    fixes.len() >= 16,
+                    "{} {}",
+                    b.name,
+                    fixes.len()
+                );
+                // The rows keep their text's 16 pixels, the groups a gap.
+                assert!(layout.row_h >= 17 && layout.gap_h >= 4, "{}", b.name);
                 let mut s = vec![0x1234u16; SCREEN_W * SCREEN_H];
                 let mut t = HdText::default();
                 m.draw_recording(&mut s, &font, ORIG, Some(&mut t));
@@ -1807,7 +1872,7 @@ mod tests {
     #[test]
     fn without_a_game_the_fixes_of_every_build() {
         let m = OptionsMenu::new();
-        assert_eq!(m.game_fixes().len(), 10);
+        assert_eq!(m.game_fixes().len(), 12);
         assert!(m.game_fixes().iter().all(|f| f.of_every_build()));
         assert_eq!(m.fix_title, "Original bug fixes");
     }

@@ -230,8 +230,12 @@ impl ThroneGame {
 struct Host<'a>(PuzzleHost<'a>);
 
 impl ThroneIo for Host<'_> {
+    /// FUN_0043fcb4 polls once a pass, at its end (0x0043fe49); the next
+    /// pass's FUN_004403b4 does not pump, and FUN_00440270 and the cursor
+    /// FUN_004400ec read the pointer: a click is at the previous pass's
+    /// pointer ([`PuzzleHost::read_input_held_pointer`]).
     fn read_input(&mut self) -> (i32, i32, bool) {
-        let m = self.0.read_input();
+        let m = self.0.read_input_held_pointer();
         (m.x, m.y, m.click)
     }
     fn draw_background(&mut self) {
@@ -283,4 +287,18 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
     } else {
         r
     }
+}
+
+#[cfg(test)]
+mod click_pointer_tests {
+    use super::*;
+
+    // FUN_00440270 reads the pointer the previous pass's poll (0x0043fe49)
+    // left unpumped on a press.
+    crate::puzzle::assets::click_pointer_test!(
+        throne_click_at_the_previous_pointer,
+        Host,
+        |h: &mut Host<'_>| h.read_input(),
+        (100, 100)
+    );
 }

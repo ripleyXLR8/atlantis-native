@@ -248,6 +248,9 @@ fn name_entry_stores_swedish_letters_as_dos_bytes() {
     step(10);
     let (x, y) = (200, 259);
     sys.push_input(Input::MouseMove { x, y });
+    // The pointer moves a poll before the press (no pump on a press edge,
+    // 0x0041a2b5).
+    step(1);
     sys.push_input(Input::MouseDown {
         button: MouseButton::Left,
         x,

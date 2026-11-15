@@ -104,8 +104,9 @@ pub trait MuriaIo {
     async fn present(&mut self, g: &MuriaGame);
     /// muria1..5 = 0..4.
     fn play_sound(&mut self, slot: i32);
-    /// `FUN_004277c8` after FLAGTEMP3 is set to `flag_temp3`.
-    async fn script_hook(&mut self, flag_temp3: i32);
+    /// `FUN_004277c8` after FLAGTEMP3 is set to `flag_temp3`: the pointer
+    /// after it, `None` when it made no poll.
+    async fn script_hook(&mut self, flag_temp3: i32) -> Option<(i32, i32)>;
     /// `FUN_0043d0e0`.
     fn stop_sounds(&mut self) {}
     fn aborted(&self) -> bool {
@@ -216,7 +217,11 @@ impl MuriaGame {
             io.present(self).await;
         }
         self.flag_temp3 = n;
-        io.script_hook(n).await;
+        // The line's polls moved the pointer: the next pass draws the
+        // cursor there (FUN_0043f4d4 @ 0x0043f555, 0x0043f61c).
+        if let Some((x, y)) = io.script_hook(n).await {
+            (self.mx, self.my) = (x, y);
+        }
     }
 
     /// `FUN_0043f850`.
@@ -379,12 +384,17 @@ impl MuriaGame {
 struct Host<'a>(PuzzleHost<'a>);
 
 impl MuriaIo for Host<'_> {
+    /// FUN_0043ee54 polls once a pass (0x0043f004); FUN_0043f850 then reads
+    /// the pointer (0x0043f87e..0x0043fa74) and the cursor FUN_0043f4d4
+    /// draws there, with no pump in between: a click is at the previous
+    /// pass's pointer ([`PuzzleHost::read_input_held_pointer`]).
     fn start_input(&mut self) -> (i32, i32, bool) {
-        let m = self.0.read_input();
+        let m = self.0.read_entry_held_pointer();
         (m.x, m.y, m.click)
     }
     fn boundary(&mut self, _g: &MuriaGame) -> (i32, i32, bool) {
-        self.start_input()
+        let m = self.0.read_input_held_pointer();
+        (m.x, m.y, m.click)
     }
     fn load_picture(&mut self, _name: &str) {
         // The one picture, loaded with the puzzle.
@@ -407,10 +417,15 @@ impl MuriaIo for Host<'_> {
     /// `FUN_0043faf0`: FLAGTEMP3 = 1021 + slot, then `FUN_004277c8` runs
     /// the first /sel entry that holds (CHAPI069 and 070 react to
     /// 1021..1024).
-    async fn script_hook(&mut self, flag_temp3: i32) {
+    ///
+    /// A line it runs (`FUN_004305e8`) polls every frame: the puzzle's
+    /// input follows ([`PuzzleHost::after_script`]).
+    async fn script_hook(&mut self, flag_temp3: i32) -> Option<(i32, i32)> {
         let h = &mut self.0;
+        let frames = h.e.sys.frames_presented();
         h.e.vars.set("flagtemp3", flag_temp3);
         h.hooks.sel_scan(h.e).await;
+        h.after_script(frames)
     }
     fn stop_sounds(&mut self) {
         self.0.stop_samples();
@@ -448,5 +463,135 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
         1
     } else {
         r
+    }
+}
+
+#[cfg(test)]
+mod click_pointer_tests {
+    use super::*;
+
+    // FUN_0043f850 reads the pointer the pass's poll (0x0043f004) left
+    // unpumped on a press.
+    crate::puzzle::assets::click_pointer_test!(
+        muria_click_at_the_previous_pointer,
+        Host,
+        |h: &mut Host<'_>| h.start_input(),
+        (100, 100)
+    );
+}
+
+#[cfg(test)]
+mod poll_count_tests {
+    use super::*;
+    use crate::puzzle::assets::f5_steps;
+
+    /// The original polls only after each present (one poll a pass): the
+    /// port's entry read steps no F5, a pass's read one.
+    #[test]
+    fn f5_steps_once_a_pass_and_not_at_entry() {
+        let Some(entry) = f5_steps("muria_f5_entry", |h| {
+            Host(h).start_input();
+        }) else {
+            return;
+        };
+        let pass = f5_steps("muria_f5_pass", |h| {
+            let mut io = Host(h);
+            io.start_input();
+            io.boundary(&MuriaGame::default());
+        });
+        assert_eq!((entry, pass), (0, Some(1)));
+    }
+}
+
+#[cfg(test)]
+mod line_input_tests {
+    use super::*;
+    use crate::hooks::HookFuture;
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::with_engine;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// A figurine line as `FUN_004305e8` plays it: a poll each frame,
+    /// ended by a left press.
+    struct Line;
+
+    impl ScriptHooks for Line {
+        fn sel_scan<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, ()> {
+            Box::pin(async move {
+                loop {
+                    e.sys.frame().await;
+                    let mut pressed = false;
+                    while let Some(ev) = e.sys.poll_event() {
+                        if let Input::MouseDown {
+                            button: MouseButton::Left,
+                            ..
+                        } = ev
+                        {
+                            pressed = true;
+                        }
+                    }
+                    if pressed {
+                        return;
+                    }
+                }
+            })
+        }
+    }
+
+    /// A tap places the figurine (press and release between two polls),
+    /// the line runs while the mouse moves, and the press that ends it is
+    /// still down at the next pass: the line's polls have seen it
+    /// (`FUN_0042e624`), so the poll 0x0043f004 makes no click, and the
+    /// pointer is where the line's pumps left it (0x00419bfa).
+    #[test]
+    fn held_skip_press_is_no_click_and_the_pointer_follows() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "muria_held_skip_press",
+            move |mut e| async move {
+                let sys = e.sys.clone();
+                let mut hooks = Line;
+                let mut h = Host(PuzzleHost::new(&mut e, &mut hooks));
+                h.start_input();
+                for _ in 0..3 {
+                    sys.frame().await;
+                }
+                let (_, _, placing) = h.boundary(&MuriaGame::default());
+                let after = h.script_hook(0x3fd).await;
+                sys.frame().await;
+                let (x, y, click) = h.boundary(&MuriaGame::default());
+                g2.set(Some((placing, after, (x, y, click))));
+            },
+            |sys, f| {
+                let b = MouseButton::Left;
+                match f {
+                    1 => sys.push_input(Input::MouseMove { x: 100, y: 100 }),
+                    2 => {
+                        sys.push_input(Input::MouseDown {
+                            button: b,
+                            x: 100,
+                            y: 100,
+                        });
+                        sys.push_input(Input::MouseUp {
+                            button: b,
+                            x: 100,
+                            y: 100,
+                        });
+                    }
+                    5 => sys.push_input(Input::MouseMove { x: 400, y: 300 }),
+                    7 => sys.push_input(Input::MouseDown {
+                        button: b,
+                        x: 400,
+                        y: 300,
+                    }),
+                    _ => {}
+                }
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some((true, Some((400, 300)), (400, 300, false))));
+        }
     }
 }

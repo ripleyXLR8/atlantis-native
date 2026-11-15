@@ -26,7 +26,7 @@ use atlantis_data::saves::{epi_episode_name, Checkpoint, Players};
 use atlantis_data::{Game, StdDir};
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::checkpoint::PLAYERS_FILE;
-use atlantis_engine::hooks::{DirectLoader, NoScripts};
+use atlantis_engine::hooks::{DirectLoader, NoScripts, ScriptHooks};
 use atlantis_engine::sys::{Input, Key, MouseButton, Runner, Sys};
 use atlantis_engine::ui::credits::credits_events;
 use atlantis_engine::ui::layout::{
@@ -590,7 +590,10 @@ impl Headless {
     }
 
     fn button(&mut self, button: MouseButton, x: i32, y: i32) {
+        // The pointer moves a poll before the press: a poll that sees a
+        // press edge does not pump the WM_MOUSEMOVE (0x0041a2b5).
         self.sys.push_input(Input::MouseMove { x, y });
+        self.step();
         self.sys.push_input(Input::MouseDown { button, x, y });
         self.step();
         self.sys.push_input(Input::MouseUp { button, x, y });
@@ -892,6 +895,57 @@ fn load_picker_edge_row_and_double_click_anywhere() {
     assert_eq!(*out.borrow(), Some((MenuOutcome::Reload, listed[12] as u8)));
 }
 
+/// A double click on LOAD GAME: the first press ends the in-game menu
+/// (FUN_0041c838) and opens the picker; the second, a WM_LBUTTONDBLCLK
+/// dispatched by the picker's polls with 0x00496138 = 1, sets 0x00496118,
+/// which the picker does not clear before its loop, and is a row click:
+/// LOAD GAME lies on grid row 4, so the picker ends at once on that
+/// title (0x0041d484..0x0041d4b4) for a reload of its chapter.
+#[test]
+fn double_click_on_load_game_reloads_the_row_under_it() {
+    let Some(g) = game("double_click_on_load_game_reloads_the_row_under_it") else {
+        return;
+    };
+    let epi = g.big.read("SPRLIST\\EPI.TXT").unwrap();
+    let load = record_centre(&g, "MAINMENU.TXT", 0, 0);
+    let cancel = record_centre(&g, "LOADMENU.TXT", 1, 7);
+    let row = menu_grid_hit(45, 108, 400, 22, 1, 11, true, load.0, load.1)
+        .expect("LOAD GAME is on a row") as usize;
+    let listed: Vec<u32> = (2..87)
+        .filter(|&c| !epi_episode_name(&epi, c).is_empty())
+        .take(8)
+        .collect();
+    let store = Rc::new(MemStore::new());
+    for &c in &listed {
+        store.write(&format!("pa{c}.gam"), b"");
+    }
+    let out = Rc::new(RefCell::new(None));
+    let o = out.clone();
+    with_engine(
+        g,
+        store,
+        move |mut e, _s| {
+            Box::pin(async move {
+                let outcome = e.ingame_menu().await;
+                *o.borrow_mut() = Some((outcome, e.players.chapters[0]));
+            })
+        },
+        move |h, n| match n {
+            30 => {
+                h.click(load.0, load.1);
+                h.click(load.0, load.1);
+            }
+            // Without the double click the picker is still up: Cancel.
+            100 => h.click(cancel.0, cancel.1),
+            _ => {}
+        },
+    );
+    assert_eq!(
+        *out.borrow(),
+        Some((MenuOutcome::Reload, listed[row] as u8))
+    );
+}
+
 /// The player screen as the original reads its input: Escape does
 /// nothing; a click on the new player row gives 16 dots; from the 16th
 /// character on each key replaces the last; Enter commits the name.
@@ -961,6 +1015,13 @@ fn inventory_bar_and_pickup() {
             })
         },
         |h, n| match n {
+            // The pointer moves a pass before each press: the bar reads
+            // the cell at the pointer of the pass before the press
+            // (FUN_0041a298 returns before its message pump on a left
+            // press, 0x0041a2b5).
+            29 => h.sys.push_input(Input::MouseMove { x: 112, y: 440 }),
+            89 => h.sys.push_input(Input::MouseMove { x: 320, y: 440 }),
+            149 | 209 => h.sys.push_input(Input::MouseMove { x: 320, y: 300 }),
             // The slides take 8 and 11 frames.
             30 => h.click(112, 440),
             90 => h.button(MouseButton::Right, 320, 440),
@@ -1004,10 +1065,48 @@ fn credits_play_headless() {
 
 /// The 1 s wait between LOGO15N and PREINTRO reads no input but loses
 /// none (GetAsyncKeyState): a click during it ends PREINTRO at its first
-/// poll, after its first frame, with one more frame presented.
+/// poll, after its first frame, with one more frame presented. LOGO15N
+/// plays to its end: a click that ended it would leave `FUN_0042e624`'s
+/// latch set (no poll sees the release), and the wait's click would be
+/// none ([`a_click_that_ended_logo15n_loses_the_waits_click`]).
 #[test]
 fn startup_wait_keeps_a_click_for_the_next_video() {
     let Some(g) = game("startup_wait_keeps_a_click_for_the_next_video") else {
+        return;
+    };
+    let sys = Sys::new(Mixer::new());
+    let trace = Rc::new(RefCell::new(Vec::new()));
+    let opts = Options {
+        trace: Some(trace.clone()),
+        saves: Rc::new(MemStore::new()),
+        ..Options::default()
+    };
+    let mut h = Headless::new(sys.clone(), atlantis_engine::run(sys.clone(), g, opts));
+    let videos = |t: &Rc<RefCell<Vec<Event>>>| {
+        t.borrow()
+            .iter()
+            .filter_map(|e| match e {
+                Event::Video { name, frames, .. } => Some((name.clone(), *frames)),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    assert!(h.until(3000, |_| videos(&trace).len() == 1));
+    // In the wait.
+    h.click(320, 240);
+    assert!(h.until(300, |_| videos(&trace).len() == 2));
+    assert_eq!(videos(&trace)[1], ("PREINTRO.HNM".to_string(), 2));
+    sys.push_input(Input::Quit);
+    h.steps(10);
+}
+
+/// A click ends LOGO15N at its poll, which sets `FUN_0042e624`'s latch;
+/// no poll sees the release before PREINTRO's first: a click during the
+/// wait is no press edge there (0x0042e6b2..0x0042e6c8), PREINTRO plays
+/// on.
+#[test]
+fn a_click_that_ended_logo15n_loses_the_waits_click() {
+    let Some(g) = game("a_click_that_ended_logo15n_loses_the_waits_click") else {
         return;
     };
     let sys = Sys::new(Mixer::new());
@@ -1032,8 +1131,8 @@ fn startup_wait_keeps_a_click_for_the_next_video() {
     assert!(h.until(200, |_| videos(&trace).len() == 1));
     // In the wait.
     h.click(320, 240);
-    assert!(h.until(300, |_| videos(&trace).len() == 2));
-    assert_eq!(videos(&trace)[1], ("PREINTRO.HNM".to_string(), 2));
+    assert!(h.until(5000, |_| videos(&trace).len() == 2));
+    assert!(videos(&trace)[1].1 > 2, "{:?}", videos(&trace)[1]);
     sys.push_input(Input::Quit);
     h.steps(10);
 }
@@ -1142,4 +1241,150 @@ fn delete_player_twice() {
     assert_eq!(out[0].1, ["pb2.gam", "pc2.gam", "pc5.gam", "players.atl"]);
     assert_eq!(&out[1].0, b"cdeabf");
     assert_eq!(out[1].1, ["pc2.gam", "pc5.gam", "players.atl"]);
+}
+
+/// The ladder put back on the wall (object 281, ATLAN4 views 115 / 116)
+/// is not in the icon table 0x004967b0; its sprite-list rows give icon 30
+/// (the ladder's, table index of 279). A pick-up takes the hand's icon
+/// and the record's icon byte from the row (`FUN_004278a0` @ 0x00427a5b,
+/// 0x00427a88), the checkpoint writes the byte as it is (dc:23472) and
+/// the reader keeps it: the hand, the bar record and the reloaded record
+/// show icon 30.
+#[test]
+fn the_ladder_picked_up_again_has_its_row_icon() {
+    let Some(g) = game("the_ladder_picked_up_again_has_its_row_icon") else {
+        return;
+    };
+    let store = Rc::new(MemStore::new());
+    let out = Rc::new(RefCell::new(Vec::new()));
+    let o = out.clone();
+    with_engine(
+        g,
+        store.clone(),
+        move |mut e, mut s| {
+            Box::pin(async move {
+                assert!(e.load_wam("ATLAN4.WAM").await);
+                e.current_place_id = Some(116);
+                assert!(e
+                    .sprite_list
+                    .iter()
+                    .any(|r| r.place_id == 116 && r.perso_id == 281 && r.icon == 30));
+                s.npc_click(&mut e, 281, 0).await;
+                let r = e.inventory.iter().position(|&id| id == 281).unwrap();
+                o.borrow_mut().push(format!(
+                    "hand {} {:?} record {:?}",
+                    e.vars.get("objetenmain"),
+                    e.held_icon(),
+                    e.record_icon(r)
+                ));
+                s.exec_set(&mut e, None, "chapter=2").await;
+                e.inventory.clear();
+                e.inventory_icons.clear();
+                e.load_checkpoint(&mut s, true).await;
+                let r = e.inventory.iter().position(|&id| id == 281).unwrap();
+                o.borrow_mut()
+                    .push(format!("loaded record {:?}", e.record_icon(r)));
+            })
+        },
+        // A right press ends the pick-up's hold loop with the ladder in
+        // hand.
+        |h, n| {
+            if n % 50 == 49 {
+                let (x, y) = h.sys.mouse();
+                h.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Right,
+                    x,
+                    y,
+                });
+                h.sys.push_input(Input::MouseUp {
+                    button: MouseButton::Right,
+                    x,
+                    y,
+                });
+            }
+        },
+    );
+    let cp = Checkpoint::parse(&store.read("pa2.gam").expect("pa2.gam not written")).unwrap();
+    assert!(cp.inventory.iter().any(|r| (r.sprite, r.id) == (30, 281)));
+    assert_eq!(
+        *out.borrow(),
+        [
+            "hand 281 Some(30) record Some(30)",
+            "loaded record Some(30)"
+        ]
+    );
+}
+
+/// The records' ids and icons after a load.
+type IconRecords = Vec<(i32, Option<usize>)>;
+
+/// The original's checkpoints load with their records' icon bytes, which
+/// are the table's index of each id (FUN_0042b328): every `pa<N>.gam` of
+/// `ATLANTIS_SAVES_PTBR` read by the engine.
+#[test]
+fn original_checkpoints_load_their_icon_bytes() {
+    let Some(dir) = std::env::var_os("ATLANTIS_SAVES_PTBR") else {
+        eprintln!(
+            "ATLANTIS_SAVES_PTBR not set: original_checkpoints_load_their_icon_bytes skipped"
+        );
+        return;
+    };
+    let Some(g) = game("original_checkpoints_load_their_icon_bytes") else {
+        return;
+    };
+    let table = g.exe.inventory_object_ids.clone();
+    drop(g);
+    let mut files: Vec<Vec<u8>> = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .filter(|e| {
+            let n = e.file_name().to_string_lossy().to_ascii_lowercase();
+            n.starts_with("pa") && n.ends_with(".gam")
+        })
+        .filter_map(|e| std::fs::read(e.path()).ok())
+        .collect();
+    files.sort();
+    assert!(!files.is_empty());
+    let mut records = 0;
+    for data in files {
+        let cp = Checkpoint::parse(&data).unwrap();
+        let want: HashMap<i32, usize> = cp
+            .inventory
+            .iter()
+            .map(|r| (r.id, usize::from(r.sprite)))
+            .collect();
+        for r in &cp.inventory {
+            assert_eq!(object_icon(&table, r.id), Some(usize::from(r.sprite)));
+        }
+        records += want.len();
+        let store = Rc::new(MemStore::new());
+        store.write(&format!("pa{}.gam", cp.chapter), &data);
+        let got: Rc<RefCell<IconRecords>> = Rc::default();
+        let g2 = got.clone();
+        let chapter = cp.chapter;
+        let g = game("original_checkpoints_load_their_icon_bytes").unwrap();
+        with_engine(
+            g,
+            store,
+            move |mut e, mut s| {
+                Box::pin(async move {
+                    e.players.chapters[0] = chapter;
+                    e.load_checkpoint(&mut s, true).await;
+                    *g2.borrow_mut() = (0..e.inventory.len())
+                        .map(|r| (e.inventory[r], e.record_icon(r)))
+                        .collect();
+                })
+            },
+            |_, _| {},
+        );
+        // The records the chapter's /INIT left: those of the file with
+        // its bytes, an INVENT= with the table's index.
+        let got = got.borrow();
+        assert!(!got.is_empty());
+        for &(id, icon) in got.iter() {
+            let want = want.get(&id).copied().or(object_icon(&table, id));
+            assert_eq!(icon, want, "chapter {chapter} object {id}");
+        }
+    }
+    assert!(records > 0);
 }

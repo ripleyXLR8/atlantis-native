@@ -740,6 +740,15 @@ impl Headless {
         alive
     }
 
+    /// A press and its release queued for the next frame's poll, without
+    /// stepping (the subject menu reads the pointer of the poll before:
+    /// move the mouse there a frame earlier).
+    fn press(&mut self, x: i32, y: i32) {
+        let button = MouseButton::Left;
+        self.sys.push_input(Input::MouseDown { button, x, y });
+        self.sys.push_input(Input::MouseUp { button, x, y });
+    }
+
     fn click(&mut self, x: i32, y: i32) {
         self.sys.push_input(Input::MouseDown {
             button: MouseButton::Left,
@@ -905,6 +914,9 @@ fn guard_conversation_through_the_subject_menu() {
     for i in 0..2000 {
         if menu_shown(&trace) || *done.borrow() {
             break;
+        }
+        if i % 10 == 8 {
+            sys.push_input(Input::MouseMove { x: cx, y: cy });
         }
         if i % 10 == 9 {
             menu_frame = sys.screen.borrow().clone();
@@ -1242,6 +1254,133 @@ fn head_open_fails_shows_the_error_box() {
     }
 }
 
+/// A point of subject cell `idx` of the menu of `ids`.
+fn subject_cell_point(ids: &[i32], idx: i32) -> (i32, i32) {
+    let (_, gx, gy) = menu_draws(ids);
+    for y in 0..480 {
+        for x in 0..640 {
+            if menu_hit(ids.len() as i32, gx, gy, x, y) == idx {
+                return (x + 10, y + 10);
+            }
+        }
+    }
+    panic!("no cell {idx}");
+}
+
+/// The subject menu `FUN_00425828` waits for no release: it runs while
+/// the button is held (only the click flag is cleared, 0x0042585d), a
+/// press edge ends it (0x004259b6..0x004259cc) and the conversation starts
+/// at once; the press is hit-tested at the pointer of the previous pass's
+/// poll (`FUN_004211f0` reads 0x004960ec, which the poll that sees the
+/// press does not pump, 0x0041a2b5).
+#[test]
+fn the_subject_menu_takes_a_press_at_the_previous_pointer() {
+    use atlantis_engine::DialogPresenter;
+    let Some(g) = game("the_subject_menu_takes_a_press_at_the_previous_pointer") else {
+        return;
+    };
+    let ids = [1, 5];
+    let (second, first) = (subject_cell_point(&ids, 1), subject_cell_point(&ids, 0));
+    let phase = Rc::new(std::cell::Cell::new(0u32));
+    let p2 = phase.clone();
+    let got = Rc::new(RefCell::new(None));
+    let g2 = got.clone();
+    let mut steps = 0;
+    with_new_game(
+        g,
+        Default::default(),
+        move |mut e, _| {
+            Box::pin(async move {
+                let mut d = Dialogs::new();
+                e.sys.set_mouse_locked(false);
+                // Entered with the left button held, its press taken by
+                // the poll before (the warp loop's).
+                e.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Left,
+                    x: 5,
+                    y: 5,
+                });
+                while e.sys.poll_event().is_some() {}
+                p2.set(1);
+                let chosen = d.subject_menu(&mut e, 600, &[1, 5]).await;
+                *g2.borrow_mut() = Some((chosen, e.sys.buttons().0));
+            })
+        },
+        move |h, _| {
+            if phase.get() != 1 {
+                return;
+            }
+            steps += 1;
+            let left = MouseButton::Left;
+            match steps {
+                3 => h.sys.push_input(Input::MouseUp {
+                    button: left,
+                    x: 5,
+                    y: 5,
+                }),
+                5 => h.sys.push_input(Input::MouseMove {
+                    x: second.0,
+                    y: second.1,
+                }),
+                // Moved onto the first cell and pressed within one pass,
+                // never released.
+                8 => h.sys.push_input(Input::MouseDown {
+                    button: left,
+                    x: first.0,
+                    y: first.1,
+                }),
+                _ => {}
+            }
+        },
+    );
+    assert_eq!(*got.borrow(), Some((Some(5), true)));
+}
+
+/// The game-over screen `FUN_00426590` ends with no wait for the release
+/// (0x00426b79..0x00426c5c): the reload follows with the button held; the
+/// flags, the bar request among them, are cleared (0x00426c0f..0x00426c4b).
+#[test]
+fn the_game_over_screen_ends_with_the_button_held() {
+    use atlantis_engine::DialogPresenter;
+    let Some(g) = game("the_game_over_screen_ends_with_the_button_held") else {
+        return;
+    };
+    let got = Rc::new(RefCell::new(None));
+    let g2 = got.clone();
+    let mut frames = 0;
+    with_new_game(
+        g,
+        Default::default(),
+        move |mut e, _| {
+            Box::pin(async move {
+                let req = atlantis_engine::scripts::GameOverRequest {
+                    section: 45,
+                    n: 2,
+                    narrator: Some(("Young Seth had failed.".into(), 'C')),
+                };
+                e.bar.request = true;
+                let mut d = Dialogs::new();
+                d.game_over(&mut e, &req).await;
+                *g2.borrow_mut() = Some((e.sys.buttons().0, e.bar.request));
+            })
+        },
+        move |h, ev| {
+            if matches!(ev.last(), Some(Event::Voice(_))) {
+                frames += 1;
+                if frames == 10 {
+                    let (x, y) = h.sys.mouse();
+                    h.sys.push_input(Input::MouseDown {
+                        button: MouseButton::Left,
+                        x,
+                        y,
+                    });
+                }
+            }
+        },
+    );
+    assert_eq!(*got.borrow(), Some((true, false)));
+}
+
 /// Escape during the first line of the guard's section 3 (a talking head):
 /// the line ends and the lines after it up to the next /set are skipped
 /// (the original's walk: "esc 1 skipped 1").
@@ -1263,8 +1402,10 @@ fn escape_skips_the_rest_of_the_section() {
             let menu = ev.iter().any(|e| matches!(e, Event::SubjectMenu { .. }));
             if !menu {
                 clicked += 1;
-                if clicked % 10 == 0 {
-                    h.click(475, 205);
+                if clicked % 10 == 9 {
+                    h.sys.push_input(Input::MouseMove { x: 475, y: 205 });
+                } else if clicked % 10 == 0 {
+                    h.press(475, 205);
                 }
             } else if !escaped && ev.contains(&Event::Voice("WAV\\ATA0003A.APC".into())) {
                 for _ in 0..10 {
@@ -1289,9 +1430,68 @@ fn escape_skips_the_rest_of_the_section() {
     assert_eq!(played, vec!['A']);
 }
 
+/// Escape and a left press in the same poll of the guard's talking head:
+/// `FUN_0041a298` tests the left edge first and returns (0x0041a2b5,
+/// 0x0041a2be) before the Escape test that sets the dialog-skip flag
+/// (0x0041a3c0): the line ends, the next ones play.
+#[test]
+fn escape_with_a_click_only_ends_the_line() {
+    let Some(g) = game("escape_with_a_click_only_ends_the_line") else {
+        return;
+    };
+    let (mut clicked, mut escaped) = (0, false);
+    let ev = with_new_game(
+        g,
+        Default::default(),
+        |mut e, mut s| {
+            Box::pin(async move {
+                s.npc_click(&mut e, 600, 0).await;
+            })
+        },
+        |h, ev| {
+            let menu = ev.iter().any(|e| matches!(e, Event::SubjectMenu { .. }));
+            if !menu {
+                clicked += 1;
+                if clicked % 10 == 9 {
+                    h.sys.push_input(Input::MouseMove { x: 475, y: 205 });
+                } else if clicked % 10 == 0 {
+                    h.press(475, 205);
+                }
+            } else if !escaped && ev.contains(&Event::Voice("WAV\\ATA0003A.APC".into())) {
+                for _ in 0..10 {
+                    h.step();
+                }
+                h.sys
+                    .push_input(Input::KeyDown(atlantis_engine::sys::Key::Escape));
+                let (x, y) = h.sys.mouse();
+                h.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Left,
+                    x,
+                    y,
+                });
+                escaped = true;
+            }
+        },
+    );
+    assert!(escaped);
+    let played: Vec<char> = ev
+        .iter()
+        .filter_map(|e| match e {
+            Event::LinePlayed {
+                section: 3, letter, ..
+            } => Some(*letter),
+            _ => None,
+        })
+        .collect();
+    assert!(played.len() > 1, "{played:?}");
+    assert_eq!(played[0], 'A');
+}
+
 /// The game-over screen of CHAPI003's section 45 (GameOver=2): GOVER02.TGA
-/// with the narrator's subtitle, the voice ATA0045C until it ends, then a
-/// black screen.
+/// with the narrator's subtitle, the voice ATA0045C until it ends. The
+/// original then clears the back surface without presenting it
+/// (`FUN_00426590` @ 0x00426b9c..0x00426be6): the picture stays on screen
+/// until the reloaded game's first frame, never a black frame.
 #[test]
 fn game_over_screen_plays_the_narrator() {
     use atlantis_engine::DialogPresenter;
@@ -1300,6 +1500,8 @@ fn game_over_screen_plays_the_narrator() {
     };
     let (mut image, mut best) = (0, 0);
     let mut last = Vec::new();
+    let mut shown = Vec::new();
+    let mut black = 0;
     let ev = with_new_game(
         g,
         Default::default(),
@@ -1321,6 +1523,10 @@ fn game_over_screen_plays_the_narrator() {
                 best = best.max(subtitle_pixels(&s).0);
                 if image == 10 {
                     dump("dialog_game_over", &s);
+                    shown = s.clone();
+                }
+                if s.iter().all(|&p| p == 0) {
+                    black += 1;
                 }
             }
             last = s.clone();
@@ -1329,7 +1535,11 @@ fn game_over_screen_plays_the_narrator() {
     assert!(ev.contains(&Event::Voice("WAV\\ATA0045C.APC".into())));
     assert!(image > 30, "{image} frames of the image");
     assert!(best > 50, "{best} subtitle pixels");
-    assert!(last.iter().all(|&p| p == 0), "the screen cleared");
+    assert_eq!(black, 0, "black frames after the image");
+    assert!(
+        last == shown,
+        "the picture stays on screen after the narration"
+    );
 }
 
 /// A talking head's UBB frame 0 is built and not presented
@@ -1414,7 +1624,7 @@ fn escape_in_the_subject_menu_cuts_the_next_voice_only_line() {
                     h.sys
                         .push_input(Input::KeyDown(atlantis_engine::sys::Key::Escape));
                 } else if steps == 10 {
-                    h.click(10, 10);
+                    h.press(10, 10);
                 }
             }
             2 if !ev.iter().any(|e| matches!(e, Event::LinePlayed { .. })) => after += 1,

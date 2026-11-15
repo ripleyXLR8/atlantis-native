@@ -23,6 +23,7 @@ use crate::con_script::{
     ConSection, ConSubjects, ConVariableNames, CON_PLAY_COUNTERS,
 };
 use crate::engine::{Abort, Engine, Event};
+use crate::enhancements::BugFix;
 use crate::hooks::{ready, Departure, HookFuture, ScriptHooks};
 use atlantis_data::sprite_anim::{
     set_perso_active, start_place_sprite_anim, stop_place_sprite_anim,
@@ -98,9 +99,6 @@ pub trait DialogPresenter {
     ) -> HookFuture<'a, Option<i32>> {
         ready(subjects.first().map(|&s| i32::from(s)))
     }
-
-    /// A new conversation starts (the previous camera is forgotten).
-    fn new_conversation(&mut self) {}
 
     /// The game-over screen (GereGameOver, `FUN_00426590`).
     fn game_over<'a>(
@@ -235,6 +233,10 @@ pub struct Scripts {
     in_place_arrival_scan: bool,
     /// A timer section plays (0x00496174).
     timer_play: bool,
+    /// A chapter change runs (0x00496140): set by `FUN_00427634` at its
+    /// entry (0x0042764c), cleared once Chapter='s /sel scan returns
+    /// (0x0042a616) and at the end of `FUN_00423760` / `FUN_0042de5c`.
+    chapter_change_running: bool,
     /// The walks of a chapter's /INIT commands so far (for tests and
     /// tools).
     pub init_walks: u32,
@@ -267,6 +269,7 @@ impl Scripts {
             init_running: false,
             in_place_arrival_scan: false,
             timer_play: false,
+            chapter_change_running: false,
             init_walks: 0,
             game_over_count: HashMap::new(),
         }
@@ -431,7 +434,13 @@ impl Scripts {
             // ChangeWam=name: load "wam\name" and make its first place the
             // current one (@ 0x0042a1f8..0x0042a2b6). Every ChangeWam of the
             // game is followed by a Vue= in the same section, which moves
-            // the player; until then no place is entered.
+            // the player; until then no place is entered. The load's result
+            // is not tested (@ 0x0042a285): a WAM that cannot be opened
+            // (its error box, Engine::load_wam) leaves the one in memory,
+            // whose first record becomes the place. The only such load
+            // (CHAPI079's atlan4.wam on disc 4, BugFix::AnyDisc off) is
+            // followed by Vue=119, which PALAIS3 lacks: the original crashes
+            // there (0x0044a453, Scripts::enter_place_from_script).
             if let Some(wam) = set.wam_name {
                 e.set_wam_path(&latin1_bytes(&wam));
                 e.load_wam(&wam).await;
@@ -456,10 +465,10 @@ impl Scripts {
                         e.given_object = Some(k);
                     }
                     if e.inventory.len() < INVENTORY_RECORDS {
-                        e.inventory.push(id);
+                        e.inventory_push(id, None);
                     }
                 } else if let Some(k) = e.inventory.iter().position(|&o| o == id) {
-                    e.inventory.remove(k);
+                    e.inventory_remove(k);
                 }
                 return;
             }
@@ -488,8 +497,11 @@ impl Scripts {
                 // The trigger commands act only for a value other than 0
                 // (the store, then `cmp [var],0 / je`: FUN_0042a100 @
                 // 0x0042ac44..0x0042b1d0): StartMusik, StopMusik, LoadMusik,
-                // ShowPerso and StopSound with 0 do nothing.
-                "startmusik" | "stopmusik" | "loadmusik" | "showperso" | "stopsound"
+                // ShowPerso and StopSound with 0 do nothing, nor do DelMusik
+                // (@ 0x0042acf9), AddGuest (@ 0x0042b107) and SubGuest
+                // (@ 0x0042b177).
+                "startmusik" | "stopmusik" | "loadmusik" | "delmusik" | "showperso"
+                | "stopsound" | "addguest" | "subguest"
                     if value == 0 =>
                 {
                     e.vars.set(key, 0);
@@ -512,12 +524,17 @@ impl Scripts {
                 // to 3). The port reads every disc at once: no prompt, it
                 // only notes the disc, which the checkpoints keep. The
                 // prompt's function also empties the hand (OBJETENMAIN = 0 @
-                // 0x0041ede9) and ends by clearing the input flags, the bar
-                // request among them (0x0041f032..0x0041f064).
+                // 0x0041ede9) and ends by clearing the input flags, the
+                // double click, the Escape latch and the bar request among
+                // them (0x0041f032..0x0041f064).
                 "changecd" => {
                     e.disc = change_cd_disc(value);
                     e.vars.set("objetenmain", 0);
-                    e.bar.flags_reset();
+                    // The prompt's loop polls FUN_0041a298 (up to 1000
+                    // ms) before those stores: it pumps a WM_LBUTTONDBLCLK
+                    // still queued.
+                    e.sys.double_click().pump();
+                    e.input_flags_reset();
                 }
                 // HideGuest / ShowGuest store no variable.
                 "hideguest" | "showguest" => e.guests_shown = key == "showguest",
@@ -605,7 +622,11 @@ impl Scripts {
                 // is clicked (FUN_004240fc).
                 _ => {
                     // AngleWarpX=N / AngleWarpY=N turn the view to N degrees,
-                    // then store the variable (@ 0x0042a995, 0x0042a9cf).
+                    // then store the variable (@ 0x0042a995, 0x0042a9cf); the
+                    // other angle keeps what the view keys made of it.
+                    if key == "anglewarpx" || key == "anglewarpy" {
+                        e.apply_view_keys();
+                    }
                     if key == "anglewarpx" {
                         e.warp.set_alpha(con_angle_radians(value));
                     } else if key == "anglewarpy" {
@@ -621,6 +642,10 @@ impl Scripts {
     /// /sel scan runs with ArriveeVue = LastVue (`FUN_00427634` sets it at
     /// 0x0042777d, `FUN_0042a100` scans at 0x0042a60e).
     async fn change_chapter(&mut self, e: &mut Engine, value: i32) {
+        if self.chapter_change_running {
+            self.change_chapter_nested(e, value).await;
+            return;
+        }
         let left = e.vars.get("chapter");
         e.vars.set("chapter", value);
         if value <= 0 || value as u32 == self.chapter {
@@ -640,6 +665,8 @@ impl Scripts {
             let state = self.script_state(e, left);
             e.write_checkpoint(&state);
         }
+        // FUN_00427634 sets 0x00496140 at its entry (0x0042764c).
+        self.chapter_change_running = true;
         self.load_con_script(e, value as u32).await;
         if let Some(cur) = e.current_place_id {
             let last = i32::from(e.last_vue);
@@ -650,6 +677,9 @@ impl Scripts {
             let played = self
                 .run_arrival_sel_counted(e, i32::from(cur), last, counted)
                 .await;
+            // 0x00496140 = 0 once FUN_004277c8 returns (0x0042a616): a
+            // chapter= of the head walk below is a whole change again.
+            self.chapter_change_running = false;
             // With no /sel entry found FUN_004277c8 returns the start of the
             // new CON text (0x00427800), which the executor takes as its next
             // position (0x00428bf9..0x00428c02): it walks the file's head up
@@ -668,10 +698,15 @@ impl Scripts {
                 }
             }
         }
-        // ARRIVEEVUE stays = LastVue: only the place loop clears it, right
-        // after its own arrival scan (@ 0x00423be7). A chapter= run anywhere
-        // else in the pass therefore gets a second arrival scan on the next
-        // pass (@ 0x00423b5a..0x00423b78) when LastVue != 0.
+        // (With no place, as after it: the flag ends with the change.)
+        self.chapter_change_running = false;
+        // ARRIVEEVUE stays = LastVue: only the place loop clears it, before
+        // each warp loop (@ 0x00423be7, after its own arrival scan). A
+        // chapter= run anywhere else in the pass therefore gets a second
+        // arrival scan on the next pass (@ 0x00423b5a..0x00423b78) when
+        // LastVue != 0, unless a move replaces it (0x00423def); until then
+        // the scans read ArriveeVue = LastVue (the departure scan of an exit
+        // click after a timer's chapter=).
         if !self.in_place_arrival_scan
             && !self.init_running
             && e.last_vue != 0
@@ -679,6 +714,49 @@ impl Scripts {
         {
             e.arrival_scan_pending = true;
             e.arrival_from_vue = e.last_vue;
+        }
+    }
+
+    /// Chapter=N while a chapter change runs (0x00496140 set: inside the
+    /// /INIT block or the /sel section `FUN_004277c8` plays): the branch
+    /// 0x0042a59f..0x0042a5fa of `FUN_0042a100`. The chapter bytes
+    /// 0x00772907 / 0x00772909 (0x0042a57d..0x0042a58a), then only the new
+    /// CON text (`FUN_004273d4`), and the executor goes on at the head of
+    /// that text: it walks the commands before the first section header.
+    /// No checkpoint, no variable reset nor CHAPTER store, no ChapterTime /
+    /// Time2 restart, no /INIT run and no /sel scan. No shipped script
+    /// reaches it (no /INIT holds a chapter=, and no /sel section a nested
+    /// change plays can match at the chapter's start).
+    async fn change_chapter_nested(&mut self, e: &mut Engine, value: i32) {
+        if value <= 0 || value as u32 == self.chapter {
+            return;
+        }
+        log::info!("chapter {} -> {value} (nested)", self.chapter);
+        e.prev_chapter = self.chapter as u8;
+        self.chapter = value as u32;
+        e.chapter = value as u32;
+        let name = con_file_name(e, self.chapter);
+        let Some(data) = e.read(&name).await else {
+            // The original shows its error box (code 0xc) and returns
+            // position 0: the walk ends.
+            log::warn!("no CON file {name}");
+            return;
+        };
+        self.script = ConScript::parse(&data);
+        e.emit(Event::ConTextReloaded(name));
+        // From the /INIT block (FUN_00425eb0 walks its own pointer over the
+        // rewritten buffer) the text is only replaced; not modelled further.
+        if self.init_running {
+            return;
+        }
+        self.init_walks += 1;
+        let cmds = self.script.init_cmds().to_vec();
+        for (cmd, offset) in cmds {
+            self.exec_set(e, Some(offset), &cmd).await;
+            if e.should_abort() || e.vars.get("gameover") != 0 {
+                break;
+            }
+            after_item(e).await;
         }
     }
 
@@ -694,6 +772,8 @@ impl Scripts {
             log::warn!("Vue={value}: not a place");
             return;
         };
+        // The place loop's zone 0x006cd7f4 = N (@ 0x0042a659).
+        e.script_vue_place = Some(place);
         let from = e.current_place_id;
         if let Some(sub) = e
             .wam
@@ -706,6 +786,26 @@ impl Scripts {
             e.set_wam_path(&latin1_bytes(&sub.wam));
             e.load_wam(&sub.wam).await;
             e.current_place = None;
+        }
+        // FUN_00421cfc (@ 0x0042a66d) looks N up in the place table; with
+        // no record N it leaves its index at the WAM's record count
+        // (0x00421d1b..0x00421d65) and names the panorama from that record
+        // (0x006cd288 = "" + "cyclo\" + its name, 0x00421dbf..0x00421e04).
+        // A record no load of this run reached is all zero: the path
+        // "cyclo\" has no dot, and FUN_0044a424 (@ 0x0042a698) writes
+        // through strrchr(path, '.') = NULL (`mov byte ptr [eax],0` @
+        // 0x0044a453): an access violation that ends the original. Only
+        // CHAPI079's Vue=119 after its failed ChangeWam reaches it
+        // (BugFix::AnyDisc off; PALAIS3's 84 records are the most of any
+        // WAM). A stale record of a larger WAM would load that record's
+        // panorama instead: no data reaches it, not modelled.
+        if !e.enhancements().fix(BugFix::AnyDisc)
+            && !e.wam.places.iter().any(|p| p.id == place)
+            && e.place_table_slots.len() <= e.wam.places.len()
+        {
+            e.original_fault(&crate::engine::vue_fault_text(place))
+                .await;
+            return;
         }
         // LastVue = the place being left, unless loading (0x0042a6a7..
         // 0x0042a6b5).
@@ -755,8 +855,10 @@ impl Scripts {
     }
 
     /// The arrival scan: ArriveeVue = the place arrived FROM (a negative
-    /// origin is no place yet: the arrived place stands for it), the /sel
-    /// scan, then ArriveeVue = 0. True when a section played.
+    /// origin is no place yet: the arrived place stands for it), then the
+    /// /sel scan (`FUN_004277c8`, which leaves ArriveeVue as it is: the place
+    /// loop clears it before the warp loop, @ 0x00423be7). True when a
+    /// section played.
     async fn run_arrival_sel(&mut self, e: &mut Engine, arrived: i32, from: i32) -> bool {
         self.run_arrival_sel_counted(e, arrived, from, false).await
     }
@@ -770,9 +872,7 @@ impl Scripts {
     ) -> bool {
         e.vars
             .set("arriveevue", if from >= 0 { from } else { arrived });
-        let played = self.run_sel_scan_counted(e, counted).await;
-        e.vars.set("arriveevue", 0);
-        played
+        self.run_sel_scan_counted(e, counted).await
     }
 
     /// The timer scans (`FUN_0042bef4` / `FUN_0042bfa4`): with TESTTIME1 /
@@ -781,6 +881,8 @@ impl Scripts {
     /// played.
     pub async fn run_con_timers(&mut self, e: &mut Engine, from_warp: bool) -> bool {
         let mut played = false;
+        // The reload a /tim1 game over asked for, held while /tim2 runs.
+        let mut held_abort = None;
         for timer in 1..=2 {
             let flag = if timer == 1 { "testtime1" } else { "testtime2" };
             if e.vars.get(flag) == 0 {
@@ -799,10 +901,10 @@ impl Scripts {
             if let Some(sec) = sec {
                 self.bump_counter(sec.id);
                 // The warp's mouse-look ends for the dialog; the mouse at the
-                // warp pointer, the section's motions set it.
+                // Windows cursor, the section's motions set the pointer.
                 e.sys.set_mouse_locked(false);
                 if from_warp {
-                    e.sys.set_mouse_pos(e.pointer.pos.0, e.pointer.pos.1);
+                    e.sys.set_mouse_pos(e.pointer.cursor.0, e.pointer.cursor.1);
                     e.mark_pointer_mouse();
                 }
                 let kind = if timer == 1 { "tim1" } else { "tim2" };
@@ -812,8 +914,25 @@ impl Scripts {
                 played = true;
             }
             if e.should_abort() {
+                // FUN_0042be3c tests no GAMEOVER between its two scans
+                // (0x0042be94 -> 0x0042bea8): after a /tim1 game over the
+                // /tim2 scan still runs, GAMEOVER still set, and its
+                // section meets the executor's test after its first item
+                // (0x00428c05) and shows the game-over picture again
+                // (FUN_00426590 with the text after that item). With
+                // BugFix::GameOverPuzzle GAMEOVER is cleared at once and
+                // the pass ends, as for the place loop's scans.
+                if timer == 1 && e.game_over_left_set() {
+                    held_abort = e.abort.take();
+                    continue;
+                }
                 break;
             }
+        }
+        // A reload the /tim2 section asked for (its game over) stands;
+        // otherwise the /tim1 game over's.
+        if e.abort.is_none() {
+            e.abort = held_abort;
         }
         played
     }
@@ -848,7 +967,7 @@ impl Scripts {
             {
                 show_perso(e, held);
                 if let Some(k) = e.inventory.iter().position(|&o| o == held) {
-                    e.inventory.remove(k);
+                    e.inventory_remove(k);
                 }
                 e.vars.set("objetenmain", 0);
             }
@@ -871,11 +990,16 @@ impl Scripts {
             return;
         };
         for r in object_pickup_rows(&e.sprite_list, vue, id) {
-            let obj = e.sprite_list[r].perso_id;
+            let (obj, icon) = (e.sprite_list[r].perso_id, e.sprite_list[r].icon);
             hide_perso(e, obj);
+            // The hand's icon and the new record's icon byte are the row's
+            // (@ 0x00427a5b, 0x00427a88), not the table's index of the id:
+            // the ladder put back on the wall (281, ATLAN4 views 115 / 116)
+            // is not in the table and its rows give icon 30.
             e.vars.set("objetenmain", obj);
+            e.held_icon = Some((obj, icon));
             if e.inventory.len() < INVENTORY_RECORDS {
-                e.inventory.push(obj);
+                e.inventory_push(obj, Some(icon));
             } else {
                 log::warn!("inventory full, object {obj} not added");
             }
@@ -901,13 +1025,16 @@ impl Scripts {
         // hand. The return at 0x004258b7 skips the followers' save, hide and
         // restore and leaves 0x00496144 (Guests::talk) as it is.
         if e.vars.get("objetenmain") != 0 {
+            // 0x004960c0 = 1 around the scan (@ 0x00425882, 0x004258ad):
+            // the still frames of its voice-only lines have no cursor.
+            e.give_scan = true;
             self.run_con_click(e).await;
+            e.give_scan = false;
             e.vars.set("objetenmain", 0);
             return;
         }
         // @ 0x004258c4: 0x00496170 = 1 up to its end (0x00425b7a).
         e.section_play = true;
-        self.dialog.new_conversation();
         // 0x004258ce..0x004258fe: the followers' sprites are saved, and
         // restored at the end when 0x00496144 is set (0x00425ba0..0x00425bdb),
         // which clears it.
@@ -999,6 +1126,15 @@ impl Scripts {
     /// it the music goes down by half (0x00495ea4 = 50, 0x00495eac = 2),
     /// then back up with 80 % again.
     async fn run_puzzle_zone(&mut self, e: &mut Engine, n: u32) {
+        // 0x00496154 = 1 (0x00424166) until after the /sel scan
+        // (0x00424242): the still frames of that scan's voice-only lines
+        // step no cursor (FUN_0041afd0 @ 0x0041b03a).
+        e.puzzle_scan = true;
+        self.run_puzzle_zone_flagged(e, n).await;
+        e.puzzle_scan = false;
+    }
+
+    async fn run_puzzle_zone_flagged(&mut self, e: &mut Engine, n: u32) {
         e.stop_ambient();
         e.music.duck(false, Some(50));
         // FinPuzzle = the result (crate::puzzle, FUN_0043a1e0).
@@ -1014,7 +1150,7 @@ impl Scripts {
         // game-over narration of the scan stops at its first poll (with
         // BugFix::PuzzleEscape a puzzle latches no Escape).
         e.bar.request = false;
-        e.reload_current_view().await;
+        e.reload_view_after_puzzle().await;
         e.vars.set("startpuzzle", 0);
         self.run_sel_scan(e).await;
         e.vars.set("finpuzzle", 0);
@@ -1034,9 +1170,9 @@ impl Scripts {
         chain: Option<Walk>,
     ) -> HookFuture<'a, ()> {
         Box::pin(async move {
-            // The gesture that triggered the section is drained, so that the
-            // first line is not skipped by a click still held.
-            e.wait_buttons_up().await;
+            // No wait for the buttons (the executor polls nothing before
+            // its first line): a click still held is no press for the line
+            // players, whose presses are edges.
             let entry_chapter = self.chapter;
             e.emit(Event::Section {
                 chapter: self.chapter,
@@ -1047,6 +1183,7 @@ impl Scripts {
             // (0x00428483 / 0x0042848b) at entry and sets them back at the
             // end (0x00428cb2); in between ClicPerso is cleared after every
             // line (0x00428b39). A /go keeps both.
+            e.apply_view_keys();
             let mut walk = chain.unwrap_or(Walk {
                 entry: (e.warp.alpha(), e.warp.beta()),
                 clic_perso: e.vars.get("clicperso"),
@@ -1055,6 +1192,24 @@ impl Scripts {
             // loop once the variable goes non-zero); the line after it feeds
             // the game-over screen.
             let mut game_over = None;
+            // A section whose first item is its /go (no item before it, as
+            // the parser ends the items at the /go): the executor runs
+            // FUN_0042831c on the /go (0x00428bf1), which returns the
+            // target's header (FUN_00425c04), then tests GAMEOVER
+            // (0x00428c05) before any item of the target. Set (a walk
+            // started with GAMEOVER left set, BugFix::GameOverPuzzle off),
+            // it calls FUN_00426590 with the text after that position, a
+            // header, so no narrator (0x00428c20..0x00428c3e), and ends.
+            if sec.items.is_empty() && sec.goto_id > 0 && !e.should_abort() {
+                let n = e.vars.get("gameover");
+                if n != 0 {
+                    game_over = Some(GameOverRequest {
+                        section: sec.id,
+                        n,
+                        narrator: None,
+                    });
+                }
+            }
             let mut line_idx = 0usize;
             let mut i = 0;
             while i < sec.items.len() {
@@ -1066,54 +1221,31 @@ impl Scripts {
                         let n = gameover_value(cmd);
                         self.exec_set(e, Some(*offset), cmd).await;
                         if n != 0 {
-                            // The narrator's voice is ATA<section><letter>,
-                            // the letter counting the lines before it
-                            // (FUN_00426590 @ 0x004267ea, 0x004268b2..).
-                            // The 1997 build takes the executor's current
-                            // letter (atlantis-cd-en-688128 FUN_004256a4 @
-                            // 0x004256ee), the same file for every game
-                            // over of the shipped scripts.
-                            let mut narrator = con_game_over_narrator(&sec.items, i)
-                                .map(|l| (l.text.clone() + &l.trail, con_track_letter(line_idx)));
-                            // The 1999 build: the second death in a section
-                            // plays the next narrator line.
-                            // The 2001 and 1997 builds with the restored
-                            // content too.
-                            let alt = e.game.exe.build.alt_game_over_narration
-                                || e.enhancements().restored_content;
-                            let mut narrator_item = i + 1;
-                            if let (Some((text, letter)), true) = (narrator.as_mut(), alt) {
-                                let count = self.game_over_count.entry(sec.id).or_default();
-                                let pick = con_alt_game_over_narration(&sec.items, i, count);
-                                if pick > 0 {
-                                    if let ConItem::Line(l) = &sec.items[i + 1 + pick] {
-                                        *text = l.text.clone() + &l.trail;
-                                    }
-                                    *letter = char::from(*letter as u8 + pick as u8);
-                                    narrator_item += pick;
-                                }
-                            }
-                            // The game-over screen copies the narrator line
-                            // into the subtitle text buffer, shown or not
-                            // (atlantis-cd-en-688128 FUN_004256a4 @
-                            // 0x00425a31..0x00425a50).
-                            if let (Some(_), Some(ConItem::Line(l))) =
-                                (&narrator, sec.items.get(narrator_item))
-                            {
-                                e.subtitle_text
-                                    .store(con_narrator_buffer_text(&latin1_bytes(&l.raw)));
-                            }
-                            game_over = Some(GameOverRequest {
-                                section: sec.id,
-                                n,
-                                narrator,
-                            });
+                            game_over = Some(self.game_over_at(e, &sec, i, line_idx, n));
                             break;
                         }
                         // A chapter change replaced the script: the walk ends.
                         // The executor still ends that item with FUN_00428da8
                         // (only GameOver breaks before it, 0x00428bf9..).
                         if self.chapter != entry_chapter {
+                            // The handler's result is the executor's new
+                            // text position (0x00428bf9..0x00428c02), and the
+                            // GAMEOVER test (0x00428c05) still comes before
+                            // FUN_00428da8: a GAMEOVER left set
+                            // (BugFix::GameOverPuzzle off) shows the screen
+                            // again, with no narrator, the position being a
+                            // header or the new file's head: no `[Narra`
+                            // there (FUN_00426590 compares the position with
+                            // `[Narra` @ 0x004bc578) [CONFIRMED-STATIC].
+                            let n = e.vars.get("gameover");
+                            if n != 0 {
+                                game_over = Some(GameOverRequest {
+                                    section: sec.id,
+                                    n,
+                                    narrator: None,
+                                });
+                                break;
+                            }
                             after_item(e).await;
                             break;
                         }
@@ -1123,7 +1255,7 @@ impl Scripts {
                         // off, the place loop's puzzle and /sel scans after
                         // a game over that left the warp loop without a
                         // click (Engine::no_click_exit) run with it.
-                        if let Some(req) = pending_game_over(e, &sec, i, line_idx) {
+                        if let Some(req) = self.pending_game_over(e, &sec, i, line_idx) {
                             game_over = Some(req);
                             break;
                         }
@@ -1182,7 +1314,7 @@ impl Scripts {
                         // the next line) before the GAMEOVER test.
                         let set_next = matches!(sec.items.get(i + 1), Some(ConItem::Set { .. }));
                         if !set_next {
-                            if let Some(req) = pending_game_over(e, &sec, i, line_idx) {
+                            if let Some(req) = self.pending_game_over(e, &sec, i, line_idx) {
                                 game_over = Some(req);
                                 break;
                             }
@@ -1247,13 +1379,91 @@ impl Scripts {
                     }
                 }
             }
-            // The click that ended the last line is not a navigation press.
-            e.wait_buttons_up().await;
+            // The executor's only exit clears the menu request 0x00496138
+            // (0x00428d81) and leaves 0x00496124 as it is: after an Escape
+            // latch the portraits are drawn again and a right press
+            // toggles the bar request, while the loops that run on
+            // 0x00496124 still stop.
+            if e.escape_request {
+                e.menu_request_cleared = true;
+            }
+            // No wait for the buttons' release: the executor's exit
+            // (0x00428c92..0x00428da4) sets back ClicPerso and the angles,
+            // clears the click flag 0x0049611c (0x00428d77) and the menu
+            // request 0x00496138 (0x00428d81) and returns, with no poll. The
+            // press that ended the last line was taken by that line's poll
+            // (an event the port's line player consumed), so the next loops,
+            // whose presses are edges, see a button still held as no press.
         })
     }
 }
 
 impl Scripts {
+    /// The game over GameOver=`n` asks for at the item `i` of `sec`, its
+    /// text the line after the item: the narrator only when that line is
+    /// one, its voice ATA<section><letter>, the letter counting the lines
+    /// before it (FUN_00426590 @ 0x004267ea, 0x004268b2..). The 1997 build
+    /// takes the executor's current letter (atlantis-cd-en-688128
+    /// FUN_004256a4 @ 0x004256ee), the same file for every game over of
+    /// the shipped scripts. The game-over function itself makes the 1999
+    /// build's pick of an alternative narration and counts the section's
+    /// deaths (GOG FUN_00426570 @ 0x004267ce..0x00426882, 0x004269e3), so
+    /// both its callers, the GameOver= command and the executor's test after
+    /// an item (0x00428c05), go through here.
+    fn game_over_at(
+        &mut self,
+        e: &mut Engine,
+        sec: &ConSection,
+        i: usize,
+        line_idx: usize,
+        n: i32,
+    ) -> GameOverRequest {
+        let mut narrator = con_game_over_narrator(&sec.items, i)
+            .map(|l| (l.text.clone() + &l.trail, con_track_letter(line_idx)));
+        // The 1999 build: the second death in a section plays the next
+        // narrator line. The 2001 and 1997 builds with the restored content
+        // too.
+        let alt = e.game.exe.build.alt_game_over_narration || e.enhancements().restored_content;
+        let mut narrator_item = i + 1;
+        if let (Some((text, letter)), true) = (narrator.as_mut(), alt) {
+            let count = self.game_over_count.entry(sec.id).or_default();
+            let pick = con_alt_game_over_narration(&sec.items, i, count);
+            if pick > 0 {
+                if let ConItem::Line(l) = &sec.items[i + 1 + pick] {
+                    *text = l.text.clone() + &l.trail;
+                }
+                *letter = char::from(*letter as u8 + pick as u8);
+                narrator_item += pick;
+            }
+        }
+        // The game-over screen copies the narrator line into the subtitle
+        // text buffer, shown or not (atlantis-cd-en-688128 FUN_004256a4 @
+        // 0x00425a31..0x00425a50).
+        if let (Some(_), Some(ConItem::Line(l))) = (&narrator, sec.items.get(narrator_item)) {
+            e.subtitle_text
+                .store(con_narrator_buffer_text(&latin1_bytes(&l.raw)));
+        }
+        GameOverRequest {
+            section: sec.id,
+            n,
+            narrator,
+        }
+    }
+
+    /// The game over the executor's test after the item `i` of `sec` meets
+    /// when GAMEOVER is already set (0x00428c05, FUN_00426590 with the text
+    /// after the item).
+    fn pending_game_over(
+        &mut self,
+        e: &mut Engine,
+        sec: &ConSection,
+        i: usize,
+        line_idx: usize,
+    ) -> Option<GameOverRequest> {
+        let n = e.vars.get("gameover");
+        (n != 0).then(|| self.game_over_at(e, sec, i, line_idx, n))
+    }
+
     /// The script side of a checkpoint; `left` is CHAPTER before the
     /// chapter= that writes it.
     fn script_state(&self, e: &Engine, left: i32) -> ScriptState {
@@ -1322,37 +1532,12 @@ fn gameover_value(cmd: &str) -> i32 {
 /// FUN_00428da8's last call). So a sound that ended during a line is seen
 /// as done, NEWSOUND cleared, before the next item (a `Cinema=` among
 /// them) runs.
-/// The game over the executor's test after the item `i` of `sec` meets
-/// when GAMEOVER is already set (0x00428c05, FUN_00426590 with the text
-/// after the item: its narrator only when the next line is one).
-fn pending_game_over(
-    e: &mut Engine,
-    sec: &ConSection,
-    i: usize,
-    line_idx: usize,
-) -> Option<GameOverRequest> {
-    let n = e.vars.get("gameover");
-    if n == 0 {
-        return None;
-    }
-    let narrator = con_game_over_narrator(&sec.items, i)
-        .map(|l| (l.text.clone() + &l.trail, con_track_letter(line_idx)));
-    if let (Some(_), Some(ConItem::Line(l))) = (&narrator, sec.items.get(i + 1)) {
-        e.subtitle_text
-            .store(con_narrator_buffer_text(&latin1_bytes(&l.raw)));
-    }
-    Some(GameOverRequest {
-        section: sec.id,
-        n,
-        narrator,
-    })
-}
-
 async fn after_item(e: &mut Engine) {
     e.poll_new_sound().await;
 }
 
 fn restore_entry(e: &mut Engine, walk: &mut Walk) {
+    e.apply_view_keys();
     if e.vars.get("anglewarpx") != 0 {
         walk.entry.0 = e.warp.alpha();
         e.vars.set("anglewarpx", 0);
@@ -1364,11 +1549,17 @@ fn restore_entry(e: &mut Engine, walk: &mut Walk) {
     e.set_view(walk.entry.0, walk.entry.1);
 }
 
+/// The hidden-perso list's capacity (`FUN_00427bd0`, dc:19386).
+const HIDDEN_PERSOS_MAX: usize = 0x100;
+
 /// `FUN_00427bd0` (HidePerso): every sprite of the perso inactive, and the
 /// id in the persistent hidden list, which the transition sprites and the
-/// next sprite lists read.
+/// next sprite lists read. The id is listed only while the list holds
+/// fewer than 0x100 ids (`0x006cd390 < 0x100`, dc:19386); past that the
+/// sprites are still deactivated, but the next sprite-list load shows the
+/// perso again.
 fn hide_perso(e: &mut Engine, perso: i32) {
-    if !e.hidden_persos.contains(&perso) {
+    if e.hidden_persos.len() < HIDDEN_PERSOS_MAX && !e.hidden_persos.contains(&perso) {
         e.hidden_persos.push(perso);
     }
     set_perso_active(&mut e.sprite_list, perso, false);
@@ -1413,10 +1604,15 @@ impl ScriptHooks for Scripts {
             // chapter does not change (the in-play no-checkpoint branch).
             self.chapter = chapter;
             e.chapter = chapter;
+            // FUN_00427634 sets 0x00496140 at its entry (0x0042764c).
+            self.chapter_change_running = true;
             self.load_con_script(e, chapter).await;
             // FUN_0042de5c step 7: CHAPTER = the chapter byte after the
             // /INIT.
             e.vars.set("chapter", self.chapter as i32);
+            // FUN_00423760 / FUN_0042de5c end with 0x00496140 = 0 (dc:16677,
+            // dc:23645).
+            self.chapter_change_running = false;
         })
     }
 
@@ -1574,6 +1770,40 @@ mod tests {
     use std::cell::RefCell;
     use std::rc::Rc;
 
+    /// An Escape latch (0x00496124 = 0, 0x00496138 = 1), then a section
+    /// of /set commands: the executor's exit clears the menu request
+    /// (0x00428d81) and leaves 0x00496124 at 0. A right press then toggles
+    /// the bar request (0x0041a2f2..0x0041a337) and the portraits are
+    /// drawn (`FUN_0042bc58`); the loops that run on 0x00496124 still stop.
+    #[test]
+    fn the_executor_exit_clears_the_menu_request_only() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_executor_exit_clears_the_menu_request_only",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                let script = crate::con_script::ConScript::parse(
+                    b"/190\r\n/sel(vue=1)\r\n/set(Flagtemp1=1)\r\n/0\r\n",
+                );
+                let sec = script.sections()[0].clone();
+                s.script = script;
+                e.latch_escape();
+                let before = e.menu_request();
+                s.play_section(&mut e, sec, "tim", None).await;
+                e.bar.request = true;
+                e.bar.right_pressed(e.section_play, e.menu_request());
+                *g2.borrow_mut() =
+                    Some((before, e.escape_request, e.menu_request(), e.bar.request));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, true, false, false)));
+        }
+    }
+
     /// A NewSound that ends during a dialog line is seen as done before the
     /// next item: the line players call FUN_00432178 every frame and the
     /// executor FUN_00428da8 after every item, both ending with the poller
@@ -1633,6 +1863,160 @@ mod tests {
         }
     }
 
+    /// A presenter that notes, for each line, whether its still frame
+    /// would step the warp cursor.
+    struct CursorProbe(Rc<RefCell<Vec<bool>>>);
+
+    impl DialogPresenter for CursorProbe {
+        fn play_line<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _req: &'a LineRequest,
+        ) -> HookFuture<'a, LineOutcome> {
+            self.0.borrow_mut().push(e.still_frame_cursor_step());
+            ready(LineOutcome::default())
+        }
+    }
+
+    /// The voice-only line of a /con section that tests only ObjetEnMain,
+    /// with object 257 in hand and a character under the pointer, reached
+    /// by a click on that character (`give`) or on a zone: whether its
+    /// still frame steps the cursor.
+    fn give_line_cursor(give: bool) -> Option<Vec<bool>> {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "no_cursor_on_the_lines_of_a_given_object",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(CursorProbe(g2.clone())));
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                // A place and a view with a character under the pointer.
+                let ids: Vec<u16> = e.wam.places.iter().map(|p| p.id).collect();
+                let mut hit = None;
+                'search: for id in ids {
+                    e.next_place_id = Some(id);
+                    e.do_place_change().await;
+                    if e.npc_rects.is_empty() {
+                        continue;
+                    }
+                    e.pointer.pos = (320, 240);
+                    for ia in 0..315 {
+                        for ib in -4..=4 {
+                            e.set_view(ia as f32 * 0.02, ib as f32 * 0.1);
+                            let (zone, perso) = e.pointer_targets();
+                            if perso >= 0x200 && zone > 0 && zone < 0x200 {
+                                hit = Some((perso, zone));
+                                break 'search;
+                            }
+                        }
+                    }
+                }
+                let (perso, zone) = hit.expect("a character over a zone");
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/con(ObjetEnMain=257)\r\n[Seth,off] Here.\r\n/0\r\n",
+                );
+                e.vars.set("objetenmain", 257);
+                g2.borrow_mut().clear();
+                if give {
+                    s.npc_click(&mut e, perso, zone).await;
+                } else {
+                    e.vars.set("cliczone", zone as i32);
+                    s.zone_click(&mut e, zone).await;
+                }
+            },
+            |_, _| {},
+        );
+        ran.then(|| got.borrow().clone())
+    }
+
+    /// `FUN_004240fc` sets 0x00496154 around a puzzle and its /sel scan
+    /// (@ 0x00424166 .. 0x00424242), and `FUN_0041afd0` does not step the
+    /// cursor while it is set (@ 0x0041b03a): the still frame of the
+    /// scan's voice-only line leaves the animation as it was; after the
+    /// zone it steps again.
+    #[test]
+    fn no_cursor_on_the_lines_of_the_post_puzzle_scan() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "no_cursor_on_the_lines_of_the_post_puzzle_scan",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(CursorProbe(g2.clone())));
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/sel(flagtemp1=1)\r\n[Seth,off] Here.\r\n/0\r\n",
+                );
+                e.vars.set("flagtemp1", 1);
+                e.vars.set("objetenmain", 0);
+                // A StartPuzzle number past the puzzles: refused at once.
+                s.run_puzzle_zone(&mut e, 99).await;
+                let after = e.still_frame_cursor_step();
+                g2.borrow_mut().push(after);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [false, true]);
+        }
+    }
+
+    /// After a puzzle `FUN_004240fc` reloads the panorama only
+    /// (`FUN_0044a424` @ 0x004241e2), not `FUN_0042431c`: the view's
+    /// sprite rows keep their frames (ATLAN1 view 8, a puzzle zone and a
+    /// looping row).
+    #[test]
+    fn a_puzzle_keeps_the_sprite_frames() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_puzzle_keeps_the_sprite_frames",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(8);
+                e.do_place_change().await;
+                let rows: Vec<usize> = (0..e.sprite_list.len())
+                    .filter(|&i| e.sprite_list[i].place_id == 8 && e.sprite_list[i].frame_count > 1)
+                    .collect();
+                assert!(!rows.is_empty());
+                for &i in &rows {
+                    e.sprite_list[i].frame = 1;
+                }
+                s.script = crate::con_script::ConScript::parse(b"/1\r\n/0\r\n");
+                e.vars.set("objetenmain", 0);
+                // A StartPuzzle number past the puzzles: refused at once.
+                s.run_puzzle_zone(&mut e, 99).await;
+                let frames: Vec<i32> = rows.iter().map(|&i| e.sprite_list[i].frame).collect();
+                *g2.borrow_mut() = Some(frames);
+            },
+            |_, _| {},
+        );
+        if ran {
+            let frames = got.borrow().clone().expect("the puzzle zone did not end");
+            assert!(frames.iter().all(|&f| f == 1), "{frames:?}");
+        }
+    }
+
+    /// `FUN_00425828` sets 0x004960c0 around the /con click scan of a
+    /// character clicked with an object in hand (@ 0x00425882..
+    /// 0x004258ad), and `FUN_0041afd0` does not step the cursor while it
+    /// is set (@ 0x0041afe8): the still frames of that section's
+    /// voice-only lines leave its animation as it was (CHAPI021 /270,
+    /// CHAPI055 /685). A zone click's scan does not set it.
+    #[test]
+    fn no_cursor_on_the_lines_of_a_given_object() {
+        let Some(given) = give_line_cursor(true) else {
+            return;
+        };
+        assert_eq!(given, [false]);
+        assert_eq!(give_line_cursor(false).unwrap(), [true]);
+    }
+
     #[test]
     fn change_cd_clamps_the_disc() {
         let got: Vec<u8> = [1, 2, 3, 4, 5, 0, -1, 255, 257]
@@ -1640,6 +2024,82 @@ mod tests {
             .map(|&v| change_cd_disc(v))
             .collect();
         assert_eq!(got, [1, 2, 3, 4, 4, 4, 4, 4, 1]);
+    }
+
+    /// CHAPI079 l. 113..116 (disc 4, PALAIS3): `ChangeWam=atlan4.wam`,
+    /// a WAM only disc 1's archive holds. As the original
+    /// ([`BugFix::AnyDisc`] off), the WAM loader `FUN_00421ebc` shows its
+    /// error box with the path and keeps PALAIS3, and the handler makes
+    /// its first record (180) the place (@ 0x0042a28a, 0x0042a2b6) until
+    /// the next command, `Vue=119`: PALAIS3 has no place 119 and its
+    /// record past the last was never written, so the original crashes
+    /// (0x0044a453, [`Scripts::enter_place_from_script`]); the port shows
+    /// why and ends the game there ([`Abort::Fault`]). With the fix, the
+    /// day city's WAM is read from disc 1 and the player enters view 119.
+    #[test]
+    fn change_wam_reads_the_disc_in_the_drive_only() {
+        use crate::enhancements::{BugFix, Enhancements};
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "change_wam_reads_the_disc_in_the_drive_only",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                s.exec_set(&mut e, None, "changecd=4").await;
+                assert!(!e.game.big.on_disc("WAM\\ATLAN4.WAM", 4));
+                assert!(e.game.big.on_disc("WAM\\ATLAN4.WAM", 1));
+                for enh in [Enhancements::original(), Enhancements::default()] {
+                    e.set_enhancements(enh);
+                    e.set_wam_path(b"PALAIS3.WAM");
+                    assert!(e.load_wam("PALAIS3.WAM").await);
+                    let trace = Rc::new(RefCell::new(Vec::new()));
+                    e.trace = Some(trace.clone());
+                    s.exec_set(&mut e, None, "changewam=atlan4.wam").await;
+                    let place = e.current_place_id;
+                    e.abort = None;
+                    s.exec_set(&mut e, None, "vue=119").await;
+                    let boxes: Vec<String> = trace
+                        .borrow()
+                        .iter()
+                        .filter_map(|ev| match ev {
+                            Event::ErrorBox(t) => Some(t.clone()),
+                            _ => None,
+                        })
+                        .collect();
+                    g2.borrow_mut().push((
+                        enh.fix(BugFix::AnyDisc),
+                        boxes,
+                        e.wam_name.clone(),
+                        place,
+                        e.abort.take(),
+                        e.current_place_id,
+                    ));
+                }
+            },
+            |sys, _| sys.push_input(crate::sys::Input::KeyDown(crate::sys::Key::Enter)),
+        );
+        if !ran {
+            return;
+        }
+        let got = got.borrow();
+        assert_eq!(
+            got[0],
+            (
+                false,
+                vec![
+                    "Fichier introuvable : wam\\atlan4.wam".to_string(),
+                    "Atlantis crashes here (0x0044a453): no view 119".to_string()
+                ],
+                "PALAIS3.WAM".to_string(),
+                Some(180),
+                Some(Abort::Fault),
+                Some(180)
+            )
+        );
+        assert_eq!((got[1].0, got[1].1.len()), (true, 0));
+        assert_eq!(got[1].2, "ATLAN4.WAM");
+        assert_eq!((got[1].4, got[1].5), (None, Some(119)));
     }
 
     /// ChangeCd outside 1..=4 asks for disc 4 (it was ignored).
@@ -1717,6 +2177,185 @@ mod tests {
         let letters: Vec<char> = got.iter().map(|r| r.narrator.as_ref().unwrap().1).collect();
         assert_eq!(letters, ['C', 'D']);
         assert_ne!(got[0].narrator, got[1].narrator);
+    }
+
+    /// Notes the lines played and the game overs shown.
+    type LinesAndOvers = (Vec<String>, Vec<(i32, bool)>);
+    struct LinesAndGameOvers(Rc<RefCell<LinesAndOvers>>);
+
+    impl DialogPresenter for LinesAndGameOvers {
+        fn play_line<'a>(
+            &'a mut self,
+            _e: &'a mut Engine,
+            req: &'a LineRequest,
+        ) -> HookFuture<'a, LineOutcome> {
+            self.0.borrow_mut().0.push(req.line.text.clone());
+            ready(LineOutcome::default())
+        }
+        fn game_over<'a>(
+            &'a mut self,
+            _e: &'a mut Engine,
+            req: &'a GameOverRequest,
+        ) -> HookFuture<'a, ()> {
+            self.0.borrow_mut().1.push((req.n, req.narrator.is_some()));
+            ready(())
+        }
+    }
+
+    /// The lines, the game overs, GAMEOVER and the abort after the timer
+    /// scans, a /tim1 game over and a /tim2 entry true on the same frame.
+    type TimerRun = (Vec<String>, Vec<(i32, bool)>, i32, Option<Abort>);
+
+    fn tim2_after_a_tim1_game_over(fixed: bool) -> Option<TimerRun> {
+        let got = Rc::new(RefCell::new((Vec::new(), Vec::new())));
+        let end = Rc::new(RefCell::new(None));
+        let (g2, end2) = (got.clone(), end.clone());
+        let ran = with_engine(
+            "a_tim1_game_over_still_scans_tim2",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(LinesAndGameOvers(g2)));
+                e.new_game(&mut s, false).await;
+                let mut x = crate::enhancements::Enhancements::original();
+                if fixed {
+                    x.fixes
+                        .set(crate::enhancements::BugFix::GameOverPuzzle, true);
+                }
+                e.set_enhancements(x);
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/tim1(flagtemp1=1)\r\n/set(GameOver=3)\r\n\
+                      [Narrator,off] Dead.\r\n/0\r\n\
+                      /2\r\n/tim2(flagtemp2=1)\r\n[Seth,off] Hello.\r\n\
+                      [Seth,off] Bye.\r\n/0\r\n",
+                );
+                e.vars.set("testtime1", 1);
+                e.vars.set("testtime2", 1);
+                e.vars.set("flagtemp1", 1);
+                e.vars.set("flagtemp2", 1);
+                s.run_con_timers(&mut e, false).await;
+                *end2.borrow_mut() = Some((e.vars.get("gameover"), e.abort));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return None;
+        }
+        let (lines, overs) = got.borrow().clone();
+        let (gameover, abort) = end.borrow().expect("the timers did not return");
+        Some((lines, overs, gameover, abort))
+    }
+
+    /// FUN_0042be3c tests no GAMEOVER between its scans (0x0042be94 ->
+    /// 0x0042bea8): after a /tim1 game over, a /tim2 entry true on the same
+    /// frame plays its first item, then the executor's test (0x00428c05)
+    /// shows the game-over picture again, without a narrator here. With
+    /// BugFix::GameOverPuzzle (GAMEOVER cleared at once) the pass ends.
+    #[test]
+    fn a_tim1_game_over_still_scans_tim2() {
+        let Some(original) = tim2_after_a_tim1_game_over(false) else {
+            return;
+        };
+        assert_eq!(
+            original,
+            (
+                vec!["Hello.".to_string()],
+                vec![(3, true), (3, false)],
+                3,
+                Some(Abort::NewGame)
+            )
+        );
+        let fixed = tim2_after_a_tim1_game_over(true).unwrap();
+        assert_eq!(fixed, (vec![], vec![(3, true)], 0, Some(Abort::NewGame)));
+    }
+
+    /// A /tim2 section whose first item is a /go after a /tim1 game over
+    /// (as CHAPI032 /tim2(time2>700) -> /go418), GAMEOVER left set
+    /// (`--original`): the executor runs FUN_0042831c on the /go
+    /// (0x00428bf1, FUN_00425c04 returns the target's header) and tests
+    /// GAMEOVER at 0x00428c05 before any item of the target, with no
+    /// narrator. No line of /3 and the second picture is GameOver 3's.
+    #[test]
+    fn a_go_first_section_shows_the_game_over_before_its_target() {
+        let got = Rc::new(RefCell::new((Vec::new(), Vec::new())));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_go_first_section_shows_the_game_over_before_its_target",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(LinesAndGameOvers(g2)));
+                e.new_game(&mut s, false).await;
+                e.set_enhancements(crate::enhancements::Enhancements::original());
+                s.script = crate::con_script::ConScript::parse(
+                    b"/1\r\n/tim1(flagtemp1=1)\r\n/set(GameOver=3)\r\n\
+                      [Narrator,off] Dead.\r\n/0\r\n\
+                      /2\r\n/tim2(flagtemp2=1)\r\n/go3\r\n\
+                      /3\r\n/sel(flagtemp3=1)\r\n[Soldat] Well.\r\n\
+                      /set(GameOver=1)\r\n[Narratrice] Gone.\r\n/0\r\n",
+                );
+                e.vars.set("testtime1", 1);
+                e.vars.set("testtime2", 1);
+                e.vars.set("flagtemp1", 1);
+                e.vars.set("flagtemp2", 1);
+                s.run_con_timers(&mut e, false).await;
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let (lines, overs) = got.borrow().clone();
+        assert_eq!((lines, overs), (vec![], vec![(3, true), (3, false)]));
+    }
+
+    /// A line's player that leaves the left button down (the press that
+    /// ended the line) and records when.
+    struct PressAndHold(Rc<std::cell::Cell<Option<u64>>>);
+
+    impl DialogPresenter for PressAndHold {
+        fn play_line<'a>(
+            &'a mut self,
+            e: &'a mut Engine,
+            _req: &'a LineRequest,
+        ) -> HookFuture<'a, LineOutcome> {
+            crate::test_support::button(&e.sys, crate::sys::MouseButton::Left, true);
+            while e.sys.poll_event().is_some() {}
+            self.0.set(Some(e.sys.millis()));
+            ready(LineOutcome::default())
+        }
+    }
+
+    /// The executor's exit (0x00428c92..0x00428da4) waits for no release:
+    /// the section returns at once while the press that ended its last
+    /// line is still held (here 500 ms).
+    #[test]
+    fn a_section_ends_with_the_button_still_held() {
+        let pressed = Rc::new(std::cell::Cell::new(None));
+        let (p2, p3) = (pressed.clone(), pressed.clone());
+        let held_ms = Rc::new(std::cell::Cell::new(None));
+        let h2 = held_ms.clone();
+        let ran = with_engine(
+            "a_section_ends_with_the_button_still_held",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(PressAndHold(p2)));
+                e.new_game(&mut s, false).await;
+                s.script = crate::con_script::ConScript::parse(
+                    b"/2\r\n/tim2(flagtemp2=1)\r\n[Seth,off] Hello.\r\n/0\r\n",
+                );
+                e.vars.set("testtime2", 1);
+                e.vars.set("flagtemp2", 1);
+                s.run_con_timers(&mut e, false).await;
+                h2.set(Some(e.sys.millis() - p3.get().unwrap()));
+            },
+            move |sys, f| {
+                if let Some(t) = pressed.get() {
+                    if f * 16 >= t + 500 && sys.buttons().0 {
+                        crate::test_support::button(sys, crate::sys::MouseButton::Left, false);
+                    }
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        assert!(held_ms.get().unwrap() < 100, "{:?}", held_ms.get());
     }
 
     /// The game overs (GAMEOVER, with a narrator), the puzzles' (id,
@@ -2073,6 +2712,247 @@ mod tests {
         }
     }
 
+    /// AddGuest=0 and SubGuest=0 do nothing (`cmp [var],0 / je` @
+    /// 0x0042b107, 0x0042b177): no record added, a record with id 0 kept.
+    #[test]
+    fn zero_guest_triggers_do_nothing() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "zero_guest_triggers_do_nothing",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                let before = e.guests.count;
+                s.exec_set(&mut e, None, "addguest=0").await;
+                g2.borrow_mut().push(e.guests.count == before);
+                let mut g = e.guests.clone();
+                g.add(0, &e.game.exe.guest_sprite_ids);
+                e.guests = g;
+                let before = e.guests.count;
+                s.exec_set(&mut e, None, "subguest=0").await;
+                g2.borrow_mut().push(e.guests.count == before);
+                s.exec_set(&mut e, None, "delmusik=0").await;
+                g2.borrow_mut().push(e.vars.get("delmusik") == 0);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [true, true, true]);
+        }
+    }
+
+    /// The zone-999 scan after the in-game menu's LOAD (CHAPI031 /391,
+    /// `/Sel(DepartVue=999)`, one [Soldat] talking-head line, under
+    /// `--original`; no shipped WAM has a zone 999) runs with 0x00496124 = 0 but the menu request
+    /// 0x00496138 = 0 (`FUN_0041c838`'s tail @ 0x0041cbff..0x0041cc09): a
+    /// right press during the line toggles the bar request 0x004960c4
+    /// (`FUN_0041a298` @ 0x0041a2f2..0x0041a337), which stays set.
+    #[test]
+    fn zone_999_scan_after_load_toggles_the_bar_request() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let armed = Rc::new(std::cell::Cell::new(None::<u64>));
+        let a2 = armed.clone();
+        let ran = with_engine(
+            "zone_999_scan_after_load_toggles_the_bar_request",
+            move |mut e| async move {
+                let mut s = Scripts::with_dialog(Box::new(crate::dialog::Dialogs::new()));
+                s.chapter_loaded(&mut e, 31, false).await;
+                assert!(e.load_wam("COMPLEXE.WAM").await);
+                // No WAM shipped has a zone 999 (the zones' actions of
+                // every WAM, run through the original's loader): place 16's
+                // exit to 14 made one.
+                e.next_place_id = Some(16);
+                e.do_place_change().await;
+                let i = e.current_place.unwrap();
+                for z in &mut e.wam.places[i].zones {
+                    if z.action == 14 {
+                        z.action = 999;
+                    }
+                }
+                e.pointer.recentre();
+                let mut found = false;
+                'search: for ia in 0..315 {
+                    for ib in -4..=4 {
+                        e.set_view(ia as f32 * 0.02, ib as f32 * 0.1);
+                        if e.pointer_targets() == (999, 0) {
+                            found = true;
+                            break 'search;
+                        }
+                    }
+                }
+                assert!(found, "no view of the zone");
+                // Past the chapter's start section (/10).
+                e.vars.set("initflag", 1);
+                e.bar.request = false;
+                a2.set(Some(0));
+                e.no_click_exit(&mut s, false).await;
+                *g2.borrow_mut() = Some((e.bar.request, e.escape_request));
+            },
+            move |sys, f| {
+                let mut sound = vec![0.0f32; 2 * (22050 * 16 / 1000)];
+                sys.mixer.fill(&mut sound, 22050, 2);
+                match armed.get() {
+                    Some(0) => armed.set(Some(f)),
+                    Some(f0) if f == f0 + 20 => {
+                        crate::test_support::button(sys, crate::sys::MouseButton::Right, true)
+                    }
+                    Some(f0) if f == f0 + 22 => {
+                        crate::test_support::button(sys, crate::sys::MouseButton::Right, false)
+                    }
+                    _ => {}
+                }
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, false)));
+        }
+    }
+
+    /// The hidden-perso list takes at most 0x100 ids (`FUN_00427bd0`,
+    /// dc:19386): a 257th HidePerso deactivates the sprites but is not
+    /// listed.
+    #[test]
+    fn hidden_perso_list_stops_at_256() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "hidden_perso_list_stops_at_256",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                e.hidden_persos = (10_000..10_000 + 0x100).collect();
+                s.exec_set(&mut e, None, "hideperso=600").await;
+                g2.borrow_mut().push(e.hidden_persos.len());
+                g2.borrow_mut()
+                    .push(usize::from(e.hidden_persos.contains(&600)));
+                e.hidden_persos.pop();
+                s.exec_set(&mut e, None, "hideperso=600").await;
+                g2.borrow_mut()
+                    .push(usize::from(e.hidden_persos.contains(&600)));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [0x100, 0, 1]);
+        }
+    }
+
+    /// ChangeCd (`FUN_0041eda8` @ 0x0041f032..0x0041f064), StartMusik of
+    /// another track and StopMusik with the stream open (`FUN_0042a100` @
+    /// 0x0042add3..0x0042ae05, 0x0042af26..0x0042af58) clear the Escape
+    /// latch (0x00496138 = 0, 0x00496124 = 1) and the double-click flag
+    /// 0x00496118 with the bar's flags.
+    #[test]
+    fn stream_close_and_disc_prompt_clear_the_latches() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "stream_close_and_disc_prompt_clear_the_latches",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                for cmd in ["changecd=2", "startmusik=5", "stopmusik=1"] {
+                    if cmd != "changecd=2" {
+                        e.music.handle_set = true;
+                    }
+                    e.escape_request = true;
+                    e.sys.double_click().flag = true;
+                    e.bar.request = true;
+                    s.exec_set(&mut e, None, cmd).await;
+                    g2.borrow_mut().push((
+                        e.escape_request,
+                        e.sys.double_click().flag,
+                        e.bar.request,
+                    ));
+                }
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [(false, false, false); 3]);
+        }
+    }
+
+    /// StartMusik of another track and StopMusik with the stream open
+    /// store 0x00496118 = 0 and pump no message (0x0042add3..0x0042ae05,
+    /// 0x0042af26..0x0042af58): a WM_LBUTTONDBLCLK a line's press edge
+    /// left queued is dispatched by the next pumping poll (the turn's,
+    /// cursor state 5). The disc prompt of ChangeCd polls
+    /// (`FUN_0041eda8`) before its stores: the message is gone.
+    #[test]
+    fn music_commands_keep_a_queued_double_click() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "music_commands_keep_a_queued_double_click",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                for cmd in ["changecd=2", "startmusik=5", "stopmusik=1"] {
+                    if cmd != "changecd=2" {
+                        e.music.handle_set = true;
+                    }
+                    let now = e.sys.millis();
+                    e.sys.double_click().first_press(now, 320, 240);
+                    assert!(e.sys.double_click().queue_press(now, 320, 240));
+                    s.exec_set(&mut e, None, cmd).await;
+                    e.sys.double_click().pump();
+                    e.sys.double_click().dispatch(5, false);
+                    g2.borrow_mut().push(e.sys.double_click().flag);
+                    e.sys.double_click().clear();
+                }
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [false, true, true]);
+        }
+    }
+
+    /// Chapter=N while a change runs (0x00496140, the /sel section the
+    /// change's scan plays): only the chapter bytes and the CON text
+    /// (0x0042a59f..0x0042a5fa): no checkpoint, the variables and CHAPTER
+    /// kept, and the flag stays until the outer scan returns. A change
+    /// after it is whole again.
+    #[test]
+    fn nested_chapter_change_only_reloads_the_text() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "nested_chapter_change_only_reloads_the_text",
+            move |mut e| async move {
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(!s.chapter_change_running);
+                e.vars.set("flagtemp1", 5);
+                let chapter_var = e.vars.get("chapter");
+                s.chapter_change_running = true;
+                trace.borrow_mut().clear();
+                s.change_chapter(&mut e, 2).await;
+                let written = trace
+                    .borrow()
+                    .iter()
+                    .any(|ev| matches!(ev, Event::CheckpointWritten(_)));
+                let mut g = g2.borrow_mut();
+                g.push(s.chapter as i32);
+                g.push(i32::from(e.prev_chapter));
+                g.push(e.vars.get("flagtemp1"));
+                g.push(i32::from(e.vars.get("chapter") == chapter_var));
+                g.push(i32::from(written));
+                g.push(i32::from(s.chapter_change_running));
+                g.push(i32::from(!s.script.sections().is_empty()));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), [2, 1, 5, 1, 0, 1, 1]);
+        }
+    }
+
     /// `chapter=` from a clicked or a timer section: the /sel entry the
     /// nested scan runs counts a play (0x00428493); from an arrival scan,
     /// none. With no /sel entry (chapter 36), the new /INIT commands run a
@@ -2153,6 +3033,9 @@ mod tests {
                 match frame {
                     30 if escape => sys.push_input(Input::KeyDown(Key::Escape)),
                     31 if escape => sys.push_input(Input::KeyUp(Key::Escape)),
+                    // The crab handles a click at the previous pass's
+                    // pointer: the mouse gets to the top band first.
+                    38 => sys.push_input(Input::MouseMove { x: 320, y: 10 }),
                     40 => at(320, 10, true),
                     42 => at(320, 10, false),
                     _ => {}
@@ -2167,7 +3050,15 @@ mod tests {
             ev.contains(&crate::engine::Event::GameOver(20)),
             "no game over"
         );
-        Some(end.get().unwrap() - voice.get().expect("no narrator voice"))
+        let end = end.get().unwrap();
+        // A narration cut at its first poll presents no frame after the
+        // voice starts (the screen ends on the picture, FUN_00426590 @
+        // 0x00426be6): the voice is seen only once the task has ended.
+        let started = ev
+            .iter()
+            .any(|e| matches!(e, crate::engine::Event::Voice(n) if n.contains("ATA0941B")));
+        let voice = voice.get().or(started.then_some(end));
+        Some(end - voice.expect("no narrator voice"))
     }
 
     /// An Escape inside a puzzle latches 0x00496124 = 0 / 0x00496138 = 1

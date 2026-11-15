@@ -91,7 +91,7 @@ Atlantis Native **不含任何游戏数据**，请使用你自己的正版游戏
 - **《Atlantis: The Lost Tales》**：除了两款中文版，还支持英文、法文、德文、荷兰文、瑞典文、西班牙文、意大利文、
   捷克文和巴西葡萄牙文光盘版、Cryo 1.01 补丁、Cryo 的 DVD-ROM（1998）、Perfect Edition、意大利文 *Atlantis Collection* DVD，
   以及 [GOG.com](https://www.gog.com/) 版（英文、法文、德文、西班牙文、意大利文）。
-- **《Atlantis II》**：法文光盘版（1.00 版）、官方 1.01 补丁、北美 DreamCatcher 光盘版（*Beyond Atlantis*，2000）、
+- **《Atlantis II》**：法文光盘版（1.00 版）、官方 1.01 补丁、北美 DreamCatcher 光盘版（*Beyond Atlantis*，2000）、波兰文光盘版（1999）、
   [GOG.com](https://www.gog.com/) 版（英文、法文、德文、西班牙文）和意大利文 *Atlantis Collection* DVD。
 - **《Atlantis III》**：只支持 [GOG.com](https://www.gog.com/) 的法文版（*Atlantis 3 - The New World*），
   指定其安装文件夹（包含 `Game.exe` 和 `Datas` 的文件夹）。其他版本（GOG.com 的其他语言版、零售光盘和 DVD）

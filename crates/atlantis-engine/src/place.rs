@@ -11,6 +11,12 @@ use std::rc::Rc;
 use atlantis_codecs::HnmVideo;
 use atlantis_data::sprite::{composite_spf_frame, decode_spw_pixels, spw_frame_count};
 use atlantis_data::sprite_anim::{animate_place_sprites, enter_place, SPRITE_TICK_MS};
+
+/// The longest gap between two calls of [`Engine::animate_sprites`]
+/// replayed tick by tick: 14 ticks hold at most one step of a row (a step
+/// needs more than 13 ticks since the last), so a replay never steps more
+/// than one call of `FUN_00425304` does.
+const SPRITE_REPLAY_TICKS: u32 = 14;
 use atlantis_data::sprite_list::{npc_click_rects, npc_row_matches};
 use atlantis_data::wam::{CentrePos, Transition};
 
@@ -69,11 +75,14 @@ fn with_ext(name: &str, ext: &str) -> String {
 
 impl Engine {
     /// The mouse moved since the mark: the pointer is the last mouse
-    /// position (WM_MOUSEMOVE, 0x00419c14).
+    /// position (WM_MOUSEMOVE, 0x00419c14). The Windows cursor is the
+    /// system mouse whenever the mouse is not locked, moved or not.
     pub(crate) fn sync_pointer_mouse(&mut self) {
         let m = self.sys.mouse();
         if m != self.pointer_mouse_mark {
             self.pointer.mouse_moved(m);
+        } else if !self.sys.mouse_locked() {
+            self.pointer.cursor_at(m);
         }
         self.pointer_mouse_mark = m;
     }
@@ -87,6 +96,10 @@ impl Engine {
         let Some(next) = self.next_place_id else {
             return;
         };
+        // The move's panorama name is for this entry only (every entry
+        // rebuilds 0x006cd288: FUN_00421b4c), even one that fails.
+        let move_cyclo = self.move_cyclo.take();
+        let pointer_loaded = std::mem::take(&mut self.move_pointer_loaded);
         let Some(index) = self.wam.places.iter().position(|p| p.id == next) else {
             log::warn!("place {next} not in {}", self.wam_name);
             self.next_place_id = None;
@@ -95,31 +108,71 @@ impl Engine {
         self.current_place = Some(index);
         self.current_place_id = Some(next);
         self.next_place_id = None;
+        // FUN_00421b4c rebuilds the path buffer 0x006cd288 from the
+        // record (@ 0x00421bf9), whichever panorama the move loads.
+        self.cyclo_path = Some(self.wam.places[index].cyclo.clone());
         self.vue_override = None; // `Vue` follows the place again
 
         // A move loads the panorama its click named in the WAM it left
         // (FUN_0044a424 @ 0x00423ed4); FUN_00421b4c (0x00424068) only
         // selects the place and rebuilds the name. Every other entry
         // loads the record's.
-        let cyclo = match self.move_cyclo.take() {
+        let cyclo = match move_cyclo {
             Some((id, name)) if id == next => name,
             _ => self.wam.places[index].cyclo.clone(),
         };
-        if self.load_cyclo(&cyclo).await {
+        if self.load_cyclo_with(&cyclo, !pointer_loaded).await {
             self.composite_npc_sprites().await;
         }
-        self.sys.set_mouse_pos(320, 240);
-        self.mark_pointer_mouse(); // the engine's own move is no mouse motion
+        // FUN_00421b4c calls no SetCursorPos: the Windows cursor stays where
+        // the mouse is (the turn left it at (320, 240) after a move). After
+        // a move's film the mouse moved since the load is the WM_MOUSEMOVE
+        // the film's polls pumped: the next sync takes it.
+        if !pointer_loaded {
+            self.mark_pointer_mouse();
+        }
         self.emit(Event::PlaceEntered {
             wam: self.wam_name.clone(),
             place: next,
         });
     }
 
-    /// The current place's view loaded again, as `FUN_004240fc` does after
-    /// a puzzle: its panorama (the pointer left at (0x140, 0x140)) and its
-    /// sprites (frame 0, the NPC click areas rebuilt). The place is not
-    /// entered again: no place event, the mouse is not moved.
+    /// `FUN_00421cfc`, the place lookup of an exit click (@ 0x00423dc5):
+    /// the path buffer 0x006cd288 named from the destination's record in
+    /// the current WAM (@ 0x00421dc4..0x00421e04).
+    pub(crate) fn look_up_place_cyclo(&mut self, dest: u16) {
+        if let Some(p) = self.wam.places.iter().find(|p| p.id == dest) {
+            self.cyclo_path = Some(p.cyclo.clone());
+        }
+    }
+
+    /// The panorama loaded again, as `FUN_004240fc` does after a puzzle
+    /// (`FUN_0044a424` @ 0x004241e2: the panorama, the FOV, the pointer
+    /// left at (0x140, 0x140)). It loads the path buffer 0x006cd288 as it
+    /// stands (`mov eax,0x6cd288` @ 0x004241dd): the current place's, or
+    /// after an exit click that a departure section aborted, the
+    /// destination's, which stays until the next place load. It calls
+    /// neither `FUN_0042431c` nor `FUN_0042488c`: the sprite rows keep their
+    /// frames, frame counts and click areas, and the layer is drawn again
+    /// at those frames. The place is not entered again: no place event,
+    /// the mouse is not moved.
+    pub(crate) async fn reload_view_after_puzzle(&mut self) {
+        let Some(index) = self.current_place else {
+            return;
+        };
+        let record = self.wam.places.get(index).map(|p| p.cyclo.clone());
+        let Some(cyclo) = self.cyclo_path.clone().or(record) else {
+            return;
+        };
+        if self.load_cyclo(&cyclo).await {
+            self.recomposite_sprite_layer();
+        }
+    }
+
+    /// The current place's view loaded as an entry does: its panorama and
+    /// its sprites (frame 0, the NPC click areas rebuilt), with no place
+    /// event (tests).
+    #[cfg(test)]
     pub(crate) async fn reload_current_view(&mut self) {
         let Some(index) = self.current_place else {
             return;
@@ -134,6 +187,12 @@ impl Engine {
 
     /// The panorama `CYCLO\<name>` (`loadCycloHNM`, `FUN_0044a424`).
     async fn load_cyclo(&mut self, name: &str) -> bool {
+        self.load_cyclo_with(name, true).await
+    }
+
+    /// [`Engine::load_cyclo`]; without `pointer` the pointer is left as it
+    /// is (a move set it where the original loads, before the film).
+    async fn load_cyclo_with(&mut self, name: &str, pointer: bool) -> bool {
         let mut path = format!("CYCLO\\{name}");
         // Some WAM entries name a .tga; the archive only has the .hnm.
         if !name.to_ascii_lowercase().ends_with(".hnm") && !self.game.big.contains(&path) {
@@ -161,8 +220,10 @@ impl Engine {
         // FUN_0044a424 sets the warp FOV (0x0044a701) and leaves the pointer
         // at (0x140, 0x140) without SetCursorPos (0x0044a70b / 0x0044a715).
         self.warp.set_hfov(WARP_FOV_DEG);
-        self.pointer.panorama_loaded();
-        self.mark_pointer_mouse();
+        if pointer {
+            self.pointer.panorama_loaded();
+            self.mark_pointer_mouse();
+        }
         true
     }
 
@@ -217,6 +278,7 @@ impl Engine {
         let Some(vue) = self.current_place_id else {
             return;
         };
+        self.sprite_layer_stale = false;
         self.warp_surface.copy_from_slice(&self.cyclo);
         self.hd_surface_changed();
         for e in &self.sprite_list {
@@ -239,10 +301,86 @@ impl Engine {
         }
     }
 
+    /// The rows of view `vue` the layer draws (`recomposite_sprite_layer`),
+    /// in list order, with their frames.
+    fn drawn_sprite_rows(&self, vue: u16) -> Vec<(usize, i32)> {
+        self.sprite_list
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| {
+                e.place_id == vue
+                    && e.active
+                    && !(self.sprites_hide_npcs && e.perso_id >= 0x200)
+                    && self.spw_cache.contains_key(&e.spw_file)
+            })
+            .map(|(i, e)| (i, e.frame.max(0)))
+            .collect()
+    }
+
+    /// A type-2 row's cycle ended on this pass. The original draws each
+    /// row with `FUN_00452d39`, which saves the panorama pixels it covers
+    /// in the row's buffer, and after the present `FUN_004255f0` puts them
+    /// back with `FUN_00453037`, in reverse list order, for the rows whose
+    /// active flag is still set only (dc:17688); the cycle end clears the
+    /// flag (@ 0x004255d7) between the two, so the ended row's last frame
+    /// is never restored and stays in the panorama buffer 0x008b9d00 until
+    /// `FUN_0044a424` loads it again. Run on the base `cyclo` (the next
+    /// [`Engine::load_cyclo`] replaces it): `drawn`, the rows drawn on the
+    /// pass at their frames, then the restores of the rows still active.
+    fn keep_ended_sprite_frames(&mut self, drawn: &[(usize, i32)]) {
+        let n = (PANO_W * self.cyclo_h).min(self.cyclo.len());
+        let mut buf = self.cyclo.clone();
+        let mut a = vec![0u16; n];
+        let mut b = vec![0u16; n];
+        let mut saves = Vec::with_capacity(drawn.len());
+        for &(i, frame) in drawn {
+            let Some(spw) = self.spw_cache.get(&self.sprite_list[i].spw_file) else {
+                continue;
+            };
+            // The pixels a frame covers: the same in two decodes over
+            // different backgrounds.
+            a.fill(0);
+            b.fill(0xffff);
+            decode_spw_pixels(spw, &mut a, PANO_W, self.cyclo_h, frame as usize);
+            decode_spw_pixels(spw, &mut b, PANO_W, self.cyclo_h, frame as usize);
+            let mut saved = Vec::new();
+            for p in 0..n {
+                if a[p] == b[p] {
+                    saved.push((p, buf[p]));
+                    buf[p] = a[p];
+                }
+            }
+            saves.push((i, saved));
+        }
+        for (i, saved) in saves.iter().rev() {
+            if self.sprite_list[*i].active {
+                for &(p, v) in saved {
+                    buf[p] = v;
+                }
+            }
+        }
+        self.cyclo = buf;
+        self.sprite_layer_stale = true;
+    }
+
     /// `FUN_00425304` once per frame: the test "more than 13 ticks" of the
-    /// 200 Hz counter is run for each tick elapsed since the last call (at
-    /// most 2 s, e.g. after a video), as the original, which does not wait
-    /// for the display, steps every 14 or 15 ticks.
+    /// 200 Hz counter (@ 0x0042550e..0x00425546) is run for each tick
+    /// elapsed since the last call when that is at most 14 ticks, as the
+    /// original, which does not wait for the display, steps every 14 or 15
+    /// ticks. Such a replay steps a row at most once, as one call of the
+    /// original. After a longer gap (a move's film, a place load, a menu:
+    /// loops that do not call FUN_00425304) the test runs once, at the
+    /// current tick: the original's first call after the gap steps each
+    /// row once (from frame 0 after a place load, FUN_0042431c), not by the
+    /// gap's length.
+    ///
+    /// The original draws each row at its current frame (`call 0x00452d39`
+    /// @ 0x00425476) before it steps it (last tick written @ 0x0042552c,
+    /// frame + 1, then the cycle end), and the view is rendered right
+    /// after: a stepped frame is first seen on the next pass, and a type-2
+    /// row is still drawn at its last frame on the pass that ends its
+    /// cycle. So the layer is redrawn here with the previous call's steps,
+    /// and this call's steps are drawn by the next one.
     pub(crate) fn animate_sprites(&mut self) {
         let Some(vue) = self.current_place_id else {
             return;
@@ -251,12 +389,16 @@ impl Engine {
             return;
         }
         let now = (self.sys.millis() / u64::from(SPRITE_TICK_MS)) as u32;
-        let mut t = if self.sprite_anim_tick != 0 && now.wrapping_sub(self.sprite_anim_tick) <= 400
+        let mut t = if self.sprite_anim_tick != 0
+            && now.wrapping_sub(self.sprite_anim_tick) <= SPRITE_REPLAY_TICKS
         {
             self.sprite_anim_tick + 1
         } else {
             now
         };
+        if self.sprite_layer_stale {
+            self.recomposite_sprite_layer();
+        }
         let mut changed = false;
         let current = self.sprite_anim_current[usize::from(vue)];
         // FUN_00425304 writes the CON variable WSPRFRAME itself (the frame
@@ -265,6 +407,13 @@ impl Engine {
         // Wsprframe is in 8..33 or 70..96. It starts from the variable, so
         // a script's write stays until the next step changes it.
         let mut wspr = self.vars.get("wsprframe");
+        // The rows drawn on this pass, and the type-2 rows that may end.
+        let drawn = self.drawn_sprite_rows(vue);
+        let one_shots: Vec<usize> = drawn
+            .iter()
+            .map(|&(i, _)| i)
+            .filter(|&i| self.sprite_list[i].kind == 2)
+            .collect();
         while now.wrapping_sub(t) as i32 >= 0 {
             changed |= animate_place_sprites(
                 &mut self.sprite_list,
@@ -278,10 +427,13 @@ impl Engine {
             t = t.wrapping_add(1);
         }
         self.sprite_anim_tick = now;
+        if one_shots.iter().any(|&i| !self.sprite_list[i].active) {
+            self.keep_ended_sprite_frames(&drawn);
+        }
         self.wspr_frame = wspr;
         self.vars.set("wsprframe", wspr);
         if changed {
-            self.recomposite_sprite_layer();
+            self.sprite_layer_stale = true;
         }
     }
 
@@ -322,6 +474,16 @@ impl Engine {
             // FUN_00423ad8 @ 0x00423ec0: FUN_004212cc turns the view to the
             // transition's source angles before the video.
             self.turn_to_transition(t.src_alpha, t.src_beta).await;
+            // Then FUN_0044a424 loads the destination (@ 0x00423ed4, dc:16884)
+            // before the film (FUN_00448c70, dc:16912): the pointer at
+            // (0x140, 0x140) with no SetCursorPos (0x0044a70b / 0x0044a715),
+            // so a mouse motion during the film, which its polls pump, puts
+            // the pointer on the mouse. The port loads the picture at the
+            // place entry ([`Engine::do_place_change`]), which leaves the
+            // pointer alone.
+            self.pointer.panorama_loaded();
+            self.mark_pointer_mouse();
+            self.move_pointer_loaded = true;
             // FUN_004212cc ends by setting the destination angles
             // (0x00421b01..0x00421b31), before the video, so FUN_0043259c's
             // ambient glide uses them.
@@ -339,7 +501,7 @@ impl Engine {
             // 0x00423f8a: a double click during the turn skips the video
             // (and its SPF sprites and ambient glide); the flag is reset
             // either way (0x00424013).
-            let play = !self.turn_double_click.flag;
+            let play = !self.sys.double_click().flag;
             // Without the video the turn's last frame stays on screen, and
             // its own sides with it: no video sides.
             if play {
@@ -358,7 +520,7 @@ impl Engine {
                 // `hd_show_view_over`).
                 self.sys.hd_video.borrow_mut().t = 1.0;
             }
-            self.turn_double_click.flag = false;
+            self.sys.double_click().clear();
             // FUN_00423ad8 resets the input flags after the video block
             // whether the video played or not (a double click):
             // 0x00496118, 0x0049611c, 0x00496120, 0x00496138 = 0,
@@ -398,6 +560,9 @@ impl Engine {
         if !self.warp_loaded {
             return;
         }
+        // The turn starts from the stored angles (the view keys of the
+        // departure's lines included).
+        self.apply_view_keys();
         let mut turn = TransitionTurn::new(
             Warp::exe_pi(),
             self.warp.alpha(),
@@ -420,6 +585,12 @@ impl Engine {
             // phase 1 and then the move's video at its first frame.
             if !first {
                 self.turn_poll();
+                // Each step (and phase 1's stop test after the poll) reads
+                // the stored angles 0x00bcb59c / 0x00bcb598: the previous
+                // frame's, wrapped by FUN_00451915, moved by the poll's
+                // view keys (FUN_004212cc l. 15661, 15749-15772).
+                let (a, b) = self.stored_view();
+                turn.set_angles(a, b);
             }
             first = false;
             let Some(f) = turn.next_frame(!self.escape_request) else {
@@ -436,6 +607,15 @@ impl Engine {
             // polled.
             self.poll_new_sound().await;
             self.ambient_frame();
+            // Then the pointer 0x004960ec / 0x004960f0 = (320, 240) and
+            // SetCursorPos(320, 240) (0x004960cc is 1), on every frame of
+            // both phases before the frame's poll (0x0042156a..0x00421593,
+            // 0x00421954..0x0042197d): Windows sees the turn's and the
+            // film's presses at the centre, wherever the exit was clicked
+            // (Sys::double_click).
+            self.pointer.recentre();
+            self.sys.set_mouse_pos(320, 240);
+            self.mark_pointer_mouse();
             self.animate_sprites();
             self.render_view();
             if self.guests_shown && self.guests.count != 0 {
@@ -452,21 +632,18 @@ impl Engine {
     }
 
     /// The turn's input poll (`FUN_0041a298` after each turn frame).
-    fn turn_poll(&mut self) {
+    pub(crate) fn turn_poll(&mut self) {
         let (mut left, mut right, mut escape) = (None, false, false);
         while let Some(ev) = self.sys.poll_event() {
             match ev {
+                // Windows queues WM_LBUTTONDBLCLK for a second press
+                // (Sys pairs every left press, latched or not); this poll
+                // does not pump it (0x0041a2b5, below).
                 Input::MouseDown {
                     button: MouseButton::Left,
                     x,
                     y,
-                } => {
-                    let now = self.sys.millis();
-                    let mode = self.cursor_state.mode;
-                    let menu = self.escape_request;
-                    self.turn_double_click.press(now, x, y, mode, menu);
-                    left = Some((x, y));
-                }
+                } => left = Some((x, y)),
                 Input::MouseDown {
                     button: MouseButton::Right,
                     ..
@@ -475,22 +652,44 @@ impl Engine {
                 _ => {}
             }
         }
-        // A left press ends the poll before the rest (0x0041a2b5).
+        // A left press ends the poll before the rest (0x0041a2b5), its
+        // message pump included: a double click's second press read here is
+        // dispatched by a later poll without a new press.
         if left.is_some() {
             return;
         }
+        // F5..F8 (0x0041a33c..0x0041a3ba): the turn's next step starts from
+        // the angles they moved.
+        self.poll_view_keys(false);
+        // The message pump: a WM_LBUTTONDBLCLK queued during the departure
+        // scan's lines or by an earlier poll of the turn.
+        let (mode, menu) = (self.cursor_state.mode, self.menu_request());
+        self.sys.double_click().dispatch(mode, menu);
         if right {
             self.bar
-                .right_pressed(self.section_play, self.escape_request);
+                .right_pressed(self.section_play, self.menu_request());
         }
         if escape && self.escape_gate_open() {
-            self.escape_request = true;
+            self.latch_escape();
         }
     }
 
     /// Escape clears 0x00496124 (`FUN_0041a298` @ 0x0041a3e8..0x0041a419)
     /// when no talking head plays (0x00496188, never in these loops) and
     /// bow mode, the bar request and OBJETENMAIN are all 0.
+    /// The Escape of `FUN_0041a298` (0x0041a419..0x0041a423): 0x00496124 =
+    /// 0 and the menu request 0x00496138 = 1.
+    pub(crate) fn latch_escape(&mut self) {
+        self.escape_request = true;
+        self.menu_request_cleared = false;
+    }
+
+    /// The menu request 0x00496138: set by the Escape latch, cleared with
+    /// it, and alone by the executor's exit (0x00428d81).
+    pub(crate) fn menu_request(&self) -> bool {
+        self.escape_request && !self.menu_request_cleared
+    }
+
     pub(crate) fn escape_gate_open(&self) -> bool {
         !self.bow_mode && !self.bar.request && self.vars.get("objetenmain") == 0
     }
@@ -504,6 +703,32 @@ impl Engine {
         places: Option<(u16, u16)>,
         frame_ms: u64,
     ) {
+        self.play_film(video, places, frame_ms, places.is_none())
+            .await;
+    }
+
+    /// A start-up film of WinMain (`FUN_00424254`, which plays it through
+    /// `FUN_0041bc74`): its sound is the NewSound value WinMain stores
+    /// before it (`newsound`, e.g. 0x12 for LOGO15N, 0x13 for PREINTRO;
+    /// `None` leaves NEWSOUND as it is), started by the film loop's first
+    /// poll of `FUN_00432a64` (0x0041bdcb) from the table 0x00496224, not
+    /// by a Cinema='s name.
+    pub(crate) async fn play_startup_film(&mut self, video: &str, newsound: Option<i32>) {
+        if let Some(v) = newsound {
+            self.vars.set("newsound", v);
+        }
+        self.play_film(video, None, CINEMA_FRAME_MS, false).await;
+    }
+
+    /// [`Engine::play_transition_video`]; `cinema_sound`: the Cinema=
+    /// handler's sound (NEWSOUND = 1 and the film's own APC name).
+    async fn play_film(
+        &mut self,
+        video: &str,
+        places: Option<(u16, u16)>,
+        frame_ms: u64,
+        cinema_sound: bool,
+    ) {
         // A cinematic is not a move: no panorama beside it (a move's is
         // set up just before its video).
         if places.is_none() {
@@ -516,8 +741,36 @@ impl Engine {
             video.to_string()
         };
         let Some(data) = self.read(&format!("UBB_VUE\\{name}")).await else {
+            // FUN_00448c70 opens neither <name>.hnm nor <name>.ubb: it sets
+            // 0x0049610c = 1, reads no header and still returns 1
+            // (dc:40504..40515). FUN_00423ad8 then runs FUN_0043259c
+            // unconditionally (@ 0x00423fed) and skips only the player
+            // (@ 0x00423ff2): a move's glide steps are set with the frame
+            // count of the last film opened. A name without a '.' opens
+            // nothing: FUN_00422f2c returns -1 and FUN_00423ad8 skips the
+            // whole block (dc:16898..16901).
+            if let (Some((_, to)), true) = (places, video.contains('.')) {
+                self.ambient_prepare_glide(to, self.last_film_frames);
+            }
+            // The Cinema= handler (`FUN_0042a100`) has stored NEWSOUND = 1
+            // before the open and, FUN_00448c70 returning 1, runs
+            // FUN_0043318c and the poller FUN_00432a64 whatever 0x0049610c
+            // (@ 0x0042a8e1, 0x0042a8e6): a NewSound of another value is
+            // stopped, the film's own APC starts if the disc has it, else
+            // NEWSOUND = 0. Only the player and the close are skipped
+            // (@ 0x0042a8eb..0x0042a8f4); then 0x00496118, 0x0049611c,
+            // 0x00496120, 0x00496138 = 0, 0x00496124 = 1 and 0x004960c4 =
+            // 0 (@ 0x0042a907..0x0042a939).
+            if cinema_sound {
+                self.cinema_new_sound(&name).await;
+                self.input_flags_reset();
+            }
             return;
         };
+        // The 0x40-byte header to 0x00896c40: the frame count at + 0x10.
+        if let Some(b) = data.get(16..20) {
+            self.last_film_frames = i32::from_le_bytes([b[0], b[1], b[2], b[3]]);
+        }
         // The SPF sprites of the move, skipping the hidden persos.
         let mut spf_names = Vec::new();
         if let Some((from, to)) = places {
@@ -558,14 +811,10 @@ impl Engine {
         // (its end, seen by a later poll, clears NEWSOUND), unless
         // BugFix::CinemaSound starts the new one. A move's video
         // (FUN_00423ad8) opens no sound: the transition-named APCs are
-        // NewSound entries that the departure sections play.
-        if places.is_none() {
-            let apc = format!("WAV\\{}", with_ext(&name, "APC"));
-            if self.cinema_sound_fix() && self.music.new_sound_last == 1 {
-                self.music.new_sound_playing = false;
-            }
-            self.vars.set("newsound", 1);
-            self.poll_new_sound_named(Some(apc)).await;
+        // NewSound entries that the departure sections play, and a start-up
+        // film's sound is WinMain's table value (Engine::play_startup_film).
+        if cinema_sound {
+            self.cinema_new_sound(&name).await;
         }
 
         let start = self.sys.millis();
@@ -590,7 +839,7 @@ impl Engine {
         // (0x0041be4a), with the menu request still set.
         if self.escape_request {
             run.s.keep_running = false;
-            run.s.menu_request = true;
+            run.s.menu_request = self.menu_request();
             run.stop_after_frame = true;
         }
         let (w, h) = (hnm.width(), hnm.height());
@@ -680,14 +929,23 @@ impl Engine {
                                 }
                             }
                         }
+                        // The frame after the ending poll (0x0041be2e) or the
+                        // last one: no poll follows it.
+                        let last =
+                            hnm.frame_count() != 0 && hnm.frames_decoded() >= hnm.frame_count();
                         // FUN_0041bc74 decodes the first frame before its
-                        // loop; each pass decodes the next, then runs
-                        // FUN_00432758.
-                        if !first {
+                        // loop; each pass decodes the next, runs
+                        // FUN_00432758 and the NewSound poller FUN_00432a64
+                        // (0x0041bdcb), then presents the frame decoded
+                        // before (FUN_0041b064 @ 0x0041bdec). So both run
+                        // before frames 0 .. N - 2 are shown (a start-up
+                        // film's sound starts with its first picture), and
+                        // not before the frame the loop's exit presents
+                        // (0x0041be4a): the last one or the one after the
+                        // ending poll. A sound that ends during the film
+                        // clears NEWSOUND at such a poll.
+                        if !last && !run.stop_after_frame {
                             self.ambient_video_frame();
-                            // The NewSound poller after the decode
-                            // (0x0041bdcb): a sound that ends during the
-                            // film clears NEWSOUND then.
                             self.poll_new_sound().await;
                         }
                         first = false;
@@ -698,10 +956,6 @@ impl Engine {
                         }
                         // HD: a video's frame is smoothed as a photograph.
                         self.sys.mark_photo();
-                        // The frame after the ending poll (0x0041be2e) or the
-                        // last one: no poll follows it.
-                        let last =
-                            hnm.frame_count() != 0 && hnm.frames_decoded() >= hnm.frame_count();
                         if run.frame_presented(last) {
                             self.sys.frame().await;
                             break;
@@ -710,6 +964,13 @@ impl Engine {
                         let (mut left, mut right, mut escape) = (false, false, false);
                         while let Some(ev) = self.sys.poll_event() {
                             match ev {
+                                // Windows pairs the next press with this
+                                // one (a double click whose first press
+                                // ends PREINTRO.HNM arms the player
+                                // screen's flag); as the second of a pair
+                                // it queues WM_LBUTTONDBLCLK, which this
+                                // poll does not pump (0x0041a2b5): a later
+                                // poll does (Sys::double_click).
                                 Input::MouseDown {
                                     button: MouseButton::Left,
                                     ..
@@ -721,6 +982,14 @@ impl Engine {
                                 Input::KeyDown(crate::sys::Key::Escape) => escape = true,
                                 _ => {}
                             }
+                        }
+                        self.poll_view_keys(left);
+                        // Without a left press edge the poll pumps
+                        // (0x0041a2be): a queued WM_LBUTTONDBLCLK is
+                        // dispatched (window procedure @ 0x00419c79).
+                        if !left {
+                            let (mode, menu) = (self.cursor_state.mode, self.menu_request());
+                            self.sys.double_click().dispatch(mode, menu);
                         }
                         run.poll(left, right, escape);
                     }
@@ -741,15 +1010,21 @@ impl Engine {
         // (FUN_0042a100 @ 0x0042a907..0x0042a954 stops nothing); one cut
         // short fades it out, 2 volume steps every 25 ms from the effects
         // volume (FUN_0041bc74 @ 0x0041be69..0x0041be9e arms 0x00495eb0 =
-        // 2). Then 0x00496124 = 1, 0x00496134 = 0 and the input flags are
-        // cleared (0x0041be55..0x0041bf8d).
+        // 2, with no test of the sample: its end clears NEWSOUND even when
+        // no sound played). Then 0x00496124 = 1, 0x00496134 = 0 and the
+        // input flags are cleared (0x0041be55..0x0041bf8d).
         // The last frame's overlays into its own buffer (0x0041be45).
         if let Some(c) = overlay.take() {
             hnm.frame_mut().copy_from_slice(&c);
         }
         let fade = run.finish(frame_ms == CINEMA_FRAME_MS, &mut self.bar);
         self.escape_request = false;
-        if fade && self.music.new_sound_active() {
+        // With the other input flags, the double-click flag 0x00496118 = 0
+        // (FUN_0041bc74 @ 0x0041bf5b; Cinema= stores it again after the
+        // film, FUN_0042a100 @ 0x0042a907): a store, no pump, so a
+        // WM_LBUTTONDBLCLK the film's last poll left queued stays.
+        self.sys.double_click().clear();
+        if fade {
             self.music.fade_out_new_sound(self.effects_volume());
         }
         let shown = run.presented;
@@ -851,7 +1126,8 @@ impl Engine {
             .prepare_glide(&place, &self.wam.ambient_objects, &cam, a, b, frames);
     }
 
-    /// `FUN_00432758`, on each frame of the video loop after the first.
+    /// `FUN_00432758`, on each pass of the video loop (before frames 0 ..
+    /// N - 2 are shown).
     fn ambient_video_frame(&mut self) {
         if !self.ambient.active() {
             return;
@@ -921,11 +1197,11 @@ impl Engine {
             self.load_cyclo(&cyclo).await;
         }
         // The same double-click test (0x00423f8a) and reset (0x00424013).
-        if t.video.contains('.') && !self.turn_double_click.flag {
+        if t.video.contains('.') && !self.sys.double_click().flag {
             self.play_transition_video(&t.video, Some((cur, cur)), TRANSITION_FRAME_MS)
                 .await;
         }
-        self.turn_double_click.flag = false;
+        self.sys.double_click().clear();
         // Then FUN_00421b4c (no load) and FUN_0042431c (@ 0x00424072):
         // the place's sprites again, from frame 0.
         self.composite_npc_sprites().await;
@@ -969,6 +1245,27 @@ impl Engine {
         self.cinema_captions = None;
     }
 
+    /// The Cinema= handler's sound of film `name` (`FUN_0042a100` @
+    /// 0x0042a7c0..0x0042a8e6): NEWSOUND = 1 and the poller on the film's
+    /// own APC (see [`Engine::play_film`]).
+    async fn cinema_new_sound(&mut self, name: &str) {
+        self.apply_new_sound_fade_end();
+        let apc = format!("WAV\\{}", with_ext(name, "APC"));
+        if self.cinema_sound_fix() && self.music.new_sound_last == 1 {
+            self.music.new_sound_playing = false;
+        }
+        self.vars.set("newsound", 1);
+        self.poll_new_sound_named(Some(apc)).await;
+    }
+
+    /// The end of a NewSound fade-out (`FUN_0042f7a8` @ 0x0042f92f):
+    /// NEWSOUND = 0.
+    fn apply_new_sound_fade_end(&mut self) {
+        if self.music.take_new_sound_fade_end() {
+            self.vars.set("newsound", 0);
+        }
+    }
+
     /// `FUN_00432a64`, the NewSound poller. The loop flag 0x00496194 is 0
     /// in the image and never written, so a sound plays once.
     pub async fn poll_new_sound(&mut self) {
@@ -978,6 +1275,7 @@ impl Engine {
     /// The poller; `cinema` is the cinematic's sound the Cinema= handler
     /// names while 0x00496190 is 1 (in place of the table's entry).
     async fn poll_new_sound_named(&mut self, cinema: Option<String>) {
+        self.apply_new_sound_fade_end();
         let value = self.vars.get("newsound");
         if value == 0 {
             return; // 1: nothing is stopped
@@ -1135,6 +1433,182 @@ mod wsprframe_tests {
 }
 
 #[cfg(test)]
+mod sprite_gap_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// FUN_00425304 runs one "more than 13 ticks" test per call
+    /// (@ 0x0042550e..0x00425546) and is not called by the film loop
+    /// FUN_0041bc74: after a 600 ms gap the slave of the ATLAN5 alley
+    /// (view 126, type 1, step every 14 ticks) moves one frame, not the
+    /// eight or nine of the gap.
+    #[test]
+    fn one_step_after_a_gap() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let got = Rc::new(std::cell::RefCell::new(None));
+        let g2 = got.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("ATLAN5.WAM").await);
+            e.next_place_id = Some(126);
+            e.do_place_change().await;
+            let mut seen = Vec::new();
+            for _ in 0..20 {
+                e.animate_sprites();
+                seen.push(e.vars.get("wsprframe"));
+                e.sys.frame().await;
+            }
+            let before = e.vars.get("wsprframe");
+            e.sys.delay(600).await;
+            e.animate_sprites();
+            *g2.borrow_mut() = Some((seen, before, e.vars.get("wsprframe")));
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        let (seen, before, after) = got.borrow().clone().expect("the task did not end");
+        // Between frames of the loop the replay keeps the 14-tick cadence.
+        assert!(seen.windows(2).all(|w| w[1] - w[0] <= 1), "{seen:?}");
+        assert!(*seen.last().unwrap() >= 3, "{seen:?}");
+        assert_eq!(after, before + 1);
+    }
+}
+
+#[cfg(test)]
+mod sprite_draw_order_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// `FUN_00425304` draws a row at its frame, then steps it: the frame a
+    /// step makes is on the panorama only from the next pass. The slave
+    /// pacing in the ATLAN5 alley (view 126, type 1, 104 frames).
+    #[test]
+    fn place_sprite_step_is_drawn_on_the_next_pass() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let got = Rc::new(std::cell::RefCell::new(None));
+        let g2 = got.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("ATLAN5.WAM").await);
+            e.next_place_id = Some(126);
+            e.do_place_change().await;
+            let frames = |e: &Engine| -> Vec<i32> {
+                e.sprite_list
+                    .iter()
+                    .filter(|r| r.place_id == 126)
+                    .map(|r| r.frame)
+                    .collect()
+            };
+            for _ in 0..400 {
+                let before = frames(&e);
+                let shown = e.warp_surface.clone();
+                e.animate_sprites();
+                if frames(&e) != before {
+                    // The step's pass shows the frames from before it.
+                    let same_pass = e.warp_surface == shown;
+                    e.sys.frame().await;
+                    e.animate_sprites();
+                    let next_pass = e.warp_surface != shown;
+                    *g2.borrow_mut() = Some((same_pass, next_pass));
+                    return;
+                }
+                e.sys.frame().await;
+            }
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        assert_eq!(*got.borrow(), Some((true, true)));
+    }
+}
+
+#[cfg(test)]
+mod one_shot_residue_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// A type-2 row's last frame stays on the panorama after its cycle
+    /// ends (FUN_004255f0 restores only the rows still active, dc:17688)
+    /// until the panorama is loaded again; a type-1 row leaves nothing.
+    /// The ATLAN5 alley's slave row (view 126, 104 frames), as type 2 and
+    /// as type 1.
+    fn residue(kind: i32) -> Option<(usize, usize)> {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return None;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let got = Rc::new(std::cell::Cell::new(None));
+        let g2 = got.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("ATLAN5.WAM").await);
+            e.next_place_id = Some(126);
+            e.do_place_change().await;
+            let pristine = e.cyclo.clone();
+            let row = e
+                .sprite_list
+                .iter()
+                .position(|r| r.place_id == 126 && r.perso_id == 529)
+                .expect("the slave row");
+            e.sprite_list[row].kind = kind;
+            e.sprite_list[row].frame = e.sprite_list[row].frame_count - 2;
+            let diff = |e: &Engine| {
+                e.cyclo
+                    .iter()
+                    .zip(&pristine)
+                    .filter(|(a, b)| a != b)
+                    .count()
+            };
+            for _ in 0..40 {
+                e.animate_sprites();
+                e.sys.frame().await;
+            }
+            let after_end = diff(&e);
+            e.reload_current_view().await;
+            g2.set(Some((after_end, diff(&e))));
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        got.get()
+    }
+
+    #[test]
+    fn one_shot_last_frame_stays_until_the_panorama_reloads() {
+        let Some((kept, reloaded)) = residue(2) else {
+            return;
+        };
+        assert!(kept > 0, "no residue");
+        assert_eq!(reloaded, 0);
+        assert_eq!(residue(1), Some((0, 0)));
+    }
+}
+
+#[cfg(test)]
 mod move_video_skip_tests {
     use super::*;
     use crate::audio::Mixer;
@@ -1175,7 +1649,7 @@ mod move_video_skip_tests {
                     .and_then(|p| p.transitions.iter().find(|t| t.video.contains('.')))
                     .map(|t| t.dst_place)
                     .expect("no move with a video at view 126");
-                e.turn_double_click.flag = skip;
+                e.sys.double_click().flag = skip;
                 e.execute_transition(next).await;
                 let v = e.sys.hd_video.borrow();
                 *o2.borrow_mut() = Some((v.active, v.t));
@@ -1204,6 +1678,311 @@ mod escape_tests {
     use crate::test_support::with_engine;
     use crate::turn::{transition_turn, TransitionTurn};
     use crate::warp::Warp;
+
+    /// The yaw after the turn from (0, 0) to the source (0.3, 0) of place
+    /// 1, F5 held (`f5`) or not, and the number of frames.
+    fn turn_with_f5(test: &str, f5: bool) -> Option<(f32, u64)> {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            test,
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.set_view(0.0, 0.0);
+                if f5 {
+                    e.sys.push_input(Input::KeyDown(Key::F(5)));
+                    while e.sys.poll_event().is_some() {}
+                }
+                let start = e.sys.millis();
+                e.turn_to_transition(0.3, 0.0).await;
+                g2.set(Some((e.warp.alpha(), (e.sys.millis() - start) / 16)));
+            },
+            |_, _| {},
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    /// FUN_004212cc puts the pointer and the Windows cursor at (320, 240)
+    /// on every frame before its poll (0x0042156a..0x00421593): a press
+    /// during the turn is at the centre, so it does not pair with a click
+    /// made off-centre (Windows' 4 x 4 rectangle) and the move's film is
+    /// not skipped.
+    #[test]
+    fn the_turn_recentres_the_cursor_for_the_pairing() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let start = Rc::new(Cell::new(u64::MAX));
+        let s2 = start.clone();
+        let ran = with_engine(
+            "the_turn_recentres_the_cursor_for_the_pairing",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.set_view(0.0, 0.0);
+                // The exit clicked at (100, 100).
+                e.sys.set_mouse_pos(100, 100);
+                e.pointer.pos = (100, 100);
+                e.mark_pointer_mouse();
+                let now = e.sys.millis();
+                e.sys.double_click().first_press(now, 100, 100);
+                e.cursor_state.mode = 5;
+                s2.set(e.sys.frames_presented());
+                e.turn_to_transition(0.3, 0.0).await;
+                g2.set(Some((
+                    e.sys.double_click().flag,
+                    e.sys.mouse(),
+                    e.pointer.pos,
+                )));
+            },
+            move |sys, _| {
+                let k = sys.frames_presented().saturating_sub(start.get());
+                if start.get() != u64::MAX && k == 3 {
+                    crate::test_support::button(sys, MouseButton::Left, true);
+                } else if start.get() != u64::MAX && k == 4 {
+                    crate::test_support::button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            assert_eq!(got.get(), Some((false, (320, 240), (320, 240))));
+        }
+    }
+
+    /// The end-of-move poll (`FUN_0041a298` @ 0x00424093) reads a press
+    /// made during the film's last frame or the place load: Windows pairs
+    /// the next press with it, a click on the exit ahead at the same point
+    /// comes as WM_LBUTTONDBLCLK.
+    #[test]
+    fn the_end_of_move_press_is_paired() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_end_of_move_press_is_paired",
+            move |mut e| async move {
+                e.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Left,
+                    x: 320,
+                    y: 240,
+                });
+                e.move_input_poll = true;
+                e.end_of_move_input();
+                let now = e.sys.millis();
+                g2.set(Some(e.sys.double_click().queue_press(now + 100, 321, 239)));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(got.get(), Some(true));
+        }
+    }
+
+    /// A film ends by storing 0x00496118 = 0 with the other input flags
+    /// (FUN_0041bc74 @ 0x0041bf5b; Cinema= again @ 0x0042a907): a flag set
+    /// before it is gone. A WM_LBUTTONDBLCLK its last poll left queued
+    /// (the press that cut it, 0x0041a2b5) stays for the next pump.
+    fn film_end_flag(cut: bool) -> Option<(bool, bool)> {
+        use crate::test_support::button;
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let start = Rc::new(Cell::new(u64::MAX));
+        let s2 = start.clone();
+        let ran = with_engine(
+            "a_film_end_clears_the_double_click_flag",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.sys.set_mouse_pos(320, 240);
+                let video = e.place().unwrap().transitions[0].video.clone();
+                e.sys.double_click().flag = true;
+                let now = e.sys.millis();
+                e.sys.double_click().first_press(now, 320, 240);
+                e.cursor_state.mode = 0;
+                s2.set(e.sys.frames_presented());
+                e.play_transition_video(&video, None, super::TRANSITION_FRAME_MS)
+                    .await;
+                let after = e.sys.double_click().flag;
+                e.cursor_state.mode = 5;
+                e.sys.frame().await;
+                e.turn_poll();
+                g2.set(Some((after, e.sys.double_click().flag)));
+            },
+            move |sys, _| {
+                let k = sys.frames_presented().saturating_sub(start.get());
+                if cut && start.get() != u64::MAX && k == 3 {
+                    button(sys, MouseButton::Left, true);
+                } else if cut && start.get() != u64::MAX && k == 4 {
+                    button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            got.get()
+        } else {
+            None
+        }
+    }
+
+    #[test]
+    fn a_film_end_clears_the_double_click_flag() {
+        let Some(plain) = film_end_flag(false) else {
+            return;
+        };
+        assert_eq!(plain, (false, false));
+        assert_eq!(film_end_flag(true), Some((false, true)));
+    }
+
+    /// FUN_004212cc's poll after each frame (0x00421670 / 0x00421a5a)
+    /// moves the stored angles by the held view keys, and the next step
+    /// and phase 1's stop test read them: F5 held turns the frames ahead
+    /// and, for 0 -> 0.3, ends phase 1 on the 0.05 test (9 frames, not 11).
+    #[test]
+    fn f5_moves_the_turn_frames() {
+        let Some((still, n_still)) = turn_with_f5("f5_moves_the_turn_frames", false) else {
+            return;
+        };
+        let (turned, n_turned) = turn_with_f5("f5_moves_the_turn_frames", true).unwrap();
+        assert_ne!(turned, still);
+        assert_eq!((n_still, n_turned), (11, 9));
+    }
+
+    /// The press that cuts a move's film and the click that ends the next
+    /// warp loop, within the double-click time at the same point: Windows
+    /// sends the second as WM_LBUTTONDBLCLK whatever loops read them; the
+    /// warp loop's last poll does not pump it (0x0041a2b5), the turn's
+    /// first poll does with the cursor state 5 (0x00419c79), and the
+    /// move's film is skipped (0x00423f8a). With `film` false the warp
+    /// click follows no press: no flag.
+    fn film_press_then_warp_click(film: bool) -> Option<bool> {
+        use crate::test_support::button;
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let phase = Rc::new(Cell::new((0u8, 0u64)));
+        let p2 = phase.clone();
+        let ran = with_engine(
+            "a_warp_click_pairs_with_the_film_press",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                // The turn before a move's film leaves the cursor at the
+                // centre (0x140, 0xf0); the film does not move it.
+                e.sys.set_mouse_pos(320, 240);
+                if film {
+                    let video = e.place().unwrap().transitions[0].video.clone();
+                    p2.set((1, e.sys.frames_presented()));
+                    e.play_transition_video(&video, None, super::TRANSITION_FRAME_MS)
+                        .await;
+                    e.input_flags_reset();
+                }
+                p2.set((2, e.sys.frames_presented()));
+                e.handle_warp(&mut crate::hooks::NoScripts).await;
+                p2.set((0, 0));
+                e.cursor_state.mode = 5;
+                // The turn polls after its first frame (0x00421670): a
+                // poll is a frame's read of the input.
+                e.sys.frame().await;
+                e.turn_poll();
+                *g2.borrow_mut() = Some(e.sys.double_click().flag);
+            },
+            move |sys, _| {
+                let (p, f0) = phase.get();
+                let k = sys.frames_presented().saturating_sub(f0);
+                match (p, k) {
+                    (1, 3) | (2, 4) => button(sys, MouseButton::Left, true),
+                    (1, 4) | (2, 5) => button(sys, MouseButton::Left, false),
+                    _ => {}
+                }
+            },
+        );
+        if !ran {
+            return None;
+        }
+        let flag = got.borrow().expect("no result");
+        Some(flag)
+    }
+
+    #[test]
+    fn a_warp_click_pairs_with_the_film_press() {
+        let Some(paired) = film_press_then_warp_click(true) else {
+            return;
+        };
+        assert!(paired);
+        assert_eq!(film_press_then_warp_click(false), Some(false));
+    }
+
+    /// A second press of a double click read by a poll of the turn: the
+    /// poll returns before its message pump (0x0041a2b5), so the flag
+    /// 0x00496118 is set by the next poll, not this one.
+    #[test]
+    fn the_turn_poll_with_a_press_does_not_pump() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_turn_poll_with_a_press_does_not_pump",
+            move |mut e| async move {
+                e.cursor_state.mode = 5;
+                let now = e.sys.millis();
+                e.sys.double_click().first_press(now, 320, 240);
+                e.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Left,
+                    x: 320,
+                    y: 240,
+                });
+                e.turn_poll();
+                g2.borrow_mut().push(e.sys.double_click().flag);
+                // The next frame's poll.
+                e.sys.frame().await;
+                e.turn_poll();
+                g2.borrow_mut().push(e.sys.double_click().flag);
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), vec![false, true]);
+        }
+    }
+
+    /// The end of a move polls once (`FUN_0041a298` @ 0x00424093): a held
+    /// F5 moves the stored angles there.
+    #[test]
+    fn f5_at_the_end_of_move_poll() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "f5_at_the_end_of_move_poll",
+            move |mut e| async move {
+                e.set_view(1.0, 0.0);
+                e.sys.push_input(Input::KeyDown(Key::F(5)));
+                e.move_input_poll = true;
+                e.end_of_move_input();
+                g2.borrow_mut().push(e.stored_view().0);
+                // A left press in that poll returns before the keys.
+                e.set_view(1.0, 0.0);
+                e.sys.push_input(Input::MouseDown {
+                    button: MouseButton::Left,
+                    x: 0,
+                    y: 0,
+                });
+                e.move_input_poll = true;
+                e.end_of_move_input();
+                g2.borrow_mut().push(e.stored_view().0);
+            },
+            |_, _| {},
+        );
+        if ran {
+            let got = got.borrow();
+            assert_eq!(got[0], (1.0f64 + 0.034906) as f32);
+            assert_eq!(got[1], 1.0);
+        }
+    }
 
     /// The turn frame by frame: with 0x00496124 set all along, the frames
     /// of `transition_turn`; cleared after the first frame, phase 1 ends
@@ -1369,6 +2148,42 @@ mod move_panorama_tests {
         }
     }
 
+    /// After an exit click whose move a departure section aborted, a
+    /// puzzle's reload (`FUN_004240fc` @ 0x004241dd) loads the path buffer
+    /// 0x006cd288 that the click's lookup `FUN_00421cfc` named: the
+    /// destination's panorama, until the next place load.
+    #[test]
+    fn puzzle_reload_after_an_aborted_move_loads_the_destination() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "puzzle_reload_after_an_aborted_move_loads_the_destination",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let here = e.wam.places[e.current_place.unwrap()].cyclo.clone();
+                let dest = e.place().unwrap().transitions[0].dst_place;
+                let there = e.wam.places.iter().find(|p| p.id == dest).unwrap();
+                let there = there.cyclo.clone();
+                assert_ne!(here, there);
+                e.look_up_place_cyclo(dest);
+                e.reload_view_after_puzzle().await;
+                let after_abort = e.cyclo == pano(&e, &there).await;
+                // The next place load names the record's again.
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.reload_view_after_puzzle().await;
+                let after_load = e.cyclo == pano(&e, &here).await;
+                *g2.borrow_mut() = Some((after_abort, after_load));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, true)));
+        }
+    }
+
     /// A departure section that ran Vue= (CHAPI062 /864) takes the move's
     /// tail: FUN_0044a424 @ 0x00423ed4 loads the place the Vue= selected,
     /// so the warp FOV is 75.137 again after the turn's 75.187, and the
@@ -1394,6 +2209,195 @@ mod move_panorama_tests {
             assert!((fov - WARP_FOV_DEG).abs() < 1e-4, "FOV {fov}");
             assert_ne!(fov, TURN_END_FOV_DEG);
             assert_eq!(pos, (0x140, 0x140));
+        }
+    }
+}
+
+#[cfg(test)]
+mod missing_film_glide_tests {
+    use super::*;
+    use crate::audio::Mixer;
+    use crate::sys::{Runner, Sys};
+
+    /// No move between the fountain views of PALAIS2 has a film in the
+    /// archive. FUN_00448c70 then reads no header and returns 1, and
+    /// FUN_00423ad8 still runs FUN_0043259c (@ 0x00423fed): the glide steps
+    /// toward the destination are set with the frame count of the last film
+    /// opened (0x00896c50), here CINEM058's 85.
+    #[test]
+    fn move_without_film_sets_the_glide_steps() {
+        let Ok(dir) = std::env::var("ATLANTIS_DATA") else {
+            eprintln!("ATLANTIS_DATA not set: skipped");
+            return;
+        };
+        let g = atlantis_data::Game::open(std::sync::Arc::new(atlantis_data::StdDir::new(dir)))
+            .unwrap();
+        let sys = Sys::new(Mixer::new());
+        let s2 = sys.clone();
+        let out = Rc::new(std::cell::RefCell::new(None));
+        let o2 = out.clone();
+        let mut r = Runner::new(sys.clone(), async move {
+            let mut e = Engine::new(s2, g, Rc::new(crate::hooks::DirectLoader));
+            assert!(e.load_wam("PALAIS2.WAM").await);
+            e.next_place_id = Some(197);
+            e.do_place_change().await;
+            let t = e
+                .place()
+                .and_then(|p| p.transitions.iter().find(|t| t.dst_place == 194))
+                .cloned()
+                .expect("no move 197 -> 194");
+            assert!(t.video.contains('.'));
+            assert!(
+                e.read(&format!("UBB_VUE\\{}", with_ext(&t.video, "HNM")))
+                    .await
+                    .is_none(),
+                "the move's film is in the archive"
+            );
+            assert!(!e.place().unwrap().ambient_refs.is_empty());
+            e.last_film_frames = 85;
+            e.execute_transition(194).await;
+            *o2.borrow_mut() = Some(e.ambient.step_vol);
+        });
+        let mut t = 0;
+        while r.step(t) {
+            t += 16;
+        }
+        let steps = out.borrow().expect("the move did not end");
+        assert!(steps.iter().any(|&s| s != 0.0), "{steps:?}");
+    }
+}
+
+#[cfg(test)]
+mod game_pointer_tests {
+    use super::*;
+    use crate::hooks::NoScripts;
+    use crate::puzzle::PuzzleHost;
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::{button, with_engine};
+    use crate::ui::menus::MenuInput;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    /// ATLAN1 place 1 entered with the interface, then a puzzle's reload
+    /// (`FUN_004240fc` -> `FUN_0044a424`) with the mouse left at `mouse`.
+    async fn after_puzzle(e: &mut Engine, mouse: (i32, i32)) {
+        e.load_interface().await;
+        e.load_cursor_sprites().await;
+        assert!(e.load_wam("ATLAN1.WAM").await);
+        e.next_place_id = Some(1);
+        e.do_place_change().await;
+        e.sys.set_mouse_pos(mouse.0, mouse.1);
+        e.mark_pointer_mouse();
+        e.reload_view_after_puzzle().await;
+    }
+
+    /// After a puzzle's reload with the mouse still, the loops entered
+    /// from the warp loop read the pointer 0x004960ec / 0x004960f0 at
+    /// (0x140, 0x140) (`FUN_0044a424` @ 0x0044a70b / 0x0044a715, no
+    /// SetCursorPos), not the Windows cursor: the bar's pointer
+    /// (`FUN_0042d558` @ 0x0042d5bf / 0x0042d5c8), the menus' hit point
+    /// (`FUN_004210c0`, dc:15546-15551) and a puzzle's pointer, until the
+    /// mouse moves (WM_MOUSEMOVE 0x00419c10..0x00419c29).
+    #[test]
+    fn the_loops_read_the_game_pointer_after_a_puzzle_reload() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_loops_read_the_game_pointer_after_a_puzzle_reload",
+            move |mut e| async move {
+                after_puzzle(&mut e, (600, 450)).await;
+                let mut drawn = vec![0u16; 640 * 480];
+                e.draw_pointer(&mut drawn);
+                let mut want = vec![0u16; 640 * 480];
+                crate::ui::draw_sprite(&mut want, &e.cursor_sprites[6], 320, 320);
+                let bar = drawn == want;
+                let menu = e.menu_pointer(&MenuInput::default());
+                let puzzle = {
+                    let mut hooks = NoScripts;
+                    let mut host = PuzzleHost::new(&mut e, &mut hooks);
+                    let still = host.read_entry();
+                    host.e.sys.push_input(Input::MouseMove { x: 601, y: 450 });
+                    let moved = host.read_input();
+                    ((still.x, still.y), (moved.x, moved.y))
+                };
+                let menu_moved = e.menu_pointer(&MenuInput::default());
+                *g2.borrow_mut() = Some((bar, menu, puzzle, menu_moved));
+            },
+            |_, _| {},
+        );
+        if !ran {
+            return;
+        }
+        let (bar, menu, puzzle, menu_moved) = got.borrow_mut().take().unwrap();
+        assert!(bar, "the bar's pointer is not drawn at (320, 320)");
+        assert_eq!(menu, (320, 320));
+        assert_eq!(puzzle, ((320, 320), (601, 450)));
+        assert_eq!(menu_moved, (601, 450));
+    }
+
+    /// The subject menu after a puzzle's reload with the mouse still over
+    /// the grid: `FUN_004211f0` hit-tests the pointer (0x00421218 /
+    /// 0x00421236), (0x140, 0x140), left of the grid, so a click made
+    /// without moving picks nothing.
+    #[test]
+    fn the_subject_menu_tests_the_game_pointer() {
+        use crate::dialog::subject_menu::{menu_draws, menu_hit};
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_subject_menu_tests_the_game_pointer",
+            move |mut e| async move {
+                let ids = [1, 2];
+                let (_, gx, gy) = menu_draws(&ids);
+                let over = (0..640)
+                    .flat_map(|x| (0..480).map(move |y| (x, y)))
+                    .find(|&(x, y)| menu_hit(2, gx, gy, x, y) == 0)
+                    .expect("a point over the first subject");
+                assert!(menu_hit(2, gx, gy, 320, 320) < 0);
+                after_puzzle(&mut e, over).await;
+                use crate::scripts::DialogPresenter;
+                let mut d = crate::dialog::Dialogs::new();
+                let chosen = d.subject_menu(&mut e, 600, &[1, 2]).await;
+                *g2.borrow_mut() = Some(chosen);
+            },
+            |sys, f| match f {
+                20 => button(sys, MouseButton::Left, true),
+                21 => button(sys, MouseButton::Left, false),
+                _ => {}
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some(None));
+        }
+    }
+
+    /// A move loads the destination after the turn and before the film
+    /// (`FUN_0044a424` @ 0x00423ed4, dc:16884; the film dc:16912): a mouse
+    /// motion after that load, pumped by the film's or the move's last
+    /// poll, puts the pointer on the mouse; the place entry
+    /// (`FUN_00421b4c`) loads nothing that resets it.
+    #[test]
+    fn a_motion_after_the_moves_load_moves_the_pointer() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_motion_after_the_moves_load_moves_the_pointer",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let dest = e.place().unwrap().transitions[0].dst_place;
+                e.execute_transition(dest).await;
+                let loaded = e.pointer.pos;
+                e.sys.push_input(Input::MouseMove { x: 100, y: 60 });
+                e.do_place_change().await;
+                e.sync_pointer_mouse();
+                *g2.borrow_mut() = Some((loaded, e.pointer.pos));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some(((320, 320), (100, 60))));
         }
     }
 }

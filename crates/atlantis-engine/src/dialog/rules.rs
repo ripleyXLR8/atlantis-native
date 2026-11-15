@@ -11,6 +11,7 @@ use std::collections::HashMap;
 
 use crate::con_script::script::latin1_bytes;
 use crate::con_script::ConLine;
+use crate::warp::{wrap_angles, Warp};
 
 /// One row of `DIALOG\INITDIAL.TXT`: the files of a character's talking
 /// head, per camera 2..5. "none" is stored as an empty name, except for the
@@ -152,7 +153,7 @@ impl LineHeader {
 /// - "camN" at the end of the header: N, used even when that camera's
 ///   INITDIAL UBB is "none";
 /// - an off / off0 / off1 line draws nothing: the camera stays the last
-///   one (0x0077290a);
+///   one (0x0077290a), 0 before the first camera of the launch;
 /// - otherwise draw (clock & 3) + 2 until the camera differs from the last
 ///   one and its UBB is not "none" (0x004287f6), then draw a second time
 ///   against the first draw (0x00428896; a Seth line after the 0x230 check,
@@ -195,11 +196,12 @@ pub fn pick_dial_cam(
         }
         cam
     };
-    let mut cam = if (2..=5).contains(&last_cam) {
-        last_cam
-    } else {
-        2
-    };
+    // The current camera 0x0077290a equals the last one 0x00772908 at the
+    // start of every line (each path of FUN_0042844c ends with both equal,
+    // 0x00428867 / 0x0042891f / 0x00428942 / 0x004289ea) and only that
+    // function writes them: an off line keeps it, 0 (.bss) until the first
+    // camera of the launch.
+    let mut cam = last_cam;
     let drawn = header.explicit_cam == 0 && !header.off;
     if header.explicit_cam != 0 {
         cam = if (2..=5).contains(&header.explicit_cam) {
@@ -301,26 +303,24 @@ pub fn line_fov(warp_loaded: bool, view: &LineView, voice_only: bool, cam: i32) 
     crate::warp::DIALOG_CAM_FOV_DEG.get(i).copied()
 }
 
-/// `FUN_00451915`: beta kept within +-max, else the limit.
-fn clamp_beta(b: f64, max: f64) -> f64 {
-    if b > max {
-        max
-    } else if b < -max {
-        -max
-    } else {
-        b
-    }
+/// A header angle `[Name,X,Y]` in radians, as `FUN_0042844c` converts it:
+/// `fild`, `fmul dword` the float pi 0x00bcb594, `fdiv dword` 180.0f
+/// (0x004bc639 / 0x004bc63d), `fstp dword` to 0x00496090 / 0x00496094
+/// (@ 0x00428587..0x00428596, 0x004285d7..0x004285e6), at the game's
+/// 53-bit x87 precision: the double product and quotient, then a float.
+pub fn header_angle(deg: i32) -> f32 {
+    (f64::from(deg) * f64::from(Warp::exe_pi()) / 180.0) as f32
 }
 
-/// `FUN_00451915`: alpha >= 2 pi -> alpha - 2 pi, < 0 -> + 2 pi.
-fn wrap_alpha(a: f64) -> f64 {
-    let two_pi = 2.0 * std::f64::consts::PI;
-    if a >= two_pi {
-        a - two_pi
-    } else if a < 0.0 {
-        a + two_pi
-    } else {
-        a
+/// `FUN_00451915(alpha, beta)` on float arguments: the warp's own rule
+/// (`warp::wrap_angles`, one float 2 pi 0x00bcab54), as doubles of the
+/// floats it stores.
+fn wrap_view(alpha: f32, beta: f32, beta_max: f64) -> Angles {
+    let (mut a, mut b) = (alpha, beta);
+    wrap_angles(&mut a, &mut b, Warp::exe_two_pi(), beta_max);
+    Angles {
+        alpha: f64::from(a),
+        beta: f64::from(b),
     }
 }
 
@@ -348,10 +348,21 @@ pub fn line_view(
     if seth_path {
         // 0x004289ef..0x00428a75: entry angles := kept; FOV of the camera
         // (0x004289ff..0x00428a14); the grid at (alpha + pi, 0).
+        // The argument in float (0x00428a19..0x00428a75): when 2 pi <=
+        // alpha - pi (fcompp / jbe @ 0x00428a31..0x00428a36) alpha + pi -
+        // 2 pi, else alpha + pi, from the stored float alpha and the float
+        // pi 0x00bcb594, rounded to float by `fstp dword [esp]`; then
+        // FUN_00451915's float wrap.
         l.entry_update = true;
         l.cam_fov = true;
-        l.view.alpha = wrap_alpha(kept.alpha + std::f64::consts::PI);
-        l.view.beta = 0.0;
+        let a = f64::from(kept.alpha as f32);
+        let pi = f64::from(Warp::exe_pi());
+        let arg = if pi * 2.0 <= a - pi {
+            ((a + pi) - pi * 2.0) as f32
+        } else {
+            (a + pi) as f32
+        };
+        l.view = wrap_view(arg, 0.0, beta_max);
     } else if clic_perso >= 0x200 {
         // 0x00428a9d..0x00428ae7 (off lines too): FOV 75.137 then the
         // camera's (0x00428ab6..0x00428ada); the grid at (alpha, 0). Below
@@ -361,9 +372,9 @@ pub fn line_view(
         l.view.beta = 0.0;
     }
     if let Some((x, y)) = angle {
-        // 0x00428afc..0x00428b0e: FUN_00451915(X, Y) writes the globals.
-        l.view.alpha = wrap_alpha(x);
-        l.view.beta = clamp_beta(y, beta_max);
+        // 0x00428afc..0x00428b0e: FUN_00451915(X, Y) on the floats
+        // 0x00496090 / 0x00496094 ([`header_angle`]) writes the globals.
+        l.view = wrap_view(x as f32, y as f32, beta_max);
         l.kept = l.view;
     }
     l
@@ -372,6 +383,54 @@ pub fn line_view(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The header angles and the Seth turn as the original computes them
+    /// in float, from Unicorn runs of FUN_0042844c's instructions
+    /// (0x00428587..0x00428596, 0x004285d7..0x004285e6; 0x00428a19..
+    /// 0x00428a4c with FUN_00451915's wrap 0x00451981..0x0045199a):
+    /// round-5 harness dialogs_header_angle_emu.py / dialogs_seth_alpha_emu.py.
+    #[test]
+    fn angles_in_the_originals_float() {
+        assert_eq!(Warp::exe_pi().to_bits(), 0x40490fdb);
+        for (deg, bits) in [
+            (325, 0x40b583a6u32),
+            (80, 0x3fb2b8c3),
+            (262, 0x40925413),
+            (5, 0x3db2b8c3),
+            (17, 0x3e97e9d9),
+            (90, 0x3fc90fdb),
+        ] {
+            assert_eq!(header_angle(deg).to_bits(), bits, "{deg}");
+        }
+        let max = rad(50.0) * 0.9;
+        let v = line_view(
+            Angles {
+                alpha: rad(30.0),
+                beta: 0.0,
+            },
+            false,
+            520,
+            Some((f64::from(header_angle(325)), f64::from(header_angle(5)))),
+            max,
+        );
+        assert_eq!((v.kept.alpha as f32).to_bits(), 0x40b583a6);
+        assert_eq!((v.kept.beta as f32).to_bits(), 0x3db2b8c3);
+        for (deg, bits) in [
+            (0, 0x40490fdbu32),
+            (30, 0x406a9280),
+            (90, 0x4096cbe4),
+            (200, 0x3eb2b8c0),
+            (325, 0x4021f772),
+        ] {
+            let kept = Angles {
+                alpha: f64::from(header_angle(deg)),
+                beta: 0.0,
+            };
+            let v = line_view(kept, true, 514, None, max);
+            assert_eq!((v.view.alpha as f32).to_bits(), bits, "Seth at {deg}");
+            assert_eq!(v.kept, kept);
+        }
+    }
 
     fn rad(d: f64) -> f64 {
         d.to_radians()
@@ -570,6 +629,30 @@ mod tests {
         assert_eq!(
             pick_dial_cam(&t, 560, &header(0, false, true), 4, false, &mut clock),
             4
+        );
+        // Before the first camera of the launch (0x00772908 in .bss).
+        assert_eq!(
+            pick_dial_cam(&t, 524, &header(0, false, true), 0, true, &mut clock),
+            0
+        );
+    }
+
+    /// The first draw after an off line at launch: the original compares
+    /// with 0x00772908 = 0 (0x004287fb), so every usable camera can come,
+    /// camera 2 included.
+    #[test]
+    fn first_draw_after_an_off_line_at_launch() {
+        let t = table(524, ["pecan2c2", "pecan2c3", "pecan2c4", "pecan2c5"]);
+        let mut clock = 3;
+        let last = pick_dial_cam(&t, 524, &header(0, false, true), 0, true, &mut clock);
+        assert_eq!(last, 0);
+        // Clock 0: the first draw keeps camera 2 (it differs from 0), the
+        // second (0x00428896) moves off it to 3. Against a last camera of
+        // 2, the first draw would already move to 3 and the second to 4.
+        let mut clock = 0;
+        assert_eq!(
+            pick_dial_cam(&t, 524, &header(0, false, false), last, true, &mut clock),
+            3
         );
     }
 

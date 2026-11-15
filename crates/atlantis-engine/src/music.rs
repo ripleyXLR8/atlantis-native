@@ -451,10 +451,19 @@ impl MusicRing {
 /// The ring as a mixer source: each 5 ms period of the 200 Hz timer plays
 /// its frames, then the timer's release and refill run, whatever the size
 /// of the mixer's reads.
+///
+/// While the game's loops are held ([`crate::audio::Mixer::set_loops_held`],
+/// the original's input poll blocked while its window is not the active
+/// one) only the release runs: the refill `FUN_0043318c` is called by the
+/// frame loops (`FUN_00432178` and the menus', puzzles' and videos' loops),
+/// the release `FUN_00433310` by the 200 Hz timer, so the driver goes on
+/// looping the ring's blocks as they stand. The same while a sequence that
+/// makes no refill call plays ([`crate::audio::Mixer::set_refill_held`]).
 pub struct MusicRingSource {
     ring: MusicRing,
     t: u32,
     left: usize,
+    held: Vec<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl MusicRingSource {
@@ -463,7 +472,20 @@ impl MusicRingSource {
             ring,
             t: 0,
             left: 0,
+            held: Vec::new(),
         }
+    }
+
+    /// Its refills skipped while `held` is set (each flag given).
+    pub fn held_by(mut self, held: Arc<std::sync::atomic::AtomicBool>) -> Self {
+        self.held.push(held);
+        self
+    }
+
+    fn loops_held(&self) -> bool {
+        self.held
+            .iter()
+            .any(|h| h.load(std::sync::atomic::Ordering::Relaxed))
     }
 }
 
@@ -489,7 +511,11 @@ impl Source for MusicRingSource {
             done += k;
             self.left -= k;
             if self.left == 0 {
-                self.ring.timer();
+                if self.loops_held() {
+                    self.ring.release();
+                } else {
+                    self.ring.timer();
+                }
             }
         }
         frames
@@ -503,6 +529,9 @@ struct SoundTimer {
     last_ms: Option<u64>,
     music_voice: Option<VoiceId>,
     new_sound_voice: Option<VoiceId>,
+    /// The NewSound fade-out ended; its NEWSOUND = 0, 0x006cd87c = 0 and
+    /// 0x00772912 = 0 are applied by [`Music::take_new_sound_fade_end`].
+    new_sound_fade_ended: bool,
 }
 
 impl SoundTimer {
@@ -535,10 +564,13 @@ impl SoundTimer {
             }
         }
         if std::mem::take(&mut self.fade.sfx_stop) {
-            // NewSound is cleared by its poller.
+            // AIL_stop_sample, a stop without a voice included; the
+            // variables the original clears here (@ 0x0042f8fa..0x0042f961)
+            // are the engine's: see Music::take_new_sound_fade_end.
             if let Some(v) = self.new_sound_voice {
                 self.mixer.stop(v);
             }
+            self.new_sound_fade_ended = true;
         }
     }
 }
@@ -574,6 +606,7 @@ impl Music {
             last_ms: None,
             music_voice: None,
             new_sound_voice: None,
+            new_sound_fade_ended: false,
         }));
         let t = timer.clone();
         sys.add_timer(Box::new(move |now| t.borrow_mut().run(now)));
@@ -656,6 +689,7 @@ impl Music {
         t.fade.sfx_mode = 0;
         t.fade.sfx_changed = false;
         t.fade.sfx_stop = false;
+        t.new_sound_fade_ended = false;
         if let Some(v) = t.new_sound_voice.take() {
             t.mixer.stop(v);
         }
@@ -678,6 +712,21 @@ impl Music {
         }
     }
 
+    /// The end of the NewSound fade-out (`FUN_0042f7a8` @
+    /// 0x0042f8fe..0x0042f95c) as the engine sees it: true once after the
+    /// timer ended the fade, with 0x006cd87c (`new_sound_last`) and
+    /// 0x00772912 (`new_sound_playing`) cleared; the caller sets NEWSOUND
+    /// to 0. The timer runs between frames, the engine applies the end at
+    /// its next NewSound poll.
+    pub fn take_new_sound_fade_end(&mut self) -> bool {
+        let ended = std::mem::take(&mut self.timer.borrow_mut().new_sound_fade_ended);
+        if ended {
+            self.new_sound_last = 0;
+            self.new_sound_playing = false;
+        }
+        ended
+    }
+
     pub fn stop_new_sound(&self) {
         let mut t = self.timer.borrow_mut();
         if let Some(v) = t.new_sound_voice.take() {
@@ -687,10 +736,12 @@ impl Music {
 
     /// The NewSound sample fades out: 0x006ce128 = the effects volume, 2
     /// steps every 25 ms (`FUN_0041bc74` @ 0x0041be69..0x0041be9e arms
-    /// 0x00495eb0 = 2).
+    /// 0x00495eb0 = 2, whether a sound plays or not). From the byte
+    /// itself: at 0 the fade ends on the next tick (`FUN_0042f7a8` tests
+    /// 0x006ce128 < 1 on every tick).
     pub fn fade_out_new_sound(&self, effects_volume: u8) {
         self.with_fade(|f| {
-            f.sfx_vol0 = i32::from(effects_volume).max(1);
+            f.sfx_vol0 = i32::from(effects_volume);
             f.sfx_vol = f.sfx_vol0;
             f.sfx_last = f.ticks;
             f.sfx_mode = 2;
@@ -764,8 +815,12 @@ impl Engine {
         // options menu applies from the next track).
         let voice = if self.music_through_ring() {
             let mut ring = MusicRing::wine(Arc::new(data.clone()));
-            ring.start()
-                .then(|| mixer.play_source(Box::new(MusicRingSource::new(ring)), 0, 0))
+            ring.start().then(|| {
+                let source = MusicRingSource::new(ring)
+                    .held_by(mixer.loops_held_flag())
+                    .held_by(mixer.refill_held_flag());
+                mixer.play_source(Box::new(source), 0, 0)
+            })
         } else {
             None
         };
@@ -838,10 +893,11 @@ impl Engine {
             }
             return;
         }
-        // Closing the open stream for another track resets the input flags,
-        // the bar request among them (0x0042add3..0x0042ae05).
+        // Closing the open stream for another track resets the input flags
+        // (0x0042add3..0x0042ae05): the double click, the Escape latch and
+        // the bar request among them.
         if self.music.handle_set {
-            self.bar.flags_reset();
+            self.input_flags_reset();
         }
         self.music_switch_track(track).await;
     }
@@ -857,11 +913,12 @@ impl Engine {
         }
         // StopMusik closes and clears 0x006ce0c0 and 0x00772915 only when
         // the handle is set (@ 0x0042aea9, 0x0042af0e, 0x0042af18), then
-        // resets the input flags (0x0042af26..0x0042af58).
+        // resets the input flags (0x0042af26..0x0042af58): the double
+        // click, the Escape latch and the bar request among them.
         if self.music.handle_set {
             self.music.handle_set = false;
             self.music.open_track = 0;
-            self.bar.flags_reset();
+            self.input_flags_reset();
         }
         self.music.track_id = 0;
     }
@@ -898,18 +955,37 @@ impl Engine {
         // LOADMUSIK fix; music_load_min_volume is 0 in every other build.
         // The executor's first-value test (0x00429c52) is also LoadMusik's
         // own (0x0041e862..0x0041e891).
-        let copies = if load && self.music.fade().cur < build.music_load_min_volume {
-            Vec::new()
+        let first_listed = list.first().is_some_and(|&i| i < 0x20);
+        let (copies, tail) = if load && self.music.fade().cur < build.music_load_min_volume {
+            (Vec::new(), false)
         } else if load && build.music_load_all_or_nothing && !fixes {
-            con_music_load_all_or_nothing(&list, current, &mut on_disk)
+            // FUN_0041e830 returns before its tail when its first track is
+            // there or open (0x0041e891): only a copy reaches it.
+            let c = con_music_load_all_or_nothing(&list, current, &mut on_disk);
+            let tail = !c.is_empty();
+            (c, tail)
         } else {
-            con_music_apply(load, &list, current, &mut on_disk, rule)
+            // The first-value rule (0x00429b12) skips the call.
+            let skipped = rule && list.first().is_some_and(|&i| i32::from(i) + 1 == current);
+            let c = con_music_apply(load, &list, current, &mut on_disk, rule);
+            (c, load && first_listed && !skipped)
         };
         for idx in copies {
             self.music_copy_through_screen_buffer(idx).await;
         }
         self.music.on_disk = on_disk;
         self.save_music_on_disk(on_disk);
+        // LoadMusik's tail (FUN_0041f1d0 @ 0x0041f347..0x0041f365), run
+        // whenever its first index is below 0x20 (SPRMENU.SPR loads with
+        // the shipped data), copy or not: 0x00496124 = 1, the click flag
+        // 0x0049611c = 0, 0x00496138 = 0, 0x00495ea4 = 0x50. So an Escape
+        // latch (a puzzle's Escape, the in-game menu's LOAD / QUIT before a
+        // zone-999 scan) is cleared, as Cinema= clears it. The 1997 builds
+        // have the same tail (atlantis-cd-en-688128 and -fr-688640 @
+        // 0x0041e998 on their own addresses).
+        if tail {
+            self.escape_request = false;
+        }
     }
 
     /// The tracks on disk written to the settings file when they changed;
@@ -1241,6 +1317,47 @@ mod on_disk_tests {
 }
 
 #[cfg(test)]
+mod load_musik_tail_tests {
+    use super::*;
+    use crate::persist::MemStore;
+    use crate::test_support::with_engine;
+
+    /// LoadMusik's tail clears the Escape latch (FUN_0041f1d0 @
+    /// 0x0041f347..0x0041f35b) whether or not a track is copied; a first
+    /// index of 0x20 or more (and DelMusik) leave it.
+    #[test]
+    fn load_musik_clears_the_escape_latch() {
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        with_engine(
+            "load_musik_clears_the_escape_latch",
+            move |mut e| async move {
+                e.saves = Rc::new(MemStore::new());
+                let mut out = Vec::new();
+                for (load, cmd) in [
+                    (true, &b"/set(loadmusik=3,5)\r\n"[..]),
+                    // Copied already: nothing copied, the tail runs.
+                    (true, &b"/set(loadmusik=3,5)\r\n"[..]),
+                    (true, &b"/set(loadmusik=40,5)\r\n"[..]),
+                    // DelMusik on the same list.
+                    (false, &b"/set(loadmusik=3,5)\r\n"[..]),
+                ] {
+                    e.escape_request = true;
+                    e.music_list_command(load, cmd, 15).await;
+                    out.push(e.escape_request);
+                }
+                *g2.borrow_mut() = out;
+            },
+            |_, _| {},
+        );
+        let got = got.borrow();
+        if !got.is_empty() {
+            assert_eq!(*got, [false, false, true, true]);
+        }
+    }
+}
+
+#[cfg(test)]
 mod fr688640_tests {
     use super::*;
     use crate::enhancements::{BugFix, Enhancements};
@@ -1421,6 +1538,113 @@ mod original_sound_tests {
             sys.mixer.voice_volume(m).map(|x| x.0),
             Some(mixer_volume(1))
         );
+    }
+
+    /// The NewSound fade-out starts from the effects byte itself
+    /// (`FUN_0041bc74` @ 0x0041be8a, `FUN_0042f7a8` tests 0x006ce128 < 1 on
+    /// every tick): at 0 it ends on the first tick, no sound playing
+    /// included, and its end clears 0x006cd87c and 0x00772912
+    /// (@ 0x0042f916, 0x0042f939).
+    #[test]
+    fn new_sound_fade_from_zero_ends_on_the_first_tick() {
+        let sys = Sys::new(Mixer::new());
+        let mut music = Music::new(&sys);
+        music.new_sound_last = 5;
+        music.new_sound_playing = true;
+        music.fade_out_new_sound(0);
+        {
+            let mut t = music.timer.borrow_mut();
+            t.last_ms = Some(0);
+            t.run(5);
+        }
+        assert!(music.take_new_sound_fade_end());
+        assert_eq!((music.new_sound_last, music.new_sound_playing), (0, false));
+        assert!(!music.take_new_sound_fade_end());
+        // A NewSound start clears an end not yet applied (dc:26256).
+        music.fade_out_new_sound(0);
+        {
+            let mut t = music.timer.borrow_mut();
+            t.run(10);
+        }
+        music.start_new_sound(pcm(1), 0x6e);
+        assert!(!music.take_new_sound_fade_end());
+    }
+
+    /// A cinematic without a sound (CINEM068) cut short by a click still
+    /// arms the NewSound fade (`FUN_0041bc74` @ 0x0041be69..0x0041bea4 does
+    /// not test the sample); at an effects volume of 0 its end, on the next
+    /// timer tick, sets NEWSOUND to 0 (@ 0x0042f92f), so a NEWSOUND the
+    /// next line sets before the following poll is dropped.
+    #[test]
+    fn a_cut_short_cinematic_without_sound_still_fades() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_cut_short_cinematic_without_sound_still_fades",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(!e.game.big.contains("WAV\\CINEM068.APC"));
+                e.ambient.effects_volume = 0;
+                let trace = Rc::new(RefCell::new(Vec::new()));
+                e.trace = Some(trace.clone());
+                e.play_cinema(68).await;
+                let armed = e.music.fade().sfx_mode == 2;
+                e.vars.set("newsound", 5);
+                e.sys.frame().await;
+                e.poll_new_sound().await;
+                let started = trace
+                    .borrow()
+                    .iter()
+                    .any(|ev| matches!(ev, Event::NewSound(5, _)));
+                *g2.borrow_mut() = Some((armed, e.vars.get("newsound"), started));
+            },
+            |sys, f| {
+                if f == 3 {
+                    crate::test_support::button(sys, crate::sys::MouseButton::Left, true);
+                } else if f == 5 {
+                    crate::test_support::button(sys, crate::sys::MouseButton::Left, false);
+                }
+            },
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, 0, false)));
+        }
+    }
+
+    /// Cinema=N whose film the archive lacks: the handler still stores
+    /// NEWSOUND = 1 and runs the poller (`FUN_0042a100` @ 0x0042a8e1,
+    /// 0x0042a8e6), so a NewSound of another value is stopped and, with no
+    /// CINEMnnn.APC either, NEWSOUND is 0; then the input flags are cleared
+    /// (@ 0x0042a907..0x0042a939): the bar request too.
+    #[test]
+    fn a_missing_cinematic_still_runs_its_sound_and_clears_the_flags() {
+        let got = Rc::new(RefCell::new(None));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "a_missing_cinematic_still_runs_its_sound_and_clears_the_flags",
+            move |mut e| async move {
+                let mut s = Scripts::new();
+                e.new_game(&mut s, false).await;
+                assert!(!e.game.big.contains("UBB_VUE\\CINEM999.HNM"));
+                assert!(!e.game.big.contains("WAV\\CINEM999.APC"));
+                e.vars.set("newsound", 0x12); // logo15n.apc
+                e.poll_new_sound().await;
+                let started = e.music.new_sound_playing;
+                e.bar.request = true;
+                e.play_cinema(999).await;
+                *g2.borrow_mut() = Some((
+                    started,
+                    e.music.new_sound_playing,
+                    e.vars.get("newsound"),
+                    e.bar.request,
+                ));
+            },
+            |_, _| {},
+        );
+        if ran {
+            assert_eq!(*got.borrow(), Some((true, false, 0, false)));
+        }
     }
 
     /// Voice files play at the voice sample's 22050 Hz whatever their
