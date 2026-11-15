@@ -71,6 +71,9 @@ thread_local! {
     /// The test plays the Italian *Atlantis Collection*
     /// (`ATLANTIS2_IT_COLLECTION`).
     static ON_IT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the Polish CD (`ATLANTIS2_DATA_PL`,
+    /// `ATLANTIS2_DISCS_PL`).
+    static ON_PL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 fn game() -> Option<A2Files> {
@@ -89,6 +92,13 @@ fn game() -> Option<A2Files> {
     if ON_IT.with(|i| i.get()) {
         let dir = std::env::var_os("ATLANTIS2_IT_COLLECTION")?;
         let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[]).expect("the collection");
+        return Some(files);
+    }
+    if ON_PL.with(|p| p.get()) {
+        let dir = std::env::var_os("ATLANTIS2_DATA_PL")?;
+        let discs = std::env::var_os("ATLANTIS2_DISCS_PL")?;
+        let (files, _) =
+            A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("the Polish CD");
         return Some(files);
     }
     let (Some(dir), Some(discs)) = (
@@ -500,6 +510,8 @@ impl Run {
                 "us-"
             } else if ON_IT.with(|i| i.get()) {
                 "it-"
+            } else if ON_PL.with(|p| p.get()) {
+                "pl-"
             } else {
                 ""
             };
@@ -6116,8 +6128,26 @@ fn the_whole_game_with_the_mouse_on_the_italian_collection() {
     whole_game("a2-flow-whole-game-it");
 }
 
+/// The whole game on the Polish CD (`ATLANTIS2_DATA_PL`,
+/// `ATLANTIS2_DISCS_PL`): the same play, the same chapters and lines. With
+/// `ATLANTIS2_PNG_DIR` its pictures are written there (`pl-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_polish_cd() {
+    if std::env::var_os("ATLANTIS2_DATA_PL").is_none()
+        || std::env::var_os("ATLANTIS2_DISCS_PL").is_none()
+    {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA_PL / ATLANTIS2_DISCS_PL not set");
+        return;
+    }
+    ON_PL.with(|p| p.set(true));
+    whole_game("a2-flow-whole-game-pl");
+}
+
 fn whole_game(scratch_name: &str) {
-    let gog = ON_GOG.with(|g| g.get()) || ON_US.with(|u| u.get()) || ON_IT.with(|i| i.get());
+    let gog = ON_GOG.with(|g| g.get())
+        || ON_US.with(|u| u.get())
+        || ON_IT.with(|i| i.get())
+        || ON_PL.with(|p| p.get());
     let started = std::time::Instant::now();
     let dir = scratch(scratch_name);
     let mut r = Run::new(&dir);

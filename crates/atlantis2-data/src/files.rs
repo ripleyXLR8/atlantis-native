@@ -372,6 +372,13 @@ impl A2Files {
             .and_then(|d| language_of_menu_txt(&d))
     }
 
+    /// The code page the texts of `loc\` are read in: the language's
+    /// ([`crate::edition::text_code_page`]): Windows-1250 for the Polish
+    /// CD, Windows-1252 otherwise.
+    pub fn text_code_page(&self) -> atlantis_data::TextCodePage {
+        crate::edition::text_code_page(self.language())
+    }
+
     /// The edition's name: the build's and the language
     /// ([`edition_label`]).
     pub fn label(&self) -> String {

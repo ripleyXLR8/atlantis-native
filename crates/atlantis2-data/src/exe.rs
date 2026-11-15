@@ -5,7 +5,7 @@
 //! are listed: another build is reported with its identifiers, so that it
 //! can be added once compared.
 //!
-//! Seven builds are known:
+//! Eight builds are known:
 //!
 //! - the French CD's `atlantis2.exe` (1.00, version string 3.15), the
 //!   reference every address in the comments belongs to;
@@ -37,7 +37,15 @@
 //!   lacks the one that takes a fixed drive for the CD, so the original
 //!   wants some CD drive in the machine (the port looks for no drive). Its
 //!   folder also holds an `atlantis2.exe`, here an AutoRun Architect
-//!   launcher that starts `Game.exe` ([`LAUNCHER_SIZES`]).
+//!   launcher that starts `Game.exe` ([`LAUNCHER_SIZES`]);
+//! - the Polish CD's `atlantis2.exe` (4 CDs, 1999, built 1999-10-26, three
+//!   weeks before 1.01): 1.01's code and link layout under the French CD's
+//!   version string 3.15. Only three functions differ from 1.01, none in
+//!   behaviour (the subtitle line breaker and the text output call the C
+//!   runtime's `strcpy` / `_mbslen` where 1.01 inlines them), so every
+//!   [`Release`] behaviour is 1.01's and none of GOG's patches is in it
+//!   (atlantis2-re `binaries/atlantis2-cd-pl-2183168.md`). Its texts are
+//!   Windows-1250 ([`crate::edition::Language::text_code_page`]).
 //!
 //! 1.01 moved most of the code and data (the linker order changed), so
 //! what the port reads from the executable is read at each build's own
@@ -117,7 +125,7 @@ const PLACE_SOUNDS_101: PlaceSoundTable = PlaceSoundTable {
 };
 
 /// The builds this port knows.
-pub const KNOWN_BUILDS: [Build; 7] = [
+pub const KNOWN_BUILDS: [Build; 8] = [
     Build {
         id: "atlantis2-cd-fr-2199552",
         label: "Atlantis II, French CD (1999)",
@@ -233,6 +241,29 @@ pub const KNOWN_BUILDS: [Build; 7] = [
         release: Release::V101,
         gog: true,
         place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
+    },
+    Build {
+        id: "atlantis2-cd-pl-2183168",
+        label: "Atlantis II, Polish CD (1999)",
+        size: 2_183_168,
+        // 1999-10-26 16:38:07 UTC.
+        pe_timestamp: 0x3815_d8ef,
+        md5: [
+            0xf2, 0xb6, 0xf7, 0xbf, 0xa3, 0xc1, 0x95, 0x2d, 0xce, 0xdd, 0xfa, 0x1a, 0x66, 0x2e,
+            0xbb, 0x84,
+        ],
+        // The French CD's version string, @ 0x005e21c8 here.
+        version: "Atlantis 2 - Version 3.15 - 8/10/1999",
+        // 1.01's code: `[CharacterSet]` (absent from its `Font.txt`, so
+        // SBCS) @ 0x0046e5e0, cell heights @ 0x0046f240, the line step
+        // @ 0x0046f1c0, no Alt+Enter (key-down callback @ 0x004764b0).
+        release: Release::V101,
+        // The CD page waits and checks the disc (@ 0x00488f47 unpatched).
+        gog: false,
+        // The same 5780 bytes at 1.01's addresses.
+        place_sounds: PLACE_SOUNDS_101,
+        // The film frame and loop are 1.01's (@ 0x004033a0, 0x00403850).
         film_subtitles_blitted: false,
     },
 ];
@@ -368,6 +399,7 @@ mod tests {
                 "f8340e5a011fd2207c5bb78b4c2a9636",
                 "0f634c4620680dfea6782645c79dc84c",
                 "4534c355a9be896c3507b475e4b5a570",
+                "f2b6f7bfa3c1952dceddfa1a662ebb84",
             ]
         );
         // The listener table is 5780 bytes in every build.
@@ -380,7 +412,7 @@ mod tests {
                 .iter()
                 .filter(|b| b.release == Release::V101)
                 .count(),
-            6
+            7
         );
         // Only the North American CD draws a film's subtitles before the
         // 800 x 600 enlargement.

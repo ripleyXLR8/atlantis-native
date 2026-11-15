@@ -104,7 +104,7 @@ Italian, Swedish and Japanese; the drive, a copy of a side or the images
 of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 1.00), a CD installation with the official
 patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
-the GOG.com edition and the Italian *Atlantis Collection* DVD (see
+the Polish CD (1999), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
 English, French, German or Spanish; other editions are unknown and
 untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
@@ -266,8 +266,8 @@ What to pick:
   cannot be read in the browser.
 - *Atlantis II*, GOG.com or the Italian *Atlantis Collection*: the
   installation folder (the one holding `Game.exe` and `DATAS_A2`).
-- *Atlantis II*, CD (the French CD, also patched to 1.01, or the North
-  American *Beyond Atlantis*): the folder of the
+- *Atlantis II*, CD (the French CD, also patched to 1.01, the North
+  American *Beyond Atlantis* or the Polish CD): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
   with a copy of each of the four CDs in it, for example in folders
   `CD1` to `CD4`, each holding the disc's `DATAS_A2` folder (copy the
@@ -542,6 +542,12 @@ with the images or copies of its four CDs. Its program has 1.01's code, so
 it plays as 1.01 too. Its intro starts with DreamCatcher's logo, and its
 second film ends without the *Atlantis II* title: that is how the disc has
 them.
+
+The Polish CD (1999, 4 CDs, Polish) installs and opens as the French CD
+does too: the installed folder with the images or copies of its four CDs.
+Its program has 1.01's code, so it plays as 1.01. Its texts are drawn with
+the Polish letters (ą ć ę ł ń ó ś ź ż), as on the Polish Windows the edition
+was made for.
 
 The Italian *Atlantis Collection* (DVD, 2014) installs one folder as GOG.com's
 does, Italian only: point Atlantis Native at it (no disc is needed). Its

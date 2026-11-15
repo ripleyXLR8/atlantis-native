@@ -34,7 +34,8 @@ pub struct ObjectNames {
 }
 
 impl ObjectNames {
-    /// Reads the file's bytes (Windows-1252, kept as bytes).
+    /// Reads the file's bytes (the edition's code page, Windows-1252 or
+    /// the Polish CD's Windows-1250, kept as bytes).
     pub fn parse(data: &[u8]) -> ObjectNames {
         let mut out = ObjectNames::default();
         let mut pos = 0;

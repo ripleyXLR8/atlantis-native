@@ -1441,7 +1441,25 @@ back) into `yucatan-*.png`.
   `cine019/055/066` in `DATAS_A2\APC\`, the ones films read, match none of
   GOG's four languages' voices nor its own `APC\DIAL\CINE*`, which the
   original never reads; by ear the former sound Russian and the latter are
-  Italian (`fix_film_language` plays the latter). The languages differ only in data: `loc\` (texts,
+  Italian (`fix_film_language` plays the latter). The Polish CD's
+  `atlantis2.exe` (4 CDs, 1999; `atlantis2-cd-pl-2183168`, 2183168 bytes,
+  PE timestamp 0x3815d8ef, MD5 `f2b6f7bfa3c1952dceddfa1a662ebb84`) carries
+  the French CD's version string 3.15 but is 1.01's code and link layout,
+  built three weeks before the patch: `Release::V101`, none of GOG's
+  patches, 1.01's listener table (atlantis2-re
+  `binaries/atlantis2-cd-pl-2183168.md`). Its install (`data1.cab` of
+  CD1) is the French CD's but for `atlantis2.exe` and `loc\` (Polish
+  texts, GOG's `Atl_Font.ttf` and `Font.txt` heights, no
+  `[CharacterSet]`); its discs are the French CD's but for the dubbed
+  voices of `datas_a2\apc\dial\`, two film tracks and seven `pz_araig`
+  files (the spider's textures renamed without accents and its models
+  rewritten to them). Its texts are Windows-1250: the original passes them
+  to `TextOutA` in fonts made in `DEFAULT_CHARSET`, so they are read in the
+  system's code page, 1250 on the Polish Windows the edition was sold for.
+  The port reads the code page from the language
+  (`edition::Language::text_code_page`, `A2Files::text_code_page`):
+  `SubtitleFont::load` looks each byte's glyph up in it, Windows-1250 for
+  Polish, Windows-1252 for every other edition (`tests/pl_cd.rs`). The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
@@ -3613,7 +3631,8 @@ back) into `yucatan-*.png`.
   (the port does not), and what Direct3D, which the original calls only
   at start-up and when the display is set up, does to the word.
 - **Dialogs** (`dialog.rs`, `hnm_stream.rs`, `subtitle.rs`, `sound.rs`):
-  a world's `loc\Dial<XX>.txt` (the texts, Windows-1252),
+  a world's `loc\Dial<XX>.txt` (the texts, Windows-1252; Windows-1250 for
+  the Polish CD),
   `scenar\com<XX>.txt` (speaker, mood, stand, camera, kind of each line)
   and `scenar\info<XX>.txt` (the speakers) are read with the world; a
   dialog collects its lines, loads each speaker's head per stand, and
@@ -4502,6 +4521,15 @@ one byte against GOG's 2018 `Game.exe`, the `loc` files, every subtitle against
 the executable's layout, every letter, the voices, the film tracks, the three
 intro films, the music, a subtitle, the menu and a save; `tests/flow.rs`'s whole
 game with the mouse played again on it, `it-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_PL`, `ATLANTIS2_DISCS_PL` the Polish CD's installed folder
+(`data1.cab` of its first disc extracted) and its CDs (`tests/pl_cd.rs`: the
+executable by its MD5, the edition's name and language, Windows-1250, the
+`loc` files, every subtitle laid out, every letter a glyph unlike its base
+letter and unlike its Windows-1252 reading, the Polish letters in every font,
+the spider's renamed textures and its web drawn as on the French CD, a
+subtitle, the main menu's tooltip and a save, the browser's way of opening
+it; `tests/flow.rs`'s whole game with the mouse played again on it;
+`pl-*.png` with `ATLANTIS2_PNG_DIR`),
 `ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
 German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
 `1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older
