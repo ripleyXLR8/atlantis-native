@@ -1,12 +1,14 @@
-//! The installed game: a folder holding `Game.exe` and `Datas\`, whose
-//! file names the game writes in any case (`Datas\spr\mouse.SPR`).
+//! The installed game: a folder holding `Game.exe` (or the retail CD's
+//! `Atlantis3.exe`) and `Datas\`, whose file names the game writes in any
+//! case (`Datas\spr\mouse.SPR`).
 //!
-//! The GOG.com release ships every file unpacked in its folder; the
+//! The GOG.com release ships every file unpacked in its folder. The
 //! executable also knows three CDs (`Atlantis3.cd1` .. `cd3` markers,
 //! @ 0x00718640) and a DVD layout (`Atlantis512.dvd`, `Atlantis1024.dvd`,
-//! @ 0x0071b76c), which no edition seen yet uses.
+//! @ 0x0071b76c): the French retail CD (2001) installs part of `Datas\`
+//! and reads the rest from its three discs ([`crate::discs`]).
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use atlantis_data::{FileSource, StdDir};
@@ -23,12 +25,15 @@ pub struct A3Files {
     /// *Atlantis Evolution*'s 2004 program's data: the source that routes
     /// the names to the discs.
     evolution_2004: Option<Arc<crate::evolution2004::Evolution2004Source>>,
+    /// The retail CD's install and discs: the source that follows the
+    /// disc tests.
+    cd: Option<Arc<crate::discs::CdSource>>,
 }
 
 /// Why a folder is not a playable install.
 #[derive(Debug)]
 pub enum OpenError {
-    /// No `Game.exe`.
+    /// No `Game.exe` (nor the CD's `Atlantis3.exe`).
     NoExe,
     /// No `Datas\` folder.
     NoDatas,
@@ -39,7 +44,7 @@ pub enum OpenError {
 impl std::fmt::Display for OpenError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            OpenError::NoExe => write!(f, "no Game.exe in the folder"),
+            OpenError::NoExe => write!(f, "no Game.exe or Atlantis3.exe in the folder"),
             OpenError::NoDatas => write!(f, "no Datas folder in the folder"),
             OpenError::Exe(e) => e.fmt(f),
         }
@@ -48,11 +53,12 @@ impl std::fmt::Display for OpenError {
 
 impl std::error::Error for OpenError {}
 
-/// Whether `dir` looks like an *Atlantis III* install (`Game.exe` and
-/// `Datas\scenar\defnames.con`).
+/// Whether `dir` looks like an *Atlantis III* install (`Game.exe` or
+/// `Atlantis3.exe`, and `Datas\scenar\defnames.con`).
 pub fn holds_atlantis3(dir: &Path) -> bool {
     let src = StdDir::new(dir);
-    src.size(exe::EXE_NAME).is_some() && src.size("Datas/scenar/defnames.con").is_some()
+    exe::EXE_NAMES.iter().any(|n| src.size(n).is_some())
+        && src.size("Datas/scenar/defnames.con").is_some()
 }
 
 impl A3Files {
@@ -61,6 +67,43 @@ impl A3Files {
         A3Files {
             src,
             evolution_2004: None,
+            cd: None,
+        }
+    }
+
+    /// The retail CD's install and discs, read through `src`.
+    pub fn cd(src: Arc<crate::discs::CdSource>) -> A3Files {
+        A3Files {
+            src: src.clone(),
+            evolution_2004: None,
+            cd: Some(src),
+        }
+    }
+
+    /// The install `install` (the folder `dir`): GOG.com's as it is; the
+    /// retail CD's with its discs, looked for in `dir`, the folders inside
+    /// it and `disc_dirs` ([`crate::discs::CdSource::open`]).
+    pub fn with_discs(install: Arc<dyn FileSource>, dir: &Path, disc_dirs: &[PathBuf]) -> A3Files {
+        let files = A3Files::new(install.clone());
+        match files.build() {
+            Ok(b) if b.release.disc_test() => A3Files::cd(Arc::new(crate::discs::CdSource::open(
+                install, dir, disc_dirs,
+            ))),
+            _ => files,
+        }
+    }
+
+    /// The retail CD's discs, when the install is the CD's.
+    pub fn discs(&self) -> Option<&crate::discs::CdSource> {
+        self.cd.as_deref()
+    }
+
+    /// `Menu_TestChangeCD(mask)` of the CD's program
+    /// ([`crate::discs::CdSource::change_cd`]); nothing for another
+    /// install.
+    pub fn change_cd(&self, mask: i32) {
+        if let Some(c) = &self.cd {
+            c.change_cd(mask);
         }
     }
 
@@ -69,6 +112,7 @@ impl A3Files {
         A3Files {
             src: src.clone(),
             evolution_2004: Some(src),
+            cd: None,
         }
     }
 
@@ -86,20 +130,36 @@ impl A3Files {
         }
     }
 
-    /// The install at `dir`, with its executable identified.
+    /// The install at `dir` (with the CD's discs in it or in a folder
+    /// inside it), with its executable identified.
     pub fn open_dir(dir: &Path) -> Result<(A3Files, &'static Build), OpenError> {
-        let files = A3Files::new(Arc::new(StdDir::new(dir)));
+        let files = A3Files::with_discs(Arc::new(StdDir::new(dir)), dir, &[]);
         let build = files.build()?;
         Ok((files, build))
     }
 
-    /// The build of `Game.exe`.
+    /// The build of the executable: `Game.exe`, else `Atlantis3.exe`
+    /// ([`exe::EXE_NAMES`]); GOG.com's launcher `Atlantis3.exe`
+    /// ([`exe::LAUNCHER_SIZE`]) is not looked at.
     pub fn build(&self) -> Result<&'static Build, OpenError> {
         if !self.src.has_dir(DATAS) {
             return Err(OpenError::NoDatas);
         }
-        let exe = self.src.read(exe::EXE_NAME).ok_or(OpenError::NoExe)?;
-        exe::identify(&exe).map_err(OpenError::Exe)
+        let mut err = None;
+        for name in exe::EXE_NAMES {
+            match self.src.size(name) {
+                None | Some(exe::LAUNCHER_SIZE) => continue,
+                Some(_) => {}
+            }
+            let Some(exe) = self.src.read(name) else {
+                continue;
+            };
+            match exe::identify(&exe) {
+                Ok(b) => return Ok(b),
+                Err(e) => err = err.or(Some(e)),
+            }
+        }
+        Err(err.map_or(OpenError::NoExe, OpenError::Exe))
     }
 
     /// The edition's name with the install's language ("Atlantis III,

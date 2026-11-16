@@ -23,7 +23,11 @@
 //!
 //! The game folder is GOG.com's installation (`Game.exe` beside `Datas\`),
 //! in English, French, German or Spanish: one executable for the four
-//! ([`atlantis3_data::exe::KNOWN_BUILDS`]), the language is the data's.
+//! ([`atlantis3_data::exe::KNOWN_BUILDS`]), the language is the data's;
+//! or the French retail CD's installation (`Atlantis3.exe` beside
+//! `Datas\`) with its three discs (CD images or copies of the CDs) in it,
+//! in a folder inside it or in a `--discs <folder>`
+//! ([`atlantis3_data::discs`]).
 //!
 //! Started from the game library, Shift held in the first moments goes
 //! back to the library's screen ([`crate::a2::Ended::Library`]), as for
@@ -141,17 +145,44 @@ pub fn fixes_in(base: &Path, original: bool) -> Fixes {
 /// `base`; with the edition's name. `original` (`--original`): every bug
 /// fix off ([`fixes_in`]).
 pub fn open_in(dir: &Path, base: &Path, original: bool) -> Result<(Game, String), String> {
+    open_in_with_discs(dir, &[], base, original)
+}
+
+/// [`open_in`] with more folders to look for the retail CD's discs in
+/// (`--discs <folder>`), beside the game folder and the folders inside
+/// it ([`atlantis3_data::discs::CdSource::open`]).
+pub fn open_in_with_discs(
+    dir: &Path,
+    discs: &[PathBuf],
+    base: &Path,
+    original: bool,
+) -> Result<(Game, String), String> {
     let _ = std::fs::create_dir_all(base);
     let fixes = fixes_in(base, original);
     let cfg_path = base.join("Atlantis3.cfg");
-    let files = A3Files::new(Arc::new(WithCfg {
-        install: StdDir::new(dir),
-        cfg: cfg_path.clone(),
-        name: atlantis3_data::cfg::CFG_PATH,
-    }));
+    let files = A3Files::with_discs(
+        Arc::new(WithCfg {
+            install: StdDir::new(dir),
+            cfg: cfg_path.clone(),
+            name: atlantis3_data::cfg::CFG_PATH,
+        }),
+        dir,
+        discs,
+    );
     let label = files
         .edition_label()
         .map_err(|e| crate::setup::explain_atlantis3(dir, &e))?;
+    if let Some(d) = files.discs() {
+        let found = d.disc_numbers();
+        if found.len() < 3 {
+            log::warn!(
+                "{label}: discs found {found:?}; the CD release reads its videos and panoramas from its three discs"
+            );
+        }
+        if found.is_empty() {
+            return Err(crate::setup::explain_atlantis3_no_disc(dir));
+        }
+    }
     let mut game = Game::with_fixes(files, fixes).map_err(|e| format!("{}: {e}", dir.display()))?;
     game.save_dir = Some(base.join("save"));
     game.menus_mut().cfg_path = Some(cfg_path);
@@ -163,9 +194,10 @@ pub fn open_in(dir: &Path, base: &Path, original: bool) -> Result<(Game, String)
     Ok((game, label))
 }
 
-/// The game in `dir`, its saves and settings in [`data_dir`].
-pub fn open(dir: &Path, original: bool) -> Result<(Game, String), String> {
-    open_in(dir, &data_dir(), original)
+/// The game in `dir`, its saves and settings in [`data_dir`]; the retail
+/// CD's discs also looked for in `discs`.
+pub fn open(dir: &Path, discs: &[PathBuf], original: bool) -> Result<(Game, String), String> {
+    open_in_with_discs(dir, discs, &data_dir(), original)
 }
 
 /// The game's picture as PNG.
@@ -182,15 +214,17 @@ fn png(game: &Game) -> Vec<u8> {
 /// once), the sound mixed and dropped, the saves in `base`; prints where
 /// it is and writes the screen to `screenshot` (PNG) when given. A check
 /// that the game starts.
+#[allow(clippy::too_many_arguments)]
 pub fn headless(
     dir: &Path,
+    discs: &[PathBuf],
     base: &Path,
     frames: u64,
     screenshot: Option<&Path>,
     no_intro: bool,
     original: bool,
 ) -> Result<(), String> {
-    let (mut game, label) = open_in(dir, base, original)?;
+    let (mut game, label) = open_in_with_discs(dir, discs, base, original)?;
     println!("{label}, {}", crate::version_string());
     let mut intro_done = no_intro;
     if no_intro {
@@ -751,7 +785,37 @@ mod tests {
         assert!(game.show_start_page());
         assert_eq!(game.mode(), Mode::Menu);
         let shot = base.join("a3.png");
-        headless(&dir, &base, 30, Some(&shot), true, false).unwrap();
+        headless(&dir, &[], &base, 30, Some(&shot), true, false).unwrap();
+        assert!(std::fs::read(&shot).unwrap().starts_with(b"\x89PNG"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The French CD's installed folder: its edition, refused without its
+    /// discs, opened with them (`--discs`) and started to the start page.
+    #[test]
+    fn the_french_cd_with_its_discs() {
+        let Some((dir, discs)) = atlantis3_data::testing::cd_fr() else {
+            return;
+        };
+        assert_eq!(label(&dir).unwrap(), "Atlantis III, CD, French");
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-cd-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        if atlantis3_data::discs::disc_candidates(&dir).is_empty() {
+            let e = open_in(&dir, &base, false).err().unwrap();
+            assert!(e.contains("none of its discs"), "{e}");
+        }
+        let (mut game, label) =
+            open_in_with_discs(&dir, std::slice::from_ref(&discs), &base, false).unwrap();
+        assert_eq!(label, "Atlantis III, CD, French");
+        assert_eq!(
+            game.files().discs().map(|d| d.disc_numbers()),
+            Some(vec![1, 2, 3])
+        );
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let shot = base.join("a3cd.png");
+        headless(&dir, &[discs], &base, 30, Some(&shot), true, false).unwrap();
         assert!(std::fs::read(&shot).unwrap().starts_with(b"\x89PNG"));
         let _ = std::fs::remove_dir_all(&base);
     }

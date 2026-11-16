@@ -193,6 +193,10 @@ pub struct Script {
     /// *Atlantis Evolution*'s 2004 program: *Atlantis III*'s rules with its
     /// own `RunInit` ([`Script::run_init`]).
     pub evolution_2004: bool,
+    /// *Atlantis III*'s retail CD program (atlantis3-cd-fr-3379200):
+    /// `CHANGECD=n` runs the disc test ([`Host::change_cd_a3`]) instead of
+    /// storing the variable.
+    pub a3_disc_test: bool,
     /// *Atlantis III*'s state ([`a3`]); unused by *Atlantis II*.
     pub a3: a3::A3State,
     pub names: DefNames,
@@ -358,6 +362,7 @@ impl Script {
             chapter_reload: false,
             init_running: false,
             evolution_2004: false,
+            a3_disc_test: false,
             init_skip: false,
             resume_pending: false,
             resume_at: 0,

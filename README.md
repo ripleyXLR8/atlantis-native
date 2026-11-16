@@ -286,12 +286,17 @@ For *Atlantis III*:
 | Release | Languages | What to point it at |
 |---|---|---|
 | [GOG.com](https://www.gog.com/) (*Atlantis 3 - The New World*; `Game.exe` of 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`) | English, French, German, Spanish | the installation folder (the one holding `Game.exe` and `Datas`) |
+| French CD (Cryo, 2001, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `f81dd8d2e49003b2ba53b48b4a21c2ec`) | French | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (or copies of the CDs) in it or in a folder inside it |
 
 GOG.com ships the same `Game.exe` in its four languages; the language is
 read from the installation (the language GOG.com's installer records),
-and the game library names it ("Atlantis III, GOG.com, German"). This is
-the only edition the project knows. Other editions (the retail CDs and
-DVDs) are unknown and untested: their `Game.exe` is refused with its size
+and the game library names it ("Atlantis III, GOG.com, German"). The
+French CD's program is older (2001) and differs in a few things the
+player sees, which Atlantis Native follows (the scarab case is drawn,
+the discs are asked for; see
+[Atlantis III](docs/GUIDE.md#atlantis-iii)); the game library names it
+"Atlantis III, CD, French". Other editions (the other retail CDs and the
+DVDs) are unknown and untested: their program is refused with its size
 and MD5, so that it can be reported and added.
 
 For *Atlantis Evolution*:
@@ -342,8 +347,10 @@ inside it. From the terminal, give that folder (the CD images may stay
 elsewhere with `--discs <folder>`). See
 [Atlantis II](docs/GUIDE.md#atlantis-ii).
 
-*Atlantis III* (2001) too: GOG.com's installation folder, found by the
-game library or given on the command line. See
+*Atlantis III* (2001) too: GOG.com's installation folder, or the French
+CD's with its three CD images (or copies) in it or in a folder inside it
+(`--discs <folder>` from the terminal), found by the game library or
+given on the command line. See
 [Atlantis III](docs/GUIDE.md#atlantis-iii).
 
 *Atlantis Evolution* (2004) as well: GOG.com's installation folder, or

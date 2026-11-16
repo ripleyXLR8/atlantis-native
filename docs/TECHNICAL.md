@@ -11,7 +11,7 @@
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
-| `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe`, `Datas\`, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
+| `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe` and the French CD's `Atlantis3.exe`, `Datas\` and the CD's discs, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
 | `atlantis3-engine` | Atlantis III: the start-up's settings, the intro and the cinematics with their sound, the chapter scripts, the panorama (`warpBFPII`, 16 and 32 bits), the place animations and sprites, the cursor, the moves with their travel videos, the dialogs with their 3D heads, the inventory, the menus and the saves, every puzzle and map, the ending and the credits; see [Atlantis III](#atlantis-iii) |
 | `atlantis4-data` | Atlantis Evolution: detection of GOG.com's `Atlantis Evolution.exe`, the language (`lang.ini`), warp packages, scenes, pictures (an exact JPEG decoder), fonts, texts, the Vorbis sounds and Theora videos decoded as the original decodes them |
 | `atlantis4-script` | Atlantis Evolution: its Lua 5.1 scripts (vendored `rilua`) and the engine's bindings |
@@ -4166,8 +4166,56 @@ English and German `chapi054.con` change,
 charsets and the scarab case per language (`tests/languages.rs`), from
 `ATLANTIS3_GOG_EN`, `ATLANTIS3_GOG_DE` and `ATLANTIS3_GOG_ES`.
 
+**The French CD (2001).** `exe::KNOWN_BUILDS` holds a second build,
+atlantis3-cd-fr-3379200 (`Atlantis3.exe`, 3,379,200 bytes, PE timestamp
+2001-09-11, MD5 `f81dd8d2...`), with `Release::Cd2001` (GOG.com's is
+`Release::Gog2003`); `A3Files::build` looks for `Game.exe`, then
+`Atlantis3.exe` (not GOG.com's 19,968-byte launcher of that name). The
+comparison of the two programs (atlantis3-re
+`binaries/atlantis3-cd-fr-3379200.md`: 9241 of the CD's 9709 functions
+the same with branch targets and addresses masked, the rest the 2003
+compiler's other code, GOG.com's JPEG library, registry log lines and
+DirectDraw retries) leaves these differences the player sees, each
+behind the release:
+
+- `CHANGECD=mask` runs `Menu_TestChangeCD(mask)`
+  (atlantis3-cd-fr-3379200 @ 0x004497c9; GOG.com's program has the
+  compare `nop`ped out and stores the variable): `Script::a3_disc_test`,
+  `Host::change_cd_a3`, `Game::change_cd_a3` (`CurrentCD` := the mask
+  when not 0, as @ 0x00457903). The disc's files:
+  `atlantis3_data::discs::CdSource` reads `Datas\` from the install
+  first, then the current disc (as `AtlFile_Open` @ 0x00418370 does with
+  the disc root the test chose), then another disc that has the file (a
+  port rule: the Palaeolithic is entered without a disc test). The test
+  plays one drive with the disc asked for inserted: a mask holding the
+  current disc keeps it, another takes its lowest disc (bit 0 = disc 1);
+  0 keeps the disc. Discs are folders holding `Atlantis3.cd<n>` and
+  `Datas`, or CD images, in the install, the folders inside it and
+  `--discs` folders (`discs::disc_candidates`, `A3Files::with_discs`);
+- `Release::scarab_bank`: `Scarabée.spr` (@ 0x00431c22) for the CD,
+  `Scarabee.spr` for GOG.com's;
+- `subjects::Layout::cd_columns`: the hit test's columns are
+  `count / 5 + 1` (@ 0x0043b3c0);
+- `Game::flip_suppressed`: only a dialog stops the warp frame's flip
+  (@ 0x0043f840);
+- `hooks::ldmorts::view_isis`: no warp cursor reset (@ 0x004c7210);
+- `game::intro_videos_cd`: the CD's intro table (@ 0x00458c40), which
+  plays `intro.hnm` in French as GOG.com's does.
+
+Tests: `crates/atlantis3-data/tests/cd_fr.rs` (the build, the edition
+*Atlantis III, CD, French*, the discs from the images and from copies,
+GOG.com's 3317 files of `Datas\` read from the install and the discs
+with their sizes, the copy each disc test chooses) and
+`crates/atlantis3-engine/tests/cd_fr.rs` (the intro, a new game on disc
+2 with the Hoggar's panorama from the disc, `CurrentCD = 2` in the save
+and its load, the scarab case drawn), with `ATLANTIS3_CD_FR` = the CD's
+installed folder and `ATLANTIS3_DISCS_FR` = the folder of its disc
+images or copies. The web page does not read discs (it plays GOG.com's
+folder only).
+
 The desktop's `a3::A3App` is its own `ApplicationHandler`, as Atlantis
-II's is: `setup::kind_of` tells Atlantis III by `Game.exe` beside
+II's is: `setup::kind_of` tells Atlantis III by `Game.exe` (or the CD's
+`Atlantis3.exe`) beside
 `Datas\scenar\defnames.con` (`atlantis3_data::files::holds_atlantis3`,
 looked at before the other games), `setup::candidate_folders` reads its
 GOG.com id 1207658958 from the registry, `desktop::open_any` gives
@@ -4192,7 +4240,8 @@ screenshots; `atlantis-native --headless <game folder> [frames]
 Tests (`crates/atlantis3-data/tests/`, `crates/atlantis3-engine/tests/`,
 with `ATLANTIS3_DATA` = the installed game, French, and for the other
 languages' tests `ATLANTIS3_GOG_EN`, `ATLANTIS3_GOG_DE`,
-`ATLANTIS3_GOG_ES` = GOG.com's English, German and Spanish installations;
+`ATLANTIS3_GOG_ES` = GOG.com's English, German and Spanish installations,
+and for the French CD's `ATLANTIS3_CD_FR` and `ATLANTIS3_DISCS_FR`;
 without them they fail, unless
 `ATLANTIS3_SKIP_DATA_TESTS=1` or Atlantis II's `ATLANTIS2_SKIP_DATA_TESTS=1`,
 which the CI sets, skips them): every file of `Datas\` parsed and every

@@ -106,8 +106,8 @@ of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
 the Polish CD (1999), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
-English, French, German or Spanish; other editions are unknown and
-untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
+English, French, German or Spanish, and the French CD (2001, three CDs);
+other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
 GOG.com's release, in English, French, German, Italian and Spanish (see
 [Atlantis Evolution](#atlantis-evolution)).
 Another edition of the first game is
@@ -138,14 +138,16 @@ The message says what is wrong and what to do:
 | holds Atlantis II's discs, not the installed game | choose the folder where Atlantis II is installed (with `atlantis2.exe`), the discs put in it |
 | (web) Atlantis II needs its four discs, and CD *n* is not among the chosen files | copy that CD into the installed game's folder or a folder inside it, and choose the folder again |
 | holds an Atlantis III program that Atlantis Native does not know | an edition not supported yet: report its size and MD5 on GitHub |
-| does not hold Atlantis III | choose GOG.com's installation folder, the one with `Game.exe` and `Datas` |
+| does not hold Atlantis III | choose GOG.com's installation folder, the one with `Game.exe` and `Datas`, or the French CD's, the one with `Atlantis3.exe` and `Datas` |
+| holds Atlantis III's CD release, but none of its discs | put the images (`.iso`) or copies of the three CDs in the installed game's folder or in a folder inside it |
 | holds Cryo's DVD | choose the language in the game library (each language found is listed), or the folder holding `FACE_A` or `FACE_B`, the drive, or the folder of the sides' images |
 | this version is on the other side of the DVD | turn the disc over (the side it names), or put the images of both sides in one folder |
 | holds a language of Cryo's DVD without the folders its side shares | copy the whole side (the folder holding `FACE_A` or `FACE_B`) |
 
 Choosing the folder above the game's works too: Atlantis Native looks a
 few levels down for `atlantis.exe` (or Atlantis II's `atlantis2.exe` or
-`Game.exe`, or Atlantis III's `Game.exe` beside `Datas`).
+`Game.exe`, or Atlantis III's `Game.exe` or `Atlantis3.exe` beside
+`Datas`).
 
 ## Several editions: the game library
 
@@ -161,7 +163,7 @@ last played selected. Each game is shown as its name and edition,
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
-German*, *Atlantis Evolution, GOG.com, English* or *Atlantis Evolution
+German*, *Atlantis III, CD, French*, *Atlantis Evolution, GOG.com, English* or *Atlantis Evolution
 (2004), CD, English* (the original 2004 program, in progress: see
 [The 2004 CD](#the-2004-cd-in-progress)), and its folder: the
 game's name in gold capitals, the edition beside it (why the folder does
@@ -743,6 +745,36 @@ GOG.com, English*. What the language changes is the original's too:
 Other editions (the retail CDs and DVDs) are unknown to the project and
 untested: their `Game.exe` is refused with its size and MD5, which an
 issue on GitHub can report so that it is added.
+
+**The French CD.** Cryo's French retail edition (2001, three CDs) is
+known too: its `Atlantis3.exe` (3,379,200 bytes, MD5
+`f81dd8d2e49003b2ba53b48b4a21c2ec`) is installed by the CD's installer
+with part of `Datas` (the intro, the menus, the scripts, the texts and
+the sounds); the panoramas, the place animations and most videos and
+voices stay on the discs. Point Atlantis Native at the installed folder
+with the images of the three CDs (`.iso`, or copies of the CDs) in it or
+in a folder inside it (from the terminal, `--discs <folder>` names
+another folder); the game library shows it as *Atlantis III, CD,
+French*. Its data are GOG.com's French files, file for file. Its program
+is two years older than GOG.com's, and Atlantis Native plays it as it
+plays:
+
+- the discs: the game asks for disc 2 when a new game starts, disc 3
+  for Baghdad and Rhea, any disc for the inter-dimension; Atlantis Native
+  takes the disc asked for at once (no disc request page), and a file
+  of another disc (the Palaeolithic is on disc 1 only) is read from that
+  disc; five place animations of the Hoggar differ on disc 2 and are
+  read from it, as the original does; the saves record the disc
+  (`CurrentCD`);
+- the scarab case: the CD's program opens `Scarabée.spr`, which the
+  French data has, so the case and its scarab are drawn (GOG.com's
+  program looks for `Scarabee.spr` and draws nothing in French);
+- the subjects menu: a click on the ninth subject of a character (third
+  column) does nothing, as in the CD's program;
+- the Isis puzzle of the land of the dead keeps the pointer it had when
+  its views are entered (GOG.com's program resets it).
+
+The web version does not read the CD's discs yet.
 
 **How it was checked.** The port follows the original program's code,
 address by address, and automated tests replay what that code computed

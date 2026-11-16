@@ -6,8 +6,9 @@
 //! game shares with *Atlantis II* are read by `atlantis2-data` and
 //! `atlantis-codecs`; this crate holds what differs.
 //!
-//! - [`exe`]: which build a `Game.exe` is;
+//! - [`exe`]: which build a `Game.exe` (or the CD's `Atlantis3.exe`) is;
 //! - [`files`]: the installed folder and its `Datas\`;
+//! - [`discs`]: the French retail CD's three discs;
 //! - [`install`]: the installer's registry values, the language and the
 //!   edition's name;
 //! - [`spr`]: the `SPRCRYO` sprite banks and the `SPWCRYO` place sprites,
@@ -42,6 +43,7 @@ pub mod con;
 pub mod coord;
 pub mod db;
 pub mod dialog;
+pub mod discs;
 pub mod evolution2004;
 pub mod evolution2004_cfg;
 pub mod evolution2004_dialog;
@@ -65,5 +67,5 @@ pub mod tokens;
 pub mod vue;
 pub mod zbf;
 
-pub use exe::{identify, Build, ExeError};
+pub use exe::{identify, Build, ExeError, Release};
 pub use files::A3Files;

@@ -358,8 +358,13 @@ pub struct Game {
     /// click kind.
     sprite_hit: Option<(i32, i32)>,
     /// The disc in the drive (`CurrentCD` of the saves, @ 0x00789d38;
-    /// never set by the GOG build's code paths met so far: 0).
+    /// never set by the GOG build's code paths met so far: 0). The CD's
+    /// program sets it to every non-zero `CHANGECD` mask
+    /// (atlantis3-cd-fr-3379200 @ 0x00457903).
     current_cd: i32,
+    /// The release of the install's program (GOG.com's when it is not
+    /// known, as for the tests' data without an executable).
+    release: atlantis3_data::Release,
     /// The spinning top's handler armed (@ 0x007899d3).
     /// The credits page (menu page 9), after the ending.
     credits: Option<credits::Credits>,
@@ -488,6 +493,10 @@ impl Game {
             Default::default()
         };
         script.evolution_2004 = files.is_evolution_2004();
+        let release = files
+            .build()
+            .map_or(atlantis3_data::Release::Gog2003, |b| b.release);
+        script.a3_disc_test = release.disc_test();
         let fpu = Fpu::Double;
         let mut renderer = Renderer::new(Variant::PII, fpu, width, height);
         let face = face_size(&files);
@@ -602,6 +611,7 @@ impl Game {
             inv2004: Default::default(),
             sprite_hit: None,
             current_cd: 0,
+            release,
             texts: None,
             subtitle: None,
             dialogs: None,
@@ -815,6 +825,16 @@ impl Game {
             Surface::Rgb565(s) => s,
             Surface::Xrgb8888(_) => &mut [],
         }
+    }
+
+    /// The game's files.
+    pub fn files(&self) -> &A3Files {
+        &self.files
+    }
+
+    /// The release of the install's program ([`atlantis3_data::Release`]).
+    pub fn program_release(&self) -> atlantis3_data::Release {
+        self.release
     }
 
     pub fn mode(&self) -> Mode {
@@ -1108,7 +1128,10 @@ impl Game {
     /// branch: GOG.com's German install has no `intro_ger.hnm`, so it
     /// plays `intro.hnm` alone, like the other languages.
     pub fn start_intro(&mut self) {
-        let mut videos = intro_videos(&self.startup.config.langue);
+        let mut videos = match self.release {
+            atlantis3_data::Release::Cd2001 => intro_videos_cd(&self.startup.config.langue),
+            atlantis3_data::Release::Gog2003 => intro_videos(&self.startup.config.langue),
+        };
         videos.reverse();
         self.intro_next = videos;
         self.mode = Mode::Idle;
@@ -1370,7 +1393,10 @@ impl Game {
         if self.files.is_evolution_2004() {
             crate::subjects::Layout::for_width_2004(self.width).0
         } else {
-            crate::subjects::Layout::for_width(self.width)
+            crate::subjects::Layout {
+                cd_columns: self.release == atlantis3_data::Release::Cd2001,
+                ..crate::subjects::Layout::for_width(self.width)
+            }
         }
     }
 
@@ -2302,9 +2328,16 @@ impl Game {
 
     /// The warp frame's test before its flip (@ 0x004400c4..0x004400d8):
     /// no flip once the frame started a video or a dialog (loop mode 4 or
-    /// 5).
+    /// 5). The CD's program tests the dialog only (atlantis3-cd-fr-3379200
+    /// @ 0x0043f840: `mode == 5`): a frame that started a video is
+    /// flipped.
     fn flip_suppressed(&self) -> bool {
-        matches!(self.mode, Mode::Intro | Mode::Video | Mode::Dialog)
+        match self.release {
+            atlantis3_data::Release::Cd2001 => self.mode == Mode::Dialog,
+            atlantis3_data::Release::Gog2003 => {
+                matches!(self.mode, Mode::Intro | Mode::Video | Mode::Dialog)
+            }
+        }
     }
 
     /// The warp frame without the overlays (@ 0x00440690) and the cursor
@@ -4783,6 +4816,18 @@ impl Host for Game {
     /// The 2004 program's `CHANGECD=n` (@ 0x0045091a..0x00450920): the
     /// disc folder switched (`Menu_TestChangeCD`), then the disc's banks
     /// (FUN_00452310, [`Game::disc_banks_2004`]).
+    /// The CD's program's `CHANGECD=mask` (atlantis3-cd-fr-3379200
+    /// @ 0x004497c9 → `Menu_TestChangeCD` @ 0x004578d0): `CurrentCD` :=
+    /// the mask when it is not 0 (@ 0x00457903), the disc it asks for
+    /// becomes the current one ([`atlantis3_data::discs::CdSource`]).
+    fn change_cd_a3(&mut self, mask: i32) {
+        log::info!("Menu_TestChangeCD : {mask}");
+        if mask != 0 {
+            self.current_cd = mask;
+        }
+        self.files.change_cd(mask);
+    }
+
     fn change_cd_2004(&mut self, n: i32) {
         log::info!("Menu_TestChangeCD : {n}");
         match u32::try_from(n) {
@@ -4980,9 +5025,35 @@ pub fn intro_videos(langue: &[u8]) -> Vec<(&'static str, u32)> {
     out
 }
 
+/// The CD's program's intro (atlantis3-cd-fr-3379200 @ 0x00458c40):
+/// `intro.hnm`, then `intro_ger.hnm` for `ger`, `intro_gre1.hnm` and
+/// `intro_gre2.hnm` for `gre`, all at 15 frames a second.
+pub fn intro_videos_cd(langue: &[u8]) -> Vec<(&'static str, u32)> {
+    let mut out = vec![("intro.hnm", 15)];
+    match langue {
+        b"ger" => out.push(("intro_ger.hnm", 15)),
+        b"gre" => out.extend([("intro_gre1.hnm", 15), ("intro_gre2.hnm", 15)]),
+        _ => {}
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn intro_videos_of_the_cd() {
+        let names = |l: &[u8]| -> Vec<&str> { intro_videos_cd(l).iter().map(|v| v.0).collect() };
+        for l in [&b"fra"[..], b"usa", b"rus", b"ita"] {
+            assert_eq!(names(l), ["intro.hnm"], "{l:?}");
+        }
+        assert_eq!(names(b"ger"), ["intro.hnm", "intro_ger.hnm"]);
+        assert_eq!(
+            names(b"gre"),
+            ["intro.hnm", "intro_gre1.hnm", "intro_gre2.hnm"]
+        );
+    }
 
     #[test]
     fn intro_videos_by_language() {

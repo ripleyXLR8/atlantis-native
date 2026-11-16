@@ -867,7 +867,15 @@ impl Script {
             host.change_cd_2004(value);
             return Some(next);
         }
-        // `CHANGECD` and every other key: the default store.
+        if self.a3_disc_test && key == self.keys.changecd {
+            // atlantis3-cd-fr-3379200 @ 0x004497b8..0x004497ff: the disc
+            // test, then the line's end; the variable is not stored (GOG's
+            // `Game.exe` has the compare `nop`ped out @ 0x00449f62).
+            host.change_cd_a3(value);
+            return Some(next);
+        }
+        // `CHANGECD` (GOG's program) and every other key: the default
+        // store.
         self.vars[key] = value;
         Some(next)
     }

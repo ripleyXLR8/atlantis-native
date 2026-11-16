@@ -344,6 +344,12 @@ pub trait Host {
     /// (FUN_00452310).
     fn change_cd_2004(&mut self, n: i32) {}
 
+    /// *Atlantis III*'s retail CD program's `CHANGECD=mask`
+    /// (atlantis3-cd-fr-3379200 @ 0x004497b8..0x004497c9):
+    /// `Menu_TestChangeCD(mask)` (@ 0x004578d0); the variable is not
+    /// stored.
+    fn change_cd_a3(&mut self, mask: i32) {}
+
     /// *Atlantis Evolution*'s 2004 `PLAYSOUND=<name>` (atlantis4-cd-en-3022848
     /// @ 0x0044ea14..0x0044eb7a): `name` is the text from the `=` to the
     /// `)`, a `#SONS#` name of `defnames.con`.

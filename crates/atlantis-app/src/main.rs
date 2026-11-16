@@ -522,12 +522,9 @@ fn main() {
     if let Some(dir) = a3_dir {
         let headless_run = args[0] == "--headless";
         let mut not_a3: Vec<&str> = first_game_flags.clone();
-        not_a3.extend(
-            a2_flags
-                .iter()
-                .copied()
-                .filter(|f| *f != "--no-intro" && !(headless_run && *f == "--screenshot")),
-        );
+        not_a3.extend(a2_flags.iter().copied().filter(|f| {
+            *f != "--no-intro" && *f != "--discs" && !(headless_run && *f == "--screenshot")
+        }));
         if force_wide {
             not_a3.push("--widescreen");
         } else if force_hd {
@@ -555,6 +552,7 @@ fn main() {
             let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
             if let Err(e) = atlantis_app::a3::headless(
                 Path::new(&dir),
+                &discs,
                 &atlantis_app::a3::data_dir(),
                 frames,
                 screenshot.as_deref(),
@@ -566,7 +564,7 @@ fn main() {
             }
             return;
         }
-        let run = atlantis_app::a3::open(Path::new(&dir), original)
+        let run = atlantis_app::a3::open(Path::new(&dir), &discs, original)
             .and_then(|(game, _)| atlantis_app::a3::run_window(game, fullscreen, no_intro));
         if let Err(e) = run {
             error_box(&e);
@@ -824,7 +822,7 @@ fn main() {
             atlantis_app::a4::run_window_on(&mut el, &dir, fullscreen, a2_grace.replace(false))
         } else if let Some(dir) = atlantis3 {
             atlantis_app::watchdog::leave();
-            atlantis_app::a3::open(&dir, original).and_then(|(game, _)| {
+            atlantis_app::a3::open(&dir, &[], original).and_then(|(game, _)| {
                 atlantis_app::a3::run_window_on(&mut el, game, fullscreen, a2_grace.replace(false))
             })
         } else {

@@ -4,7 +4,11 @@
 //! `Game.exe` and `Datas\`) from `ATLANTIS3_DATA` (GOG.com's French
 //! install); the tests of the other languages read GOG.com's English,
 //! German and Spanish installs from `ATLANTIS3_GOG_EN`, `ATLANTIS3_GOG_DE`
-//! and `ATLANTIS3_GOG_ES` ([`GOG_LANGUAGES`]). Without it a test must
+//! and `ATLANTIS3_GOG_ES` ([`GOG_LANGUAGES`]); the French retail CD's
+//! tests read its installed folder (`Atlantis3.exe` and `Datas\`) from
+//! `ATLANTIS3_CD_FR` and the folder of its three discs (the CD images or
+//! copies of the CDs) from `ATLANTIS3_DISCS_FR` ([`cd_fr`]). Without it a
+//! test must
 //! not pass as if it had run: [`missing`] fails it, unless
 //! `ATLANTIS3_SKIP_DATA_TESTS=1` (or `ATLANTIS2_SKIP_DATA_TESTS=1`, which a
 //! build without any game sets, such as the CI's) asks for the game-data
@@ -64,6 +68,18 @@ pub fn dir_of(var: &str) -> Option<PathBuf> {
             None
         }
     }
+}
+
+/// The variable naming the French retail CD's installed folder.
+pub const CD_FR_VAR: &str = "ATLANTIS3_CD_FR";
+
+/// The variable naming the folder of the French retail CD's discs.
+pub const DISCS_FR_VAR: &str = "ATLANTIS3_DISCS_FR";
+
+/// The French retail CD's installed folder and its discs' folder
+/// (`ATLANTIS3_CD_FR`, `ATLANTIS3_DISCS_FR`), or `None` after [`missing`].
+pub fn cd_fr() -> Option<(PathBuf, PathBuf)> {
+    Some((dir_of(CD_FR_VAR)?, dir_of(DISCS_FR_VAR)?))
 }
 
 /// The installed game's folder from `ATLANTIS3_DATA`, or `None` after

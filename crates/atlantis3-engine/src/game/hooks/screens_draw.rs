@@ -255,18 +255,20 @@ impl Game {
 
     /// `AtlScarabee_MainInit` (@ 0x00432200): `Scarabee.spr`, that name
     /// only (the game's file names ignore case, not accents: the French
-    /// and Spanish `Scarabée.SPR` is not it). Run at start-up
-    /// (@ 0x004d67b0) and by the `ldmorts.wam` and `cfuner.wam` loads
-    /// (@ 0x004c3730, @ 0x004c3785).
+    /// and Spanish `Scarabée.SPR` is not it); the CD's program opens
+    /// `Scarabée.spr` (atlantis3-cd-fr-3379200 @ 0x00431c22,
+    /// [`atlantis3_data::Release::scarab_bank`]), so the French CD draws
+    /// the case. Run at start-up (@ 0x004d67b0) and by the `ldmorts.wam`
+    /// and `cfuner.wam` loads (@ 0x004c3730, @ 0x004c3785).
     pub(crate) fn scarab_reload_banks(&mut self) {
-        let path = "spr/Scarabee.spr";
+        let name = self.release.scarab_bank();
         self.puzzles.screens.scarab_bank = self
             .files
-            .read(path)
+            .read(&format!("spr/{name}"))
             .and_then(|d| Bank::parse(&d, self.depth()).ok())
             .map(Arc::new);
         if self.puzzles.screens.scarab_bank.is_none() {
-            log::warn!("AtlScarabee_MainInit() : pb ouverture spr de la carte (Scarabee.spr): the scarab case draws nothing");
+            log::warn!("AtlScarabee_MainInit() : pb ouverture spr de la carte ({name}): the scarab case draws nothing");
         }
     }
 
@@ -280,7 +282,8 @@ impl Game {
         self.draw_warp_only();
         let (cx, cy) = (self.width as i32 / 2, self.height as i32 / 2);
         if let (Some(bank), Some(s)) = (self.puzzles.screens.scarab_bank.clone(), shown) {
-            let path = "spr\\Scarabee.spr";
+            let path = format!("spr\\{}", self.release.scarab_bank());
+            let path = path.as_str();
             match s {
                 None => self.draw_spr_centre(path, &bank, 0, cx, cy, 1.0),
                 Some(k) => {

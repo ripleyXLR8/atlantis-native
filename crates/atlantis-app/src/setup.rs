@@ -74,7 +74,9 @@ four discs itself.\n\
 \u{2022} Atlantis II on CD: the folder where the game is installed (the one with \
 atlantis2.exe), with the images of its four CDs (or copies of the CDs) in it or in a \
 folder inside it.\n\
-\u{2022} Atlantis III: GOG.com's installation folder (the one with Game.exe and Datas).\n\
+\u{2022} Atlantis III: GOG.com's installation folder (the one with Game.exe and Datas), or \
+the folder where the French CD installed it (the one with Atlantis3.exe and Datas), with the \
+images of its three CDs (or copies of the CDs) in it or in a folder inside it.\n\
 \u{2022} Atlantis Evolution: GOG.com's installation folder (the one with Atlantis Evolution.exe \
 and 3D), or the folder where its 2004 CD installed it (the one with Atlantis Evolution.exe \
 and cd0 to cd4).\n\n\
@@ -371,14 +373,25 @@ pub fn explain_atlantis3(dir: &Path, err: &atlantis3_data::files::OpenError) -> 
         atlantis3_data::files::OpenError::Exe(e) => format!(
             "{shown} holds an Atlantis III program that Atlantis Native does not know \
              ({e}): an edition of the game that is not supported yet.\n\n\
-             Supported: GOG.com's release (English, French, German or Spanish). Other editions are unknown to the \
+             Supported: GOG.com's release (English, French, German or Spanish) and the French \
+             CD (2001, three CDs). Other editions are unknown to the \
              project: an issue on GitHub with the program's size and MD5 helps."
         ),
         _ => format!(
             "{shown} does not hold Atlantis III ({err}): choose the folder where the game \
-             is installed, the one with Game.exe and Datas."
+             is installed, the one with Game.exe (GOG.com's) or Atlantis3.exe (the CD's) and Datas."
         ),
     }
+}
+
+/// What to say of the CD release's installation without its discs.
+pub fn explain_atlantis3_no_disc(dir: &Path) -> String {
+    format!(
+        "{} holds Atlantis III's CD release, but none of its discs.\n\n\
+         The CD release reads its videos and panoramas from its three discs: put the CD \
+         images (.iso) or copies of the three CDs in the game folder or in a folder inside it.",
+        dir.display()
+    )
 }
 
 /// What to tell the player about an Atlantis Evolution folder that does
@@ -812,7 +825,9 @@ mod tests {
     fn explains_atlantis3_folders() {
         let d = Path::new("/games/Atlantis 3");
         let e = explain_atlantis3(d, &atlantis3_data::files::OpenError::NoDatas);
-        assert!(e.contains("Game.exe and Datas"), "{e}");
+        assert!(e.contains("Game.exe (GOG.com's) or Atlantis3.exe"), "{e}");
+        let e = explain_atlantis3_no_disc(d);
+        assert!(e.contains("three discs"), "{e}");
         assert_eq!(GameKind::Atlantis3.name(), "Atlantis III");
         assert_eq!(GameKind::ALL.map(GameKind::index), [0, 1, 2, 3]);
     }

@@ -703,7 +703,7 @@ fn tiles_save(h: &mut Hx) {
 /// when listed and its frame from the solved picture (flag 63) or the
 /// saved positions; in `LDMorts.wam` views 7..10 every tile's frame
 /// listed (each tile is a mode-0 slot showing its position); the warp
-/// cursor reset, no tile held.
+/// cursor reset (not by the CD's program), no tile held.
 pub(super) fn view_isis(h: &mut Hx) {
     h.set_var("LDM_CARREAUENMAIN", 0);
     let ki = tiles_build(h, "LDM_ISISKI", 4, 0);
@@ -740,7 +740,11 @@ pub(super) fn view_isis(h: &mut Hx) {
     if h.g.puzzles.ldmorts.held.is_some() {
         log::warn!("PuzzleIsis_Init(): Carreau en main pas NULL");
     }
-    h.g.reset_warp_cursor();
+    // The cursor reset (@ 0x004287f0) is GOG's program's: the CD's
+    // (atlantis3-cd-fr-3379200 @ 0x004c7210) leaves the cursor as it is.
+    if h.g.release == atlantis3_data::Release::Gog2003 {
+        h.g.reset_warp_cursor();
+    }
     h.g.puzzles.ldmorts.held = None;
 }
 

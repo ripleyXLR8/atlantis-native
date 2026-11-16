@@ -47,6 +47,8 @@ pub struct Layout {
     pub ring: usize,
     /// The bank's size suffix (`52`, `64`, `80`).
     pub suffix: &'static str,
+    /// The CD's program's hit test ([`Layout::hit`]).
+    pub cd_columns: bool,
 }
 
 impl Layout {
@@ -63,6 +65,7 @@ impl Layout {
             ch: c,
             ring,
             suffix,
+            cd_columns: false,
         }
     }
 
@@ -82,6 +85,7 @@ impl Layout {
             ch: c,
             ring: if suffix.is_some() { 30 } else { 0 },
             suffix: suffix.unwrap_or(""),
+            cd_columns: false,
         };
         (lay, suffix)
     }
@@ -145,13 +149,21 @@ impl Layout {
     /// The hit test of a click at the pointer (@ 0x0043b5b0): the index
     /// of the cell under it (column-major, edges included, not checked
     /// against the count), or `None` outside the grid (−2 in the
-    /// original).
+    /// original). The columns are counted by the caller (@ 0x0043ba40):
+    /// 1 up to 4 subjects, 2 up to 8, 3 up to 12, else 0; the CD's
+    /// program (`cd_columns`, atlantis3-cd-fr-3379200 @ 0x0043b3c0) passes
+    /// `count / 5 + 1`, so the ninth subject (drawn in a third column) is
+    /// not clickable there, and 13 and more subjects are.
     pub fn hit(&self, n: i32, pointer: (i32, i32)) -> Option<usize> {
-        let cols = match n {
-            ..=4 => 1,
-            5..=8 => 2,
-            9..=12 => 3,
-            _ => 0,
+        let cols = if self.cd_columns {
+            n / 5 + 1
+        } else {
+            match n {
+                ..=4 => 1,
+                5..=8 => 2,
+                9..=12 => 3,
+                _ => 0,
+            }
         };
         let rows = n.min(4);
         let ys = self.ystart(n);
@@ -211,5 +223,25 @@ mod tests {
             Some("spr/suj0152.spr")
         );
         assert_eq!(Layout::bank_path_2004(1280, 1), None);
+    }
+
+    #[test]
+    fn the_cds_columns() {
+        let gog = Layout::for_width(640);
+        let cd = Layout {
+            cd_columns: true,
+            ..gog
+        };
+        // The third column's first cell (index 8 of nine subjects).
+        let p = (gog.x0 + 2 * gog.cw + 1, gog.y0 + 1);
+        assert_eq!(gog.hit(9, p), Some(8));
+        assert_eq!(cd.hit(9, p), None);
+        assert_eq!(cd.hit(10, p), Some(8));
+        assert_eq!(gog.hit(13, (gog.x0 + 1, gog.y0 + 1)), None);
+        assert_eq!(cd.hit(13, (gog.x0 + 1, gog.y0 + 1)), Some(0));
+        for n in 1..=8 {
+            let p = (gog.x0 + 1, gog.ystart(n) + 1);
+            assert_eq!(gog.hit(n, p), cd.hit(n, p), "{n}");
+        }
     }
 }
