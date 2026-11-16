@@ -645,6 +645,15 @@ impl Game {
                 self.perform_2004();
                 return true;
             }
+            // The same speaker: FUN_00444b60(0x006e6f6c, 0x006e6f70)
+            // (@ 0x00410922..0x0041092c), the screen centre's view
+            // direction as yaw / pitch (FUN_004698e0's two `fpatan`).
+            // Nothing reads them: the two addresses occur in the program
+            // only as these two `PUSH` operands (a byte search of the whole
+            // file), no code addresses them through 0x006e6f40.. (a
+            // `CString` of its own) [CONFIRMED-STATIC]. FUN_00444b60 has no
+            // other effect than the camera node's world matrix refresh
+            // (FUN_004b23e0 through FUN_004b1c80, a cache): not ported.
         } else {
             let s = self.speaker_2004();
             if let Some(d) = self.dialog2004.as_mut() {

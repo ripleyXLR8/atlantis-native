@@ -1046,7 +1046,14 @@ impl Script {
         self.current_view = None;
         self.run_command(host, format!("(monde={})", d.monde).as_bytes());
         self.previous_chapter = self.chapter;
+        // @ 0x00461b57: the chapter (0x0070fbf8) := the file's, then
+        // FUN_00450c60 (@ 0x00461b5d): `CHAPTER` := it, so the view reset
+        // of `(Vue=n)` below (FUN_00450d80: chapter := `CHAPTER`) keeps it.
+        // 0x0070fbfc := 1 just before (@ 0x00461b50): `RunInit` starts on
+        // the new text's `/INIT` (its reload branch).
+        self.chapter_reload = true;
         self.chapter = d.chapter;
+        self.vars[self.keys.chapter] = d.chapter;
         if !self.load_chapter(host, d.chapter) {
             self.fail(format!(
                 "SetVariables(): chapitre introuvable scenar\\chapi{:03}.con",

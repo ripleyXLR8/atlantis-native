@@ -243,6 +243,9 @@ impl Game {
             log::warn!("AtlBink_start({file}): frame rate incorrect (p_Fps={fps}).");
             return false;
         }
+        // 0x006e01e0 := traj (@ 0x00402449), after the rate check: a
+        // refused rate keeps the previous film's.
+        self.film_traj = traj;
         let name = paths.video.rsplit('/').next().unwrap_or(file);
         let film = match Film::open(name, Arc::from(data), self.depth(), self.now) {
             Ok(f) => f,
@@ -328,6 +331,22 @@ impl Game {
     /// One pass of loop mode 5 (FUN_00402fb0): the cine-in or cine-out
     /// when one runs, else the film's frame.
     pub(crate) fn film_pass_2004(&mut self) {
+        // A cine-out left by a failed start (0x006e01f4 = 1, p = 1.0: a
+        // cine-in, if any, also ends at 1.0): FUN_00402fb0 runs it instead
+        // of the film's frames; its end closes this film.
+        if self.film_cine.is_none() && self.film_cine_out_stale {
+            if let Some(f) = self.film.as_ref() {
+                self.film_cine_out_stale = false;
+                self.film_cine = Some(Cine {
+                    out: true,
+                    p: 1.0,
+                    last: self.now,
+                    start: None,
+                    back: f.back,
+                    stopped: false,
+                });
+            }
+        }
         if self.film_cine.is_some() {
             self.cine_step();
         } else {
@@ -367,10 +386,23 @@ impl Game {
                 self.film_close(c.stopped);
             } else if let Some((file, txt, fps)) = c.start {
                 if !self.atl_bink_start(&file, &txt, fps, false, false, Vec::new(), c.back) {
-                    // `AtlBink_Start` failed (mode back), then FUN_00403340
-                    // → FUN_00403230 with no film open.
+                    // `AtlBink_Start` failed: the mode back (FUN_004a2620
+                    // (0x006e018c) on each of its failure paths), 0 returned
+                    // (@ 0x00402ffb), so the frame routine calls FUN_00403340
+                    // (@ 0x004a1567). There, a cine-out wanted (0x006e01ec)
+                    // and 0x006e01e0 clear: 0x006e01f4 := 1, p := 1.0, the
+                    // stretch surface closed, return — no FUN_00403230, so
+                    // the section is not resumed, and the next film's passes
+                    // (FUN_00402fb0 tests 0x006e01f4 before playing) run the
+                    // cine-out. Else FUN_00403230 with no film open: the
+                    // section resumes. No CD script has `cineout`
+                    // [CONFIRMED-DATA].
                     self.mode = c.back;
-                    self.film_close(false);
+                    if self.film_cine_out && !self.film_traj {
+                        self.film_cine_out_stale = true;
+                    } else {
+                        self.film_close(false);
+                    }
                 }
             }
             return;

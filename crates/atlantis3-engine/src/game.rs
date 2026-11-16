@@ -254,6 +254,13 @@ pub struct Game {
     film_cine: Option<film::Cine>,
     film_cine_in: bool,
     film_cine_out: bool,
+    /// 0x006e01e0: the last film's travel flag, as `AtlBink_Start` sets it
+    /// after its frame rate check (@ 0x00402449); kept across films.
+    film_traj: bool,
+    /// 0x006e01f4 left at 1 outside loop mode 5: a cine-in whose
+    /// `AtlBink_Start` failed with a cine-out wanted ([`film`]); the next
+    /// film's passes run that cine-out.
+    film_cine_out_stale: bool,
     film_skip_key: bool,
     /// `AtlBink_Start` ran while the script was out of the game (a
     /// `CINEMA=` without cine-in): its `NUMFRAMEVIDEO` := 0 is written
@@ -545,6 +552,8 @@ impl Game {
             film_cine: None,
             film_cine_in: false,
             film_cine_out: false,
+            film_traj: false,
+            film_cine_out_stale: false,
             film_skip_key: false,
             numframevideo_reset: false,
             view_no_turn_2004: false,
@@ -4023,10 +4032,64 @@ impl Game {
             return false;
         };
         let (yaw, pitch) = zone_aim_a3(self.camera.fpu, &z.points);
-        self.camera.enter(yaw, pitch);
+        self.aim_camera(yaw, pitch);
         self.look.stop();
         self.centre = self.pick_centre();
         self.centre == Some(i)
+    }
+
+    /// Points the camera at (yaw, pitch) (radians, the read-back angles'
+    /// convention) for the tests' aims: with the 2004 ship's node in the
+    /// way (its pitching on, or the camera still its child), by the turns
+    /// the look makes (FUN_00444920 about the ship's Y, FUN_004449e0 about
+    /// the camera's X), so the next look pass keeps them; else
+    /// [`Camera::enter`].
+    fn aim_camera(&mut self, yaw: f32, pitch: f32) {
+        if !self.ship.engaged() {
+            self.camera.enter(yaw, pitch);
+            return;
+        }
+        for _ in 0..4 {
+            let (y0, p0) = self.camera.angles();
+            self.ship.pitch(&mut self.camera, p0);
+            self.ship.yaw(&mut self.camera, y0 - yaw);
+            self.ship.pitch(&mut self.camera, -pitch);
+        }
+    }
+
+    /// [`Game::aim_at_zone`], then, when the zone's aim point is not under
+    /// the centre (a concave zone, one in front of it, the ship's node
+    /// turning the camera), the first orientation in 1° steps whose
+    /// centre picks it (tests: a player turning until the cursor shows
+    /// the zone).
+    #[doc(hidden)]
+    pub fn aim_at_zone_scan(&mut self, pred: impl Fn(&wam::Zone) -> bool) -> bool {
+        if self.aim_at_zone(&pred) {
+            return true;
+        }
+        let Some(i) = self
+            .place
+            .view
+            .and_then(|v| self.place.wam.view(v))
+            .and_then(|v| v.zones.iter().position(&pred))
+        else {
+            return false;
+        };
+        let fpu = self.camera.fpu;
+        for pitch in (-120..=120).map(|p: i32| if p % 2 == 0 { p / 2 } else { -(p + 1) / 2 }) {
+            for yaw in 0..360 {
+                self.aim_camera(
+                    atlantis2_engine::script::a3::deg_to_rad_a3(fpu, yaw),
+                    atlantis2_engine::script::a3::deg_to_rad_a3(fpu, pitch),
+                );
+                if self.pick_centre() == Some(i) {
+                    self.look.stop();
+                    self.centre = Some(i);
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// The face pixel under `c`'s screen centre: *Atlantis III*'s
@@ -4080,7 +4143,12 @@ impl Game {
             }
         }
         let Some(c) = found else { return false };
-        self.camera = c;
+        if self.ship.engaged() {
+            let (yaw, pitch) = c.angles();
+            self.aim_camera(yaw, pitch);
+        } else {
+            self.camera = c;
+        }
         self.look.stop();
         self.centre = self.pick_centre();
         self.click();
