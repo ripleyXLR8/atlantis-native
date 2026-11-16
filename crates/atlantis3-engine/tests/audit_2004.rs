@@ -455,3 +455,23 @@ fn a_disabled_zone_is_not_picked() {
         g.place()
     );
 }
+
+/// The loader (FUN_00460b50) sets the chapter (0x0070fbf8, @ 0x00461b57)
+/// and `CHAPTER` from it (FUN_00450c60 @ 0x00461b5d) before `(Vue=n)`,
+/// whose view reset (FUN_00450d80) takes the chapter from `CHAPTER`: a
+/// game loaded from the start page is in the file's chapter, and saved at
+/// once it writes that chapter again (`Chapitre = `, FUN_0045f080
+/// @ 0x0045f89e reads 0x0070fbf8).
+#[test]
+fn a_load_keeps_the_chapter() {
+    let Some((mut g, _)) = cabin() else { return };
+    let name = g.save_game().unwrap();
+    let text = g.saved(&name).unwrap().to_vec();
+    let mut g2 = game().unwrap();
+    assert!(g2.load_save_text("game1_9.sav", text));
+    assert_eq!(g2.script().unwrap().chapter, 1);
+    assert_eq!(var(&g2, "CHAPTER"), 1);
+    let n2 = g2.save_game().unwrap();
+    let again = String::from_utf8_lossy(g2.saved(&n2).unwrap()).into_owned();
+    assert!(again.contains("\nChapitre = 1\n"), "{again}");
+}
