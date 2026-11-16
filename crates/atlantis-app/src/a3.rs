@@ -44,7 +44,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
+use winit::keyboard::{Key, NamedKey, PhysicalKey};
 use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 
 pub use atlantis3_data::files::holds_atlantis3;
@@ -413,8 +413,13 @@ impl ApplicationHandler for A3App {
             return;
         }
         let (gw, gh) = (self.game.width() as u32, self.game.height() as u32);
+        let title = if self.evolution_2004 {
+            "Atlantis Evolution (2004) - Atlantis Native"
+        } else {
+            "Atlantis III - Atlantis Native"
+        };
         let attrs = Window::default_attributes()
-            .with_title("Atlantis III - Atlantis Native")
+            .with_title(title)
             .with_inner_size(LogicalSize::new(gw, gh))
             .with_fullscreen(self.fullscreen.then_some(Fullscreen::Borderless(None)));
         let window = match el.create_window(attrs) {
@@ -482,7 +487,7 @@ impl ApplicationHandler for A3App {
         if let WindowEvent::KeyboardInput { event: k, .. } = &event {
             if self.evolution_2004 {
                 if let PhysicalKey::Code(c) = k.physical_key {
-                    if let Some(vk) = virtual_key(c) {
+                    if let Some(vk) = crate::vk::virtual_key(c) {
                         self.game.key_2004(vk, k.state == ElementState::Pressed);
                     }
                 }
@@ -562,14 +567,15 @@ impl ApplicationHandler for A3App {
     }
 }
 
-/// Opens a window on the game; returns when it is closed.
-/// *Atlantis Evolution*'s 2004 program (`--evolution2004 <install>`, a
-/// development entry while the port is in progress, atlantis4-re decision
-/// 0008): the CD install read through
+/// *Atlantis Evolution*'s 2004 program (`--evolution2004 <install>`, the
+/// development entry; the game library and a bare install folder on the
+/// command line run it as well, [`run_evolution_2004_on`]; atlantis4-re
+/// decision 0008): the CD install read through
 /// [`atlantis3_data::evolution2004::Evolution2004Source`], its saves and
 /// settings in the player's `atlantis-evolution-2004` folder (its saves
 /// in `save/`, its `Atlantis4.cfg` read from there once the menus wrote
-/// it); the start-up's logos, then the start page.
+/// it); the start-up's logos, then the start page. Opens a window on the
+/// game; returns when it is closed.
 pub fn run_evolution_2004(dir: &Path, fullscreen: bool) -> Result<(), String> {
     let game = open_evolution_2004(dir, &evolution_2004_data_dir())?;
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
@@ -577,6 +583,88 @@ pub fn run_evolution_2004(dir: &Path, fullscreen: bool) -> Result<(), String> {
     app.evolution_2004 = true;
     el.run_app(&mut app)
         .map_err(|e| format!("The window failed: {e}"))
+}
+
+/// [`run_evolution_2004`] for the game started from the game library (or
+/// its folder given alone on the command line), on its event loop: with
+/// `shift_grace` Shift held in the first moments goes back to the library,
+/// as for the other games.
+pub fn run_evolution_2004_on(
+    el: &mut EventLoop<()>,
+    dir: &Path,
+    fullscreen: bool,
+    shift_grace: bool,
+) -> Result<Ended, String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    let game = open_evolution_2004(dir, &evolution_2004_data_dir())?;
+    let mut app = A3App::new(game, fullscreen, true);
+    app.evolution_2004 = true;
+    app.started_from_library(shift_grace.then(|| Instant::now() + SHIFT_GRACE));
+    el.run_app_on_demand(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))?;
+    Ok(if app.to_library {
+        Ended::Library
+    } else {
+        Ended::Quit
+    })
+}
+
+pub use atlantis3_data::evolution2004::holds_evolution_2004;
+
+/// The edition of the 2004 program's install in `dir`, for the game
+/// library and the window ("Atlantis Evolution (2004), CD, English",
+/// atlantis4-re decision 0008): its `Atlantis Evolution.exe` identified by
+/// size, PE timestamp and MD5
+/// ([`atlantis3_data::evolution2004::KNOWN_BUILDS`]).
+pub fn evolution_2004_label(dir: &Path) -> Result<String, atlantis3_data::evolution2004::ExeError> {
+    use atlantis3_data::evolution2004::{edition_label, identify_dir, ExeError};
+    match identify_dir(dir) {
+        Some(build) => build.map(edition_label),
+        None => Err(ExeError::NotPe),
+    }
+}
+
+/// [`headless`] for the 2004 program: the start-up's logos (skipped with
+/// `skip_logos`), then the start page, `frames` frames of 1/60 s, the
+/// saves in `base`; the screen to `screenshot` when given.
+pub fn headless_evolution_2004(
+    dir: &Path,
+    base: &Path,
+    frames: u64,
+    screenshot: Option<&Path>,
+    skip_logos: bool,
+) -> Result<(), String> {
+    let label = evolution_2004_label(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let mut game = open_evolution_2004(dir, base)?;
+    println!("{label}, {}", crate::version_string());
+    game.start_logos_2004();
+    let mut sound = vec![0.0f32; 2 * (22050 / 60)];
+    for i in 0..frames {
+        if skip_logos && game.logos_running_2004() {
+            game.skip();
+        }
+        game.step(i as f64 / 60.0);
+        game.audio.fill(&mut sound, 22050, 2);
+        if game.quit {
+            break;
+        }
+    }
+    println!(
+        "{frames} frames, mode {:?}, {}x{}, logos {}",
+        game.mode(),
+        game.width(),
+        game.height(),
+        if game.logos_running_2004() {
+            "running"
+        } else {
+            "done"
+        }
+    );
+    if let Some(path) = screenshot {
+        std::fs::write(path, png(&game)).map_err(|e| format!("{}: {e}", path.display()))?;
+        println!("screenshot: {}", path.display());
+    }
+    Ok(())
 }
 
 /// The 2004 program's folder in the per-user data folder.
@@ -601,13 +689,14 @@ pub fn open_evolution_2004(dir: &Path, base: &Path) -> Result<Game, String> {
     game.save_dir = Some(base.join("save"));
     game.menus_mut().cfg_path = Some(cfg_path);
     log::info!(
-        "Atlantis Evolution (2004), development entry, {}; data in {}",
+        "Atlantis Evolution (2004), {}; saves and settings in {}",
         crate::version_string(),
         base.display()
     );
     Ok(game)
 }
 
+/// Opens a window on the game; returns when it is closed.
 pub fn run_window(game: Game, fullscreen: bool, no_intro: bool) -> Result<(), String> {
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     let mut app = A3App::new(game, fullscreen, no_intro);
@@ -634,123 +723,6 @@ pub fn run_window_on(
         Ended::Library
     } else {
         Ended::Quit
-    })
-}
-
-/// A key's Windows virtual-key code (the 2004 program's key handlers and
-/// `GetKeyboardState`): letters, digits, the arrows, the editing keys,
-/// Enter, Escape, Space, Tab, Backspace, the function keys, the modifiers
-/// (`WM_KEYDOWN`'s generic codes), the keypad.
-fn virtual_key(c: KeyCode) -> Option<u8> {
-    use KeyCode as K;
-    let letters = [
-        K::KeyA,
-        K::KeyB,
-        K::KeyC,
-        K::KeyD,
-        K::KeyE,
-        K::KeyF,
-        K::KeyG,
-        K::KeyH,
-        K::KeyI,
-        K::KeyJ,
-        K::KeyK,
-        K::KeyL,
-        K::KeyM,
-        K::KeyN,
-        K::KeyO,
-        K::KeyP,
-        K::KeyQ,
-        K::KeyR,
-        K::KeyS,
-        K::KeyT,
-        K::KeyU,
-        K::KeyV,
-        K::KeyW,
-        K::KeyX,
-        K::KeyY,
-        K::KeyZ,
-    ];
-    if let Some(i) = letters.iter().position(|&l| l == c) {
-        return Some(b'A' + i as u8);
-    }
-    let digits = [
-        K::Digit0,
-        K::Digit1,
-        K::Digit2,
-        K::Digit3,
-        K::Digit4,
-        K::Digit5,
-        K::Digit6,
-        K::Digit7,
-        K::Digit8,
-        K::Digit9,
-    ];
-    if let Some(i) = digits.iter().position(|&d| d == c) {
-        return Some(b'0' + i as u8);
-    }
-    let pad = [
-        K::Numpad0,
-        K::Numpad1,
-        K::Numpad2,
-        K::Numpad3,
-        K::Numpad4,
-        K::Numpad5,
-        K::Numpad6,
-        K::Numpad7,
-        K::Numpad8,
-        K::Numpad9,
-    ];
-    if let Some(i) = pad.iter().position(|&d| d == c) {
-        return Some(0x60 + i as u8);
-    }
-    let f = [
-        K::F1,
-        K::F2,
-        K::F3,
-        K::F4,
-        K::F5,
-        K::F6,
-        K::F7,
-        K::F8,
-        K::F9,
-        K::F10,
-        K::F11,
-        K::F12,
-    ];
-    if let Some(i) = f.iter().position(|&k| k == c) {
-        return Some(0x70 + i as u8);
-    }
-    Some(match c {
-        K::Backspace => 0x08,
-        K::Tab => 0x09,
-        K::Enter | K::NumpadEnter => 0x0d,
-        // `WM_KEYDOWN`'s generic codes for the modifiers.
-        K::ShiftLeft | K::ShiftRight => 0x10,
-        K::ControlLeft | K::ControlRight => 0x11,
-        K::AltLeft | K::AltRight => 0x12,
-        K::Pause => 0x13,
-        K::CapsLock => 0x14,
-        K::Escape => 0x1b,
-        K::Space => 0x20,
-        K::PageUp => 0x21,
-        K::PageDown => 0x22,
-        K::End => 0x23,
-        K::Home => 0x24,
-        K::ArrowLeft => 0x25,
-        K::ArrowUp => 0x26,
-        K::ArrowRight => 0x27,
-        K::ArrowDown => 0x28,
-        K::Insert => 0x2d,
-        K::Delete => 0x2e,
-        K::NumpadMultiply => 0x6a,
-        K::NumpadAdd => 0x6b,
-        K::NumpadSubtract => 0x6d,
-        K::NumpadDecimal => 0x6e,
-        K::NumpadDivide => 0x6f,
-        K::NumLock => 0x90,
-        K::ScrollLock => 0x91,
-        _ => return None,
     })
 }
 

@@ -161,7 +161,9 @@ last played selected. Each game is shown as its name and edition,
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
-German* or *Atlantis Evolution, GOG.com, English*, and its folder: the
+German*, *Atlantis Evolution, GOG.com, English* or *Atlantis Evolution
+(2004), CD, English* (the original 2004 program, in progress: see
+[The 2004 CD](#the-2004-cd-in-progress)), and its folder: the
 game's name in gold capitals, the edition beside it (why the folder does
 not open, in red, when it does not). The screen has the look of the web
 version's page, and its text and ornaments are drawn at the window's
@@ -193,7 +195,9 @@ build)*, with *from disc images* for the images of its sides); a
 language whose side is not in the drive is shown *not found*, with the
 side to turn the disc to. A folder of CD images is the first game's when
 one of its images is (images of both games' discs side by side
-included). A folder that no longer holds the game (moved, renamed,
+included); the images of Atlantis Evolution's 2004 CDs are not a game
+(they hold its installer), and the search goes on in the folders below
+them. A folder that no longer holds the game (moved, renamed,
 on a drive not plugged in) is shown in red as *not found*: **Locate...**
 (in place of Play) asks where it is now, or remove it.
 
@@ -282,6 +286,12 @@ What to pick:
   kept in the browser under `atlantis-native/atlantis3/`; its controls
   are the desktop's (see [Atlantis III](#atlantis-iii)): a click takes
   the mouse, Escape lets it go first.
+- *Atlantis Evolution*, the 2004 CD (in progress): the folder its
+  installer filled (the one holding `Atlantis Evolution.exe` and `cd0`
+  to `cd4`, about 4 GB, read a part at a time). Its saves and
+  `Atlantis4.cfg` are kept in the browser under
+  `atlantis-native/atlantis-evolution-2004/`; its controls are the
+  desktop's (see [The 2004 CD](#the-2004-cd-in-progress)).
 - A folder holding more than one game: the page asks which one to play.
 
 The sound starts with the first click or key (browsers allow sound only
@@ -853,11 +863,12 @@ without one, by the processor. It runs the original's own menus and
 options; Atlantis Native's options menu (F10) and HD mode are not part
 of it. The PortMaster build plays the first game only.
 
-**Edition.** Only GOG.com's release is known (*Atlantis Evolution*, its
-`Atlantis Evolution.exe` 2,363,910 bytes, MD5
-`f2de382af52f1d89e32ed7c286be8b4f`). Another program is refused with
-its size and MD5, which an issue on GitHub can report so that it is
-added.
+**Edition.** GOG.com's release is the one this section describes
+(*Atlantis Evolution*, its `Atlantis Evolution.exe` 2,363,910 bytes, MD5
+`f2de382af52f1d89e32ed7c286be8b4f`). The original 2004 CD program is
+known too, in progress (see [The 2004 CD](#the-2004-cd-in-progress)).
+Another program is refused with its size and MD5, which an issue on
+GitHub can report so that it is added.
 
 **Languages.** GOG.com's installation holds the five languages, English,
 French, German, Italian and Spanish, and one program for all of them;
@@ -929,6 +940,52 @@ there, written with the defaults at the first start:
 | `language` | `auto` (the installation's `lang.ini`, as the original), or `de`, `en`, `es`, `fr`, `it` |
 | `renderer` | `gpu` (the graphics card) or `cpu` (the processor: slower, used when no OpenGL 3.3 or ES 3.0 context can be made) |
 | `fullscreen` | `on` (the original's start) or `off`; F11 and Alt+Enter change it |
+
+### The 2004 CD (in progress)
+
+The original program of 2004, sold on four CDs by The Adventure Company
+(English; `Atlantis Evolution.exe` of 3,022,848 bytes, MD5
+`2199bc93d2ac3f8b4279e0db898559e8`, dated 2004-09-28), is Cryo's engine
+grown from *Atlantis III*'s, not GOG.com's 2012 program: Atlantis Native
+plays it with its *Atlantis III* engine. The game library shows it as
+*Atlantis Evolution (2004), CD, English*, beside GOG.com's edition.
+
+**Status.** Its logos, start page and menus, the saves, the panoramas
+and chapter scripts, the dialogs and voices, the inventory, the music,
+the Bink films, the ship's pitching and its eight mini-games run, each
+traced to the original's code and checked piece by piece by automated
+tests. It has not yet been played through from start to end: it is
+playable, but in progress, and reports are welcome.
+
+**What to point it at.** The CDs hold only the installer's compressed
+archives (`Data1.cab` to `Data4.cab`), which Atlantis Native does not
+unpack: install the game from its CDs (on Windows, or with Wine), then
+add the folder the installer filled to the library, the one holding
+`Atlantis Evolution.exe` and `cd0` to `cd4` (by default
+`C:\Program Files\The Adventure Company\Atlantis Evolution`; **Find
+installations** looks there). That folder holds all four discs: the
+program switches from one disc's folder to the next itself, and the
+CDs are not needed to play. Chosen in the folder picker, a CD (or a
+folder of its images) is explained, not taken for a game. From the
+command line, give the installed folder:
+
+    atlantis-native "C:\Program Files\The Adventure Company\Atlantis Evolution"
+
+(`--headless <folder> [frames] [--no-intro] [--screenshot <file.png>]`
+plays its logos, skipped with `--no-intro`, and its start page without
+a window.)
+
+**Controls.** Those of [Atlantis III](#atlantis-iii-controls): the mouse
+turns the view, a left click acts, the right button opens and closes the
+inventory, Escape opens the menu, Space skips a film, Alt+Enter or F11
+switches the full screen; every key also reaches the program's own
+handlers, as the mini-games need. Started from the library, Shift held
+in its first two seconds goes back to the library's screen.
+
+**Saves and settings.** The saves (`save\`) and `Atlantis4.cfg` (the
+options) are in `atlantis-evolution-2004/` in the per-user data folder;
+until its menus write the player's own, the installation's
+`datas\Atlantis4.cfg` is read. The game's folder is never written.
 
 ## Command line
 

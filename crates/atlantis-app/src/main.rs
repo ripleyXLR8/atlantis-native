@@ -79,6 +79,16 @@
 //! <file>] [--lang <l>] [--cpu] [--gpu-check] [--fullscreen]` is its
 //! development viewer (the shortcuts past the menus).
 //!
+//! A folder holding Atlantis Evolution's 2004 CD installation
+//! (`Atlantis Evolution.exe` beside `cd0\` .. `cd4\`) opens the 2004
+//! program, played by Atlantis III's engine (`atlantis_app::a3`): its
+//! logos, its start page and the game, its saves and `Atlantis4.cfg` in
+//! the `atlantis-evolution-2004` folder of the per-user data folder;
+//! `--headless <folder> [frames] [--no-intro] [--screenshot <file.png>]`
+//! plays the logos (skipped with `--no-intro`) and the start page without
+//! a window. The game library finds and opens it too, as an edition of
+//! Atlantis Evolution; `--evolution2004 <folder>` opens it directly.
+//!
 //! `atlantis-native --list-games` prints the games found on the computer
 //! (every game: what the library's "Find installations" adds) and ends.
 //!
@@ -179,7 +189,8 @@ fn main() {
         }
         return;
     }
-    // Atlantis Evolution's 2004 program, the port in progress.
+    // Atlantis Evolution's 2004 program (the game library and a bare
+    // install folder run it too).
     if args.first().map(String::as_str) == Some("--evolution2004") {
         let fullscreen = args.iter().any(|a| a == "--fullscreen");
         args.retain(|a| a != "--fullscreen");
@@ -503,7 +514,10 @@ fn main() {
         [d] => Some(d),
         _ => None,
     }
-    .filter(|d| atlantis_app::a3::holds_atlantis3(Path::new(d)))
+    .filter(|d| {
+        atlantis_app::a3::holds_atlantis3(Path::new(d))
+            || atlantis_app::a3::holds_evolution_2004(Path::new(d))
+    })
     .cloned();
     if let Some(dir) = a3_dir {
         let headless_run = args[0] == "--headless";
@@ -521,6 +535,22 @@ fn main() {
         }
         refuse(&not_a3, "Atlantis III's mode");
         let no_intro = intro == Some(false);
+        if headless_run && atlantis_app::a3::holds_evolution_2004(Path::new(&dir)) {
+            // The 2004 CD program (Atlantis III's engine): its logos
+            // (skipped with `--no-intro`), then its start page.
+            let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
+            if let Err(e) = atlantis_app::a3::headless_evolution_2004(
+                Path::new(&dir),
+                &atlantis_app::a3::evolution_2004_data_dir(),
+                frames,
+                screenshot.as_deref(),
+                no_intro,
+            ) {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+            return;
+        }
         if headless_run {
             let frames: u64 = args.get(2).and_then(|f| f.parse().ok()).unwrap_or(600);
             if let Err(e) = atlantis_app::a3::headless(

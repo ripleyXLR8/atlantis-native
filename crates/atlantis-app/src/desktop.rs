@@ -1335,6 +1335,89 @@ mod tests {
         let _ = std::fs::remove_dir_all(&d);
     }
 
+    /// Atlantis Evolution's 2004 CD as the library shows it: an
+    /// installation of its layout with an unknown program refused as "not
+    /// supported yet" (its size and MD5 in the folder's message), its data
+    /// without the program refused with what is missing, a folder of its
+    /// CDs explained (the installer's archives), and the installation
+    /// (`ATLANTIS4_CD`) described with its edition and found by the search,
+    /// also below the folder of the CD images.
+    #[test]
+    fn describes_evolution_2004() {
+        let d = tmp("a4cd");
+        let fake = d.join("Atlantis Evolution");
+        std::fs::create_dir_all(fake.join("cd0/datas/scenar")).unwrap();
+        std::fs::create_dir_all(fake.join("cd1/datas/warp")).unwrap();
+        let mut exe = vec![0u8; 80];
+        exe[..2].copy_from_slice(b"MZ");
+        exe[0x3c] = 0x40;
+        exe[0x40..0x44].copy_from_slice(b"PE\0\0");
+        std::fs::write(fake.join("Atlantis Evolution.exe"), &exe).unwrap();
+        assert_eq!(setup::kind_of(&fake), Some(GameKind::Atlantis4));
+        let e = describe(&fake);
+        assert!(
+            !e.found && e.label.contains("Atlantis Evolution not supported yet"),
+            "{}",
+            e.label
+        );
+        assert_eq!(e.kind, Some(GameKind::Atlantis4));
+        let why = open_any(&fake).err().unwrap();
+        assert!(why.contains("80 bytes") && why.contains("MD5"), "{why}");
+        // The data without the program.
+        std::fs::remove_file(fake.join("Atlantis Evolution.exe")).unwrap();
+        assert_eq!(setup::kind_of(&fake), Some(GameKind::Atlantis4));
+        let err = crate::a4::label(&fake).unwrap_err();
+        assert!(matches!(err, atlantis4_data::files::OpenError::NoExe));
+        assert!(setup::explain_atlantis4(&fake, &err).contains("cd0 to cd4"));
+        // A copy of the first CD: no game, explained.
+        let disc = d.join("ATLEVO_CD1");
+        touch(&disc.join("Atlantis Evolution.msi"));
+        touch(&disc.join("Data1.cab"));
+        assert_eq!(setup::kind_of(&disc), None);
+        assert!(setup::evolution_2004_discs(&disc));
+        let text = setup::explain(&disc, &GameError::NoExecutable);
+        assert!(text.contains("CDs of Atlantis Evolution (2004)"), "{text}");
+        let Some(cd) = atlantis3_data::testing::dir_of("ATLANTIS4_CD") else {
+            let _ = std::fs::remove_dir_all(&d);
+            return;
+        };
+        let e = describe(&cd);
+        assert!(e.found, "{}", e.label);
+        assert_eq!(e.label, "Atlantis Evolution (2004), CD, English");
+        assert_eq!(e.kind, Some(GameKind::Atlantis4));
+        assert!(matches!(open_any(&cd), Ok(Opened::Atlantis4(_))));
+        link(&cd, &d.join("Games/Atlantis Evolution"));
+        let found = first_of_each_game(&[d.join("Games")]);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].0, d.join("Games/Atlantis Evolution"));
+        assert_eq!(found[0].1.label(), "Atlantis Evolution (2004), CD, English");
+        // The CD images beside the installation (the images of the
+        // installer's discs, not the first game's): the search goes on
+        // below them, and the images alone are explained.
+        let isos = cd
+            .parent()
+            .map(Path::to_path_buf)
+            .filter(|p| (1..=4).all(|n| p.join(format!("atlevo-cd{n}.iso")).is_file()));
+        if let Some(isos) = isos {
+            assert_eq!(setup::kind_of(&isos), None);
+            assert!(setup::evolution_2004_discs(&isos));
+            let roots = setup::find_roots(&isos, 4);
+            assert_eq!(roots, vec![(cd.clone(), GameKind::Atlantis4)]);
+            let only = d.join("isos");
+            std::fs::create_dir_all(&only).unwrap();
+            for n in 1..=4 {
+                let name = format!("atlevo-cd{n}.iso");
+                link(&isos.join(&name), &only.join(&name));
+            }
+            assert_eq!(setup::find_roots(&only, 4), vec![]);
+            let text = setup::explain(&only, &GameError::NoExecutable);
+            assert!(text.contains("not the installed game"), "{text}");
+        } else {
+            eprintln!("no atlevo-cd1..4.iso beside ATLANTIS4_CD: the CD images not checked");
+        }
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
     /// Atlantis II's editions as the library shows them: GOG.com's folder,
     /// the CD installation with its discs' images in a folder inside it,
     /// the same patched to 1.01, the CD installation without its discs.

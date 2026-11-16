@@ -1056,9 +1056,38 @@ pub fn language_name(tag: &str) -> Option<&'static str> {
 
 /// The edition of the installation in `dir`, for the game library: the
 /// build's name and the language its `lang.ini` gives, as the original
-/// chooses it ("Atlantis Evolution, GOG.com, French").
+/// chooses it ("Atlantis Evolution, GOG.com, French"). The 2004 CD
+/// program's install ([`crate::a3::holds_evolution_2004`], played by
+/// *Atlantis III*'s engine) gives its own ("Atlantis Evolution (2004), CD,
+/// English", [`crate::a3::evolution_2004_label`]), its unknown program
+/// refused as GOG.com's is.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn label(dir: &Path) -> Result<String, atlantis4_data::files::OpenError> {
+    let cd_layout = {
+        use atlantis_data::FileSource;
+        atlantis_data::StdDir::new(dir).has_dir("cd0/datas/scenar")
+    };
+    if cd_layout {
+        use atlantis3_data::evolution2004::ExeError as E2004;
+        use atlantis4_data::exe::ExeError;
+        if !crate::a3::holds_evolution_2004(dir) {
+            return Err(atlantis4_data::files::OpenError::NoExe);
+        }
+        return crate::a3::evolution_2004_label(dir).map_err(|e| {
+            atlantis4_data::files::OpenError::Exe(match e {
+                E2004::NotPe => ExeError::NotPe,
+                E2004::Unknown {
+                    size,
+                    pe_timestamp,
+                    md5,
+                } => ExeError::Unknown {
+                    size,
+                    pe_timestamp,
+                    md5,
+                },
+            })
+        });
+    }
     let (files, build) = A4Files::open_dir(dir)?;
     Ok(match language_name(&files.language()) {
         Some(name) => format!("{}, {name}", build.label),
@@ -1341,6 +1370,10 @@ pub fn run_window_on(
     shift_grace: bool,
 ) -> Result<crate::a2::Ended, String> {
     use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    // The 2004 CD program: Atlantis III's engine, its own window.
+    if crate::a3::holds_evolution_2004(dir) {
+        return crate::a3::run_evolution_2004_on(el, dir, fullscreen, shift_grace);
+    }
     let path = settings_path();
     let settings = load_settings(&path);
     let render = Render {

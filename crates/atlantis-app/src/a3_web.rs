@@ -3,6 +3,11 @@
 //! original's keys and its display sizes and depths (the options'
 //! switch), the frame presented through WebGL 2.
 //!
+//! *Atlantis Evolution*'s 2004 CD program, played by the same engine
+//! ([`start_evolution_2004`]), runs here as on the desktop: its logos
+//! before its start page, every key to its key handlers, its saves and
+//! `Atlantis4.cfg` under `atlantis-native/atlantis-evolution-2004/`.
+//!
 //! The game's files are the picked folder's, read when the engine reads
 //! them ([`crate::web`]'s `PickedDir`). The saves (with their thumbnails)
 //! and `Atlantis3.cfg` are kept in the browser's `localStorage` under
@@ -31,7 +36,7 @@ use winit::application::ApplicationHandler;
 use winit::dpi::PhysicalPosition;
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
-use winit::keyboard::{Key, NamedKey};
+use winit::keyboard::{Key, NamedKey, PhysicalKey};
 use winit::platform::web::EventLoopExtWebSys;
 use winit::window::{Window, WindowId};
 
@@ -45,31 +50,40 @@ const CFG_KEY: &str = "atlantis3.cfg";
 /// busy) is not game time.
 const GAP: f64 = 0.25;
 
-/// The install with `Datas\Atlantis3.cfg` taken from the browser's
-/// storage once the menus wrote it there.
+/// `Atlantis4.cfg`'s key in the 2004 program's storage.
+const CFG_KEY_2004: &str = "atlantis4.cfg";
+
+/// The 2004 program's settings file in its install, as
+/// [`atlantis3_data::evolution2004::Evolution2004Source`] maps it.
+const CFG_PATH_2004: &str = "datas/Atlantis4.cfg";
+
+/// The install with `Datas\Atlantis3.cfg` (the 2004 program's
+/// `datas\Atlantis4.cfg`) taken from the browser's storage once the menus
+/// wrote it there.
 struct WithCfg {
     install: Arc<dyn FileSource>,
     cfg: Option<Vec<u8>>,
+    /// The settings file's name in the install.
+    name: &'static str,
 }
 
 impl WithCfg {
-    fn is_cfg(name: &str) -> bool {
-        name.replace('\\', "/")
-            .eq_ignore_ascii_case(atlantis3_data::cfg::CFG_PATH)
+    fn is_cfg(&self, name: &str) -> bool {
+        name.replace('\\', "/").eq_ignore_ascii_case(self.name)
     }
 }
 
 impl FileSource for WithCfg {
     fn size(&self, name: &str) -> Option<u64> {
         match &self.cfg {
-            Some(d) if Self::is_cfg(name) => Some(d.len() as u64),
+            Some(d) if self.is_cfg(name) => Some(d.len() as u64),
             _ => self.install.size(name),
         }
     }
 
     fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
         match &self.cfg {
-            Some(d) if Self::is_cfg(name) => {
+            Some(d) if self.is_cfg(name) => {
                 let start = usize::try_from(offset).ok()?.min(d.len());
                 Some(d[start..(start + len).min(d.len())].to_vec())
             }
@@ -93,6 +107,7 @@ pub fn start(install: Arc<dyn FileSource>, store: Rc<dyn SaveStore>) -> Result<(
     let files = A3Files::new(Arc::new(WithCfg {
         install,
         cfg: cfg.clone(),
+        name: atlantis3_data::cfg::CFG_PATH,
     }));
     let label = files
         .edition_label()
@@ -130,6 +145,54 @@ pub fn start(install: Arc<dyn FileSource>, store: Rc<dyn SaveStore>) -> Result<(
     Ok(())
 }
 
+/// Starts *Atlantis Evolution*'s 2004 CD program from its installed folder
+/// `install` (the one with `Atlantis Evolution.exe` and `cd0` .. `cd4`),
+/// the saves and `Atlantis4.cfg` in `store`: its logos, then its start
+/// page, as the desktop's `crate::a3::run_evolution_2004`.
+pub fn start_evolution_2004(
+    install: Arc<dyn FileSource>,
+    store: Rc<dyn SaveStore>,
+) -> Result<(), JsValue> {
+    use atlantis3_data::evolution2004::{edition_label, identify, Evolution2004Source, EXE_NAME};
+    let exe = install
+        .read(EXE_NAME)
+        .ok_or_else(|| JsValue::from(format!("Atlantis Evolution (2004): no {EXE_NAME}")))?;
+    let label = identify(&exe)
+        .map(edition_label)
+        .map_err(|e| JsValue::from(format!("Atlantis Evolution (2004): {e}")))?;
+    let cfg = store.read(CFG_KEY_2004);
+    let src = Evolution2004Source::new(Arc::new(WithCfg {
+        install,
+        cfg: cfg.clone(),
+        name: CFG_PATH_2004,
+    }));
+    let files = A3Files::evolution_2004(Arc::new(src));
+    let mut game =
+        Game::new(files).map_err(|e| JsValue::from(format!("Atlantis Evolution (2004): {e}")))?;
+    game.unix_time = || (js_sys::Date::now() / 1000.0) as i64;
+    let mut kept = 0;
+    for name in store.list() {
+        if name == CFG_KEY_2004 {
+            continue;
+        }
+        if let Some(d) = store.read(&name) {
+            game.insert_save(&name, d);
+            kept += 1;
+        }
+    }
+    log::info!(
+        "{label}, {} files kept in the browser, {}",
+        kept,
+        crate::version_string()
+    );
+    let el = EventLoop::new().map_err(|e| e.to_string())?;
+    let mut app = A3App::new(game, store, cfg);
+    app.evolution_2004 = true;
+    app.cfg_key = CFG_KEY_2004;
+    el.spawn_app(app);
+    Ok(())
+}
+
 /// The window's application.
 struct A3App {
     game: Game,
@@ -159,6 +222,11 @@ struct A3App {
     times: FrameTimes,
     state_in: u32,
     done: bool,
+    /// The 2004 program ([`start_evolution_2004`]): its logos in place of
+    /// the intro, every key to its key handlers.
+    evolution_2004: bool,
+    /// The settings file's key in the storage.
+    cfg_key: &'static str,
 }
 
 impl A3App {
@@ -186,6 +254,8 @@ impl A3App {
             times: FrameTimes::default(),
             state_in: 0,
             done: false,
+            evolution_2004: false,
+            cfg_key: CFG_KEY,
         }
     }
 
@@ -254,7 +324,7 @@ impl A3App {
         }
         let cfg = self.game.menus().cfg_written.clone();
         if let Some(c) = cfg.filter(|c| self.cfg_kept.as_ref() != Some(c)) {
-            self.store.write(CFG_KEY, &c);
+            self.store.write(self.cfg_key, &c);
             self.cfg_kept = Some(c);
         }
     }
@@ -306,7 +376,14 @@ impl A3App {
         run_test_commands(&mut self.game, &mut self.times);
         if !self.intro_started {
             self.intro_started = true;
-            self.game.start_intro();
+            if self.evolution_2004 {
+                // Loop mode 1 (FUN_0045e970): the logos, then the start
+                // page.
+                self.intro_done = true;
+                self.game.start_logos_2004();
+            } else {
+                self.game.start_intro();
+            }
         }
         self.game.step(self.clock);
         if !self.intro_done && self.game.mode() == Mode::Idle {
@@ -352,8 +429,13 @@ impl ApplicationHandler for A3App {
             return;
         }
         use winit::platform::web::{WindowAttributesExtWebSys, WindowExtWebSys};
+        let title = if self.evolution_2004 {
+            "Atlantis Evolution (2004) - Atlantis Native"
+        } else {
+            "Atlantis III - Atlantis Native"
+        };
         let attrs = Window::default_attributes()
-            .with_title("Atlantis III - Atlantis Native")
+            .with_title(title)
             .with_append(true);
         let window = match el.create_window(attrs) {
             Ok(w) => Rc::new(w),
@@ -399,6 +481,18 @@ impl ApplicationHandler for A3App {
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         if self.done {
             return;
+        }
+        // The 2004 program: every key press (repeats included, as
+        // `WM_KEYDOWN`) and release reaches its key handlers and the
+        // mini-games' `GetKeyboardState`, as on the desktop.
+        if let WindowEvent::KeyboardInput { event: k, .. } = &event {
+            if self.evolution_2004 {
+                if let PhysicalKey::Code(c) = k.physical_key {
+                    if let Some(vk) = crate::vk::virtual_key(c) {
+                        self.game.key_2004(vk, k.state == ElementState::Pressed);
+                    }
+                }
+            }
         }
         match event {
             WindowEvent::RedrawRequested => self.redraw(el),
@@ -461,12 +555,8 @@ impl ApplicationHandler for A3App {
                     Key::Named(NamedKey::F11) => a2_web::toggle_fullscreen(),
                     Key::Named(NamedKey::Escape) if self.game.credits().is_some() => {
                         if self.game.credits_escape() {
-                            let data = self
-                                .game
-                                .startup
-                                .config
-                                .write(&self.game.startup.install_language);
-                            self.store.write(CFG_KEY, &data);
+                            let data = self.game.cfg_file_text();
+                            self.store.write(self.cfg_key, &data);
                             self.cfg_kept = Some(data);
                         }
                     }

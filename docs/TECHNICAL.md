@@ -4318,7 +4318,9 @@ to change them.
 
 ## Atlantis Evolution
 
-*Atlantis Evolution* (2004) is known in one edition, GOG.com's, whose
+*Atlantis Evolution* (2004) has two programs. This section is about
+GOG.com's (the 2004 CD's original program, played by the *Atlantis III*
+engine, is in [The 2004 CD program](#the-2004-cd-program) below), whose
 `Atlantis Evolution.exe` (2,363,910 bytes, MD5
 `f2de382af52f1d89e32ed7c286be8b4f`, a 2012 Tetraedge Engine program) is
 the reference of every address quoted in its crates. Nothing of Cryo's
@@ -4422,6 +4424,62 @@ original. Native adds its own choice over `lang.ini`: `--lang
 and `?lang=fr` in the web page's address. `tests/languages.rs` boots
 each language present: the first node, the intro's sound file, a
 narration's text and voice, and the menu pictures.
+
+### The 2004 CD program
+
+The CD of The Adventure Company (English, four discs) holds the
+original program, atlantis4-cd-en-3022848 (`Atlantis Evolution.exe` of
+3,022,848 bytes, PE timestamp 0x415917e6, MD5
+`2199bc93d2ac3f8b4279e0db898559e8`): *Atlantis III*'s engine grown, so
+Native plays it as a variant of its *Atlantis III* engine
+(atlantis4-re decisions 0007 and 0008), not with the `atlantis4-*`
+crates. Its formats and subsystems are in `atlantis3-data`
+(`evolution2004*.rs`, the Bink decoder) and `atlantis3-engine` (the
+`*2004.rs` modules), switched on by `A3Files::evolution_2004`; it is in
+progress (not yet played through from start to end).
+
+**Files.** The discs hold only InstallShield cabinets (`Data1.cab` ..
+`Data4.cab` and their `Data<N>1.cab` tails, disc 1 also `Atlantis
+Evolution.msi`), which Native does not unpack. The installer copies
+every disc to the hard disk, one folder each (`cd0` .. `cd4`, each with
+its `datas\`), and writes the install type `FLA`; with it the program
+builds each data path from the folder the file belongs to, the disc-0
+folders under `cd0\`, the others under the current disc's `cd<N>\`,
+which `CHANGECD` (`Menu_TestChangeCD`) sets without asking for a disc.
+`Evolution2004Source` maps the engine's `Datas\` names that way and
+`A3Files::set_disc` follows `CHANGECD`, so the installed folder alone is
+the game: no CD or CD image is read.
+
+**Detection and the library.** `holds_evolution_2004` (the program
+beside `cd0/datas/scenar`) makes `setup::kind_of` take the folder as
+Atlantis Evolution's (`GameKind::Atlantis4`): one game, two editions.
+`evolution2004::identify` checks the program by size, PE timestamp and
+MD5; `a4::label` gives the CD's install the label *Atlantis Evolution
+(2004), CD, English* (`evolution2004::edition_label`, decision 0008: the
+game, its program's year, then the edition), refuses an unknown program
+as GOG.com's is (its size and MD5), and the CD's data without the
+program with what is missing. Chosen in the library, the session keeps
+the folder as Atlantis Evolution's (`Session::take_atlantis4`) and
+`a4::run_window_on` hands the CD's install to
+`a3::run_evolution_2004_on`: the *Atlantis III* window, its logos and
+start page, every key to the program's handlers (`vk::virtual_key`),
+Shift in the first two seconds back to the library. Its saves and
+`Atlantis4.cfg` are in `atlantis-evolution-2004/` of the per-user data
+folder. `setup::candidate_folders` looks in the installer's
+`The Adventure Company` folder; `evolution2004::disc_number` recognises
+the four discs (a drive, a copy or an image), so that a folder of their
+images is not taken for the first game's CD images (the search goes on
+below it) and the folder picker explains them
+(`setup::explain_evolution_2004_discs`). The same folder on the command
+line opens it; `--headless <folder>` runs its logos and start page
+without a window; `--evolution2004 <folder>` is the development entry.
+
+**In the browser.** `web_layout::a4cd_install` finds the install among
+the picked files (`atlantis evolution.exe` beside `cd0/datas/scenar/`),
+and `a3_web::start_evolution_2004` runs it in *Atlantis III*'s page
+window, its saves and `Atlantis4.cfg` in `localStorage` under
+`atlantis-native/atlantis-evolution-2004/`; the files are read a part
+at a time, as for the other games.
 
 ## Tests
 

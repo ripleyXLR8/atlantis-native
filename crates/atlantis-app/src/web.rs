@@ -341,6 +341,35 @@ pub async fn start(
     // player's choice.
     let paths: Vec<&str> = all.keys().map(String::as_str).collect();
     let picked = crate::web_layout::picked(&paths);
+    // Atlantis Evolution's 2004 CD alone, or chosen among the games of
+    // the folder.
+    if let Some(install) = crate::web_layout::a4cd_install(&paths) {
+        use crate::web_layout::Picked;
+        let mut others: Vec<&str> = match &picked {
+            Picked::Both(_) => vec!["atlantis=Atlantis: The Lost Tales", "atlantis2=Atlantis II"],
+            Picked::Atlantis2(_) => vec!["atlantis2=Atlantis II"],
+            Picked::LostTales => vec!["atlantis=Atlantis: The Lost Tales"],
+            _ => Vec::new(),
+        };
+        if crate::web_layout::a3_install(&paths).is_some() {
+            others.push("atlantis3=Atlantis III");
+        }
+        if crate::web_layout::a4_install(&paths).is_some() {
+            others.push("atlantis4=Atlantis Evolution");
+        }
+        if others.is_empty() || game.as_deref() == Some("atlantis4cd") {
+            drop(paths);
+            start_evolution_2004(all, &install)?;
+            return Ok("atlantis4cd".into());
+        }
+        if game.is_none() {
+            return Err(format!(
+                "GAMES:{};atlantis4cd=Atlantis Evolution (2004)",
+                others.join(";")
+            )
+            .into());
+        }
+    }
     // Atlantis Evolution alone, or chosen among the games of the folder.
     if let Some(install) = crate::web_layout::a4_install(&paths) {
         use crate::web_layout::Picked;
@@ -892,6 +921,23 @@ fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsVa
         }
     };
     crate::a3_web::start(Arc::new(PickedDir::new(&index, install)), store)
+}
+
+/// Atlantis Evolution's 2004 CD program from its installed folder among
+/// the picked files (Atlantis III's engine, [`crate::a3_web`]), the saves
+/// in the browser's storage. The install (about 4 GB, the four discs
+/// copied by the CD's installer) stays in the player's files: each is read
+/// when the engine reads it, the part it reads.
+fn start_evolution_2004(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
+    let index = keep_picked(all);
+    let store: Rc<dyn SaveStore> = match WebStore::new("atlantis-evolution-2004") {
+        Some(s) => Rc::new(s),
+        None => {
+            log::warn!("no localStorage: the saves last as long as the page");
+            Rc::new(atlantis_engine::MemStore::new())
+        }
+    };
+    crate::a3_web::start_evolution_2004(Arc::new(PickedDir::new(&index, install)), store)
 }
 
 /// Atlantis Evolution from its installed folder among the picked files

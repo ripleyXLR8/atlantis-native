@@ -67,6 +67,7 @@ pub mod session;
 pub mod setup;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod support;
+mod vk;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod watchdog;
 #[cfg(target_arch = "wasm32")]

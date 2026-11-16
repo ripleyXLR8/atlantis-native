@@ -26,6 +26,8 @@ pub struct Build {
     pub id: &'static str,
     /// The edition, for people.
     pub label: &'static str,
+    /// The language of its texts and voices (the installer's `gbr`).
+    pub language: &'static str,
     pub size: u64,
     /// The PE header's `TimeDateStamp`.
     pub pe_timestamp: u32,
@@ -38,6 +40,7 @@ pub struct Build {
 pub const KNOWN_BUILDS: [Build; 1] = [Build {
     id: "atlantis4-cd-en-3022848",
     label: "Atlantis Evolution (2004), CD",
+    language: "English",
     size: 3_022_848,
     // 2004-09-28 09:51:02 UTC.
     pe_timestamp: 0x4159_17e6,
@@ -116,6 +119,38 @@ pub fn identify(exe: &[u8]) -> Result<&'static Build, ExeError> {
             pe_timestamp: stamp,
             md5: hex(&md5),
         })
+}
+
+/// The build of the program in the install `dir` (its `Atlantis
+/// Evolution.exe`); `None` when there is no program.
+pub fn identify_dir(dir: &std::path::Path) -> Option<Result<&'static Build, ExeError>> {
+    let exe = std::fs::read(dir.join(EXE_NAME)).ok()?;
+    Some(identify(&exe))
+}
+
+/// The edition's name for the game library and the window: the game, the
+/// year of its program, the medium and the language (atlantis4-re decision
+/// 0008: "Atlantis Evolution (2004), CD, English").
+pub fn edition_label(build: &Build) -> String {
+    format!("{}, {}", build.label, build.language)
+}
+
+/// Which of the CD's four discs `src` is (the disc's root: a drive, a copy
+/// or a CD image), 0 when none. The discs hold the installer's InstallShield
+/// cabinets only, which the installer unpacks into `cd0` .. `cd4`: disc 1
+/// `Atlantis Evolution.msi` and `Data1.cab`, disc N (2..4) `Data<N>.cab`
+/// with the end of the previous one's, `Data<N-1>1.cab` (the CD images of
+/// atlantis4-re `discs/`).
+pub fn disc_number(src: &dyn atlantis_data::FileSource) -> u8 {
+    if src.size("Atlantis Evolution.msi").is_some() && src.size("Data1.cab").is_some() {
+        return 1;
+    }
+    (2..=4u8)
+        .find(|n| {
+            src.size(&format!("Data{n}.cab")).is_some()
+                && src.size(&format!("Data{}1.cab", n - 1)).is_some()
+        })
+        .unwrap_or(0)
 }
 
 /// A data folder, as one of the program's path builders names it.
@@ -344,6 +379,31 @@ mod tests {
         assert_eq!(hex(&SPR_DLLS[0].3), "dff10ab7a8b3c8a3553b1165f58b766e");
         assert_eq!(hex(&SPR_DLLS[1].3), "d889443ff5e452e8132e3f4bb2d6135c");
         assert_eq!(identify(b"MZ"), Err(ExeError::NotPe));
+    }
+
+    #[test]
+    fn the_discs_and_the_label() {
+        use atlantis_data::files::MemFiles;
+        let disc = |names: &[&str]| {
+            let mut m = MemFiles::new();
+            for n in names {
+                m.insert(n, vec![0]);
+            }
+            disc_number(&m)
+        };
+        assert_eq!(
+            disc(&["Atlantis Evolution.msi", "Data1.cab", "setup.exe"]),
+            1
+        );
+        assert_eq!(disc(&["DATA11.CAB", "DATA2.CAB"]), 2);
+        assert_eq!(disc(&["Data21.cab", "Data3.cab"]), 3);
+        assert_eq!(disc(&["Data31.cab", "Data4.cab"]), 4);
+        assert_eq!(disc(&["Data2.cab"]), 0);
+        assert_eq!(disc(&["Data1.cab"]), 0);
+        assert_eq!(
+            edition_label(&KNOWN_BUILDS[0]),
+            "Atlantis Evolution (2004), CD, English"
+        );
     }
 
     #[test]

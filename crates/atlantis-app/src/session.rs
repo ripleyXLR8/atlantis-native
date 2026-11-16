@@ -859,6 +859,82 @@ mod tests {
         assert!(!app.session().unwrap().wants_own_mode());
     }
 
+    /// Atlantis Evolution's 2004 CD in the game library: its installation
+    /// shown as an edition of Atlantis Evolution ("Atlantis Evolution
+    /// (2004), CD, English") beside GOG.com's, found by the search, chosen
+    /// on the screen it is kept for the program to run after the event loop
+    /// (Atlantis Evolution's slot, whose runner plays the 2004 program on
+    /// Atlantis III's engine), and it opens to its logos and start page
+    /// with its saves in the player's data folder.
+    #[test]
+    fn the_library_plays_evolution_2004() {
+        let Some(cd) = atlantis3_data::testing::dir_of("ATLANTIS4_CD") else {
+            return;
+        };
+        let own = own_data_dir("atlantis4cd");
+        let d = own.dir.clone();
+        let want = "Atlantis Evolution (2004), CD, English";
+        assert_eq!(crate::a4::label(&cd).unwrap(), want);
+        let found = crate::desktop::first_of_each_game(std::slice::from_ref(&cd));
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].0, cd);
+        assert_eq!(found[0].1.kind(), crate::setup::GameKind::Atlantis4);
+        assert_eq!(found[0].1.label(), want);
+        let mut folders: Vec<PathBuf> = std::env::var_os("ATLANTIS4_DATA")
+            .map(PathBuf::from)
+            .into_iter()
+            .collect();
+        folders.push(cd.clone());
+        let text: String = folders
+            .iter()
+            .map(|f| format!("{}\n", f.display()))
+            .collect();
+        std::fs::write(d.join("games.txt"), &text).unwrap();
+        let mut app = app_with_library(&d);
+        app.show_launcher(None);
+        let l = app.session().unwrap().launcher().unwrap();
+        let labels: Vec<&str> = l.entries().iter().map(|e| e.label.as_str()).collect();
+        assert!(l.entries().iter().all(|e| e.found), "{labels:?}");
+        assert_eq!(labels.last(), Some(&want));
+        if folders.len() == 2 {
+            assert!(
+                labels[0].starts_with("Atlantis Evolution, GOG.com, "),
+                "{labels:?}"
+            );
+        }
+        let i = folders.len() - 1;
+        app.run_launcher_action(LauncherAction::Play(i));
+        let s = app.session().unwrap();
+        assert!(s.launcher().is_none());
+        assert!(s.wants_atlantis4() && s.wants_own_mode() && !s.wants_atlantis3());
+        assert_eq!(s.library().folders()[0], cd);
+        assert_eq!(
+            app.session_mut().unwrap().take_atlantis4(),
+            Some(cd.clone())
+        );
+        assert!(!app.session().unwrap().wants_own_mode());
+        // What the program then runs: the 2004 program, from this folder,
+        // its saves in the player's folder; the logos skipped, the start
+        // page.
+        assert!(crate::a3::holds_evolution_2004(&cd));
+        let base = d.join("atlantis-evolution-2004");
+        let mut game = crate::a3::open_evolution_2004(&cd, &base).unwrap();
+        game.start_logos_2004();
+        let mut t = 0.0;
+        while game.logos_running_2004() && t < 60.0 {
+            game.skip();
+            t += 0.04;
+            game.step(t);
+        }
+        for _ in 0..25 {
+            t += 0.04;
+            game.step(t);
+        }
+        assert!(!game.logos_running_2004());
+        assert_eq!(game.mode(), atlantis3_engine::Mode::Menu);
+        assert!(base.is_dir());
+    }
+
     /// Switching games drops the engine: nothing keeps its system alive.
     #[test]
     fn switching_drops_the_engine() {

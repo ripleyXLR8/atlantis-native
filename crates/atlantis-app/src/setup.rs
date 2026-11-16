@@ -30,7 +30,8 @@ pub enum GameKind {
     /// [`atlantis3_data::files::holds_atlantis3`]).
     Atlantis3,
     /// Atlantis Evolution (GOG.com's `Atlantis Evolution.exe` beside
-    /// `3D\OnGameEnter.lua`: [`holds_atlantis4`]).
+    /// `3D\OnGameEnter.lua`, or the 2004 CD's installation, the same name
+    /// beside `cd0\datas\scenar`: [`holds_atlantis4`]).
     Atlantis4,
 }
 
@@ -75,7 +76,8 @@ atlantis2.exe), with the images of its four CDs (or copies of the CDs) in it or 
 folder inside it.\n\
 \u{2022} Atlantis III: GOG.com's installation folder (the one with Game.exe and Datas).\n\
 \u{2022} Atlantis Evolution: GOG.com's installation folder (the one with Atlantis Evolution.exe \
-and 3D).\n\n\
+and 3D), or the folder where its 2004 CD installed it (the one with Atlantis Evolution.exe \
+and cd0 to cd4).\n\n\
 Atlantis Native only reads these files and never changes them.";
 
 /// Case-insensitive lookup of a file in a folder.
@@ -101,16 +103,56 @@ pub fn names_in(dir: &Path) -> Vec<String> {
 
 /// Whether `dir` holds Atlantis Evolution: GOG.com's installation
 /// (`Atlantis Evolution.exe` beside `3D\OnGameEnter.lua`,
-/// [`atlantis4_data::files::holds_atlantis4`]), or its data alone (the
-/// scripts' `3D\OnGameEnter.lua` and `Texts\`, which no folder of the
-/// other games has: the folder is then refused with what is missing).
+/// [`atlantis4_data::files::holds_atlantis4`]), the 2004 CD's
+/// installation (`Atlantis Evolution.exe` beside `cd0\datas\scenar`,
+/// [`atlantis3_data::evolution2004::holds_evolution_2004`]), or the data
+/// alone of either (GOG.com's scripts' `3D\OnGameEnter.lua` and `Texts\`;
+/// the CD's `cd0\datas\scenar` and `cd1\datas`), which no folder of the
+/// other games has: the folder is then refused with what is missing.
 pub fn holds_atlantis4(dir: &Path) -> bool {
     use atlantis_data::FileSource;
-    if atlantis4_data::files::holds_atlantis4(dir) {
+    if atlantis4_data::files::holds_atlantis4(dir)
+        || atlantis3_data::evolution2004::holds_evolution_2004(dir)
+    {
         return true;
     }
     let src = atlantis_data::StdDir::new(dir);
-    src.size(atlantis4_data::files::GAME_ENTER_SCRIPT).is_some() && src.has_dir("Texts")
+    (src.size(atlantis4_data::files::GAME_ENTER_SCRIPT).is_some() && src.has_dir("Texts"))
+        || (src.has_dir("cd0/datas/scenar") && src.has_dir("cd1/datas"))
+}
+
+/// Whether `dir` holds discs of Atlantis Evolution's 2004 CD (a disc's
+/// root, a drive or a copy, or CD images at its top,
+/// [`atlantis3_data::evolution2004::disc_number`]): the installer's
+/// archives, not the game.
+pub fn evolution_2004_discs(dir: &Path) -> bool {
+    use atlantis3_data::evolution2004::disc_number;
+    if disc_number(&atlantis_data::StdDir::new(dir)) != 0 {
+        return true;
+    }
+    std::fs::read_dir(dir).is_ok_and(|entries| {
+        entries.flatten().any(|e| {
+            let name = e.file_name().to_string_lossy().to_ascii_lowercase();
+            atlantis_data::disc_image::IMAGE_EXTENSIONS
+                .iter()
+                .any(|x| name.ends_with(&format!(".{x}")))
+                && atlantis_data::disc_image::DiscImage::open(&e.path())
+                    .is_some_and(|img| disc_number(&img) != 0)
+        })
+    })
+}
+
+/// What to say of a folder of Atlantis Evolution's 2004 discs.
+pub fn explain_evolution_2004_discs(dir: &Path) -> String {
+    format!(
+        "{} holds the CDs of Atlantis Evolution (2004), not the installed game.\n\n\
+         The CDs hold the installer's compressed archives, which Atlantis Native does not \
+         unpack. Install the game from its CDs (on Windows, or with Wine), then choose the \
+         folder where it was installed (by default C:\\Program Files\\The Adventure \
+         Company\\Atlantis Evolution, the one with Atlantis Evolution.exe and cd0 to cd4). \
+         The installation holds all four discs: the CDs are not needed to play.",
+        dir.display()
+    )
 }
 
 /// Which game `dir` itself holds, if any: Atlantis Evolution when
@@ -234,6 +276,9 @@ pub fn find_roots(dir: &Path, depth: usize) -> Vec<(PathBuf, GameKind)> {
 
 /// What to tell the player about a folder that is not a game folder.
 pub fn explain(dir: &Path, err: &GameError) -> String {
+    if evolution_2004_discs(dir) {
+        return explain_evolution_2004_discs(dir);
+    }
     if atlantis2_discs_only(dir) {
         return format!(
             "{} holds the discs of Atlantis II, not the installed game.\n\n\
@@ -249,13 +294,15 @@ pub fn explain(dir: &Path, err: &GameError) -> String {
 /// Whether the CD images at the top of `dir` (by their extension) are
 /// taken for the first game's: when none is one of Atlantis II's discs
 /// (as before Atlantis II was known: any image, the first game's message
-/// then says what is wrong), or when one of them opens and is not (a
-/// folder of both games' images is the first game's).
+/// then says what is wrong) nor of Atlantis Evolution's 2004 CD (the
+/// installer's discs: the installed game may be in a folder below), or
+/// when one of them opens and is neither (a folder of both games' images
+/// is the first game's).
 fn has_other_disc_images(dir: &Path) -> bool {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return false;
     };
-    let (mut images, mut atlantis2, mut other) = (false, false, false);
+    let (mut images, mut other_game, mut other) = (false, false, false);
     for e in entries.flatten() {
         let name = e.file_name().to_string_lossy().to_ascii_lowercase();
         if !atlantis_data::disc_image::IMAGE_EXTENSIONS
@@ -266,7 +313,8 @@ fn has_other_disc_images(dir: &Path) -> bool {
         }
         images = true;
         match atlantis_data::disc_image::DiscImage::open(&e.path()) {
-            Some(img) if atlantis2_data::files::disc_number(&img) != 0 => atlantis2 = true,
+            Some(img) if atlantis2_data::files::disc_number(&img) != 0 => other_game = true,
+            Some(img) if atlantis3_data::evolution2004::disc_number(&img) != 0 => other_game = true,
             Some(_) => other = true,
             None => {}
         }
@@ -274,7 +322,7 @@ fn has_other_disc_images(dir: &Path) -> bool {
             return true;
         }
     }
-    images && !atlantis2
+    images && !other_game
 }
 
 /// Whether `dir` holds Atlantis II discs (CD images, or copies of the
@@ -342,14 +390,15 @@ pub fn explain_atlantis4(dir: &Path, err: &atlantis4_data::files::OpenError) -> 
         OpenError::Exe(e) => format!(
             "{shown} holds an Atlantis Evolution program that Atlantis Native does not \
              know ({e}): an edition of the game that is not supported yet.\n\n\
-             Supported: GOG.com's release (English, French, German, Italian, Spanish). \
-             Other editions are unknown to the project: an issue on GitHub with the \
+             Supported: GOG.com's release (English, French, German, Italian, Spanish) and \
+             the 2004 CD (The Adventure Company, English). Other editions are unknown to the project: an issue on GitHub with the \
              program's size and MD5 helps."
         ),
         OpenError::NoExe => format!(
             "{shown} holds Atlantis Evolution's data but not its program, \
              Atlantis Evolution.exe: choose the folder where the game is installed, the \
-             one with Atlantis Evolution.exe and 3D."
+             one with Atlantis Evolution.exe and 3D (GOG.com's) or Atlantis Evolution.exe \
+             and cd0 to cd4 (the 2004 CD's)."
         ),
         OpenError::NoScenes => format!(
             "{shown} does not hold Atlantis Evolution ({err}): choose the folder where the \
@@ -386,6 +435,14 @@ pub fn candidate_folders() -> Vec<PathBuf> {
         ] {
             push_matching(&mut out, Path::new(base), "atlantis");
         }
+        // The 2004 CD's installer: `The Adventure Company\Atlantis
+        // Evolution` in the program files.
+        for base in [
+            r"C:\Program Files\The Adventure Company",
+            r"C:\Program Files (x86)\The Adventure Company",
+        ] {
+            push_matching(&mut out, Path::new(base), "atlantis");
+        }
     }
     #[cfg(target_os = "macos")]
     {
@@ -399,7 +456,13 @@ pub fn candidate_folders() -> Vec<PathBuf> {
     {
         if let Some(home) = std::env::var_os("HOME") {
             let home = Path::new(&home);
-            for base in ["GOG Games", "Games", ".wine/drive_c/GOG Games"] {
+            for base in [
+                "GOG Games",
+                "Games",
+                ".wine/drive_c/GOG Games",
+                ".wine/drive_c/Program Files/The Adventure Company",
+                ".wine/drive_c/Program Files (x86)/The Adventure Company",
+            ] {
                 push_matching(&mut out, &home.join(base), "atlantis");
             }
         }

@@ -178,6 +178,21 @@ pub fn a4_install(paths: &[&str]) -> Option<String> {
         .map(str::to_string)
 }
 
+/// The installed folder of Atlantis Evolution's 2004 CD among `paths`:
+/// the shallowest holding `atlantis evolution.exe` and files under
+/// `cd0/datas/scenar/`
+/// ([`atlantis3_data::evolution2004::holds_evolution_2004`]).
+pub fn a4cd_install(paths: &[&str]) -> Option<String> {
+    const SCENAR: &str = "cd0/datas/scenar/";
+    paths
+        .iter()
+        .filter_map(|p| p.find(SCENAR).map(|i| &p[..i]))
+        .filter(|dir| dir.is_empty() || dir.ends_with('/'))
+        .filter(|dir| paths.contains(&format!("{dir}atlantis evolution.exe").as_str()))
+        .min_by_key(|dir| (depth(dir), dir.to_string()))
+        .map(str::to_string)
+}
+
 /// The folder names of a path list (its files' folders, each once), for
 /// messages.
 pub fn top_names(paths: &[&str], prefix: &str) -> Vec<String> {
@@ -269,6 +284,30 @@ mod tests {
         assert_eq!(a4_install(&paths[..1]), None);
         assert_eq!(a4_install(&paths[1..]), None);
         assert_eq!(a4_install(CD), None);
+    }
+
+    #[test]
+    fn atlantis_evolutions_2004_installed_folder() {
+        let paths = [
+            "atlantis evolution/atlantis evolution.exe",
+            "atlantis evolution/cd0/datas/scenar/chapi000.con",
+            "atlantis evolution/cd1/datas/warp/c10001.jp6",
+            "atlantis evolution/datas/atlantis4.cfg",
+        ];
+        assert_eq!(a4cd_install(&paths).as_deref(), Some("atlantis evolution/"));
+        assert_eq!(a4_install(&paths), None);
+        assert_eq!(a3_install(&paths), None);
+        assert_eq!(picked(&paths), Picked::None);
+        // The install picked itself.
+        let top: Vec<&str> = paths
+            .iter()
+            .map(|p| p.strip_prefix("atlantis evolution/").unwrap())
+            .collect();
+        assert_eq!(a4cd_install(&top).as_deref(), Some(""));
+        // The program alone, or the data alone: not the game.
+        assert_eq!(a4cd_install(&paths[..1]), None);
+        assert_eq!(a4cd_install(&paths[1..]), None);
+        assert_eq!(a4cd_install(CD), None);
     }
 
     #[test]

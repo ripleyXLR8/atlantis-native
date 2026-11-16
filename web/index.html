@@ -347,6 +347,11 @@
           language is the installation's; <code>?lang=fr</code> (or
           <code>de</code>, <code>en</code>, <code>es</code>, <code>it</code>)
           after the page's address chooses another.</li>
+      <li><em>The 2004 CD</em> (The Adventure Company, English; in
+          progress): the folder where its installer put the game (the one
+          holding <code>Atlantis Evolution.exe</code> and <code>cd0</code>
+          to <code>cd4</code>). The CDs themselves hold only the
+          installer's archives.</li>
     </ul>
     </section>
     </div>
@@ -403,7 +408,7 @@
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
     try {
       const started = await start(files, language, game, paths, a4lang);
-      document.body.classList.add({ atlantis2: "game-a2", atlantis3: "game-a3", atlantis4: "game-a4" }[started] || "game-a1");
+      document.body.classList.add({ atlantis2: "game-a2", atlantis3: "game-a3", atlantis4: "game-a4", atlantis4cd: "game-a3" }[started] || "game-a1");
       document.body.classList.remove("landing");
       // Atlantis II or III quit from its menu: the page again.
       window.atlantisQuit = () => location.reload();

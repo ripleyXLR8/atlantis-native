@@ -57,11 +57,16 @@ replays of the whole story against the original's scripts and by the
 developer's own play (see [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution)).
 
 **In progress:** the original 2004 CD program of *Atlantis Evolution*
-(Cryo's own engine, grown from *Atlantis III*'s), on a development branch
-(`a4cd/m0`). Its panoramas, chapter scripts, music, Bink films and the
-ship's pitching already run on the *Atlantis III* engine, each traced
-to the original's code; its menus, dialogs, inventory, saves and
-puzzles do not yet. It is not playable yet and not in the releases.
+(The Adventure Company's CD, English; Cryo's own engine, grown from
+*Atlantis III*'s), played by the *Atlantis III* engine. It is in the game
+library as *Atlantis Evolution (2004), CD, English*, beside GOG.com's
+edition, on the desktop and in the browser: its logos, start page,
+menus, saves, panoramas, chapter scripts, dialogs, inventory, music,
+Bink films, the ship's pitching and its eight mini-games run, each
+traced to the original's code and checked piece by piece by automated
+tests. It has not yet been played through from start to end: it is
+playable, but still in progress (see
+[The 2004 CD](docs/GUIDE.md#the-2004-cd-in-progress)).
 
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
@@ -142,7 +147,8 @@ contains none of them.</sub>
 - 🌊 **Atlantis Evolution** (new in 0.7.0): GOG.com's edition in English, French,
   German, Italian and Spanish, its interface laid out on any window size
   as the original lays it out, full screen or windowed; on the desktop
-  and in the browser.
+  and in the browser. Its original 2004 CD program is in the game library
+  too, in progress.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
   proportions, the mouse captured while you look around; full screen at
   a key, and on the desktop kept for the next start (F10, "Start in full
@@ -293,10 +299,15 @@ For *Atlantis Evolution*:
 | Release | Languages | What to point it at |
 |---|---|---|
 | [GOG.com](https://www.gog.com/) (`Atlantis Evolution.exe` of 2,363,910 bytes, MD5 `f2de382af52f1d89e32ed7c286be8b4f`; one program for all five languages) | English, French, German, Italian, Spanish (the one GOG.com's client installed, or another chosen in `settings.ini`) | the installation folder (the one holding `Atlantis Evolution.exe` and `3D`) |
+| The 2004 CD of The Adventure Company, four discs (`Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `2199bc93d2ac3f8b4279e0db898559e8`; **in progress**) | English | the folder where its installer put the game (the one holding `Atlantis Evolution.exe` and `cd0` to `cd4`; by default `C:\Program Files\The Adventure Company\Atlantis Evolution`) |
 
-This is the only edition the project knows; another `Atlantis
-Evolution.exe` is refused with its size and MD5, so that it can be
-reported and added. The PortMaster build plays the first game only.
+GOG.com's edition is a 2012 program (Tetraedge Engine); the CD's is the
+original 2004 program, played by the *Atlantis III* engine. The CDs
+hold only the installer's compressed archives: install the game from
+them (on Windows, or with Wine), then point Atlantis Native at the
+installed folder, which holds all four discs (the CDs are not needed to
+play). Another `Atlantis Evolution.exe` is refused with its size and
+MD5, so that it can be reported and added. The PortMaster build plays the first game only.
 
 The web version plays the four games: see
 [The web version](docs/GUIDE.md#the-web-version).
@@ -335,8 +346,9 @@ elsewhere with `--discs <folder>`). See
 game library or given on the command line. See
 [Atlantis III](docs/GUIDE.md#atlantis-iii).
 
-*Atlantis Evolution* (2004) as well: GOG.com's installation folder, found
-by the game library or given on the command line. See
+*Atlantis Evolution* (2004) as well: GOG.com's installation folder, or
+the folder the 2004 CD's installer filled (in progress), found by the
+game library or given on the command line. See
 [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution).
 
 ## Controls
