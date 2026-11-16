@@ -254,6 +254,13 @@ pub struct Game {
     film_cine: Option<film::Cine>,
     film_cine_in: bool,
     film_cine_out: bool,
+    /// 0x006e01e0: the last film's travel flag, as `AtlBink_Start` sets it
+    /// after its frame rate check (@ 0x00402449); kept across films.
+    film_traj: bool,
+    /// 0x006e01f4 left at 1 outside loop mode 5: a cine-in whose
+    /// `AtlBink_Start` failed with a cine-out wanted ([`film`]); the next
+    /// film's passes run that cine-out.
+    film_cine_out_stale: bool,
     film_skip_key: bool,
     /// `AtlBink_Start` ran while the script was out of the game (a
     /// `CINEMA=` without cine-in): its `NUMFRAMEVIDEO` := 0 is written
@@ -545,6 +552,8 @@ impl Game {
             film_cine: None,
             film_cine_in: false,
             film_cine_out: false,
+            film_traj: false,
+            film_cine_out_stale: false,
             film_skip_key: false,
             numframevideo_reset: false,
             view_no_turn_2004: false,

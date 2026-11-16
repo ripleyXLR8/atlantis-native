@@ -292,3 +292,68 @@ fn the_cine_out() {
     assert!(!g.film_sound_playing(), "stopped by the player");
     assert_eq!(g.mode(), Mode::Warp);
 }
+
+/// A cine-in whose `AtlBink_Start` fails (here the frame rate: `fps10`,
+/// @ 0x004023df) with `cineout` wanted: FUN_00402fb0 returns 0 with the
+/// mode already back, FUN_00403340 sets 0x006e01f4 (the cine-out) and
+/// returns without FUN_00403230. The next film's passes then run that
+/// cine-out from 1.0 instead of its frames, and its close leaves its
+/// track playing (not stopped by the player).
+#[test]
+fn a_failed_start_after_the_cine_in_leaves_the_cine_out() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    g.run_command("(cinema=INTRO,fps10,cineout)");
+    assert_eq!(g.film_cine_2004(), Some((false, 0.0)));
+    let mut passes = 0;
+    while g.film_cine_2004().is_some() {
+        t += 0.04;
+        g.step(t);
+        passes += 1;
+        assert!(passes < 30);
+    }
+    assert_eq!(passes, 14);
+    assert_eq!(g.film_2004(), None, "the rate is refused");
+    assert_eq!(g.mode(), Mode::Warp);
+
+    g.run_command("(cinema=INTRO,nocinein)");
+    assert_eq!(g.film_2004().map(|f| f.0), Some("intro.bik"));
+    t += 0.04;
+    g.step(t);
+    // The port's cine time is the time since the previous pass: none yet
+    // on the pass that finds the left cine-out.
+    assert_eq!(g.film_cine_2004(), Some((true, 1.0)), "the left cine-out");
+    assert_eq!(g.film_2004().map(|f| f.1), Some(1), "no frame drawn");
+    let mut passes = 0;
+    while g.film_cine_2004().is_some() {
+        t += 0.04;
+        g.step(t);
+        passes += 1;
+        assert!(passes < 30);
+    }
+    assert_eq!(g.film_2004(), None);
+    assert!(g.film_sound_playing(), "the track plays on");
+    assert_eq!(g.mode(), Mode::Warp);
+}
+
+/// The same failure without a cine-out wanted: FUN_00403230 with no film,
+/// the mode back; the next film plays its frames.
+#[test]
+fn a_failed_start_after_the_cine_in_without_cine_out() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    g.run_command("(cinema=INTRO,fps10)");
+    while g.film_cine_2004().is_some() {
+        t += 0.04;
+        g.step(t);
+    }
+    assert_eq!(g.film_2004(), None);
+    assert_eq!(g.mode(), Mode::Warp);
+    g.run_command("(cinema=INTRO,nocinein)");
+    t += 0.04;
+    g.step(t);
+    assert_eq!(g.film_cine_2004(), None);
+    assert_eq!(g.film_2004().map(|f| f.1), Some(2));
+}
