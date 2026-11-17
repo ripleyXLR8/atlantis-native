@@ -1036,8 +1036,10 @@ impl Engine {
     }
 
     /// The zone of the current view under the centre (@ 0x006d85e0), its
-    /// index in the view's list: for tests and tools.
+    /// index in the view's list, the picks reading that view's list as an
+    /// entry leaves them: for tests and tools.
     pub fn set_centre_zone(&mut self, zone: Option<usize>) {
+        self.pick_view = Some(self.view);
         self.centre_zone = zone.map(|z| (self.view, z));
     }
 

@@ -450,7 +450,7 @@ impl Engine {
         let kind = d.kind();
         if kind == 1 {
             self.turn_or_look();
-            self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+            self.centre_zone = self.pick_centre();
         }
         if kind == 0 || kind == 1 {
             self.dialog_scene(out.as_deref_mut());

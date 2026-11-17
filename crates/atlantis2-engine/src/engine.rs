@@ -499,6 +499,13 @@ pub struct Engine {
     /// pointer stays on the old view's zone after a move until the next
     /// pick.
     centre_zone: Option<(u32, usize)>,
+    /// The view whose zone list the centre pick reads (@ 0x006d85dc):
+    /// set by a view's entry (@ 0x0045a092, after the `NextWarpInvalide`
+    /// test), so an entry that variable skips, or FUN_0040fe50 alone,
+    /// leaves the old view's; none after a place's load (`AtlWam_Load`
+    /// @ 0x0040ff9d). Its other writer is the start-up's clear
+    /// (@ 0x0049d8c4).
+    pick_view: Option<u32>,
     sprite_hit: Option<usize>,
     /// Whether the draw finds the sprites under the centre. False
     /// reproduces the harness of the moves golden, which stubs the draw.
@@ -1018,6 +1025,7 @@ impl Engine {
             next_view: None,
             arrival: (0.0, 0.0),
             centre_zone: None,
+            pick_view: None,
             sprite_hit: None,
             sprite_picks: true,
             forced_centre: None,
@@ -1180,6 +1188,8 @@ impl Engine {
             .as_ref()
             .is_some_and(|s| s.vars[s.keys.next_warp_invalide] == 1);
         if invalid {
+            // The picks keep the old view's zone list (@ 0x006d85dc is set
+            // only past this test, @ 0x0045a092).
             self.set_script_var(|k| k.next_warp_invalide, 2);
             self.view = id;
             self.vars.vue = id;
@@ -1202,6 +1212,8 @@ impl Engine {
         log::info!("view {id}: warp {name} (disc {disc})");
         self.view = id;
         self.vars.vue = id;
+        // @ 0x0045a092: the zone list the picks read.
+        self.pick_view = Some(id);
         self.event(Event::Enter { view: id });
         self.camera.enter(yaw, pitch);
         let (w, h) = (self.renderer.width() as u32, self.renderer.height() as u32);
@@ -1316,7 +1328,7 @@ impl Engine {
     /// is skipped under the bag bar, the subject menu, a dialog or an
     /// overlay; this one is not).
     fn motion_pick(&mut self) {
-        self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+        self.centre_zone = self.pick_centre();
     }
 
     /// A move of the system pointer by (dx, dy) screen pixels where the
@@ -2006,7 +2018,7 @@ impl Engine {
             None => self.look.frame(&mut self.camera),
             Some(1) => {
                 self.turn_or_look();
-                self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+                self.centre_zone = self.pick_centre();
             }
             Some(_) => {}
         }
@@ -2028,7 +2040,7 @@ impl Engine {
             && !self.overlays.cover
         {
             self.turn_or_look();
-            self.centre_zone = self.pick_centre().map(|i| (self.view, i));
+            self.centre_zone = self.pick_centre();
         }
         // The overlays' clicks (@ 0x0047efd0).
         if self.overlays.any() {
@@ -2120,14 +2132,17 @@ impl Engine {
         self.look.frame(&mut self.camera);
     }
 
-    /// The zone under the screen centre (@ 0x00458fe0).
-    fn pick_centre(&self) -> Option<usize> {
-        let view = self.wam.view(self.view)?;
+    /// The zone under the screen centre (@ 0x00458fe0) in the pick's zone
+    /// list (@ 0x006d85dc, [`Engine::pick_view`]'s): that view and the
+    /// zone's index.
+    fn pick_centre(&self) -> Option<(u32, usize)> {
+        let id = self.pick_view?;
+        let view = self.wam.view(id)?;
         let d = self
             .camera
             .ray(self.camera.cx, self.camera.cy)
             .map(f64::from);
-        wam::pick(&view.zones, d)
+        wam::pick(&view.zones, d).map(|i| (id, i))
     }
 
     /// FUN_0045b040 (from FUN_0045a930, in the warp and the dialog loop):
@@ -2346,10 +2361,13 @@ impl Engine {
         }
     }
 
-    /// The zone the centre pointer designates in the current view.
+    /// The zone the centre pointer designates (@ 0x006d85e0): one of the
+    /// pick's list (the current view's, or the old view's after an entry
+    /// `NextWarpInvalide` skipped). A zone picked before a real entry is
+    /// not used.
     fn centre(&self) -> Option<(usize, &Zone)> {
         let (v, i) = self.centre_zone?;
-        if v != self.view {
+        if Some(v) != self.pick_view {
             return None;
         }
         Some((i, self.wam.view(v)?.zones.get(i)?))
@@ -2666,6 +2684,9 @@ impl Engine {
             s.current_view = None;
         }
         self.centre_zone = None;
+        // @ 0x0040ff8e..0x0040ff9d: the picked zone and the pick's list
+        // cleared.
+        self.pick_view = None;
         self.next_view = None;
         // FUN_0047afc0: the place sounds freed.
         self.place_sounds_reset();
@@ -3372,8 +3393,8 @@ impl Engine {
     /// The click zone under the screen centre (@ 0x0040c6a0 picks it every
     /// frame, @ 0x00458fe0): its index in the view's list, and the zone.
     pub fn centre_zone(&self) -> Option<(usize, &Zone)> {
-        let i = self.pick_centre()?;
-        Some((i, &self.current_view()?.zones[i]))
+        let (v, i) = self.pick_centre()?;
+        Some((i, self.wam.view(v)?.zones.get(i)?))
     }
 
     /// A zone's aim (FUN_00459300), radians.

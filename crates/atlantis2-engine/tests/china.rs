@@ -506,6 +506,64 @@ fn next_warp_invalide_skips_the_view_entry() {
     assert_eq!(var(&e, "nbpassageporte"), 1);
 }
 
+/// After the entry `NextWarpInvalide` skipped, the picks keep the old
+/// view's zone list: @ 0x006d85dc is set only by a real entry
+/// (@ 0x0045a092, past the skip test @ 0x0045a049) and cleared by
+/// `AtlWam_Load` (@ 0x0040ff9d), while the skipped view is current. So in
+/// the arrival frame after chapter 59's door video the centre pick
+/// (@ 0x0040c82c) finds view 22's zones under the camera, and a click
+/// there runs view 22's zone 122 with view 122 current: the departure
+/// scan again (`DepartVue=122`, the door sound once more), then the
+/// arrival scan's `vue=22`. A place's load clears the list.
+#[test]
+fn a_skipped_entry_keeps_the_old_views_zones_for_the_picks() {
+    let Some(files) = game() else { return };
+    let mut e = in_china(files);
+    goto(&mut e, "miniature.wam", 22, 59);
+    let z = zone(&e, |z| z.kind == 1 && z.value == 122);
+    aim(&mut e, z);
+    e.events.clear();
+    e.click(50.0);
+    for _ in 0..600 {
+        if e.loop_type == LoopType::Video {
+            break;
+        }
+        e.tick();
+        e.pass(None);
+    }
+    assert_eq!(e.loop_type, LoopType::Video);
+    assert!(e.events.contains(&Event::EnterSkipped { view: 122 }));
+    assert_eq!(e.place(), ("miniature.wam", 122));
+    assert!(e.wam().view(122).unwrap().zones.is_empty());
+    e.end_video();
+    // The camera on view 22's zone 122: the pick finds it although view
+    // 122 is current.
+    let (yaw, pitch) = e.zone_aim(22, z).unwrap();
+    e.camera.enter(yaw, pitch);
+    let (i, found) = e.centre_zone().expect("view 22's zones picked");
+    assert_eq!((i, found.kind, found.value), (z, 1, 122));
+    // A click in the arrival frame takes it.
+    e.events.clear();
+    e.click(100.0);
+    e.pass(None);
+    let at = |p: &dyn Fn(&Event) -> bool| {
+        e.events
+            .iter()
+            .position(p)
+            .unwrap_or_else(|| panic!("{:?}", e.events))
+    };
+    let depart = at(&|x| matches!(x, Event::DepartScan(v) if v.departvue == 122));
+    let sound = at(&|x| *x == Event::Sound("sound217.apc".into()));
+    let arrive = at(&|x| matches!(x, Event::ArrivalScan(v) if v.arriveevue == 122));
+    assert!(depart < sound && sound < arrive, "{:?}", e.events);
+    settle(&mut e);
+    assert_eq!(e.place(), ("miniature.wam", 22));
+    assert_eq!(var(&e, "NextWarpInvalide"), 0);
+    // A place's load clears the list: nothing picked until an entry.
+    e.load_place("miniature.wam");
+    assert!(e.centre_zone().is_none());
+}
+
 /// `ViewBigSpr`: in the turtle room (chapter 46), a click on the turtle's
 /// picture zone shows `zoomTor.spr` over the panorama until a click; a
 /// command shows the map `CarteChi.spr`.
