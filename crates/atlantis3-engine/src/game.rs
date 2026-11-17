@@ -1835,12 +1835,16 @@ impl Game {
         back: Mode,
         spf: Vec<Bank>,
     ) -> bool {
-        let Some(data) = self.files.read(path) else {
+        let opened = atlantis2_engine::film_file::open(
+            self.files.shared_source(),
+            self.files.datas_path(path),
+        );
+        let Some(data) = opened else {
             log::warn!("{path}: not found");
             return false;
         };
         let name = path.rsplit('/').next().unwrap_or(path).to_string();
-        let cinema = match Cinema::open_depth(&name, Arc::from(data), fps, self.depth()) {
+        let cinema = match Cinema::open_depth(&name, data, fps, self.depth()) {
             Ok(c) => c,
             Err(e) => {
                 log::warn!("{e}");

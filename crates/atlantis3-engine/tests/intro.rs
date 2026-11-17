@@ -65,3 +65,52 @@ fn frame_rates_the_original_refuses() {
         Err(atlantis3_engine::CinemaError::FrameRate(20))
     ));
 }
+
+/// A cinematic read by parts (the web build's way,
+/// `atlantis2_engine::film_file`) plays as the file read whole: every
+/// frame (RGB565 and 32 bits), its sound and its time. The intro, and the
+/// new game's first film (`cine001.hnm`, 34 MB, the Hoggar's).
+#[test]
+fn a_cinematic_read_by_parts_plays_as_read_whole() {
+    use atlantis2_engine::film_file;
+    use atlantis3_data::spr::Depth;
+    let Some(files) = files() else { return };
+    for (path, depth) in [
+        ("hnm/intro.hnm", Depth::Rgb565),
+        ("hnm/HNM640/hoggar/cine001.hnm", Depth::Xrgb8888),
+    ] {
+        let open = |parts: bool| {
+            film_file::set_by_parts(parts);
+            let data = film_file::open(files.shared_source(), files.datas_path(path)).unwrap();
+            film_file::set_by_parts(false);
+            Cinema::open_depth(path, data, 15, depth).unwrap()
+        };
+        let (mut whole, mut parts) = (open(false), open(true));
+        assert_eq!(whole.audio_format(), parts.audio_format());
+        let mut n = 0;
+        loop {
+            let (a, b) = (whole.advance(), parts.advance());
+            assert_eq!(a, b, "{path} frame {n}");
+            if !a {
+                break;
+            }
+            let same = match (whole.frame_px(), parts.frame_px()) {
+                (
+                    atlantis3_engine::cinema::Frame::Rgb565(x),
+                    atlantis3_engine::cinema::Frame::Rgb565(y),
+                ) => x == y,
+                (
+                    atlantis3_engine::cinema::Frame::Xrgb8888(x),
+                    atlantis3_engine::cinema::Frame::Xrgb8888(y),
+                ) => x == y,
+                _ => false,
+            };
+            assert!(same, "{path} frame {n}");
+            assert_eq!(whole.take_audio(), parts.take_audio(), "{path} frame {n}");
+            assert_eq!(whole.next_due_ms(), parts.next_due_ms(), "{path} frame {n}");
+            n += 1;
+        }
+        assert_eq!(n, whole.frame_count(), "{path}");
+        assert!(parts.ended());
+    }
+}

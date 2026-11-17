@@ -238,3 +238,97 @@ fn alpha_blend_matches_the_original() {
     }
     assert_eq!(checked, 82 + 82 + 41 + 41);
 }
+
+/// Every frame, alpha mask and sound sample of `data` decoded with the
+/// file read by parts of `part` bytes ([`HnmParts`], the web build's
+/// cinematics) and whole.
+fn same_by_parts(data: &[u8], part: usize, path: &str) {
+    use atlantis_codecs::{HnmData, HnmParts};
+    let shared: Arc<[u8]> = Arc::from(data);
+    // The largest read.
+    let reads = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let parts = {
+        let shared = shared.clone();
+        let reads = reads.clone();
+        HnmParts::new(
+            data.len() as u64,
+            part,
+            Box::new(move |offset, len| {
+                reads.fetch_max(len, std::sync::atomic::Ordering::Relaxed);
+                let o = usize::try_from(offset).ok()?;
+                shared.get(o..o + len).map(<[u8]>::to_vec)
+            }),
+        )
+    };
+    let mut whole = HnmVideo::new(HnmData::from(shared)).unwrap();
+    let mut by_parts = HnmVideo::new(HnmData::from(parts)).unwrap();
+    assert_eq!(whole.audio_format(), by_parts.audio_format(), "{path}");
+    let mut n = 0;
+    loop {
+        let a = whole.next_frame().map(|f| f.map(frame_md5));
+        let b = by_parts.next_frame().map(|f| f.map(frame_md5));
+        match (a, b) {
+            (None, None) => break,
+            (Some(Ok(a)), Some(Ok(b))) => assert_eq!(a, b, "{path} frame {n}"),
+            (a, b) => panic!("{path} frame {n}: {a:?} / {b:?}"),
+        }
+        assert_eq!(whole.alpha(), by_parts.alpha(), "{path} frame {n}");
+        assert_eq!(
+            whole.take_audio(),
+            by_parts.take_audio(),
+            "{path} frame {n}"
+        );
+        assert_eq!(
+            whole.next_frame_start_ms(),
+            by_parts.next_frame_start_ms(),
+            "{path} frame {n}"
+        );
+        n += 1;
+    }
+    assert!(n > 0, "{path}");
+    // Read in order, a part (or a superchunk) at a time: never whole.
+    if data.len() > 4 * part.max(1 << 16) {
+        assert!(
+            reads.load(std::sync::atomic::Ordering::Relaxed) < data.len() / 2,
+            "{path}"
+        );
+    }
+}
+
+/// The files read by parts decode as the files read whole: one file in 20
+/// of the four discs (cinematics with sound, moves, dialog videos with
+/// their `AL` masks, panoramas) by parts of 64 KB, the dialog videos of
+/// the first rows by parts of 1 and 1000 bytes too.
+#[test]
+fn files_read_by_parts_decode_as_whole() {
+    let Some(files) = discs() else { return };
+    let rows: Vec<(u8, &str)> = GOLDEN
+        .lines()
+        .filter(|l| l.starts_with("F "))
+        .map(|line| {
+            let f: Vec<&str> = line.split_whitespace().collect();
+            (f[1].parse().unwrap(), f[2])
+        })
+        .collect();
+    let mut alpha_files = 0;
+    for (i, &(disc, path)) in rows.iter().enumerate() {
+        if i % 20 != 0 && alpha_files == 3 {
+            continue;
+        }
+        let data = read(&files, disc, path);
+        if i % 20 == 0 {
+            same_by_parts(&data, 64 << 10, path);
+        }
+        let with_alpha = alpha_files < 3 && data.len() < (4 << 20) && {
+            let mut v = HnmVideo::new(&data[..]).unwrap();
+            v.next_frame();
+            v.alpha().is_some()
+        };
+        if with_alpha {
+            alpha_files += 1;
+            same_by_parts(&data, 1, path);
+            same_by_parts(&data, 1000, path);
+        }
+    }
+    assert_eq!(alpha_files, 3);
+}

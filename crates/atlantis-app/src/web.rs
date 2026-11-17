@@ -826,9 +826,44 @@ fn read_picked_part_now(index: usize, offset: u64, len: usize) -> Option<Vec<u8>
     })
 }
 
+/// A part of a picked file read in the background ([`PickedDir`]'s
+/// `read_ahead`): its bytes once the browser gave them.
+struct Ahead {
+    index: usize,
+    offset: u64,
+    len: usize,
+    data: Rc<RefCell<Option<Vec<u8>>>>,
+}
+
+/// The parts read ahead kept (a cinematic needs the next one; Atlantis
+/// III may play a cinematic over another's sound).
+const AHEAD_KEPT: usize = 4;
+
+thread_local! {
+    /// The parts read ahead, the newest last.
+    static AHEAD: RefCell<Vec<Ahead>> = const { RefCell::new(Vec::new()) };
+}
+
+/// Bytes `offset..offset + len` of picked file `index` from a part read
+/// ahead, if one holds them and has arrived.
+fn take_ahead(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
+    AHEAD.with(|a| {
+        let a = a.borrow();
+        let p = a.iter().find(|p| {
+            p.index == index && p.offset <= offset && offset + len as u64 <= p.offset + p.len as u64
+        })?;
+        let d = p.data.borrow();
+        let d = d.as_ref()?;
+        let at = usize::try_from(offset - p.offset).ok()?;
+        d.get(at..at + len).map(<[u8]>::to_vec)
+    })
+}
+
 /// A folder of the picked files (Atlantis II's installed folder, a disc's
 /// copy): its files by their path below it (lower case), read at once
-/// when the engine reads them ([`read_picked`]).
+/// when the engine reads them ([`read_picked`]), or from a part read
+/// ahead in the background when the engine announced it
+/// ([`FileSource::read_ahead`]: a cinematic read by parts).
 pub(crate) struct PickedDir {
     /// Lower-case path below the folder -> (index in [`PICKED`], size).
     files: HashMap<String, (usize, u64)>,
@@ -868,6 +903,9 @@ impl FileSource for PickedDir {
         if offset.checked_add(len as u64)? > size {
             return None;
         }
+        if let Some(d) = take_ahead(index, offset, len) {
+            return Some(d);
+        }
         let t = web_time::Instant::now();
         let data = read_picked_part(index, offset, len);
         let ms = t.elapsed().as_secs_f64() * 1e3;
@@ -878,6 +916,45 @@ impl FileSource for PickedDir {
             log::warn!("{name}: the browser could not read it");
         }
         data
+    }
+
+    fn read_ahead(&self, name: &str, offset: u64, len: usize) {
+        let Some(&(index, size)) = self.files.get(&key(name)) else {
+            return;
+        };
+        let len = usize::try_from(size.saturating_sub(offset)).map_or(len, |rest| rest.min(len));
+        if len == 0 {
+            return;
+        }
+        let Some(file) = PICKED.with(|p| p.borrow().get(index).cloned()) else {
+            return;
+        };
+        let data = Rc::new(RefCell::new(None));
+        let fresh = AHEAD.with(|a| {
+            let mut a = a.borrow_mut();
+            if a.iter().any(|p| p.index == index && p.offset == offset) {
+                return false;
+            }
+            if a.len() >= AHEAD_KEPT {
+                a.remove(0);
+            }
+            a.push(Ahead {
+                index,
+                offset,
+                len,
+                data: data.clone(),
+            });
+            true
+        });
+        if fresh {
+            wasm_bindgen_futures::spawn_local(async move {
+                if let Ok(d) = fetch(&file, offset, len as u64).await {
+                    if d.len() == len {
+                        *data.borrow_mut() = Some(d);
+                    }
+                }
+            });
+        }
     }
 
     fn has_dir(&self, name: &str) -> bool {

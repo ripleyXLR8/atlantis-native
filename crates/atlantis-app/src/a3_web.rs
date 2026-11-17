@@ -91,6 +91,12 @@ impl FileSource for WithCfg {
         }
     }
 
+    fn read_ahead(&self, name: &str, offset: u64, len: usize) {
+        if !self.is_cfg(name) {
+            self.install.read_ahead(name, offset, len);
+        }
+    }
+
     fn has_dir(&self, name: &str) -> bool {
         self.install.has_dir(name)
     }
@@ -636,8 +642,9 @@ pub fn atlantis3_test(command: String) {
 
 /// The game's state, for the end-to-end runs (JSON: the loop mode, the
 /// place and view, the screen's size and depth, the free pointer, the
-/// menu page, the retail CD's current disc (0 for none), the clock, the
-/// frame times).
+/// menu page, the retail CD's current disc (0 for none), the sound
+/// output's late buffers since the page opened, the clock, the frame
+/// times).
 #[wasm_bindgen]
 pub fn atlantis3_state() -> String {
     STATE.with(|s| s.borrow().clone())
@@ -718,7 +725,7 @@ fn record_state(game: &Game, clock: f64, times: &FrameTimes, audio: bool, locked
     let s = format!(
         "{{\"mode\":\"{:?}\",\"wam\":\"{}\",\"view\":{},\"width\":{},\"height\":{},\
          \"depth\":\"{:?}\",\"pointer\":[{px},{py}],\"page\":{page},\"audio\":{audio},\
-         \"locked\":{locked},\"items\":[{}],\"found\":{found},\"disc\":{},\"clock\":{:.3},\"times\":{}}}",
+         \"locked\":{locked},\"items\":[{}],\"found\":{found},\"disc\":{},\"underruns\":{},\"clock\":{:.3},\"times\":{}}}",
         game.mode(),
         wam.replace(['"', '\\'], ""),
         view.map_or("null".to_string(), |v| v.to_string()),
@@ -727,6 +734,7 @@ fn record_state(game: &Game, clock: f64, times: &FrameTimes, audio: bool, locked
         game.depth(),
         items.join(","),
         game.files().discs().map_or(0, |d| d.current()),
+        crate::audio_out::underruns(),
         clock,
         times.report()
     );

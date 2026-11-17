@@ -17,7 +17,7 @@ mod ubb;
 
 pub use alpha::{blend_x888, AlphaTables};
 pub use apc::{decode_apc, Apc, ApcDecoder, ApcHeader, APC_HEADER_SIZE};
-pub use hnm::{AudioFormat, HnmVideo, SoundRule};
+pub use hnm::{AudioFormat, HnmBytes, HnmData, HnmParts, HnmVideo, ReadPart, SoundRule};
 pub use hnm6::HnmPixel;
 pub use ubb::{palette_to_rgb565, UbbFrame, UbbVideo, IA_BUFFER_SIZE};
 

@@ -15,13 +15,15 @@
 use std::sync::Arc;
 
 use atlantis3_data::spr::Depth;
-use atlantis_codecs::{AudioFormat, DecodeError, HnmVideo, SoundRule};
+use atlantis_codecs::{AudioFormat, DecodeError, HnmData, HnmVideo, SoundRule};
 
 /// A film decoded in the display's format (CryoMovie's play re-initialises
-/// its buffers for the surface's: RGB565 or x8r8g8b8, @ 0x006b9619).
+/// its buffers for the surface's: RGB565 or x8r8g8b8, @ 0x006b9619); its
+/// file read whole, or by parts in the web build
+/// ([`atlantis2_engine::film_file`]).
 enum Video {
-    Rgb565(HnmVideo<Arc<[u8]>>),
-    Xrgb8888(HnmVideo<Arc<[u8]>, u32>),
+    Rgb565(HnmVideo<HnmData>),
+    Xrgb8888(HnmVideo<HnmData, u32>),
 }
 
 macro_rules! video {
@@ -85,10 +87,11 @@ impl Cinema {
     /// [`Cinema::open`] decoding into the display's format `depth`.
     pub fn open_depth(
         name: &str,
-        data: Arc<[u8]>,
+        data: impl Into<HnmData>,
         fps: u32,
         depth: Depth,
     ) -> Result<Cinema, CinemaError> {
+        let data = data.into();
         if fps != 15 && fps != 25 {
             return Err(CinemaError::FrameRate(fps));
         }

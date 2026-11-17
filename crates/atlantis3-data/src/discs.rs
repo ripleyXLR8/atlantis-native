@@ -257,6 +257,14 @@ impl FileSource for CdSource {
         self.disc_of(name)?.source.read_at(name, offset, len)
     }
 
+    fn read_ahead(&self, name: &str, offset: u64, len: usize) {
+        if self.install.size(name).is_some() {
+            self.install.read_ahead(name, offset, len);
+        } else if let Some(d) = in_datas(name).then(|| self.disc_of(name)).flatten() {
+            d.source.read_ahead(name, offset, len);
+        }
+    }
+
     fn has_dir(&self, name: &str) -> bool {
         self.install.has_dir(name)
             || (in_datas(name) && self.discs.iter().any(|d| d.source.has_dir(name)))

@@ -17,6 +17,14 @@ pub trait FileSource: Send + Sync {
     /// Whether a directory exists (the GOG release ships its files unpacked).
     fn has_dir(&self, name: &str) -> bool;
 
+    /// A hint that bytes `offset..offset + len` of `name` are read next
+    /// (a cinematic read by parts): the web build reads them in the
+    /// background meanwhile. Nothing by default; a source that wraps
+    /// another passes it on.
+    fn read_ahead(&self, name: &str, offset: u64, len: usize) {
+        let _ = (name, offset, len);
+    }
+
     /// The whole file.
     fn read(&self, name: &str) -> Option<Vec<u8>> {
         let size = self.size(name)?;

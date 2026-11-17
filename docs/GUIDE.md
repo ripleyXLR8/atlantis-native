@@ -332,8 +332,13 @@ widescreen and the bug fixes, as on the desktop.
 
 Other differences of the browser:
 
-- Atlantis II and III read a large file (a cinematic) in one go: the
-  music or the ambience can break off for a moment as it starts.
+- Atlantis II and III read a cinematic a part at a time as it plays,
+  the next part in the background, so that starting a film no longer
+  stops the page (it took 0.2 s for a 17 MB film, 0.4 s for a 34 MB
+  one; now about 7 ms) nor breaks off the sound. Other large files are
+  still read in one go:
+  Atlantis III's music of a place (about 10 MB, a tenth of a second)
+  as the place starts, where the sound can break off for a moment.
 - Atlantis II goes on while the page is shown without the focus (the
   page's own buttons take it); it stops only while the page is hidden.
   Its `atlant2.cfg` is written within two seconds of a change, and

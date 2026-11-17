@@ -445,7 +445,8 @@ impl Cursor {
 
 /// A video playing (a transition, a film, the intro).
 struct Video {
-    hnm: HnmVideo,
+    /// Read whole, or by parts in the web build ([`crate::film_file`]).
+    hnm: HnmVideo<atlantis_codecs::HnmData>,
     name: String,
     /// The loop type it returns to (@ 0x00616890).
     prev: LoopType,
@@ -2958,7 +2959,8 @@ impl Engine {
         self.music_pump();
         let opened = self
             .files
-            .read(Folder::Hnm, name)
+            .locate_shared(Folder::Hnm, name)
+            .and_then(|(src, path)| crate::film_file::open(src, path))
             .and_then(|d| HnmVideo::new(d).ok());
         let Some(mut hnm) = opened else {
             self.event(Event::VideoStart {

@@ -1169,7 +1169,35 @@ function copies the text's low bytes straight into the engine's buffer
 The engine reads only the files and the parts it asks for, as on the
 desktop, which reads its videos and sounds whole when they start: a
 request costs about 1.5 ms, then about 12 ms a MB (Edge; a 4 MB intro
-53 ms, a 39 MB cinematic about half a second). The other ways were
+53 ms, a 39 MB cinematic about half a second). So the web build reads
+the cinematics of Atlantis II and III by parts
+(`atlantis2_engine::film_file`, on in WebAssembly only): the decoder
+reads its file through `atlantis_codecs::HnmBytes`, the whole file
+(the desktop, unchanged) or `HnmParts`, which reads 512 KB at a time as
+the superchunks are reached and lets the bytes before go; each read
+announces the next part (`FileSource::read_ahead`, passed on by the
+CD's `CdSource` and Atlantis III's page source), which `PickedDir`
+reads in the background (`Blob.arrayBuffer`, four parts kept) and
+serves when the decoder asks for it. Measured in headless Edge, two
+runs each, from the new game's click for 10 to 14 s (`PerformanceObserver`
+long tasks, the longest gap between redraws, and the sound output's late
+buffers, `underruns` in `atlantis2_state` / `atlantis3_state`), GOG.com's
+folders: the opening film of Atlantis II (`cine069.hnm`, 16.9 MB) was
+read in 200 ms, a 217 ms task as it started; the first film of Atlantis
+III's new game (`cine093.hnm`, 16.6 MB) in 199 ms, a 216 to 236 ms
+task. Read by parts, no task over 50 ms is left at either start (the
+first part, read at once, takes about 7 ms) and every later part of
+Atlantis II's film was at hand when the decoder reached it; the late
+sound buffers went from 11-12 to 5 (Atlantis II) and from 21-25 to 13
+(Atlantis III). What is left is the click's own work (Atlantis II's new
+game 147 to 158 ms; Atlantis III's 336 to 369 ms, of which 134 ms read
+the Hoggar's music, `Muzik04.apc`, 10.7 MB, still read whole). The decoded frames, sound and times are
+the same either way (`atlantis-codecs`
+`files_read_by_parts_decode_as_whole`: one file in twenty of Atlantis
+II's four discs by parts of 64 KB, three dialog videos with `AL` masks
+by parts of 1 and 1000 bytes; `atlantis3-engine`
+`a_cinematic_read_by_parts_plays_as_read_whole`: the intro and the 34 MB
+`cine001.hnm`, 16 and 32 bits). The other ways were
 weighed: `FileReaderSync` exists only in a worker (the engine, WebGL and
 the sound would move there); `SharedArrayBuffer` with `Atomics.wait`
 needs a cross-origin isolated page, which GitHub Pages cannot serve.

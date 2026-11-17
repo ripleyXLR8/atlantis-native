@@ -582,8 +582,9 @@ pub fn atlantis2_test(command: String) {
 }
 
 /// The game's state after the last pass, for the end-to-end runs (JSON:
-/// the loop, the place, the dialog, the video, the menu page, the game's
-/// clock in seconds, the frame times).
+/// the loop, the place, the dialog, the video, the menu page, the sound
+/// output's late buffers since the page opened, the game's clock in
+/// seconds, the frame times).
 #[wasm_bindgen]
 pub fn atlantis2_state() -> String {
     STATE.with(|s| s.borrow().clone())
@@ -707,12 +708,13 @@ pub fn record_state(engine: &Engine, times: &FrameTimes, audio: bool) {
         "{{\"loop\":{},\"wam\":{},\"view\":{view},\"yaw\":{yaw:.2},\"pitch\":{pitch:.2},\
          \"zone\":{zone},\"chapter\":{chapter},\"dialog\":{dialog},\"video\":{video},\
          \"intro\":{},\"page\":{page},\"widgets\":[{}],\"hd\":{},\"audio\":{audio},\
-         \"clock\":{:.3},\"times\":{}}}",
+         \"underruns\":{},\"clock\":{:.3},\"times\":{}}}",
         json(&format!("{:?}", engine.loop_type)),
         json(wam),
         engine.intro_playing(),
         widgets.join(","),
         engine.hd_layer().is_some(),
+        crate::audio_out::underruns(),
         engine.clock(),
         times.report()
     );

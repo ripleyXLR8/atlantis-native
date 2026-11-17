@@ -196,6 +196,17 @@ impl A3Files {
         &*self.src
     }
 
+    /// The source, shared: for a file read by parts (the web build's
+    /// cinematics), by its [`A3Files::datas_path`].
+    pub fn shared_source(&self) -> Arc<dyn FileSource> {
+        self.src.clone()
+    }
+
+    /// The path in the source of a file of `Datas\`.
+    pub fn datas_path(&self, name: &str) -> String {
+        format!("{DATAS}/{name}")
+    }
+
     /// A file of `Datas\` (`name` with `/` or `\`, any case).
     pub fn read(&self, name: &str) -> Option<Vec<u8>> {
         self.src.read(&format!("{DATAS}/{name}"))

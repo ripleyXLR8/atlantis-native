@@ -506,20 +506,20 @@ impl A2Files {
     /// The source and path of a file: install files from the install
     /// folder; CD files from the current disc, else from the first other
     /// disc holding it.
-    fn locate(&self, folder: Folder, name: &str) -> Option<(&dyn FileSource, String, u8)> {
+    fn locate(&self, folder: Folder, name: &str) -> Option<(&Arc<dyn FileSource>, String, u8)> {
         let path = folder.path(name);
         match folder.location().0 {
             Root::Install => {
                 let p = self
                     .present(0, self.install.as_ref(), &path)
                     .unwrap_or(path);
-                Some((self.install.as_ref(), p, 0))
+                Some((&self.install, p, 0))
             }
             Root::Cd => {
                 let current = self.discs.iter().find(|d| d.number == self.current);
                 if let Some(d) = current {
                     if let Some(p) = self.present(d.number, d.source.as_ref(), &path) {
-                        return Some((d.source.as_ref(), p, d.number));
+                        return Some((&d.source, p, d.number));
                     }
                 }
                 let (other, p) = self.discs.iter().find_map(|d| {
@@ -534,7 +534,7 @@ impl A2Files {
                     self.current,
                     other.number
                 );
-                Some((other.source.as_ref(), p, other.number))
+                Some((&other.source, p, other.number))
             }
         }
     }
@@ -548,6 +548,17 @@ impl A2Files {
     /// A whole file.
     pub fn read(&self, folder: Folder, name: &str) -> Option<Vec<u8>> {
         self.read_with_disc(folder, name).map(|(d, _)| d)
+    }
+
+    /// The source that holds a file as [`A2Files::read`] finds it, and
+    /// its path there: for a file read by parts (the web build's
+    /// cinematics).
+    pub fn locate_shared(
+        &self,
+        folder: Folder,
+        name: &str,
+    ) -> Option<(Arc<dyn FileSource>, String)> {
+        self.locate(folder, name).map(|(s, p, _)| (s.clone(), p))
     }
 
     /// A whole file and the disc it came from (0 for the install folder).

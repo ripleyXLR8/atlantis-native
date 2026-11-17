@@ -119,11 +119,165 @@ struct MovieSound {
     frames_out: u64,
 }
 
+/// The bytes of an HNM file for [`HnmVideo`]: the whole file in memory
+/// (`Vec<u8>`, `&[u8]`, `Arc<[u8]>`...) or read by parts as the frames
+/// need them ([`HnmParts`], [`HnmData`]).
+pub trait HnmBytes {
+    /// The file's size.
+    fn size(&self) -> usize;
+    /// Bytes `start..end`, read if need be; `None` past the end of the
+    /// file or when they cannot be read.
+    fn bytes(&mut self, start: usize, end: usize) -> Option<&[u8]>;
+    /// Bytes `start..end` if they are at hand: those of the last two
+    /// [`HnmBytes::bytes`] calls are.
+    fn held(&self, start: usize, end: usize) -> Option<&[u8]>;
+}
+
+impl<T: AsRef<[u8]>> HnmBytes for T {
+    fn size(&self) -> usize {
+        self.as_ref().len()
+    }
+
+    fn bytes(&mut self, start: usize, end: usize) -> Option<&[u8]> {
+        let d: &T = self;
+        d.as_ref().get(start..end)
+    }
+
+    fn held(&self, start: usize, end: usize) -> Option<&[u8]> {
+        self.as_ref().get(start..end)
+    }
+}
+
+/// Reads `len` bytes at an offset of a file (all of them, else `None`).
+pub type ReadPart = Box<dyn FnMut(u64, usize) -> Option<Vec<u8>> + Send + Sync>;
+
+/// An HNM file read by parts: the bytes the decoder asks for, a part of
+/// at least `part` bytes at a time, read in order as the frames are
+/// decoded; the bytes before the last two asked for are let go. A film is
+/// then never read whole at its start (the web build's synchronous reads
+/// of the player's files cost about 12 ms a MB on the page's thread).
+pub struct HnmParts {
+    read: ReadPart,
+    size: usize,
+    /// The file offset of `buf[0]`.
+    start: usize,
+    buf: Vec<u8>,
+    /// The start of the previous request, kept.
+    keep: usize,
+    part: usize,
+}
+
+impl HnmParts {
+    /// A file of `size` bytes read through `read`, `part` bytes at least
+    /// at a time.
+    pub fn new(size: u64, part: usize, read: ReadPart) -> HnmParts {
+        HnmParts {
+            read,
+            size: usize::try_from(size).unwrap_or(usize::MAX),
+            start: 0,
+            buf: Vec::new(),
+            keep: 0,
+            part: part.max(1),
+        }
+    }
+}
+
+impl HnmBytes for HnmParts {
+    fn size(&self) -> usize {
+        self.size
+    }
+
+    fn bytes(&mut self, start: usize, end: usize) -> Option<&[u8]> {
+        if start > end || end > self.size {
+            return None;
+        }
+        let keep = std::mem::replace(&mut self.keep, start);
+        let held_end = self.start + self.buf.len();
+        if start < self.start || end > held_end {
+            let from = start.min(keep);
+            if from >= self.start && from <= held_end {
+                self.buf.drain(..from - self.start);
+                self.start = from;
+            } else {
+                self.buf.clear();
+                self.start = start;
+            }
+            let have = self.start + self.buf.len();
+            let want = end.max(start.saturating_add(self.part)).min(self.size);
+            if want > have {
+                let more = (self.read)(have as u64, want - have)?;
+                if more.len() != want - have {
+                    return None;
+                }
+                self.buf.extend_from_slice(&more);
+            }
+        }
+        self.buf.get(start - self.start..end - self.start)
+    }
+
+    fn held(&self, start: usize, end: usize) -> Option<&[u8]> {
+        self.buf
+            .get(start.checked_sub(self.start)?..end.checked_sub(self.start)?)
+    }
+}
+
+/// An HNM file in memory or read by parts: the type the players keep, so
+/// that one player type serves both.
+pub enum HnmData {
+    Vec(Vec<u8>),
+    Shared(std::sync::Arc<[u8]>),
+    Parts(HnmParts),
+}
+
+impl From<Vec<u8>> for HnmData {
+    fn from(d: Vec<u8>) -> HnmData {
+        HnmData::Vec(d)
+    }
+}
+
+impl From<std::sync::Arc<[u8]>> for HnmData {
+    fn from(d: std::sync::Arc<[u8]>) -> HnmData {
+        HnmData::Shared(d)
+    }
+}
+
+impl From<HnmParts> for HnmData {
+    fn from(d: HnmParts) -> HnmData {
+        HnmData::Parts(d)
+    }
+}
+
+impl HnmBytes for HnmData {
+    fn size(&self) -> usize {
+        match self {
+            HnmData::Vec(d) => d.len(),
+            HnmData::Shared(d) => d.len(),
+            HnmData::Parts(p) => p.size(),
+        }
+    }
+
+    fn bytes(&mut self, start: usize, end: usize) -> Option<&[u8]> {
+        match self {
+            HnmData::Vec(d) => d.get(start..end),
+            HnmData::Shared(d) => d.get(start..end),
+            HnmData::Parts(p) => p.bytes(start, end),
+        }
+    }
+
+    fn held(&self, start: usize, end: usize) -> Option<&[u8]> {
+        match self {
+            HnmData::Vec(d) => d.get(start..end),
+            HnmData::Shared(d) => d.get(start..end),
+            HnmData::Parts(p) => p.held(start, end),
+        }
+    }
+}
+
 /// An HNM6 file decoded frame by frame: the IX videos (transitions,
 /// cinematics) and the IW panoramas, as RGB565 frames.
 ///
 /// `D` holds the file's bytes (`Vec<u8>`, `&[u8]`, `Arc<[u8]>`...).
-pub struct HnmVideo<D: AsRef<[u8]> = Vec<u8>, P: HnmPixel = u16> {
+pub struct HnmVideo<D: HnmBytes = Vec<u8>, P: HnmPixel = u16> {
     data: D,
     width: usize,
     height: usize,
@@ -150,7 +304,7 @@ pub struct HnmVideo<D: AsRef<[u8]> = Vec<u8>, P: HnmPixel = u16> {
     alpha: Option<(usize, usize)>,
 }
 
-impl<D: AsRef<[u8]>> HnmVideo<D> {
+impl<D: HnmBytes> HnmVideo<D> {
     /// Opens an HNM6 file, with fresh zeroed frame buffers.
     pub fn new(data: D) -> Result<Self, DecodeError> {
         Self::with_buffers(data, Vec::new())
@@ -172,15 +326,22 @@ impl<D: AsRef<[u8]>> HnmVideo<D> {
     }
 }
 
-impl<D: AsRef<[u8]>, P: HnmPixel> HnmVideo<D, P> {
+impl<D: HnmBytes, P: HnmPixel> HnmVideo<D, P> {
     /// [`HnmVideo::with_rule`] into frame buffers of pixels `P`: `u16` for
     /// RGB565, `u32` for the x8r8g8b8 frames of a 32-bit display
     /// ([`HnmPixel`]).
-    pub fn open(data: D, block: Vec<P>, rule: SoundRule) -> Result<Self, DecodeError> {
-        let hnm = data.as_ref();
-        if hnm.len() < FILE_HEADER_SIZE {
+    pub fn open(mut data: D, block: Vec<P>, rule: SoundRule) -> Result<Self, DecodeError> {
+        // The header and the first superchunk, all that is looked at here
+        // (the first superchunk's end bounded by the file's).
+        let len = data.size();
+        if len < FILE_HEADER_SIZE {
             return Err(DecodeError::Truncated);
         }
+        let first = data
+            .bytes(FILE_HEADER_SIZE, FILE_HEADER_SIZE + 4)
+            .map_or(4, |w| (le32(w, 0) & 0x00ff_ffff) as usize);
+        let end = (FILE_HEADER_SIZE + first.max(4)).min(len);
+        let hnm = &data.bytes(0, end).ok_or(DecodeError::Truncated)?.to_vec()[..];
         // HNM4 and UBB2 are 8-bit formats: the 16-bit decoder refuses them.
         if &hnm[0..4] != b"HNM6" {
             return Err(DecodeError::NotHnm6);
@@ -302,7 +463,7 @@ impl<D: AsRef<[u8]>, P: HnmPixel> HnmVideo<D, P> {
     /// has none. Draw it with [`crate::AlphaTables::blend`].
     pub fn alpha(&self) -> Option<&[u8]> {
         let (start, end) = self.alpha?;
-        self.data.as_ref().get(start..end)
+        self.data.held(start, end)
     }
 
     /// The last decoded frame (before the first one: the initial buffer
@@ -358,17 +519,22 @@ impl<D: AsRef<[u8]>, P: HnmPixel> HnmVideo<D, P> {
     /// Reads one superchunk: `None` at the end of the file, else whether it
     /// held a video chunk.
     fn read_packet(&mut self) -> Result<Option<bool>, DecodeError> {
-        let hnm = self.data.as_ref();
         // A zero header ends the file.
-        if self.pos + 4 > hnm.len() || le32(hnm, self.pos) == 0 {
+        let word = match self.data.bytes(self.pos, self.pos + 4) {
+            Some(w) => le32(w, 0),
+            None => return Ok(None),
+        };
+        if word == 0 {
             return Ok(None);
         }
-        let size = (le32(hnm, self.pos) & 0x00ff_ffff) as usize;
+        let size = (word & 0x00ff_ffff) as usize;
         if size < 4 {
             return Err(DecodeError::InvalidSuperchunk);
         }
-        let superchunk = hnm
-            .get(self.pos + 4..self.pos + size)
+        let base = self.pos + 4;
+        let superchunk = self
+            .data
+            .bytes(base, self.pos + size)
             .ok_or(DecodeError::Truncated)?;
         self.pos += size;
 
@@ -391,7 +557,7 @@ impl<D: AsRef<[u8]>, P: HnmPixel> HnmVideo<D, P> {
                 // Not part of the picture: kept for the caller (the first
                 // game's files have none).
                 CHUNK_AL => {
-                    let start = data.as_ptr() as usize - hnm.as_ptr() as usize;
+                    let start = base + (data.as_ptr() as usize - superchunk.as_ptr() as usize);
                     self.alpha = Some((start, start + data.len()));
                 }
                 other => return Err(DecodeError::UnexpectedChunk(other)),
