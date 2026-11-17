@@ -421,6 +421,20 @@ impl Game {
         }
     }
 
+    /// The view's turn speeds (@ 0x007592cc yaw, @ 0x007592d0 pitch).
+    #[doc(hidden)]
+    pub fn board_turn_speeds(&self) -> (f32, f32) {
+        (self.look.yaw_speed, self.look.pitch_speed)
+    }
+
+    /// Sets the view's turn speeds (as the mouse callback's mode-3 adds
+    /// leave them).
+    #[doc(hidden)]
+    pub fn board_set_turn_speeds(&mut self, yaw: f32, pitch: f32) {
+        self.look.yaw_speed = yaw;
+        self.look.pitch_speed = pitch;
+    }
+
     /// The mode a running screen goes back to (@ 0x00755934 for the
     /// jewel case), as a loop mode number.
     #[doc(hidden)]

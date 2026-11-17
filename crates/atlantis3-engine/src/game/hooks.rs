@@ -553,6 +553,13 @@ impl Game {
             return;
         };
         self.tr(|| "stop".into());
+        // Every screen's stop zeroes the turn speeds (0x00431760: the
+        // skull @ 0x00409b1b, the case @ 0x00412f6c, the tower map
+        // @ 0x00406755, the map @ 0x004054f5, the scarab @ 0x00431e75, the
+        // remote @ 0x004cff95, the unicorn @ 0x0042eb21, the game boy
+        // @ 0x0041f7b2); the screens' warp draw (0x00440690) has no look
+        // step, so the speeds the screen opened with are still there.
+        self.look.stop();
         let back = self.puzzles.screen_back.take().unwrap_or(Mode::Warp);
         self.click = false;
         self.right_clicked = false;
