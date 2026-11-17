@@ -1933,9 +1933,22 @@ impl Game {
         true
     }
 
-    /// CryoMovie's volume (@ 0x006b9100 with `GlobalVolume`, 0..99).
+    /// CryoMovie's volume (@ 0x006b9100 with `GlobalVolume`, 0..99, called
+    /// @ 0x0042125c): below 100, without the Cryo Sound Library,
+    /// `waveOutSetVolume(v × 0x028f028f)` @ 0x006b9135..0x006b9143, so each
+    /// side gets v × 655 of 65535. The 2004 program's films keep v / 99.
     fn cinema_gain(&self) -> f32 {
-        self.startup.config.global_volume as f32 / 99.0
+        let v = self.startup.config.global_volume;
+        if self.files.is_evolution_2004() {
+            return v as f32 / 99.0;
+        }
+        (v * 655) as f32 / 65535.0
+    }
+
+    /// Tests: [`Game::cinema_gain`].
+    #[doc(hidden)]
+    pub fn test_cinema_gain(&self) -> f32 {
+        self.cinema_gain()
     }
 
     fn video_step(&mut self) {

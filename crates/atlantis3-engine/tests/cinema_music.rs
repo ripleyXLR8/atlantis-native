@@ -132,3 +132,20 @@ fn escape_in_the_warp_stops_the_sound_objects() {
     assert_eq!(g.mode(), Mode::Menu);
     assert_eq!(objects(&g), 0, "under the menu");
 }
+
+/// The films' volume (0x006b9100 @ 0x006b9135..0x006b9143):
+/// `waveOutSetVolume(GlobalVolume × 0x028f028f)`, each side v × 655 of
+/// 65535: 0.98948 at the default 99, 0.49973 at 50.
+#[test]
+fn the_films_volume() {
+    let Some(dir) = atlantis3_data::testing::install_dir() else {
+        return;
+    };
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    for v in [99, 50, 0] {
+        g.startup.config.global_volume = v;
+        assert_eq!(g.test_cinema_gain(), (v * 655) as f32 / 65535.0, "{v}");
+    }
+    g.startup.config.global_volume = 99;
+    assert!((g.test_cinema_gain() - 0.98948).abs() < 1e-5);
+}
