@@ -47,10 +47,12 @@ impl Engine {
     }
 
     /// `AtlMain_SetLoopType` (FUN_0049da90): the loop type, and the mode
-    /// it draws in (FUN_00402960: native for the panorama).
+    /// it draws in (FUN_00402960: native for the panorama, loop type 0,
+    /// and the `MESSAGE_CLIC` viewer, 10: @ 0x0049daa0..0x0049dac5; 1.01
+    /// the same).
     pub(crate) fn set_loop_type(&mut self, t: LoopType) {
         self.loop_type = t;
-        self.apply_mode(t == LoopType::Warp);
+        self.apply_mode(matches!(t, LoopType::Warp | LoopType::Message));
     }
 
     /// `AtlDial_start` (FUN_0047ff60): after the loop type 2, dialog

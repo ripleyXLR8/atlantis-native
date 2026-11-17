@@ -284,6 +284,43 @@ fn the_dialogs_by_number() {
     assert!(NATIVE_DIALOGS.contains(&44));
 }
 
+/// `MESSAGE_CLIC` at 800 x 600: `AtlMain_SetLoopType` draws loop type 10
+/// natively as the panorama (FUN_0049da90 @ 0x0049daa4: types 0 and 10
+/// → FUN_00402960(1)), so the frozen panorama and the text are drawn at
+/// 800 x 600, the text at the screen's centre (FUN_00476860 lays it out
+/// on the screen's size @ 0x004769a2..0x004769be), not enlarged.
+#[test]
+fn the_message_viewer_is_native_at_800x600() {
+    let Some(files) = game() else { return };
+    let mut r = Run::new(files, scratch("message", 800, 600));
+    r.new_game();
+    r.wait(2);
+    let bare = r.screen.clone();
+    r.e.run_command(b"(MESSAGE_CLIC=PAUSED)");
+    assert_eq!(r.e.loop_type, LoopType::Message);
+    r.step();
+    assert_eq!((r.e.width(), r.e.height()), (800, 600));
+    assert_eq!((r.e.camera.cx, r.e.camera.cy), (400.0, 300.0));
+    // The panorama as it was (the turn stopped) and the text at the centre
+    // of the 800 x 600 screen.
+    let differ: Vec<usize> = (0..r.screen.len())
+        .filter(|&i| r.screen[i] != bare[i])
+        .collect();
+    assert!(!differ.is_empty(), "no text drawn");
+    let (mut x0, mut x1, mut y0, mut y1) = (800, 0, 600, 0);
+    for &i in &differ {
+        let (x, y) = (i % 800, i / 800);
+        (x0, x1, y0, y1) = (x0.min(x), x1.max(x), y0.min(y), y1.max(y));
+    }
+    assert!((x0 + x1) / 2 >= 395 && (x0 + x1) / 2 <= 405, "{x0}..{x1}");
+    assert!((y0 + y1) / 2 >= 295 && (y0 + y1) / 2 <= 305, "{y0}..{y1}");
+    // A click ends it: back to the panorama, native.
+    r.e.click(r.pass as f64 * PASS);
+    r.wait(2);
+    assert_eq!(r.e.loop_type, LoopType::Warp);
+    assert_eq!((r.e.width(), r.e.height()), (800, 600));
+}
+
 /// A film's dialog at 800 x 600 (`cinema=19,71`): 1.00 and 1.01 draw its
 /// subtitles after the film frame's enlargement (FUN_00402c30 @ 0x0040bc65,
 /// FUN_00480840 @ 0x0040c08e) on the surface the next frame covers, so the
