@@ -195,3 +195,43 @@ fn escape_stops_every_place_sound() {
         assert!(!g.audio.is_playing(ch), "place channel {ch}");
     }
 }
+
+/// A new game run to its first cinematic.
+fn first_cinematic() -> Option<(Game, f64)> {
+    let dir = atlantis3_data::testing::install_dir()?;
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    assert!(g.new_game());
+    let mut t = 0.0;
+    for _ in 0..20_000 {
+        t += 1.0 / 30.0;
+        g.step(t);
+        if g.mode() == Mode::Video && !g.video_is_travel() {
+            return Some((g, t));
+        }
+    }
+    panic!("no cinematic");
+}
+
+/// F8: Space or Escape in CryoMovie's loop of `AtlHnm_continue`
+/// (@ 0x00421e83..0x00421ebe) stops the film, then every sound object and
+/// place sound (0x00433580). The film's normal end does not.
+#[test]
+fn skipping_a_cinematic_stops_the_other_sounds() {
+    let Some((mut g, _)) = first_cinematic() else {
+        return;
+    };
+    play_on(&g, CHANNEL_PLACE);
+    play_on(&g, CHANNEL_PLACE + 1);
+    let film = g.video().map(|v| v.0.to_string());
+    g.skip();
+    // The film ended (the next one of the chain may start at once).
+    assert!(g.mode() != Mode::Video || g.video().map(|v| v.0.to_string()) != film);
+    assert!(!g.audio.is_playing(CHANNEL_PLACE));
+    assert!(!g.audio.is_playing(CHANNEL_PLACE + 1));
+
+    // The control: the film's end leaves them.
+    let (mut g, _) = first_cinematic().unwrap();
+    play_on(&g, CHANNEL_PLACE);
+    g.finish_video();
+    assert!(g.audio.is_playing(CHANNEL_PLACE));
+}

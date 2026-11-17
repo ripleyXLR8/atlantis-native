@@ -1171,7 +1171,8 @@ impl Game {
     }
 
     /// Space or Escape (`WM_KEYDOWN` in the cinematic's wait loop
-    /// @ 0x00421c5b): the cinematic stops. Travel videos ignore keys.
+    /// @ 0x00421c5b): the cinematic stops, every other sound with it.
+    /// Travel videos ignore keys.
     pub fn skip(&mut self) {
         // The 2004 program's keyboard callback: Escape (scan code 1) or
         // Space (0x39) in loop mode 5 sets 0x006e9e70 (@ 0x0042c504..
@@ -1181,6 +1182,11 @@ impl Game {
             return;
         }
         if self.video.as_ref().is_some_and(|v| !v.travel) {
+            // CryoMovie's loop of `AtlHnm_continue` on Space or Escape
+            // (@ 0x00421e83..0x00421ebe): the film stopped (0x006b8e30),
+            // then every sound object and place sound (0x00433580); the
+            // film's normal end does not.
+            self.sfx_stop_all();
             self.end_video();
         }
     }
