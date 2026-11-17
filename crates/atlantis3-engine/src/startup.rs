@@ -31,9 +31,10 @@ pub struct Startup {
 
 impl Startup {
     /// The settings of the install `files`: its `Atlantis3.cfg` (none: the
-    /// defaults) and its registry values, every bug fix on.
+    /// defaults) and its registry values, every bug fix on but `fix_32bits`
+    /// ([`Fixes::original_depth`]).
     pub fn read(files: &A3Files) -> Startup {
-        Startup::read_with(files, Fixes::default())
+        Startup::read_with(files, Fixes::original_depth())
     }
 
     /// [`Startup::read`] with the bug fixes `fixes` ([`Fixes::apply`],

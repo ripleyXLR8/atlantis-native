@@ -178,6 +178,15 @@ pub struct Config {
     /// `SuperCine` (DAT_00789c64): a mode branch of @ 0x00452000
     /// (@ 0x004528bd) `[UNKNOWN]`. Default false.
     pub super_cine: bool,
+    /// Whether the file named a pixel format (the port's; the original
+    /// keeps no such flag). [`Config::write`] writes no line for 16 bits,
+    /// so a file without one means 16 bits chosen or never chosen.
+    pub pixel_format_set: bool,
+    /// The port's `fix_32bits`: [`Config::write`] also writes
+    /// `PixelFormat = 16bits` for a 16-bit choice (a name the original's
+    /// reader takes, @ 0x00407260..0x004074cc), so that choice survives
+    /// the fix's 32-bit start. Default false: the original's file.
+    pub write_16bits: bool,
     /// The bad values met by the reader.
     pub warnings: Vec<CfgWarning>,
 }
@@ -208,6 +217,8 @@ impl Default for Config {
             log_file: false,
             humeur: false,
             super_cine: false,
+            pixel_format_set: false,
+            write_16bits: false,
             warnings: Vec::new(),
         }
     }
@@ -260,7 +271,10 @@ impl Config {
                 b"PixelFormat" => {
                     let name = l.token();
                     match PixelFormat::from_name(name) {
-                        Some(p) => self.pixel_format = p,
+                        Some(p) => {
+                            self.pixel_format = p;
+                            self.pixel_format_set = true;
+                        }
                         None => self.warn(CfgWarning::PixelFormat(name.to_vec())),
                     }
                 }
@@ -345,6 +359,8 @@ impl Config {
         }
         if self.pixel_format.bits() > 16 {
             line(b"PixelFormat\t\t= 32bits\n");
+        } else if self.write_16bits {
+            line(b"PixelFormat\t\t= 16bits\n");
         }
         if !self.full_screen {
             line(b"FullScreen\t\t= false\n");
@@ -479,6 +495,7 @@ SFXVolume = 120\r\nMusicVolume = -4\r\nCursor = maybe\r\nTime 1 2 3\r\nUnknown =
             humeur: true,
             super_cine: true,
             time: [5, -1, 0, 7, 123_456],
+            pixel_format_set: true,
             ..Config::default()
         };
         let bytes = c.write(b"fra");
@@ -496,6 +513,28 @@ SFXVolume = 120\r\nMusicVolume = -4\r\nCursor = maybe\r\nTime 1 2 3\r\nUnknown =
         let c = Config::parse(b"WarpRes\t\t=\t1024\r\nPixelFormat\t=\t32bits");
         assert_eq!((c.warp_res, c.warp_view()), (1024, (800, 600)));
         assert_eq!(c.pixel_format.bits(), 32);
+        assert!(c.pixel_format_set);
         assert!(c.warnings.is_empty());
+    }
+
+    /// No `PixelFormat` line: 16 bits, not set; `write_16bits` (the
+    /// port's `fix_32bits`) writes a 16-bit choice, which reads back.
+    #[test]
+    fn sixteen_bits_written_only_for_the_fix() {
+        let c = Config::parse(b"SousTitre\t= fra");
+        assert_eq!(
+            (c.pixel_format, c.pixel_format_set),
+            (PixelFormat::R5G6B5, false)
+        );
+        assert!(!c.write(b"fra").windows(11).any(|w| w == b"PixelFormat"));
+        let fixed = Config {
+            write_16bits: true,
+            ..c
+        };
+        let back = Config::parse(&fixed.write(b"fra"));
+        assert_eq!(
+            (back.pixel_format, back.pixel_format_set),
+            (PixelFormat::R5G6B5, true)
+        );
     }
 }

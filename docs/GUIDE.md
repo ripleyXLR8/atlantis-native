@@ -843,6 +843,15 @@ run only, and so does `fix_warpres_cd = off` in `settings.ini` (in the
 same `atlantis3` folder as the saves); the game then does what the
 original does, the reset at the options page included.
 
+**Bug fix.** The original starts in 16-bit colours: no shipped
+`Atlantis3.cfg` names a colour depth, and 16 bits is its default, so the
+first start shows banded colours until the player picks 32 bits on the
+options page. Atlantis Native starts in 32 bits when the file names no
+depth (`fix_32bits`, on); a 16-bit choice on the options page is kept
+(written as `PixelFormat = 16bits`, which the original reads too).
+`--original` or `fix_32bits = off` in `settings.ini` starts in 16 bits,
+as the original.
+
 The saves (`save/game<player>_<number>.sav` with their thumbnails, as the
 original names them), `Atlantis3.cfg` (the options) and `settings.ini`
 (Atlantis Native's bug fixes) are kept in the `atlantis3` folder of the per-user data folder (see

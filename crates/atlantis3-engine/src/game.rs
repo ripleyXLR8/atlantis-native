@@ -467,9 +467,9 @@ impl Game {
     /// The game of the install `files`: its settings and the start-up's
     /// script part (chapter 0's boot state, the funeral chamber). Nothing
     /// is shown before [`Game::start_intro`] or [`Game::new_game`]. Every
-    /// bug fix on.
+    /// bug fix on but `fix_32bits` ([`crate::Fixes::original_depth`]).
     pub fn new(files: A3Files) -> Result<Game, GameError> {
-        Game::with_fixes(files, crate::Fixes::default())
+        Game::with_fixes(files, crate::Fixes::original_depth())
     }
 
     /// [`Game::new`] with the bug fixes `fixes` (`--original`:

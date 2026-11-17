@@ -19,6 +19,14 @@
 //!   `Datas\warp\Warp1024\` folder, gives WarpRes 512 and the 640 x 480
 //!   warp view ([`Fixes::apply`]). The file is left as it is until the
 //!   menus write it, as the original's next write does (with 512).
+//! - `fix_32bits` ([`Fixes::depth_32`]): the original starts in 16 bits
+//!   (r5g6b5) when `Atlantis3.cfg` names no `PixelFormat` (the defaults
+//!   @ 0x004095bb `push 0x8a` → 0x004e7c80 in GOG.com's program, @
+//!   0x004095cb in the 2001 CD's), and no shipped file names one, so the
+//!   first start shows 16-bit colours until the player picks 32 bits on
+//!   the options page. With the fix a file without `PixelFormat` starts in
+//!   32 bits (x8r8g8b8), and the file then also keeps a 16-bit choice
+//!   (`PixelFormat = 16bits`, which the original reads too).
 
 use atlantis3_data::cfg::Config;
 use atlantis3_data::A3Files;
@@ -35,6 +43,9 @@ pub struct Fixes {
     /// `fix_warpres_cd`: the options page's `Version = CD` rule (and a
     /// missing `warp\Warp1024\`) applied at start-up ([`Fixes::apply`]).
     pub warpres_cd: bool,
+    /// `fix_32bits`: 32 bits when `Atlantis3.cfg` names no pixel format
+    /// ([`Fixes::apply`]).
+    pub depth_32: bool,
     /// `fix_smooth_turn` (*Atlantis Evolution*'s 2004 program only): the
     /// warp is drawn with the camera turned by the part of the next 1/25 s
     /// look step already elapsed. The original turns the camera only at
@@ -50,6 +61,7 @@ impl Default for Fixes {
     fn default() -> Fixes {
         Fixes {
             warpres_cd: true,
+            depth_32: true,
             smooth_turn: true,
         }
     }
@@ -60,13 +72,26 @@ impl Fixes {
     pub fn original() -> Fixes {
         Fixes {
             warpres_cd: false,
+            depth_32: false,
             smooth_turn: false,
         }
     }
 
+    /// Every fix on but `fix_32bits`: the display depth of the original's
+    /// first start (16 bits), the one the goldens were captured in
+    /// ([`crate::Game::new`], [`crate::startup::Startup::read`]). The app
+    /// passes its own [`Fixes`] (`Game::with_fixes`).
+    pub fn original_depth() -> Fixes {
+        Fixes {
+            depth_32: false,
+            ..Fixes::default()
+        }
+    }
+
     /// The keys of `settings.ini`, with their fields.
-    const KEYS: [(&'static str, Field); 2] = [
+    const KEYS: [(&'static str, Field); 3] = [
         ("fix_warpres_cd", |f| &mut f.warpres_cd),
+        ("fix_32bits", |f| &mut f.depth_32),
         ("fix_smooth_turn", |f| &mut f.smooth_turn),
     ];
 
@@ -117,6 +142,13 @@ impl Fixes {
     /// its options page (and keeps from the next start, its menus having
     /// written `WarpRes = 512`).
     pub fn apply(&self, config: &mut Config, files: &A3Files) {
+        if self.depth_32 {
+            config.write_16bits = true;
+            if !config.pixel_format_set {
+                log::info!("fix_32bits: no PixelFormat in Atlantis3.cfg, 32 bits");
+                config.pixel_format = atlantis3_data::cfg::PixelFormat::X8R8G8B8;
+            }
+        }
         if self.warpres_cd
             && config.warp_res != 512
             && (config.version == b"CD" || !files.has_dir("warp/Warp1024"))
@@ -202,5 +234,26 @@ mod tests {
         let mut c = spanish(b"CD");
         Fixes::original().apply(&mut c, &files(&["Datas/warp/Warp512/a.hnm"]));
         assert_eq!((c.warp_res, c.warp_view()), (1024, (800, 600)));
+    }
+
+    /// `fix_32bits`: a file without `PixelFormat` (the shipped ones)
+    /// starts in 32 bits with the fix, in 16 bits without it; a named
+    /// format is kept either way.
+    #[test]
+    fn depth_32_only_without_a_pixel_format() {
+        use atlantis3_data::cfg::PixelFormat;
+        let f = files(&["Datas/warp/Warp512/a.hnm"]);
+        let mut c = Config::parse(b"SousTitre\t= fra");
+        Fixes::default().apply(&mut c, &f);
+        assert_eq!(c.pixel_format, PixelFormat::X8R8G8B8);
+        assert!(c.write_16bits);
+        let mut c = Config::parse(b"SousTitre\t= fra");
+        Fixes::original().apply(&mut c, &f);
+        assert_eq!(c.pixel_format, PixelFormat::R5G6B5);
+        assert!(!c.write_16bits);
+        let mut c = Config::parse(b"PixelFormat\t= 16bits");
+        Fixes::default().apply(&mut c, &f);
+        assert_eq!(c.pixel_format, PixelFormat::R5G6B5);
+        assert!(!Fixes::parse("fix_32bits = off\n").depth_32);
     }
 }
