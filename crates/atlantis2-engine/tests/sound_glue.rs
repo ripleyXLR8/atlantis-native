@@ -713,3 +713,46 @@ fn the_music_machine_runs_twice_a_pass_in_the_menus() {
     assert!(gaps[0].contains(&2), "the panorama: {:?}", gaps[0]);
     assert_eq!(gaps[1], [1; 4], "a menu");
 }
+
+/// The end of a music switch's fade: FUN_00476e80, its volume at 0 with
+/// the next state 1 or 2, stops the old music with FUN_004778f0 before the
+/// state changes (@ 0x00476f4b..0x00476f52: voice 0 stopped, the file
+/// closed, the buffer freed), so the same pass's refill (state 3 then
+/// FUN_00477590, which returns at once without a buffer or a file,
+/// @ 0x004775ab..0x004775be) writes nothing and the new music opens on
+/// the next pass.
+#[test]
+fn a_switch_fade_ends_with_the_old_music_stopped() {
+    let Some(files) = game() else { return };
+    let mut e = in_tibet(files);
+    let mut t = e.clock();
+    let mut step = |e: &mut Engine| {
+        t += PASS;
+        e.set_clock(t);
+        e.pass(None);
+    };
+    e.run_command(b"(startmusik=20)");
+    // At a mark (state 2) or from the start (1), as the list says.
+    let next = e.music.next;
+    assert_eq!(e.music.state, 3);
+    assert!(next == 1 || next == 2, "{next}");
+    let mut ended = false;
+    for _ in 0..600 {
+        let fading = e.music.state == 3;
+        step(&mut e);
+        if fading && e.music.state == next {
+            // The pass of the fade's end: the old music is gone.
+            assert_eq!(e.music_playing(), None);
+            assert!(!e.voices().is_playing(VOICE_MUSIC));
+            assert_eq!(e.music.target, e.music.max);
+            ended = true;
+            break;
+        }
+        assert_eq!(e.music_playing(), Some(1));
+    }
+    assert!(ended, "the fade never ended: state {}", e.music.state);
+    // The next pass opens the new one.
+    step(&mut e);
+    assert_eq!(e.music_playing(), Some(20));
+    assert!(e.voices().is_playing(VOICE_MUSIC));
+}

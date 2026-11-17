@@ -195,7 +195,8 @@ impl MusicVolume {
         }
         if self.volume == self.target {
             if self.next == 1 || self.next == 2 {
-                // FUN_004778f0 stops the old music first.
+                // FUN_004778f0 stops the old music first (the engine's
+                // `fade_step`).
                 self.target = self.after;
             }
             self.state = self.next;

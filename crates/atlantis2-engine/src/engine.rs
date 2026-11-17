@@ -1459,11 +1459,22 @@ impl Engine {
     }
 
     /// The music fade step (@ 0x00476e80) at the clock, its volume given to
-    /// the music voice.
+    /// the music voice. The end of a music switch's fade (the next state
+    /// 1 or 2) first stops the old music with FUN_004778f0
+    /// (@ 0x00476f4b..0x00476f52: voice 0 stopped, the file closed and the
+    /// buffer freed), so the same pass's refill finds no file
+    /// (FUN_00477590 @ 0x004775ab..0x004775be) and the new music opens on
+    /// the next pass.
     fn fade_step(&mut self) {
         let clock = self.clock;
-        if let Some(att) = self.music_mut().step(clock) {
+        let m = self.music_mut();
+        let switching = m.state == 3 && matches!(m.next, 1 | 2);
+        if let Some(att) = m.step(clock) {
             self.voices.set_attenuation(crate::sound::VOICE_MUSIC, att);
+        }
+        if switching && self.music.state != 3 {
+            self.voices.stop(crate::sound::VOICE_MUSIC);
+            self.player.stream.close();
         }
     }
 
