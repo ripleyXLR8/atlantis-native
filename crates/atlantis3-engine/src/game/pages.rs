@@ -373,22 +373,33 @@ impl Game {
                 // `BT_QUIT` of the start page: the credits (@ 0x00457690),
                 // whose end quits.
                 Event::Quit => self.start_credits(),
+                Event::Volume2004 { master, frame } => {
+                    // @ 0x0045a457 FUN_00430cb0(v) (the music volume
+                    // clamped to 0..99, the couches' volumes again) or
+                    // @ 0x0045a4fc FUN_00430dd0(v) (the master's, then
+                    // FUN_00430cb0 of the music's); the cfg writer keeps
+                    // `ftol` of the float (`%d`, @ 0x0040cc71, 0x0040cd2a).
+                    let v = crate::menu::evolution::slider_volume_2004(frame, self.renderer.fpu);
+                    let (m, g) = self.with_music_2004(|mu, b| {
+                        if master {
+                            mu.set_global_volume(b, v);
+                        } else {
+                            mu.set_music_volume(b, v);
+                        }
+                        (mu.music, mu.global)
+                    });
+                    let c = &mut self.startup.config;
+                    c.music_volume = m as i32;
+                    c.global_volume = g as i32;
+                }
                 Event::Volumes => {
                     // The music setter applies master × music at once
                     // (@ 0x00434100); the other levels are read when a
                     // sound starts.
                     let g = csm_gain(self.level(self.startup.config.music_volume));
                     self.audio.set_gain(CHANNEL_MUSIC, [g, g]);
-                    if self.files.is_evolution_2004() {
-                        // The 2004 options page's calls (@ 0x0045a457
-                        // FUN_00430cb0, @ 0x0045a4fc FUN_00430dd0).
-                        let c = &self.startup.config;
-                        let (m, g) = (c.music_volume as f32, c.global_volume as f32);
-                        self.with_music_2004(|mu, b| {
-                            mu.set_music_volume(b, m);
-                            mu.set_global_volume(b, g);
-                        });
-                    }
+                    // The 2004 options page sets its music volumes through
+                    // `Event::Volume2004`.
                 }
                 Event::Options => {
                     let c = &self.startup.config;

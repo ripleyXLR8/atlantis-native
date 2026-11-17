@@ -15,7 +15,9 @@ use std::sync::Arc;
 use atlantis3_data::evolution2004::Evolution2004Source;
 use atlantis3_data::A3Files;
 use atlantis3_engine::game::{Game, Mode};
-use atlantis3_engine::menu::{PAGE_LOAD, PAGE_MAIN, PAGE_OPTIONS, PAGE_SAVE, PAGE_START};
+use atlantis3_engine::menu::{
+    PAGE_LOAD, PAGE_MAIN, PAGE_OPTIONS, PAGE_SAVE, PAGE_START, PAGE_VOLUMES,
+};
 use atlantis3_engine::music2004::Fade;
 use atlantis3_engine::px::Surface;
 
@@ -304,6 +306,62 @@ fn new_game_save_and_load_from_the_menus() {
         .slots
         .iter()
         .all(|s| !s.stream && s.volume == 0.0));
+}
+
+/// Drags `slider` of the volumes page until it shows `frame`.
+fn drag_to(g: &mut Game, t: &mut f64, slider: &[u8], frame: i32) {
+    let (x0, y) = point_of(g, PAGE_VOLUMES, slider);
+    let w = g.width() as i32;
+    for x in (0..w).map(|d| (x0 + d) % w) {
+        let on = g.menus().get(PAGE_VOLUMES).unwrap().clicked((x, y)) == Some(slider);
+        if !on {
+            continue;
+        }
+        g.set_pointer(x, y);
+        g.click();
+        *t += 0.02;
+        g.step(*t);
+        g.release();
+        *t += 0.02;
+        g.step(*t);
+        let p = g.menus().get(PAGE_VOLUMES).unwrap();
+        if p.items[p.find(slider).unwrap()].frame == frame {
+            return;
+        }
+    }
+    panic!("{} never at frame {frame}", String::from_utf8_lossy(slider));
+}
+
+/// The volumes page's sliders (FUN_0045a230): voices and effects take the
+/// exact x87 product `frame × 6.6666665` truncated (19 at frame 3), music
+/// and master keep it as a float, rounded toward zero once a warp frame
+/// left the control word 0x0e7f (19.999998 at frame 3), the cfg its `ftol`.
+#[test]
+fn the_volume_sliders_store_the_x87_products() {
+    let Some(mut g) = game() else { return };
+    let mut t = 0.0;
+    assert!(g.new_game());
+    g.skip();
+    frames(&mut g, &mut t, 2);
+    assert_eq!(g.mode(), Mode::Warp);
+    g.escape();
+    let (x, y) = point_of(&g, PAGE_MAIN, b"BT_OUTIL");
+    g.set_pointer(x, y);
+    frames(&mut g, &mut t, 2);
+    click_on(&mut g, &mut t, b"BT_OUTIL");
+    assert_eq!(g.menu_page().map(|p| p.0), Some(PAGE_VOLUMES));
+    frames(&mut g, &mut t, 1);
+    drag_to(&mut g, &mut t, b"SL_VOICE", 3);
+    assert_eq!(g.startup.config.voices_volume, 19);
+    drag_to(&mut g, &mut t, b"SL_SFX", 6);
+    assert_eq!(g.startup.config.sfx_volume, 39);
+    drag_to(&mut g, &mut t, b"SL_MUSIC", 3);
+    assert_eq!(g.music2004.music, 19.999_998);
+    assert_eq!(g.startup.config.music_volume, 19);
+    drag_to(&mut g, &mut t, b"SL_MASTER", 1);
+    assert_eq!(g.music2004.global, 6.666_666_5);
+    assert_eq!(g.music2004.music, 19.999_998);
+    assert_eq!(g.startup.config.global_volume, 6);
 }
 
 #[test]
