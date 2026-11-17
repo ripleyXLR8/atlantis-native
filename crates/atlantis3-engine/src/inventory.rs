@@ -143,18 +143,21 @@ impl Inventory {
             .copied()
     }
 
-    /// The pointer at an edge scrolls one slot every 0.25 s.
+    /// The pointer at an edge (x = 0 or W − 1) scrolls one slot every
+    /// 0.25 s (@ 0x00429bd2..0x00429ce5): when more than 0.25 s passed the
+    /// timer restarts first, then the scroll moves if it can, so a rest at
+    /// an edge with nothing to scroll restarts the timer too.
     pub fn scroll_step(&mut self, width: usize, shown: usize, px: i32, now: f64) {
         let (n, _) = slots(width);
-        if now - self.scroll_time <= 0.25 {
+        let (left, right) = (px <= 0, px == width as i32 - 1);
+        if !(left || right) || now - self.scroll_time <= 0.25 {
             return;
         }
-        if px <= 0 && self.scroll > 0 {
-            self.scroll -= 1;
-            self.scroll_time = now;
-        } else if px >= width as i32 - 1 && self.scroll + (n as usize) < shown {
+        self.scroll_time = now;
+        if left {
+            self.scroll = self.scroll.saturating_sub(1);
+        } else if self.scroll + (n as usize) < shown {
             self.scroll += 1;
-            self.scroll_time = now;
         }
     }
 }

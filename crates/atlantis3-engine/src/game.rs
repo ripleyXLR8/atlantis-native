@@ -347,6 +347,8 @@ pub struct Game {
     object_names: Option<atlantis3_data::objects::ObjectNames>,
     /// Tests: the place frame hook's runs (0x004c27d0) since the last reset.
     hook_calls: u32,
+    /// Tests: the text the inventory's hover label drew this frame.
+    label_text: Option<Vec<u8>>,
     subjects_bank: Option<Bank>,
     arrows: Option<Bank>,
     banks_world: i32,
@@ -607,6 +609,7 @@ impl Game {
             objects_hand: None,
             object_names: None,
             hook_calls: 0,
+            label_text: None,
             subjects_bank: None,
             arrows: None,
             banks_world: 0,
@@ -1308,6 +1311,19 @@ impl Game {
         self.hook_calls = 0;
     }
 
+    /// Tests: the inventory's first shown slot (@ 0x0075859c).
+    #[doc(hidden)]
+    pub fn test_inventory_scroll(&self) -> usize {
+        self.inventory.scroll
+    }
+
+    /// Tests: the `Objects.txt` text of the hover label drawn by the last
+    /// inventory frame.
+    #[doc(hidden)]
+    pub fn test_inventory_label(&self) -> Option<&[u8]> {
+        self.label_text.as_deref()
+    }
+
     /// Whether the inventory is open.
     pub fn inventory_open(&self) -> bool {
         self.inventory.open
@@ -1546,6 +1562,7 @@ impl Game {
     /// The hover label of the object under the pointer (@ 0x00429b80 →
     /// @ 0x0042a530), every frame, no delay.
     fn draw_inventory_label(&mut self) {
+        self.label_text = None;
         let items = self.inventory_items();
         let Some(e) = self
             .inventory
@@ -1585,6 +1602,7 @@ impl Game {
         else {
             return;
         };
+        self.label_text = Some(text.clone());
         let (w, h) = (self.width, self.height);
         self.texts();
         let Some(font) = self
@@ -1673,13 +1691,15 @@ impl Game {
             // the inventory and goes in the hand; the fade's step.
             self.draw_inventory_items();
             self.draw_pointer();
+            // The pick (@ 0x00429b80): the edge scrolling first, then the
+            // hover label with the new scroll, then the click.
+            let items = self.inventory_items();
+            self.inventory
+                .scroll_step(self.width, items.len(), self.pointer.0, self.now);
             self.draw_inventory_label();
             // The flip (@ 0x00427cc6): the subtitle line or the voice
             // slots over the inventory.
             self.flip_texts();
-            let items = self.inventory_items();
-            self.inventory
-                .scroll_step(self.width, items.len(), self.pointer.0, self.now);
             // The click is tested and cleared only with the pointer in the
             // bar's row (@ 0x00429cfd..0x00429cff `jle` past the hover and
             // the click; @ 0x00429db7 / 0x00429dc0): a click above the bar

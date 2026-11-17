@@ -9,6 +9,7 @@
 //!   pointer later entering the row over an object takes it.
 //! - The place hook 0x004c27d0 runs in every open-bag frame (@ 0x00427ce6,
 //!   after the `jle` that skips only the close and the hold).
+//! - The edge scrolling's timer and the hover label after the step.
 //!
 //! Needs the game: `ATLANTIS3_DATA`.
 
@@ -22,6 +23,7 @@ const GOLDEN: &str = include_str!("golden/inventory_pending.txt");
 #[derive(Clone, Copy)]
 struct Fields {
     hooks: bool,
+    scroll: bool,
 }
 
 fn frame_line(g: &Game, f: &str, x: i32, y: i32, which: Fields) -> String {
@@ -39,6 +41,12 @@ fn frame_line(g: &Game, f: &str, x: i32, y: i32, which: Fields) -> String {
     if which.hooks {
         l += &format!(" hooks={}", g.test_hook_calls());
     }
+    if which.scroll {
+        let label = g.test_inventory_label().map_or("-".to_string(), |t| {
+            t.iter().map(|b| format!("{b:02x}")).collect()
+        });
+        l += &format!(" scroll={} label={label}", g.test_inventory_scroll());
+    }
     l
 }
 
@@ -51,6 +59,7 @@ fn golden_line(l: &str, which: Fields) -> String {
         let keep = match key {
             "open" | "mode" | "hand" => true,
             "hooks" => which.hooks,
+            "scroll" | "label" => which.scroll,
             _ => false,
         };
         if keep {
@@ -131,12 +140,39 @@ fn replay(cases: &[&str], which: Fields) {
 
 #[test]
 fn a_click_above_the_bar_stays_pending() {
-    replay(&["take", "empty", "band"], Fields { hooks: false });
+    replay(
+        &["take", "empty", "band"],
+        Fields {
+            hooks: false,
+            scroll: false,
+        },
+    );
 }
 
 /// The place hook 0x004c27d0 runs once in every open-bag frame
 /// (@ 0x00427ce6), with or without a pick.
 #[test]
 fn the_place_hook_runs_in_every_bag_frame() {
-    replay(&["take", "empty", "band"], Fields { hooks: true });
+    replay(
+        &["take", "empty", "band"],
+        Fields {
+            hooks: true,
+            scroll: false,
+        },
+    );
+}
+
+/// Edge scrolling (@ 0x00429bd2..0x00429ce5): at x = 0 or W − 1 the 0.25-s
+/// timer restarts whenever it expires, even with nothing to scroll, and
+/// the hover label of the same frame names the object under the pointer
+/// after the step; and the labels of the take cases.
+#[test]
+fn the_edge_scrolling_and_its_label() {
+    replay(
+        &["take", "empty", "band", "scroll"],
+        Fields {
+            hooks: true,
+            scroll: true,
+        },
+    );
 }
