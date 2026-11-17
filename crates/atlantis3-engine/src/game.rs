@@ -3037,11 +3037,15 @@ impl Game {
         (g * f64::from(level)) as i32
     }
 
-    fn play_music(&mut self, path: &str) {
-        if let Some((rate, ch, pcm)) = self.sound(path) {
-            let g = csm_gain(self.level(self.startup.config.music_volume));
-            self.audio.play(CHANNEL_MUSIC, rate, ch, pcm, true, [g, g]);
-        }
+    /// The music track `path` played looped on its channel; false when the
+    /// file is missing.
+    fn play_music(&mut self, path: &str) -> bool {
+        let Some((rate, ch, pcm)) = self.sound(path) else {
+            return false;
+        };
+        let g = csm_gain(self.level(self.startup.config.music_volume));
+        self.audio.play(CHANNEL_MUSIC, rate, ch, pcm, true, [g, g]);
+        true
     }
 
     /// `AtlBruitages_InitWarp` (@ 0x00401f30): the listener at the view's
@@ -4817,14 +4821,19 @@ impl Host for Game {
         if self.music.as_deref() == Some(path.as_str()) && self.audio.is_playing(CHANNEL_MUSIC) {
             return false;
         }
-        self.music = Some(path.clone());
-        self.play_music(&path);
+        // The last track that started (0x00759328, written only on
+        // 0x00433930's success path @ 0x00433ca0..0x00433ca5): a missing
+        // file leaves it, and the film's end (0x00433d00) restarts it.
+        if self.play_music(&path) {
+            self.music = Some(path);
+        }
         false
     }
 
-    /// `STOPMUSIK` (@ 0x004491eb): the music faded out (here stopped).
+    /// `STOPMUSIK` (@ 0x004491eb): the music faded out (here stopped); the
+    /// last track's name is kept (0x0044c610 → 0x00433d30(1) only sets the
+    /// slots' fade flags).
     fn stop_music(&mut self) {
-        self.music = None;
         self.audio.stop(CHANNEL_MUSIC);
     }
 

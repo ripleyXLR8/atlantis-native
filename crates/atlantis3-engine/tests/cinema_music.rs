@@ -47,3 +47,27 @@ fn the_music_stops_under_a_cinematic_and_starts_again_after() {
     // After the last one: the track again.
     assert!(g.audio.is_playing(CHANNEL_MUSIC), "the music back");
 }
+
+/// The track restarted after a film is the last one that started
+/// (0x00759328, written only on 0x00433930's success path
+/// @ 0x00433ca0..0x00433ca5; `STOPMUSIK` 0x0044c610 keeps it): chapi031's
+/// milky ball runs `StopMusik=1`, `StartMusik=38` (no `Muzik038` in any
+/// world) and the unicorn board's film 77; after the film the original
+/// plays chapter 31's `music\bagdad\Muzik06.apc` again.
+#[test]
+fn after_a_film_the_last_track_that_started() {
+    let Some(dir) = atlantis3_data::testing::install_dir() else {
+        return;
+    };
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    g.run_command("(monde=3)");
+    g.run_command("(StartMusik=6)");
+    assert!(g.audio.is_playing(CHANNEL_MUSIC), "Muzik06");
+    g.run_command("(StopMusik=1)");
+    g.run_command("(StartMusik=38)");
+    assert!(!g.audio.is_playing(CHANNEL_MUSIC), "no Muzik038");
+    g.run_command("(Cinema=77,fps=25)");
+    assert_eq!(g.mode(), Mode::Video);
+    g.finish_video();
+    assert!(g.audio.is_playing(CHANNEL_MUSIC), "Muzik06 again");
+}
