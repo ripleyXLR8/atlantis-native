@@ -4691,11 +4691,10 @@ impl Host for Game {
         self.tr(|| "scan".into());
     }
 
-    /// `PLAYVOICE=d,l,r,g` (@ 0x0040da70): the port's parse keeps four
-    /// numbers; the fifth (blue) is 0.
-    fn play_voice(&mut self, values: [i32; 4]) {
-        let [d, l, r, g] = values;
-        self.play_voice_c(d, l, r, g, 0);
+    /// `PLAYVOICE=d,l,r,g,b` (@ 0x0040da70).
+    fn play_voice(&mut self, values: [i32; 5]) {
+        let [d, l, r, g, b] = values;
+        self.play_voice_c(d, l, r, g, b);
     }
 
     fn wam_commands(&mut self, wam: &str, flags: &[i32]) -> Vec<String> {

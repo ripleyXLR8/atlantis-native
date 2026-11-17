@@ -568,11 +568,13 @@ impl Script {
             host.new_sound(&format!("sound{value:03}.apc"));
             return Some(next);
         }
-        if self.evolution_2004 && is(self, "PLAYVOICE") {
-            // atlantis4-cd-en-3022848 @ 0x0044ec99..0x0044ed49: the value,
-            // then four more numbers, each `atol` past the previous one's
-            // digits and the non-digits after them; FUN_004109f0(n1, n2,
-            // n3, n4, n5, 1).
+        if is(self, "PLAYVOICE") {
+            // atlantis3-gog-fr-3473408 @ 0x0044902a..0x004490f2 (the 2001 CD
+            // build @ 0x0044888a..0x0044894b, atlantis4-cd-en-3022848
+            // @ 0x0044ec99..0x0044ed49): the value, then four more numbers,
+            // each `atoi` past the previous one's digits and the non-digits
+            // after them; 0x0040da70(value, a, b, c, d) = (dialog, line, r,
+            // g, b) (2004: FUN_004109f0(n1, n2, n3, n4, n5, 1)).
             let mut n = [value, 0, 0, 0, 0];
             let mut i = p + 1;
             for x in n.iter_mut().skip(1) {
@@ -584,13 +586,11 @@ impl Script {
                 }
                 *x = self.atoi_at(src, i);
             }
-            host.play_voice_2004(n);
-            return Some(next);
-        }
-        if is(self, "PLAYVOICE") {
-            let mut i = p + 1;
-            let n = [0; 4].map(|_| self.parse_int(src, &mut i));
-            host.play_voice(n);
+            if self.evolution_2004 {
+                host.play_voice_2004(n);
+            } else {
+                host.play_voice(n);
+            }
             return Some(next);
         }
         if key == k.stopsound {
