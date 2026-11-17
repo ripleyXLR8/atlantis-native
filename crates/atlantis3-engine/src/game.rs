@@ -1285,6 +1285,14 @@ impl Game {
         }
     }
 
+    /// Tests: the inventory harness's reset between cases: alpha 0, the
+    /// first slot 0 (the bag emptied by 0x0042a020 and the scroll stored).
+    #[doc(hidden)]
+    pub fn test_inventory_reset(&mut self) {
+        self.inventory.alpha = 0.0;
+        self.inventory.scroll = 0;
+    }
+
     /// Whether the inventory is open.
     pub fn inventory_open(&self) -> bool {
         self.inventory.open
@@ -1657,7 +1665,13 @@ impl Game {
             let items = self.inventory_items();
             self.inventory
                 .scroll_step(self.width, items.len(), self.pointer.0, self.now);
-            let picked = if std::mem::take(&mut self.click) {
+            // The click is tested and cleared only with the pointer in the
+            // bar's row (@ 0x00429cfd..0x00429cff `jle` past the hover and
+            // the click; @ 0x00429db7 / 0x00429dc0): a click above the bar
+            // stays pending until the pointer enters the row (and takes the
+            // object there) or the close clears it.
+            let in_row = self.pointer.1 > self.height as i32 - crate::inventory::BAR_H;
+            let picked = if in_row && std::mem::take(&mut self.click) {
                 self.inventory
                     .pick(self.width, self.height, self.pointer, &items)
             } else {
