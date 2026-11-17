@@ -217,6 +217,10 @@ impl FileSource for DvdFiles {
         self.src.read_at(&self.map(name), offset, len)
     }
 
+    fn read_ahead(&self, name: &str, offset: u64, len: usize) {
+        self.src.read_ahead(&self.map(name), offset, len);
+    }
+
     fn has_dir(&self, name: &str) -> bool {
         self.src.has_dir(&self.map(name))
     }

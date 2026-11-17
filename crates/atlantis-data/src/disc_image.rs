@@ -10,6 +10,10 @@
 //! four discs: a [`DiscSet`] serves the files of all the images as one
 //! folder.
 //! Compressed images (zip, 7z, chd) are not read.
+//!
+//! An image's bytes come from an [`ImageBytes`]: its file on the desktop,
+//! a file the player picked in the browser (read by parts, never whole),
+//! so that both read the same file system the same way.
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -31,6 +35,52 @@ const LAYOUTS: [(u64, u64, u64); 6] = [
     (352_800, 2352, 16),
 ];
 
+/// The bytes of an image, read by parts: its file on the desktop, a
+/// picked file in the browser.
+pub trait ImageBytes: Send + Sync {
+    /// Fills `buf` with the bytes at `offset`; false when they cannot all
+    /// be read.
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> bool;
+
+    /// A hint that bytes `offset..offset + len` are read next
+    /// ([`FileSource::read_ahead`] of a file of the image, brought to the
+    /// image's bytes). Nothing by default.
+    fn read_ahead(&self, offset: u64, len: u64) {
+        let _ = (offset, len);
+    }
+}
+
+/// An image's file on disk.
+struct FileBytes(Mutex<File>);
+
+impl ImageBytes for FileBytes {
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> bool {
+        use std::io::{Read, Seek, SeekFrom};
+        let mut f = self.0.lock().unwrap();
+        f.seek(SeekFrom::Start(offset)).is_ok() && f.read_exact(buf).is_ok()
+    }
+}
+
+/// An image held in memory (tests, small images).
+impl ImageBytes for Vec<u8> {
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> bool {
+        let Ok(start) = usize::try_from(offset) else {
+            return false;
+        };
+        match self.get(start..start.saturating_add(buf.len())) {
+            Some(src) => {
+                buf.copy_from_slice(src);
+                true
+            }
+            None => false,
+        }
+    }
+}
+
+/// Raw sectors read at once at most (2.3 MB of 2352-byte sectors): a
+/// larger read of a raw image is made in parts of this many.
+const RAW_BATCH: u64 = 1024;
+
 /// A file of the image: its first sector and size.
 #[derive(Clone, Copy, Debug)]
 struct Extent {
@@ -41,7 +91,7 @@ struct Extent {
 /// One CD image.
 pub struct DiscImage {
     path: PathBuf,
-    file: Mutex<File>,
+    bytes: Box<dyn ImageBytes>,
     lead_in: u64,
     sector_size: u64,
     data_offset: u64,
@@ -52,25 +102,27 @@ pub struct DiscImage {
     joliet: bool,
 }
 
-fn read_exact_at(file: &Mutex<File>, offset: u64, buf: &mut [u8]) -> bool {
-    use std::io::{Read, Seek, SeekFrom};
-    let mut f = file.lock().unwrap();
-    f.seek(SeekFrom::Start(offset)).is_ok() && f.read_exact(buf).is_ok()
-}
-
 impl DiscImage {
     /// Opens an image whose layout holds an ISO 9660 file system.
     pub fn open(path: &Path) -> Option<DiscImage> {
-        let file = Mutex::new(File::open(path).ok()?);
+        let file = FileBytes(Mutex::new(File::open(path).ok()?));
+        DiscImage::from_bytes(path, Box::new(file))
+    }
+
+    /// The image whose bytes `bytes` gives (`path` names it: its file, or
+    /// the picked file's path in the browser), if its layout holds an ISO
+    /// 9660 file system. Only the descriptors and the directories are read
+    /// here.
+    pub fn from_bytes(path: impl Into<PathBuf>, bytes: Box<dyn ImageBytes>) -> Option<DiscImage> {
         for (lead_in, sector_size, data_offset) in LAYOUTS {
             let mut pvd = [0u8; 2048];
             let at = lead_in + 16 * sector_size + data_offset;
-            if !read_exact_at(&file, at, &mut pvd) || pvd[0] != 1 || &pvd[1..6] != b"CD001" {
+            if !bytes.read_at(at, &mut pvd) || pvd[0] != 1 || &pvd[1..6] != b"CD001" {
                 continue;
             }
             let mut img = DiscImage {
-                path: path.to_path_buf(),
-                file,
+                path: path.into(),
+                bytes,
                 lead_in,
                 sector_size,
                 data_offset,
@@ -84,7 +136,7 @@ impl DiscImage {
             for n in 17..32u64 {
                 let mut d = [0u8; 2048];
                 let at = lead_in + n * sector_size + data_offset;
-                if !read_exact_at(&img.file, at, &mut d) || &d[1..6] != b"CD001" || d[0] == 255 {
+                if !img.bytes.read_at(at, &mut d) || &d[1..6] != b"CD001" || d[0] == 255 {
                     break;
                 }
                 if d[0] == 2
@@ -179,21 +231,48 @@ impl DiscImage {
         let mut out = vec![0u8; len];
         let start = ext.lba * SECTOR + offset;
         if self.sector_size == SECTOR && self.data_offset == 0 {
-            return read_exact_at(&self.file, self.lead_in + start, &mut out).then_some(out);
+            return self
+                .bytes
+                .read_at(self.lead_in + start, &mut out)
+                .then_some(out);
         }
-        // Raw sectors: the 2048 user bytes of each one in turn.
-        let mut done = 0usize;
-        while done < len {
-            let pos = start + done as u64;
-            let (sector, within) = (pos / SECTOR, pos % SECTOR);
-            let n = ((SECTOR - within) as usize).min(len - done);
-            let at = self.lead_in + sector * self.sector_size + self.data_offset + within;
-            if !read_exact_at(&self.file, at, &mut out[done..done + n]) {
+        // Raw sectors: the sectors spanned read together (by batches of
+        // `RAW_BATCH`), the 2048 user bytes of each one taken in turn.
+        let end = start + len as u64;
+        let mut pos = start;
+        while pos < end {
+            let first = pos / SECTOR;
+            let batch_end = end.min((first + RAW_BATCH) * SECTOR);
+            let (from, to) = self.raw_span(pos, batch_end);
+            let mut raw = vec![0u8; usize::try_from(to - from).ok()?];
+            if !self.bytes.read_at(from, &mut raw) {
                 return None;
             }
-            done += n;
+            while pos < batch_end {
+                let (sector, within) = (pos / SECTOR, pos % SECTOR);
+                let n = (SECTOR - within).min(batch_end - pos) as usize;
+                let at = (self.raw_offset(sector) + within - from) as usize;
+                let done = (pos - start) as usize;
+                out[done..done + n].copy_from_slice(&raw[at..at + n]);
+                pos += n as u64;
+            }
         }
         Some(out)
+    }
+
+    /// The image offset of sector `sector`'s user data.
+    fn raw_offset(&self, sector: u64) -> u64 {
+        self.lead_in + sector * self.sector_size + self.data_offset
+    }
+
+    /// The image's bytes that hold user bytes `start..end` (`end` >
+    /// `start`): from the first one's to the last one's.
+    fn raw_span(&self, start: u64, end: u64) -> (u64, u64) {
+        let last = (end - 1) / SECTOR;
+        (
+            self.raw_offset(start / SECTOR) + start % SECTOR,
+            self.raw_offset(last) + (end - 1) % SECTOR + 1,
+        )
     }
 
     fn key(name: &str) -> String {
@@ -217,6 +296,22 @@ impl FileSource for DiscImage {
         let ext = *self.files.get(&Self::key(name))?;
         let data = self.read_extent(ext, offset, len)?;
         (data.len() == len).then_some(data)
+    }
+
+    /// Passed on to the image's bytes, as the bytes that hold the part:
+    /// the same span a read of the part then reads (a raw image's part of
+    /// at most `RAW_BATCH` sectors in one read).
+    fn read_ahead(&self, name: &str, offset: u64, len: usize) {
+        let Some(&ext) = self.files.get(&Self::key(name)) else {
+            return;
+        };
+        let len = (len as u64).min(ext.size.saturating_sub(offset));
+        if len == 0 {
+            return;
+        }
+        let start = ext.lba * SECTOR + offset;
+        let (from, to) = self.raw_span(start, start + len);
+        self.bytes.read_ahead(from, to - from);
     }
 
     fn has_dir(&self, name: &str) -> bool {
@@ -283,6 +378,12 @@ impl FileSource for DiscSet {
 
     fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
         self.holder(name)?.read_at(name, offset, len)
+    }
+
+    fn read_ahead(&self, name: &str, offset: u64, len: usize) {
+        if let Some(i) = self.holder(name) {
+            i.read_ahead(name, offset, len);
+        }
     }
 
     fn has_dir(&self, name: &str) -> bool {
@@ -443,6 +544,123 @@ mod tests {
         // The primary tree's names are not used then.
         assert_eq!(img.size("game/atlantis.exe"), None);
         let _ = std::fs::remove_file(p);
+    }
+
+    /// An image read through a source that gives its bytes by parts (the
+    /// browser's picked file): every layout, the reads it is asked for
+    /// recorded.
+    struct Parts {
+        data: Vec<u8>,
+        reads: Mutex<Vec<(u64, usize)>>,
+        ahead: Mutex<Vec<(u64, u64)>>,
+    }
+
+    impl ImageBytes for std::sync::Arc<Parts> {
+        fn read_at(&self, offset: u64, buf: &mut [u8]) -> bool {
+            self.reads.lock().unwrap().push((offset, buf.len()));
+            self.data.read_at(offset, buf)
+        }
+
+        fn read_ahead(&self, offset: u64, len: u64) {
+            self.ahead.lock().unwrap().push((offset, len));
+        }
+    }
+
+    /// The test image with a large file (`big.dat`, 5 MB from sector 23,
+    /// over `RAW_BATCH` sectors), in the layout `(lead_in, sector size,
+    /// data offset)`.
+    fn layout_image(layout: (u64, u64, u64)) -> (Vec<u8>, Vec<u8>) {
+        let (lead_in, size, offset) = layout;
+        let big_len = 5 << 20;
+        let mut sectors = iso_sectors();
+        // The root's record of big.dat, after the others.
+        let mut r = vec![0u8; 34 + 8];
+        r[0] = r.len() as u8;
+        r[2..6].copy_from_slice(&23u32.to_le_bytes());
+        r[10..14].copy_from_slice(&(big_len as u32).to_le_bytes());
+        r[32] = 7;
+        r[33..40].copy_from_slice(b"BIG.DAT");
+        let used = sectors[18].iter().rposition(|&b| b != 0).unwrap() + 2;
+        sectors[18][used..used + r.len()].copy_from_slice(&r);
+        let big: Vec<u8> = (0..big_len).map(|i| (i * 7 % 253) as u8).collect();
+        for c in big.chunks(2048) {
+            let mut s = [0u8; 2048];
+            s[..c.len()].copy_from_slice(c);
+            sectors.push(s);
+        }
+        let mut img = vec![0xAAu8; lead_in as usize];
+        for s in &sectors {
+            img.extend(std::iter::repeat_n(0x55u8, offset as usize));
+            img.extend_from_slice(s);
+            img.extend(std::iter::repeat_n(0x33u8, (size - 2048 - offset) as usize));
+        }
+        (img, big)
+    }
+
+    /// Read by parts, every layout gives the bytes the whole file holds;
+    /// no read of the image is larger than a raw batch, and a part read
+    /// ahead is the span its read then reads.
+    #[test]
+    fn reads_by_parts_give_the_same_bytes() {
+        for layout in LAYOUTS {
+            let (img, big) = layout_image(layout);
+            let parts = std::sync::Arc::new(Parts {
+                data: img,
+                reads: Mutex::new(Vec::new()),
+                ahead: Mutex::new(Vec::new()),
+            });
+            let disc = DiscImage::from_bytes("t.iso", Box::new(parts.clone())).expect("image");
+            assert_eq!(disc.read("game/atlantis.exe").unwrap(), b"hello");
+            assert_eq!(
+                disc.read("big.dat").as_deref(),
+                Some(&big[..]),
+                "{layout:?}"
+            );
+            for part in [1usize, 1000, 2048, 4096, 65536, 512 << 10] {
+                // The small parts over the first sectors only.
+                let whole = if part < 2048 {
+                    &big[..20_000]
+                } else {
+                    &big[..]
+                };
+                let mut joined = Vec::new();
+                let mut at = 0;
+                while at < whole.len() {
+                    let n = part.min(whole.len() - at);
+                    joined.extend(disc.read_at("BIG.DAT", at as u64, n).unwrap());
+                    at += n;
+                }
+                assert!(joined == whole, "{layout:?} by {part}");
+            }
+            // A part read ahead, then read: one read, the span announced.
+            parts.reads.lock().unwrap().clear();
+            disc.read_ahead("big.dat", 3000, 100_000);
+            let ahead = parts.ahead.lock().unwrap()[0];
+            assert_eq!(
+                disc.read_at("big.dat", 3000, 100_000).unwrap(),
+                big[3000..103_000]
+            );
+            assert_eq!(
+                *parts.reads.lock().unwrap(),
+                [(ahead.0, ahead.1 as usize)],
+                "{layout:?}"
+            );
+            parts.reads.lock().unwrap().clear();
+            let _ = disc.read("big.dat");
+            let largest = parts
+                .reads
+                .lock()
+                .unwrap()
+                .iter()
+                .map(|r| r.1)
+                .max()
+                .unwrap();
+            if layout.1 != 2048 {
+                assert!(largest as u64 <= RAW_BATCH * layout.1, "{layout:?}");
+            }
+            // Past the end: nothing.
+            assert_eq!(disc.read_at("big.dat", big.len() as u64 - 10, 11), None);
+        }
     }
 
     /// A file of the player's beside the images is read from the folder,
