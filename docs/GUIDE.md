@@ -108,7 +108,8 @@ the Polish CD (1999), the GOG.com edition and the Italian *Atlantis Collection* 
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
 English, French, German or Spanish, and the French CD (2001, three CDs);
 other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
-GOG.com's release, in English, French, German, Italian and Spanish (see
+GOG.com's release, in English, French, German, Italian and Spanish, and
+the 2004 CD (English, in progress) (see
 [Atlantis Evolution](#atlantis-evolution)).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
@@ -308,6 +309,11 @@ What to pick:
   kept in the browser under `atlantis-native/atlantis3/`; its controls
   are the desktop's (see [Atlantis III](#atlantis-iii)): a click takes
   the mouse, Escape lets it go first.
+- *Atlantis Evolution*, GOG.com (English, French, German, Italian or
+  Spanish): the installation folder (the one holding
+  `Atlantis Evolution.exe` and `3D`). The language is the
+  installation's; `?lang=` after the page's address chooses another
+  (`en`, `fr`, `de`, `it`, `es`).
 - *Atlantis Evolution*, the 2004 CD (in progress): the folder its
   installer filled (the one holding `Atlantis Evolution.exe` and `cd0`
   to `cd4`, about 4 GB, read a part at a time). Its saves and

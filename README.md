@@ -35,28 +35,28 @@ end too, on Windows, macOS, Linux and in the browser: Tibet, Ireland,
 China, Yucatán and Xibalba, Shamballa and Atlantis, with every puzzle (see
 [Atlantis II](docs/GUIDE.md#atlantis-ii)).
 
-*Atlantis III: The New World* (2001) plays from start to end as well, new
-in 0.6.0, on the desktop and in the browser: from the Hoggar desert
-through the Land of the Dead and the other worlds to the credits, with
-its dialogs, menus, saves and every puzzle. GOG.com's edition is known,
-in English, French, German and Spanish (see
-[Atlantis III](docs/GUIDE.md#atlantis-iii)). It has
-been checked mostly by automated replays against the original's code and
-by the developer's own play, not yet by many players: reports are
-welcome.
+*Atlantis III: The New World* (2001) plays from start to end as well, on
+the desktop and in the browser: from the Hoggar desert through the Land
+of the Dead and the other worlds to the credits, with its dialogs,
+menus, saves and every puzzle. Two editions are known: GOG.com's, in
+English, French, German and Spanish, and the French retail CD (2001,
+three CDs) (see [Atlantis III](docs/GUIDE.md#atlantis-iii)). It has been
+checked mostly by automated replays against the original's code and by
+the developer's own play, not yet by many players: reports are welcome.
 
-*Atlantis Evolution* (2004) is new in 0.7.0 in GOG.com's edition, in its five
-languages, from the splash screens and the main menu through the whole
-story to the end, with its dialogs, inventory, documents, saves and
-puzzles, its videos and sounds decoded as the original decodes them.
-GOG.com does not sell the 2004 program: its edition is a 2012 version of
-the game on the Tetraedge Engine, not on Cryo's engine, so Atlantis Native
-has a new engine for it, drawn by the graphics card with OpenGL (or WebGL 2
-in the browser), or by the processor. It has been checked by automated
-replays of the whole story against the original's scripts and by the
-developer's own play (see [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution)).
+*Atlantis Evolution* (2004) plays from start to end in GOG.com's
+edition, in its five languages, from the splash screens and the main
+menu through the whole story to the end, with its dialogs, inventory,
+documents, saves and puzzles, its videos and sounds decoded as the
+original decodes them. GOG.com does not sell the 2004 program: its
+edition is a 2012 version of the game on the Tetraedge Engine, not on
+Cryo's engine, so Atlantis Native has a new engine for it, drawn by the
+graphics card with OpenGL (or WebGL 2 in the browser), or by the
+processor. It has been checked by automated replays of the whole story
+against the original's scripts and by the developer's own play (see
+[Atlantis Evolution](docs/GUIDE.md#atlantis-evolution)).
 
-**In progress:** the original 2004 CD program of *Atlantis Evolution*
+**Preview:** the original 2004 CD program of *Atlantis Evolution*
 (The Adventure Company's CD, English; Cryo's own engine, grown from
 *Atlantis III*'s), played by the *Atlantis III* engine. It is in the game
 library as *Atlantis Evolution (2004), CD, English*, beside GOG.com's
@@ -64,9 +64,8 @@ edition, on the desktop and in the browser: its logos, start page,
 menus, saves, panoramas, chapter scripts, dialogs, inventory, music,
 Bink films, the ship's pitching and its eight mini-games run, each
 traced to the original's code and checked piece by piece by automated
-tests. It has not yet been played through from start to end: it is
-playable, but still in progress (see
-[The 2004 CD](docs/GUIDE.md#the-2004-cd-in-progress)).
+tests. It has not yet been played through from start to end: reports
+are welcome (see [The 2004 CD](docs/GUIDE.md#the-2004-cd-in-progress)).
 
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
@@ -78,8 +77,8 @@ original's bugs and an optional HD mode.
 ## Screenshots
 
 <p align="center">
-  <img src="docs/screenshots/macos-player-screen.jpg" width="49%" alt="The player screen on macOS, HD mode">
-  <img src="docs/screenshots/dialog-hd.jpg" width="49%" alt="A dialog with its 3D talking head, HD mode">
+  <img src="docs/screenshots/macos-player-screen.jpg" width="49%" alt="Atlantis: The Lost Tales, the player screen on macOS, HD mode">
+  <img src="docs/screenshots/dialog-hd.jpg" width="49%" alt="Atlantis: The Lost Tales, a dialog with its 3D talking head, HD mode">
 </p>
 
 <p align="center">
@@ -87,29 +86,37 @@ original's bugs and an optional HD mode.
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/widescreen.jpg" width="98%" alt="Widescreen: the panorama fills a 16:9 window">
+  <img src="docs/screenshots/widescreen.jpg" width="49%" alt="Widescreen: the panorama fills a 16:9 window">
+  <img src="docs/screenshots/atlantis2-shamballa-widescreen.jpg" width="49%" alt="Atlantis II: Shamballa in the HD mode, widescreen">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/atlantis2-shamballa-widescreen.jpg" width="98%" alt="Atlantis II: Shamballa in the HD mode, widescreen">
+  <img src="docs/screenshots/atlantis3-hoggar-dialog.jpg" width="49%" alt="Atlantis III, GOG.com: a dialog in the Hoggar, 800 x 600, with its subtitle">
+  <img src="docs/screenshots/atlantis3-cd-fr-hoggar.jpg" width="49%" alt="Atlantis III, French CD: the Hoggar desert, 800 x 600">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/atlantis3-hoggar-dialog.jpg" width="70%" alt="Atlantis III: a dialog in the Hoggar, 800 x 600, with its subtitle">
+  <img src="docs/screenshots/evolution-gog-rowboat.jpg" width="49%" alt="Atlantis Evolution, GOG.com: at sea in the rowboat, 1280 x 720">
+  <img src="docs/screenshots/web-atlantis3-cd-images-edge.jpg" width="49%" alt="The web version in Edge: Atlantis III's French CD played from its CD images">
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/game-library.png" width="70%" alt="The game library: several editions of the game">
+  <img src="docs/screenshots/evolution-2004-cd-cabin.jpg" width="49%" alt="Atlantis Evolution, the 2004 CD: the cabin of the first scene, 1024 x 768">
+  <img src="docs/screenshots/game-library.png" width="49%" alt="The game library: editions of the four games, among them Atlantis III's French CD and Atlantis Evolution's 2004 CD">
 </p>
 
-<sub>From top to bottom: the player screen (macOS, HD mode); a dialog with
-its 3D talking head drawn at the window's resolution; the same view in
-the original's 640x480 and in the HD mode; widescreen; *Atlantis II*'s
-Shamballa in the HD mode, widescreen; a dialog of *Atlantis III* in the
-Hoggar (GOG.com's French edition, 800 x 600); the game library.
-The game's pictures and text are © Microids (Cryo Interactive
-Entertainment), shown here to illustrate the engine; Atlantis Native
-contains none of them.</sub>
+<sub>Left to right, top to bottom: the first game's player screen
+(macOS, HD mode); a dialog with its 3D talking head drawn at the
+window's resolution; the same view in the original's 640x480 and in the
+HD mode; widescreen; *Atlantis II*'s Shamballa in the HD mode,
+widescreen; a dialog of *Atlantis III* in the Hoggar (GOG.com's French
+edition, 800 x 600); the Hoggar on *Atlantis III*'s French CD; *Atlantis
+Evolution*, GOG.com's edition, at sea; the web version in Edge,
+*Atlantis III*'s French CD read from its ISO images; the cabin of the
+first scene on *Atlantis Evolution*'s 2004 CD (a preview); the game
+library. The games' pictures and text are © Microids (the first three:
+Cryo Interactive Entertainment), shown here to illustrate the engine;
+Atlantis Native contains none of them.</sub>
 
 ## Features
 
@@ -139,16 +146,19 @@ contains none of them.</sub>
 - 📚 **Game library**: several editions (GOG.com, CD, DVD, disc
   images...) of the four games in one list, to choose the one to play at
   start-up or switch from F10.
-- 🏜️ **Atlantis III** (new in 0.6.0): GOG.com's edition in English,
-  French, German or Spanish, whole,
-  with the original's own menus and options (640 x 480, 800 x 600 or
-  1024 x 768, 16 or 32 bits), its saves kept apart from the game's
-  folder, F12 screenshots; on the desktop and in the browser.
-- 🌊 **Atlantis Evolution** (new in 0.7.0): GOG.com's edition in English, French,
+- 🏜️ **Atlantis III**: GOG.com's edition in English, French, German or
+  Spanish and the French retail CD, whole, with the original's own menus
+  and options (640 x 480, 800 x 600 or 1024 x 768, 16 or 32 bits; 32 by
+  default, a bug fix), its saves kept apart from the game's folder, F12
+  screenshots; on the desktop and in the browser.
+- 🌊 **Atlantis Evolution**: GOG.com's edition in English, French,
   German, Italian and Spanish, its interface laid out on any window size
   as the original lays it out, full screen or windowed; on the desktop
   and in the browser. Its original 2004 CD program is in the game library
-  too, in progress.
+  too, as a preview.
+- 🌐 **In the browser**: the four games, read from your own folder; the
+  CD editions of the first three also from their disc images (`.iso`,
+  `.bin`, `.img`, `.mdf`, `.nrg`), a part at a time.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
   proportions, the mouse captured while you look around; full screen at
   a key, and on the desktop kept for the next start (F10, "Start in full
@@ -173,11 +183,15 @@ those of the latest commit:
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
 
 The web version of the latest commit is also online:
-**https://ripleyxlr8.github.io/atlantis-native/** (Chrome, Edge, Firefox
-or Safari), for the four games (tried in Edge and Firefox, Atlantis II
-in Chrome too; not yet in Safari). Pick
-your game folder there: its files are read inside your browser and never
-sent anywhere; the saves stay in that browser.
+**https://ripleyxlr8.github.io/atlantis-native/**, for the four games
+(tried in Edge, a Chromium browser, and in Firefox, Atlantis II in
+Chrome too; not yet in Safari). Pick your game folder there: its files
+are read inside your browser, a part at a time (the CD images too, and
+Atlantis II's and III's cinematics), and never sent anywhere; the saves
+stay in that browser. For the CD editions of Atlantis I, II and III, the
+folder may hold the CD images (`.iso`, `.bin`, `.img`, `.mdf`, `.nrg`)
+in place of copies of the discs (see [The web
+version](docs/GUIDE.md#the-web-version)).
 
 > **Windows:** the program is not code-signed (a certificate costs money
 > each year), so Windows SmartScreen may warn that it "protected your PC"
@@ -304,7 +318,7 @@ For *Atlantis Evolution*:
 | Release | Languages | What to point it at |
 |---|---|---|
 | [GOG.com](https://www.gog.com/) (`Atlantis Evolution.exe` of 2,363,910 bytes, MD5 `f2de382af52f1d89e32ed7c286be8b4f`; one program for all five languages) | English, French, German, Italian, Spanish (the one GOG.com's client installed, or another chosen in `settings.ini`) | the installation folder (the one holding `Atlantis Evolution.exe` and `3D`) |
-| The 2004 CD of The Adventure Company, four discs (`Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `2199bc93d2ac3f8b4279e0db898559e8`; **in progress**) | English | the folder where its installer put the game (the one holding `Atlantis Evolution.exe` and `cd0` to `cd4`; by default `C:\Program Files\The Adventure Company\Atlantis Evolution`) |
+| The 2004 CD of The Adventure Company, four discs (`Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `2199bc93d2ac3f8b4279e0db898559e8`; **a preview**, not yet played through from start to end) | English | the folder where its installer put the game (the one holding `Atlantis Evolution.exe` and `cd0` to `cd4`; by default `C:\Program Files\The Adventure Company\Atlantis Evolution`) |
 
 GOG.com's edition is a 2012 program (Tetraedge Engine); the CD's is the
 original 2004 program, played by the *Atlantis III* engine. The CDs
@@ -354,7 +368,7 @@ given on the command line. See
 [Atlantis III](docs/GUIDE.md#atlantis-iii).
 
 *Atlantis Evolution* (2004) as well: GOG.com's installation folder, or
-the folder the 2004 CD's installer filled (in progress), found by the
+the folder the 2004 CD's installer filled (a preview), found by the
 game library or given on the command line. See
 [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution).
 

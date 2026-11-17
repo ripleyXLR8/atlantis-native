@@ -5,8 +5,8 @@
 **在今天的电脑上，重返亚特兰蒂斯。**
 
 Cryo Interactive 的《亚特兰蒂斯：失落的传说》（*Atlantis: The Lost Tales*，1997）、
-《Atlantis II》（1999）和《Atlantis III: The New World》（2001）的原生移植版，
-用 Rust 编写，支持 Windows、macOS、Linux 以及网页浏览器。《Atlantis III》目前只支持 GOG.com 的法文版。
+《Atlantis II》（1999）、《Atlantis III: The New World》（2001）和《Atlantis Evolution》（2004）的原生移植版，
+用 Rust 编写，支持 Windows、macOS、Linux 以及网页浏览器。
 
 **[▶ 在浏览器中游玩](https://ripleyxlr8.github.io/atlantis-native/)**（需要你自己的游戏光盘或 GOG.com 版）
 
@@ -25,10 +25,19 @@ Cryo Interactive 的《亚特兰蒂斯：失落的传说》（*Atlantis: The Los
 续作《Atlantis II》（*Beyond Atlantis*，1999）同样可以从头玩到尾，支持 Windows、macOS、Linux 和浏览器：
 西藏、爱尔兰、中国、尤卡坦与西巴尔巴、香巴拉和亚特兰蒂斯，包含所有谜题（见[玩家指南](docs/GUIDE.md#atlantis-ii)，英文）。
 
-《Atlantis III: The New World》（2001）是 0.6.0 版新增的游戏，同样可以从头玩到尾，支持桌面版和浏览器：
+《Atlantis III: The New World》（2001）同样可以从头玩到尾，支持桌面版和浏览器：
 从霍加尔（Hoggar）沙漠，经过亡者之地和其他世界，一直到片尾字幕，包含对话、菜单、存档和所有谜题。
-目前只知道 GOG.com 的法文版（见[玩家指南](docs/GUIDE.md#atlantis-iii)，英文）。
+已知两个版本：GOG.com 版（英文、法文、德文、西班牙文）和法文零售光盘版（2001 年，3 张光盘）（见[玩家指南](docs/GUIDE.md#atlantis-iii)，英文）。
 它主要通过与原版代码比对的自动回放测试，以及开发者本人的游玩来检验，玩过的玩家还不多：欢迎回报问题。
+
+《Atlantis Evolution》（2004）的 GOG.com 版（英文、法文、德文、意大利文、西班牙文）可以从头玩到尾：
+从开场画面和主菜单，经过整个故事直到结局，包含对话、物品栏、文件、存档和谜题，视频和声音的解码方式与原版相同。
+GOG.com 出售的并不是 2004 年的原版程序，而是 2012 年基于 Tetraedge 引擎的版本，
+因此 Atlantis Native 为它写了一个新引擎，用显卡（OpenGL，浏览器中为 WebGL 2）或处理器绘制（见[玩家指南](docs/GUIDE.md#atlantis-evolution)，英文）。
+
+**预览：** The Adventure Company 发行的 2004 年英文原版光盘程序（Cryo 自己的引擎，由《Atlantis III》的引擎发展而来），
+由 Atlantis Native 的《Atlantis III》引擎运行，在游戏库中显示为 *Atlantis Evolution (2004), CD, English*，支持桌面版和浏览器。
+它还没有从头到尾完整玩过一遍：欢迎回报问题（见[玩家指南](docs/GUIDE.md#the-2004-cd-in-progress)，英文）。
 
 这就是**原版游戏本身，逐像素、逐采样忠实重现**：引擎移植自
 [ScummVM](https://www.scummvm.org/) CryOmni3D 引擎中的 Atlantis 引擎，而后者是通过逆向工程原版可执行文件重建的。
@@ -42,8 +51,10 @@ Cryo Interactive 的《亚特兰蒂斯：失落的传说》（*Atlantis: The Los
 - 🐞 **错误修复**（可选）：修复原版的各种错误；一个开关即可全部关闭，回到原版发行时的样子。
 - 💾 **存档兼容**：游戏在每一章自动存档，使用原版自己的存档格式。
 - ⚙️ **选项菜单**（F10 或 O）：画面、HD 设置和各项改进，游戏中即时切换。
-- 📚 **游戏库**：三款游戏的多个版本（GOG.com、光盘、DVD、光盘镜像……）集中在同一个列表中，启动时选择要玩的版本，或在 F10 菜单中切换。
-- 🏜️ **Atlantis III**（0.6.0 版新增）：完整支持 GOG.com 法文版，使用原版自己的菜单和选项（640 x 480、800 x 600 或 1024 x 768，16 或 32 位色），存档不放在游戏文件夹中，F12 截图；支持桌面版和浏览器。
+- 📚 **游戏库**：四款游戏的多个版本（GOG.com、光盘、DVD、光盘镜像……）集中在同一个列表中，启动时选择要玩的版本，或在 F10 菜单中切换。
+- 🏜️ **Atlantis III**：完整支持 GOG.com 版（英文、法文、德文、西班牙文）和法文零售光盘版，使用原版自己的菜单和选项（640 x 480、800 x 600 或 1024 x 768，16 或 32 位色；默认 32 位，属于错误修复之一），存档不放在游戏文件夹中，F12 截图；支持桌面版和浏览器。
+- 🌊 **Atlantis Evolution**：GOG.com 版（英文、法文、德文、意大利文、西班牙文），界面按原版的方式适应任何窗口大小，可全屏或窗口模式；支持桌面版和浏览器。2004 年的原版光盘程序也在游戏库中，目前为预览版。
+- 🌐 **浏览器**：四款游戏都从你自己的文件夹读取；前三款游戏的光盘版也可以直接读取光盘镜像（`.iso`、`.bin`、`.img`、`.mdf`、`.nrg`），按需分段读取。
 
 ## 中文版
 
@@ -75,9 +86,10 @@ Cryo Interactive 的《亚特兰蒂斯：失落的传说》（*Atlantis: The Los
 | 掌机（[PortMaster](https://portmaster.games/)，64 位 ARM，如 R36S），第一部游戏 | `atlantis-native-portmaster.zip`（解压到 `ports` 文件夹，游戏文件放进 `ports/atlantisnative/gamedata/`） |
 | 网页（静态网站，需通过 HTTP 提供；在 nightly 版中） | `atlantis-native-web.zip` |
 
-网页版：**https://ripleyxlr8.github.io/atlantis-native/**（Chrome、Edge、Firefox 或 Safari），
-三款游戏都可以玩（《Atlantis II》尚未在 Safari 中测试，《Atlantis III》只在 Edge 中测试过）。
-在网页中选择你的游戏文件夹即可：文件只在你的浏览器中读取，不会发送到任何地方；存档保存在该浏览器中。
+网页版：**https://ripleyxlr8.github.io/atlantis-native/**，四款游戏都可以玩
+（已在 Edge（Chromium 内核）和 Firefox 中测试，《Atlantis II》也在 Chrome 中测试过；尚未在 Safari 中测试）。
+在网页中选择你的游戏文件夹即可：文件只在你的浏览器中按需分段读取，不会发送到任何地方；存档保存在该浏览器中。
+第一、二、三部的光盘版，文件夹中可以放光盘镜像（`.iso`、`.bin`、`.img`、`.mdf`、`.nrg`）代替光盘的复制文件。
 
 > **Windows：** 程序没有代码签名，第一次运行时 SmartScreen 可能会显示警告。
 > 点击“**更多信息**”，再点“**仍要运行**”即可。请只从[发布页面](https://github.com/ripleyXLR8/atlantis-native/releases)下载。
@@ -93,9 +105,13 @@ Atlantis Native **不含任何游戏数据**，请使用你自己的正版游戏
   以及 [GOG.com](https://www.gog.com/) 版（英文、法文、德文、西班牙文、意大利文）。
 - **《Atlantis II》**：法文光盘版（1.00 版）、官方 1.01 补丁、北美 DreamCatcher 光盘版（*Beyond Atlantis*，2000）、波兰文光盘版（1999）、
   [GOG.com](https://www.gog.com/) 版（英文、法文、德文、西班牙文）和意大利文 *Atlantis Collection* DVD。
-- **《Atlantis III》**：只支持 [GOG.com](https://www.gog.com/) 的法文版（*Atlantis 3 - The New World*），
-  指定其安装文件夹（包含 `Game.exe` 和 `Datas` 的文件夹）。其他版本（GOG.com 的其他语言版、零售光盘和 DVD）
-  尚属未知，也未经测试：程序会拒绝其 `Game.exe`，并显示文件大小和 MD5，方便在 GitHub 上回报以便加入支持。
+- **《Atlantis III》**：[GOG.com](https://www.gog.com/) 版（*Atlantis 3 - The New World*，英文、法文、德文、西班牙文），
+  指定其安装文件夹（包含 `Game.exe` 和 `Datas` 的文件夹）；法文零售光盘版（2001 年，3 张光盘），
+  指定其安装文件夹（包含 `Atlantis3.exe` 和 `Datas` 的文件夹），三张光盘的镜像（或复制文件）放在其中或其子文件夹中。
+  其他版本（其他零售光盘和 DVD）尚属未知，也未经测试：程序会拒绝其可执行文件，并显示文件大小和 MD5，方便在 GitHub 上回报以便加入支持。
+- **《Atlantis Evolution》**：[GOG.com](https://www.gog.com/) 版（英文、法文、德文、意大利文、西班牙文），
+  指定其安装文件夹（包含 `Atlantis Evolution.exe` 和 `3D` 的文件夹）；The Adventure Company 的 2004 年英文光盘版（预览版），
+  指定其安装程序生成的文件夹（包含 `Atlantis Evolution.exe` 和 `cd0` 到 `cd4` 的文件夹）：光盘本身只有安装程序的压缩档。
 
 ## 快速开始
 
@@ -119,8 +135,8 @@ Atlantis Native **不含任何游戏数据**，请使用你自己的正版游戏
 | **移植版选项**（画面、HD、错误修复、游戏库） | **F10**（或 **O**） |
 | 全屏 | F、F11 或 Alt+Enter |
 
-《Atlantis II》和《Atlantis III》有各自的操作方式，见玩家指南中的
-[Atlantis II](docs/GUIDE.md#controls) 和 [Atlantis III](docs/GUIDE.md#atlantis-iii-controls)（英文）。
+《Atlantis II》、《Atlantis III》和《Atlantis Evolution》有各自的操作方式，见玩家指南中的
+[Atlantis II](docs/GUIDE.md#controls)、[Atlantis III](docs/GUIDE.md#atlantis-iii-controls) 和 [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution-controls)（英文）。
 
 ## 关于 AI 的使用
 
@@ -134,4 +150,4 @@ GNU General Public License 第 3 版或更高版本（见 `LICENSE`）。代码�
 版权所有 (C) ScummVM 团队。中文字幕字体为 Noto Serif SC / TC 子集（SIL Open Font License 1.1，见
 `assets/fonts/LICENSE-NotoSerifCJK`）；Noto 是 Google Inc. 的商标。
 
-*Atlantis: The Lost Tales*、*Atlantis II* 和 *Atlantis III* 是其所有者的商标。本项目与其没有任何关联。
+*Atlantis: The Lost Tales*、*Atlantis II*、*Atlantis III* 和 *Atlantis Evolution* 是其所有者的商标。本项目与其没有任何关联。
