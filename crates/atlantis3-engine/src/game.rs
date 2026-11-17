@@ -1222,8 +1222,18 @@ impl Game {
             self.menus.press();
         }
         self.click = true;
-        if self.last_press.is_some_and(|t| self.now - t < 0.2) {
-            self.double_click = true;
+        let quick = self.last_press.is_some_and(|t| self.now - t < 0.2);
+        if self.files.is_evolution_2004() {
+            if quick {
+                self.double_click = true;
+            }
+        } else {
+            // The press writes the double-click byte 0x007592bb: 0, then 1
+            // within 0.2 s of the previous press (@ 0x004315b1 /
+            // 0x004315ec). It keeps its value until the next press, the
+            // click that ends a travel video (@ 0x00422073) or `CINEMA`
+            // (@ 0x00448322): the only writers.
+            self.double_click = quick;
         }
         // The script reads the same flags (`Script::click`).
         if let Some(s) = self.script.as_mut() {
@@ -1447,7 +1457,7 @@ impl Game {
             s.click = false;
         }
         self.click = false;
-        self.double_click = false;
+        self.clear_double_click_2004();
         self.look_last = None;
     }
 
@@ -1474,7 +1484,7 @@ impl Game {
             s.click = false;
         }
         self.click = false;
-        self.double_click = false;
+        self.clear_double_click_2004();
         self.look_last = None;
     }
 
@@ -2061,6 +2071,17 @@ impl Game {
 
     // ---- the warp ------------------------------------------------------
 
+    /// The 2004 program's double-click flag cleared at the warp frame's
+    /// end and when a menu closes, as before. *Atlantis III* keeps its byte
+    /// 0x007592bb until the next press (see [`Game::click`]): a double
+    /// click during a move's turn still skips the travel video at the
+    /// completion (@ 0x00440242).
+    fn clear_double_click_2004(&mut self) {
+        if self.files.is_evolution_2004() {
+            self.double_click = false;
+        }
+    }
+
     /// `AtlWarp_continue` (@ 0x0043ff20).
     fn warp_frame(&mut self) {
         if std::mem::take(&mut self.resume_next) {
@@ -2130,7 +2151,7 @@ impl Game {
         // to enter waits for the warp.
         if !matches!(self.mode, Mode::Warp | Mode::Subjects) {
             self.click = false;
-            self.double_click = false;
+            self.clear_double_click_2004();
             self.right_clicked = false;
             if self.moving.pending && self.moving.next.is_none() {
                 self.complete_move();
@@ -2154,7 +2175,7 @@ impl Game {
         if self.moving.pending {
             self.complete_move();
         }
-        self.double_click = false;
+        self.clear_double_click_2004();
         // 8. `CLICZONE` = 0.
         if let Some(s) = self.script.as_mut() {
             let k = s.keys.cliczone;
@@ -4719,6 +4740,8 @@ impl Host for Game {
     }
 
     fn play_cinema(&mut self, n: i32, fps: i32) -> bool {
+        // `CINEMA` clears the double-click byte (@ 0x00448322).
+        self.double_click = false;
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         let (video, subtitles) = atlantis3_data::cine_txt::cinema_names(n as u32);

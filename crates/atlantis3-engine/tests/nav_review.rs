@@ -82,3 +82,54 @@ fn the_cross_is_drawn_over_the_object_in_the_hand() {
         cross_pixels(&g)
     );
 }
+
+/// Runs warp frames of 0.04 s from `t` until view 5 is entered and the
+/// warp is back (at most 1000 frames); whether a travel video played.
+fn walk_to_view_5(g: &mut Game, mut t: f64) -> bool {
+    let mut travel = false;
+    for _ in 0..1000 {
+        t += 0.04;
+        g.step(t);
+        travel |= g.video_is_travel();
+        if g.place().1 == Some(5) && g.mode() == Mode::Warp {
+            return travel;
+        }
+    }
+    panic!("view 5 not reached");
+}
+
+/// F4: the double-click byte 0x007592bb is written only by a press
+/// (@ 0x004315b1 / 0x004315ec), the click that ends a travel video
+/// (@ 0x00422073) and `CINEMA` (@ 0x00448322). The second press of a
+/// double click on the move zone to view 5 comes during the turn; the byte
+/// is still set when the turn ends, and the completion starts no travel
+/// video (@ 0x00440242).
+#[test]
+fn a_double_click_on_a_move_skips_the_travel_video() {
+    let Some((mut g, t)) = hoggar_view_4(108.0) else {
+        return;
+    };
+    // The control: one press, the travel video plays.
+    g.click();
+    assert!(walk_to_view_5(&mut g, t), "a single click plays the video");
+
+    let (mut g, t) = hoggar_view_4(108.0).unwrap();
+    g.click();
+    let t = t + 0.04;
+    g.step(t);
+    assert!(g.turning());
+    g.click();
+    assert!(!walk_to_view_5(&mut g, t), "a double click skips it");
+
+    // Two presses 0.2 s or more apart are no double click.
+    let (mut g, t) = hoggar_view_4(108.0).unwrap();
+    g.click();
+    let mut t = t;
+    for _ in 0..6 {
+        t += 0.04;
+        g.step(t);
+    }
+    assert!(g.turning());
+    g.click();
+    assert!(walk_to_view_5(&mut g, t), "presses 0.24 s apart");
+}
