@@ -101,17 +101,46 @@ impl FileSource for WithCfg {
 }
 
 /// Starts Atlantis III from its installed folder `install`, the saves in
-/// `store`.
-pub fn start(install: Arc<dyn FileSource>, store: Rc<dyn SaveStore>) -> Result<(), JsValue> {
+/// `store`; the French retail CD with its discs among `discs` (the picked
+/// folders that may be copies of the CDs, each with its name for the
+/// log), read as the desktop reads them
+/// ([`atlantis3_data::discs::CdSource`]: the install, then the disc the
+/// last disc test chose, then another disc that has the file).
+pub fn start(
+    install: Arc<dyn FileSource>,
+    discs: Vec<(String, Arc<dyn FileSource>)>,
+    store: Rc<dyn SaveStore>,
+) -> Result<(), JsValue> {
     let cfg = store.read(CFG_KEY);
-    let files = A3Files::new(Arc::new(WithCfg {
-        install,
-        cfg: cfg.clone(),
-        name: atlantis3_data::cfg::CFG_PATH,
-    }));
+    let files = A3Files::with_disc_sources(
+        Arc::new(WithCfg {
+            install,
+            cfg: cfg.clone(),
+            name: atlantis3_data::cfg::CFG_PATH,
+        }),
+        || discs,
+    );
     let label = files
         .edition_label()
         .map_err(|e| JsValue::from(format!("Atlantis III: {e}")))?;
+    if let Some(d) = files.discs() {
+        let found = d.disc_numbers();
+        if found.is_empty() {
+            return Err(crate::web_layout::A3_NO_DISC.into());
+        }
+        if found.len() < 3 {
+            let missing: Vec<String> = (1..=3u8)
+                .filter(|n| !found.contains(n))
+                .map(|n| format!("CD {n}"))
+                .collect();
+            let text = format!(
+                "{label}: {} not among the chosen files; the game stops where it needs it.",
+                missing.join(", ")
+            );
+            log::warn!("{text}");
+            crate::web::notice(&text);
+        }
+    }
     // The bug fixes (`settings.ini` in the same storage, written with
     // the defaults when there is none; the web page has no `--original`).
     let fixes = match store.read(SETTINGS_FILE) {
@@ -607,7 +636,8 @@ pub fn atlantis3_test(command: String) {
 
 /// The game's state, for the end-to-end runs (JSON: the loop mode, the
 /// place and view, the screen's size and depth, the free pointer, the
-/// menu page, the clock, the frame times).
+/// menu page, the retail CD's current disc (0 for none), the clock, the
+/// frame times).
 #[wasm_bindgen]
 pub fn atlantis3_state() -> String {
     STATE.with(|s| s.borrow().clone())
@@ -688,7 +718,7 @@ fn record_state(game: &Game, clock: f64, times: &FrameTimes, audio: bool, locked
     let s = format!(
         "{{\"mode\":\"{:?}\",\"wam\":\"{}\",\"view\":{},\"width\":{},\"height\":{},\
          \"depth\":\"{:?}\",\"pointer\":[{px},{py}],\"page\":{page},\"audio\":{audio},\
-         \"locked\":{locked},\"items\":[{}],\"found\":{found},\"clock\":{:.3},\"times\":{}}}",
+         \"locked\":{locked},\"items\":[{}],\"found\":{found},\"disc\":{},\"clock\":{:.3},\"times\":{}}}",
         game.mode(),
         wam.replace(['"', '\\'], ""),
         view.map_or("null".to_string(), |v| v.to_string()),
@@ -696,6 +726,7 @@ fn record_state(game: &Game, clock: f64, times: &FrameTimes, audio: bool, locked
         game.height(),
         game.depth(),
         items.join(","),
+        game.files().discs().map_or(0, |d| d.current()),
         clock,
         times.report()
     );

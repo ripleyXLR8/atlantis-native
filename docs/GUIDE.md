@@ -139,7 +139,7 @@ The message says what is wrong and what to do:
 | (web) Atlantis II needs its four discs, and CD *n* is not among the chosen files | copy that CD into the installed game's folder or a folder inside it, and choose the folder again |
 | holds an Atlantis III program that Atlantis Native does not know | an edition not supported yet: report its size and MD5 on GitHub |
 | does not hold Atlantis III | choose GOG.com's installation folder, the one with `Game.exe` and `Datas`, or the French CD's, the one with `Atlantis3.exe` and `Datas` |
-| holds Atlantis III's CD release, but none of its discs | put the images (`.iso`) or copies of the three CDs in the installed game's folder or in a folder inside it |
+| holds Atlantis III's CD release, but none of its discs | put the images (`.iso`) or copies of the three CDs in the installed game's folder or in a folder inside it (in the browser: copies only, inside it or beside it in the folder you pick) |
 | holds Cryo's DVD | choose the language in the game library (each language found is listed), or the folder holding `FACE_A` or `FACE_B`, the drive, or the folder of the sides' images |
 | this version is on the other side of the DVD | turn the disc over (the side it names), or put the images of both sides in one folder |
 | holds a language of Cryo's DVD without the folders its side shares | copy the whole side (the folder holding `FACE_A` or `FACE_B`) |
@@ -284,7 +284,16 @@ What to pick:
   added while the game runs).
 - *Atlantis III*, GOG.com (English, French, German or Spanish): the
   installation folder (the one
-  holding `Game.exe` and `Datas`). Its saves and `Atlantis3.cfg` are
+  holding `Game.exe` and `Datas`).
+- *Atlantis III*, the French CD (2001, three CDs): the folder of the
+  installed game (the one holding `Atlantis3.exe` and `Datas`), with a
+  copy of each of the three CDs in it, for example in folders `CD1` to
+  `CD3`, each holding the disc's `Datas` folder and its `Atlantis3.cd1`
+  (`cd2`, `cd3`) file (copy the whole disc). The copies may also sit
+  beside the installed folder: then pick the folder holding both. The
+  browser reads files, not CD images; the discs are taken as on the
+  desktop (the one the game asks for, at once).
+- *Atlantis III*, either edition: its saves and `Atlantis3.cfg` are
   kept in the browser under `atlantis-native/atlantis3/`; its controls
   are the desktop's (see [Atlantis III](#atlantis-iii)): a click takes
   the mouse, Escape lets it go first.
@@ -754,7 +763,8 @@ the sounds); the panoramas, the place animations and most videos and
 voices stay on the discs. Point Atlantis Native at the installed folder
 with the images of the three CDs (`.iso`, or copies of the CDs) in it or
 in a folder inside it (from the terminal, `--discs <folder>` names
-another folder); the game library shows it as *Atlantis III, CD,
+another folder; the web page takes copies of the CDs, see [The web
+version](#the-web-version)); the game library shows it as *Atlantis III, CD,
 French*. Its data are GOG.com's French files, file for file. Its program
 is two years older than GOG.com's, and Atlantis Native plays it as it
 plays:

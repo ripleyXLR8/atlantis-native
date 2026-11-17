@@ -93,6 +93,24 @@ impl A3Files {
         }
     }
 
+    /// The install `install`: GOG.com's as it is; the retail CD's with the
+    /// disc candidates `candidates()` (copies or images, each with a name
+    /// for the log, [`crate::discs::CdSource::new`]), asked for only for
+    /// the CD's program. The web page's way: it has the picked folders,
+    /// not paths.
+    pub fn with_disc_sources(
+        install: Arc<dyn FileSource>,
+        candidates: impl FnOnce() -> Vec<(String, Arc<dyn FileSource>)>,
+    ) -> A3Files {
+        let files = A3Files::new(install.clone());
+        match files.build() {
+            Ok(b) if b.release.disc_test() => {
+                A3Files::cd(Arc::new(crate::discs::CdSource::new(install, candidates())))
+            }
+            _ => files,
+        }
+    }
+
     /// The retail CD's discs, when the install is the CD's.
     pub fn discs(&self) -> Option<&crate::discs::CdSource> {
         self.cd.as_deref()

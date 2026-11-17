@@ -286,7 +286,7 @@ For *Atlantis III*:
 | Release | Languages | What to point it at |
 |---|---|---|
 | [GOG.com](https://www.gog.com/) (*Atlantis 3 - The New World*; `Game.exe` of 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`) | English, French, German, Spanish | the installation folder (the one holding `Game.exe` and `Datas`) |
-| French CD (Cryo, 2001, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `f81dd8d2e49003b2ba53b48b4a21c2ec`) | French | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (or copies of the CDs) in it or in a folder inside it |
+| French CD (Cryo, 2001, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `f81dd8d2e49003b2ba53b48b4a21c2ec`) | French | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (or copies of the CDs) in it or in a folder inside it; in the browser, copies of the CDs (folders `CD1` to `CD3`, say, each holding the disc's `Datas` and `Atlantis3.cd<n>`), in it or beside it: it reads files, not images |
 
 GOG.com ships the same `Game.exe` in its four languages; the language is
 read from the installation (the language GOG.com's installer records),

@@ -4210,8 +4210,23 @@ with their sizes, the copy each disc test chooses) and
 2 with the Hoggar's panorama from the disc, `CurrentCD = 2` in the save
 and its load, the scarab case drawn), with `ATLANTIS3_CD_FR` = the CD's
 installed folder and `ATLANTIS3_DISCS_FR` = the folder of its disc
-images or copies. The web page does not read discs (it plays GOG.com's
-folder only).
+images or copies. The web page reads copies of the CDs:
+`web_layout::a3_install` takes the CD's `Atlantis3.exe` as GOG.com's
+`Game.exe`, `web_layout::a3_discs` lists the picked folders that hold
+one disc marker beside `datas` (inside the installed folder and the
+folders inside those, as `discs::disc_candidates`; then the picked
+folder above it and the folders directly inside that), and
+`A3Files::with_disc_sources` builds the same `CdSource` from them (the
+first copy of a disc kept); none found is refused with the page's
+`A3_NO_DISC`, fewer than three shown as a notice. The page's
+`PickedDir::list` gives a folder's subfolders as well as its files, as
+`StdDir` does (`web_layout::entries`): the CD's language is the one
+folder of `Datas\loc\text\`. Tests: `web_layout`'s
+`atlantis3s_cd_with_its_discs` (the paths alone) and
+`atlantis3s_cd_on_disk` (the real copies, `ATLANTIS3_CD_FR` with `cd1`
+to `cd3` beside it: the edition, the three discs, disc 2 chosen); in
+headless Edge the CD reaches its start page and a new game asks for disc
+2 and shows the Hoggar's first view from it.
 
 The desktop's `a3::A3App` is its own `ApplicationHandler`, as Atlantis
 II's is: `setup::kind_of` tells Atlantis III by `Game.exe` (or the CD's

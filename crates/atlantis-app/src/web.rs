@@ -756,6 +756,11 @@ extern "C" {
     fn show_notice(text: &str);
 }
 
+/// A message shown at the top of the page for a while.
+pub(crate) fn notice(text: &str) {
+    show_notice(text);
+}
+
 thread_local! {
     /// The files the player picked (Atlantis II's), by index: a browser's
     /// `File` stays on the page's thread, the engine's sources hold the
@@ -880,18 +885,11 @@ impl FileSource for PickedDir {
         self.files.keys().any(|k| k.starts_with(&prefix))
     }
 
-    /// The files of folder `dir` (lower case).
+    /// The entries of folder `dir` (lower case): its files and its
+    /// folders, as the desktop's `StdDir` lists them (Atlantis III's
+    /// install language is the one folder of `Datas\loc\text`).
     fn list(&self, dir: &str) -> Vec<String> {
-        let prefix = match key(dir) {
-            d if d.is_empty() => d,
-            d => d + "/",
-        };
-        self.files
-            .keys()
-            .filter_map(|k| k.strip_prefix(&prefix))
-            .filter(|n| !n.contains('/'))
-            .map(str::to_string)
-            .collect()
+        crate::web_layout::entries(self.files.keys().map(String::as_str), &key(dir))
     }
 }
 
@@ -912,7 +910,20 @@ fn keep_picked(all: HashMap<String, File>) -> HashMap<String, (usize, u64)> {
 /// Atlantis III from its installed folder among the picked files
 /// ([`crate::a3_web`]), the saves in the browser's storage.
 fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
+    let discs = {
+        let paths: Vec<&str> = all.keys().map(String::as_str).collect();
+        crate::web_layout::a3_discs(&paths, install)
+    };
     let index = keep_picked(all);
+    let discs: Vec<(String, Arc<dyn FileSource>)> = discs
+        .iter()
+        .map(|p| {
+            (
+                p.clone(),
+                Arc::new(PickedDir::new(&index, p)) as Arc<dyn FileSource>,
+            )
+        })
+        .collect();
     let store: Rc<dyn SaveStore> = match WebStore::new("atlantis3") {
         Some(s) => Rc::new(s),
         None => {
@@ -920,7 +931,7 @@ fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsVa
             Rc::new(atlantis_engine::MemStore::new())
         }
     };
-    crate::a3_web::start(Arc::new(PickedDir::new(&index, install)), store)
+    crate::a3_web::start(Arc::new(PickedDir::new(&index, install)), discs, store)
 }
 
 /// Atlantis Evolution's 2004 CD program from its installed folder among

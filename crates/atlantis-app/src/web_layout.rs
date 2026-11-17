@@ -153,16 +153,67 @@ pub fn picked(paths: &[&str]) -> Picked {
 }
 
 /// Atlantis III's installed folder among `paths`: the shallowest holding
-/// `game.exe` and `datas/scenar/defnames.con`
+/// `game.exe` (GOG.com's) or `atlantis3.exe` (the French retail CD's),
+/// and `datas/scenar/defnames.con`
 /// ([`atlantis3_data::files::holds_atlantis3`]).
 pub fn a3_install(paths: &[&str]) -> Option<String> {
     paths
         .iter()
         .filter_map(|p| p.strip_suffix("datas/scenar/defnames.con"))
         .filter(|dir| dir.is_empty() || dir.ends_with('/'))
-        .filter(|dir| paths.contains(&format!("{dir}game.exe").as_str()))
+        .filter(|dir| {
+            atlantis3_data::exe::EXE_NAMES
+                .iter()
+                .any(|n| paths.contains(&format!("{dir}{}", n.to_ascii_lowercase()).as_str()))
+        })
         .min_by_key(|dir| (depth(dir), dir.to_string()))
         .map(str::to_string)
+}
+
+/// The folders that may be the French retail CD's discs (copies of the
+/// CDs: a disc marker `atlantis3.cd<n>` beside a `datas` folder,
+/// [`atlantis3_data::discs::disc_number`]) for the installed folder
+/// `install`, in the order the desktop looks at them
+/// ([`atlantis3_data::discs::disc_candidates`]): the folders inside the
+/// installed one and those inside them, in name order; then, when the
+/// player picked a folder above the installed one, that folder and the
+/// folders directly inside it (the copies beside the installed folder).
+/// [`atlantis3_data::discs::CdSource`] keeps the first copy of each disc.
+pub fn a3_discs(paths: &[&str], install: &str) -> Vec<String> {
+    let is_disc = |f: &str| {
+        let markers = atlantis3_data::discs::DISC_MARKERS
+            .iter()
+            .filter(|m| paths.contains(&format!("{f}{}", m.to_ascii_lowercase()).as_str()))
+            .count();
+        markers == 1 && has_folder(paths, f, "datas")
+    };
+    let root = paths
+        .first()
+        .and_then(|p| p.split_once('/'))
+        .map_or(String::new(), |(r, _)| format!("{r}/"));
+    let mut looked: Vec<String> = Vec::new();
+    for c in children(paths, install) {
+        // `datas` is the install's, not a disc.
+        if c == format!("{install}datas/") {
+            continue;
+        }
+        if is_disc(&c) {
+            looked.push(c);
+        } else {
+            looked.extend(children(paths, &c));
+        }
+    }
+    if root != install {
+        looked.push(root.clone());
+        looked.extend(children(paths, &root));
+    }
+    let mut discs = Vec::new();
+    for f in looked {
+        if f != install && !discs.contains(&f) && is_disc(&f) {
+            discs.push(f);
+        }
+    }
+    discs
 }
 
 /// Atlantis Evolution's installed folder among `paths`: the shallowest
@@ -193,6 +244,25 @@ pub fn a4cd_install(paths: &[&str]) -> Option<String> {
         .map(str::to_string)
 }
 
+/// The entries of folder `dir` (lower case, `""` the top) among the
+/// files `paths` (lower-case paths below a folder): its files and its
+/// folders, each once, in name order, as the desktop's `StdDir` lists a
+/// folder (the web's `PickedDir`).
+pub fn entries<'a>(paths: impl Iterator<Item = &'a str>, dir: &str) -> Vec<String> {
+    let prefix = if dir.is_empty() {
+        String::new()
+    } else {
+        format!("{}/", dir.trim_end_matches('/'))
+    };
+    let mut out: Vec<String> = paths
+        .filter_map(|k| k.strip_prefix(prefix.as_str()))
+        .map(|n| n.split('/').next().unwrap_or(n).to_string())
+        .collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
 /// The folder names of a path list (its files' folders, each once), for
 /// messages.
 pub fn top_names(paths: &[&str], prefix: &str) -> Vec<String> {
@@ -220,6 +290,15 @@ pub const A2_NO_DISC: &str = "This folder holds Atlantis II, but none of its dis
     disc's DATAS_A2 folder), then choose the folder again. The browser cannot read CD \
     images (.iso, .bin...): copy the discs' files. GOG.com's installation holds them \
     already.";
+
+/// The message for the French retail CD of Atlantis III picked without
+/// its discs.
+pub const A3_NO_DISC: &str = "This folder holds Atlantis III's CD release, but none of its \
+    discs.\n\nThe CD release reads its videos and panoramas from its three discs: copy each \
+    CD into the folder of the installed game or into a folder inside it (for example CD1 to \
+    CD3, each holding the disc's Datas folder and its Atlantis3.cd file), or pick the folder \
+    that holds both the installed game and the copies, then choose the folder again. The \
+    browser cannot read CD images (.iso...): copy the discs' files.";
 
 /// The message for discs missing (`missing`: their numbers).
 pub fn a2_missing_discs(missing: &[u8]) -> String {
@@ -267,6 +346,150 @@ mod tests {
         // No program beside the data: not the game.
         assert_eq!(a3_install(&paths[1..]), None);
         assert_eq!(a3_install(CD), None);
+    }
+
+    /// The French retail CD of Atlantis III: its installed folder (the
+    /// CD's `Atlantis3.exe`), its three copies inside it, or beside it in
+    /// the picked folder.
+    #[test]
+    fn atlantis3s_cd_with_its_discs() {
+        let inside = [
+            "atlantis 3/atlantis3.exe",
+            "atlantis 3/datas/scenar/defnames.con",
+            "atlantis 3/datas/atlantis3.cfg",
+            "atlantis 3/cd1/atlantis3.cd1",
+            "atlantis 3/cd1/datas/warp/x.pak",
+            "atlantis 3/cd1/datas/atlantis3.cfg",
+            "atlantis 3/discs/cd2/atlantis3.cd2",
+            "atlantis 3/discs/cd2/datas/hnm/a.hnm",
+            "atlantis 3/discs/cd3/atlantis3.cd3",
+            "atlantis 3/discs/cd3/datas/hnm/b.hnm",
+            "atlantis 3/goodies/readme.txt",
+        ];
+        assert_eq!(a3_install(&inside).as_deref(), Some("atlantis 3/"));
+        assert_eq!(
+            a3_discs(&inside, "atlantis 3/"),
+            [
+                "atlantis 3/cd1/",
+                "atlantis 3/discs/cd2/",
+                "atlantis 3/discs/cd3/"
+            ]
+        );
+        assert_eq!(picked(&inside), Picked::None);
+        // The copies beside the installed folder (the folder above both
+        // picked), and a marker without its Datas: no disc.
+        let beside = [
+            "a3/installed/atlantis3.exe",
+            "a3/installed/datas/scenar/defnames.con",
+            "a3/cd1/atlantis3.cd1",
+            "a3/cd1/datas/warp/x.pak",
+            "a3/cd2/atlantis3.cd2",
+            "a3/cd2/datas/hnm/a.hnm",
+            "a3/cd3/atlantis3.cd3",
+            "a3/cd3/datas/hnm/b.hnm",
+            "a3/iso/atlantis3_cd1.iso",
+            "a3/loose/atlantis3.cd2",
+        ];
+        assert_eq!(a3_install(&beside).as_deref(), Some("a3/installed/"));
+        assert_eq!(
+            a3_discs(&beside, "a3/installed/"),
+            ["a3/cd1/", "a3/cd2/", "a3/cd3/"]
+        );
+        // The installed folder alone: no disc (the page then says so).
+        assert!(a3_discs(&beside[..2], "a3/installed/").is_empty());
+        // GOG.com's Spanish install holds the three markers at its root:
+        // neither it nor anything in it is a disc.
+        let gog = [
+            "atlantis 3/game.exe",
+            "atlantis 3/atlantis3.exe",
+            "atlantis 3/atlantis3.cd1",
+            "atlantis 3/atlantis3.cd2",
+            "atlantis 3/atlantis3.cd3",
+            "atlantis 3/datas/scenar/defnames.con",
+        ];
+        assert_eq!(a3_install(&gog).as_deref(), Some("atlantis 3/"));
+        assert!(a3_discs(&gog, "atlantis 3/").is_empty());
+        assert!(A3_NO_DISC.contains("none of its discs"));
+    }
+
+    /// A folder's entries are its files and its folders (Atlantis III's
+    /// install language is the one folder of `datas/loc/text`).
+    #[test]
+    fn a_folders_entries() {
+        let paths = [
+            "datas/loc/text/fra/menu.txt",
+            "datas/loc/text/fra/obj.txt",
+            "datas/loc/readme.txt",
+            "game.exe",
+        ];
+        let e = |d| entries(paths.iter().copied(), d);
+        assert_eq!(e("datas/loc/text"), ["fra"]);
+        assert_eq!(e("datas/loc/"), ["readme.txt", "text"]);
+        assert_eq!(e(""), ["datas", "game.exe"]);
+        assert!(e("spw").is_empty());
+    }
+
+    /// The French CD's installed folder and its three copies on disk
+    /// (`ATLANTIS3_CD_FR`, the copies `cd1` to `cd3` beside it as in the
+    /// project's data): the paths the browser would give for their parent
+    /// folder, the layout found, the discs read from the copies and the
+    /// edition named as on the desktop.
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn atlantis3s_cd_on_disk() {
+        use atlantis_data::{FileSource, StdDir};
+        use std::sync::Arc;
+        let Some((install, _)) = atlantis3_data::testing::cd_fr() else {
+            return;
+        };
+        let parent = install.parent().unwrap();
+        if !parent.join("cd2").is_dir() {
+            eprintln!("no copies of the CDs beside {}", install.display());
+            return;
+        }
+        fn walk(dir: &std::path::Path, rel: &str, out: &mut Vec<String>) {
+            for e in std::fs::read_dir(dir).unwrap().flatten() {
+                let name = e.file_name().to_string_lossy().to_lowercase();
+                let path = format!("{rel}{name}");
+                if e.path().is_dir() {
+                    walk(&e.path(), &format!("{path}/"), out);
+                } else {
+                    out.push(path);
+                }
+            }
+        }
+        let mut all = Vec::new();
+        for d in ["installed", "cd1", "cd2", "cd3"] {
+            walk(&parent.join(d), &format!("a3cd/{d}/"), &mut all);
+        }
+        let paths: Vec<&str> = all.iter().map(String::as_str).collect();
+        assert_eq!(a3_install(&paths).as_deref(), Some("a3cd/installed/"));
+        let discs = a3_discs(&paths, "a3cd/installed/");
+        assert_eq!(discs, ["a3cd/cd1/", "a3cd/cd2/", "a3cd/cd3/"]);
+        assert_eq!(
+            entries(paths.iter().copied(), "a3cd/installed/datas/loc/text"),
+            ["fra"]
+        );
+        let sources: Vec<(String, Arc<dyn FileSource>)> = discs
+            .iter()
+            .map(|p| {
+                let dir = parent.join(p.trim_start_matches("a3cd/"));
+                (p.clone(), Arc::new(StdDir::new(dir)) as Arc<dyn FileSource>)
+            })
+            .collect();
+        let files =
+            atlantis3_data::A3Files::with_disc_sources(Arc::new(StdDir::new(&install)), || sources);
+        assert_eq!(files.edition_label().unwrap(), "Atlantis III, CD, French");
+        let cd = files.discs().unwrap();
+        assert_eq!(cd.disc_numbers(), [1, 2, 3]);
+        // A new game's disc test (ChangeCD=2): the Hoggar's panorama from
+        // disc 2.
+        cd.change_cd(2);
+        assert_eq!(cd.current(), 2);
+        assert!(files
+            .source()
+            .size("Datas/warp/Warp512/hoggar/ho0004.hnm")
+            .is_some());
     }
 
     #[test]
