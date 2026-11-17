@@ -73,6 +73,9 @@ pub struct Game {
     pub now_ms: f64,
     /// The global marker flag (`App+0x86b0`, the options' `PermanentHelp`).
     pub markers_shown: bool,
+    /// `helpButton` shown in this game (`PermanentHelp` off at
+    /// `Game::enter`).
+    pub help_button: bool,
     /// The options' `InverseLook` (`App+0x86b1`): the mouse look inverted.
     pub inverse_look: bool,
     /// The bilinear weights' precision of the drawing.
@@ -246,6 +249,7 @@ impl Game {
             height,
             now_ms: 0.0,
             markers_shown: true,
+            help_button: false,
             inverse_look: false,
             weights: Weights::Exact,
             trace: None,

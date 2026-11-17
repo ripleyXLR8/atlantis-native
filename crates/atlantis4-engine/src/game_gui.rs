@@ -35,7 +35,10 @@ impl Game {
             self.documents = documents::Documents::new(&Screens::slots(&s.documents));
             self.screens = Some(s);
         }
-        self.screens.as_mut().expect("screens")
+        let help = self.help_button;
+        let s = self.screens.as_mut().expect("screens");
+        s.help_button = help;
+        s
     }
 
     /// The engine clock now, µs.
@@ -199,6 +202,11 @@ impl Game {
         log::info!("GUI: {a:?}");
         match a {
             Action::Sound(p) => self.sounds.play_free_sound(&self.files, &p, 1.0),
+            Action::ShowMarkers => {
+                if let Some(w) = self.warp.as_mut() {
+                    w.markers_shown = true;
+                }
+            }
             Action::OpenMenu => {
                 let Game {
                     screens, inventory, ..

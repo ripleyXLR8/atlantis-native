@@ -190,6 +190,9 @@ impl Game {
         self.view = crate::view::View::default();
         // No drag, both velocities 0 (@ 0x005296d5, 0x00529706).
         self.inertia = crate::view::Inertia::default();
+        // `helpButton` is hidden only when `PermanentHelp` is on
+        // (@ 0x00528fb7..0x00529021).
+        self.help_button = !self.markers_shown;
         self.ended = false;
         self.planks = None;
     }
