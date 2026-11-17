@@ -433,6 +433,7 @@ impl Game {
 
     /// The warp frame's hook (@ 0x004c27d0), after `Interp_GereFrame`.
     pub(super) fn frame_hook(&mut self) {
+        self.hook_calls += 1;
         if !self.a3_place_hooks() {
             return;
         }

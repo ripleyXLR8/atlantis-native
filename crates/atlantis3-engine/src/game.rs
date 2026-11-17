@@ -345,6 +345,8 @@ pub struct Game {
     objects_hand: Option<Bank>,
     /// `Objects.txt` of the subtitle language (the hover label's names).
     object_names: Option<atlantis3_data::objects::ObjectNames>,
+    /// Tests: the place frame hook's runs (0x004c27d0) since the last reset.
+    hook_calls: u32,
     subjects_bank: Option<Bank>,
     arrows: Option<Bank>,
     banks_world: i32,
@@ -604,6 +606,7 @@ impl Game {
             objects: None,
             objects_hand: None,
             object_names: None,
+            hook_calls: 0,
             subjects_bank: None,
             arrows: None,
             banks_world: 0,
@@ -1293,6 +1296,18 @@ impl Game {
         self.inventory.scroll = 0;
     }
 
+    /// Tests: the place frame hook's runs (0x004c27d0) since
+    /// [`Game::test_hook_calls_reset`].
+    #[doc(hidden)]
+    pub fn test_hook_calls(&self) -> u32 {
+        self.hook_calls
+    }
+
+    #[doc(hidden)]
+    pub fn test_hook_calls_reset(&mut self) {
+        self.hook_calls = 0;
+    }
+
     /// Whether the inventory is open.
     pub fn inventory_open(&self) -> bool {
         self.inventory.open
@@ -1684,8 +1699,11 @@ impl Game {
                 if let Some(s) = self.script.as_mut() {
                     s.hold(e.id);
                 }
-                self.frame_hook();
             }
+            // The place hook on every open-bag frame (@ 0x00427ce6: the `jle`
+            // @ 0x00427cd6 skips only the close and the hold): the puzzles'
+            // timers go on behind the bag.
+            self.frame_hook();
             self.inventory.fade_step(self.now);
         } else {
             self.draw_subjects();

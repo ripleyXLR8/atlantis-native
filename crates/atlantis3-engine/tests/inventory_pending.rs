@@ -7,6 +7,8 @@
 //! - A click above the bar stays pending (0x00429b80 tests and clears the
 //!   click byte only with the pointer in the bar's row, @ 0x00429cfd): the
 //!   pointer later entering the row over an object takes it.
+//! - The place hook 0x004c27d0 runs in every open-bag frame (@ 0x00427ce6,
+//!   after the `jle` that skips only the close and the hold).
 //!
 //! Needs the game: `ATLANTIS3_DATA`.
 
@@ -18,30 +20,37 @@ const GOLDEN: &str = include_str!("golden/inventory_pending.txt");
 /// The fields of a golden `frame` line the test compares besides open,
 /// mode and hand.
 #[derive(Clone, Copy)]
-struct Fields {}
+struct Fields {
+    hooks: bool,
+}
 
-fn frame_line(g: &Game, f: &str, x: i32, y: i32, _which: Fields) -> String {
+fn frame_line(g: &Game, f: &str, x: i32, y: i32, which: Fields) -> String {
     let s = g.script().unwrap();
     let mode = match g.mode() {
         Mode::Inventory => 7,
         Mode::Warp => 3,
         m => panic!("{m:?}"),
     };
-    format!(
+    let mut l = format!(
         "frame {f} {x} {y} open={} mode={mode} hand={}",
         u8::from(g.inventory_open()),
         s.vars[s.keys.objetenmain]
-    )
+    );
+    if which.hooks {
+        l += &format!(" hooks={}", g.test_hook_calls());
+    }
+    l
 }
 
 /// A golden `frame` line with the fields the test compares.
-fn golden_line(l: &str, _which: Fields) -> String {
+fn golden_line(l: &str, which: Fields) -> String {
     let w: Vec<&str> = l.split_whitespace().collect();
     let mut out: Vec<&str> = w[..4].to_vec();
     for x in &w[4..] {
         let key = x.split('=').next().unwrap();
         let keep = match key {
             "open" | "mode" | "hand" => true,
+            "hooks" => which.hooks,
             _ => false,
         };
         if keep {
@@ -108,6 +117,7 @@ fn replay(cases: &[&str], which: Fields) {
                 let (x, y) = (w[2].parse().unwrap(), w[3].parse().unwrap());
                 g.set_pointer(x, y);
                 t += dt;
+                g.test_hook_calls_reset();
                 g.step(t);
                 got.push(frame_line(&g, w[1], x, y, which));
                 want.push(golden_line(l, which));
@@ -121,5 +131,12 @@ fn replay(cases: &[&str], which: Fields) {
 
 #[test]
 fn a_click_above_the_bar_stays_pending() {
-    replay(&["take", "empty", "band"], Fields {});
+    replay(&["take", "empty", "band"], Fields { hooks: false });
+}
+
+/// The place hook 0x004c27d0 runs once in every open-bag frame
+/// (@ 0x00427ce6), with or without a pick.
+#[test]
+fn the_place_hook_runs_in_every_bag_frame() {
+    replay(&["take", "empty", "band"], Fields { hooks: true });
 }
