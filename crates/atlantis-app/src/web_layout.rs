@@ -362,34 +362,43 @@ pub fn top_names(paths: &[&str], prefix: &str) -> Vec<String> {
 /// folder.
 pub const A2_DISCS_ONLY: &str = "This folder holds the discs of Atlantis II, not the \
     installed game.\n\nChoose the folder where Atlantis II is installed (the one with \
-    atlantis2.exe, wam and scenar), after copying the four CDs into it or into folders \
-    inside it (for example CD1 to CD4, each holding the disc's DATAS_A2 folder).";
+    atlantis2.exe, wam and scenar), with the images of the four CDs (.iso, .bin, .mdf, \
+    .nrg...) or copies of them in it or in a folder inside it; or a folder that holds both \
+    the installed game and the discs.";
+
+/// The message for Atlantis III's discs picked without its installed
+/// folder.
+pub const A3_DISCS_ONLY: &str = "This folder holds the discs of Atlantis III, not the \
+    installed game.\n\nChoose the folder where Atlantis III is installed (the one with \
+    Atlantis3.exe and Datas), with the images of the three CDs (.iso, .bin, .mdf, .nrg...) \
+    or copies of them in it or in a folder inside it; or a folder that holds both the \
+    installed game and the discs.";
 
 /// The message for an installed Atlantis II without its discs.
 pub const A2_NO_DISC: &str = "This folder holds Atlantis II, but none of its discs.\n\n\
-    The CD release reads its videos and pictures from the four discs: copy each CD into \
-    this folder or into a folder inside it (for example CD1 to CD4, each holding the \
-    disc's DATAS_A2 folder), then choose the folder again. The browser cannot read CD \
-    images (.iso, .bin...): copy the discs' files. GOG.com's installation holds them \
-    already.";
+    The CD release reads its videos and pictures from the four discs: put the images of \
+    the CDs (.iso, .bin, .mdf, .nrg...) or copies of them (for example folders CD1 to CD4, \
+    each holding the disc's DATAS_A2 folder) in this folder or in a folder inside it, or \
+    choose a folder that holds both the installed game and the discs. GOG.com's \
+    installation holds them already.";
 
 /// The message for the French retail CD of Atlantis III picked without
 /// its discs.
 pub const A3_NO_DISC: &str = "This folder holds Atlantis III's CD release, but none of its \
-    discs.\n\nThe CD release reads its videos and panoramas from its three discs: copy each \
-    CD into the folder of the installed game or into a folder inside it (for example CD1 to \
-    CD3, each holding the disc's Datas folder and its Atlantis3.cd file), or pick the folder \
-    that holds both the installed game and the copies, then choose the folder again. The \
-    browser cannot read CD images (.iso...): copy the discs' files.";
+    discs.\n\nThe CD release reads its videos and panoramas from its three discs: put the \
+    images of the CDs (.iso, .bin, .mdf, .nrg...) or copies of them (for example folders CD1 \
+    to CD3, each holding the disc's Datas folder and its Atlantis3.cd file) in the folder of \
+    the installed game or in a folder inside it, or pick the folder that holds both the \
+    installed game and the discs, then choose the folder again.";
 
 /// The message for discs missing (`missing`: their numbers).
 pub fn a2_missing_discs(missing: &[u8]) -> String {
     let list: Vec<String> = missing.iter().map(|n| format!("CD {n}")).collect();
     format!(
-        "Atlantis II needs its four discs, and {} not among the chosen files. Copy each CD \
-         into the folder of the installed game or into a folder inside it (for example \
-         CD1 to CD4, each holding the disc's DATAS_A2 folder), then choose the folder \
-         again.",
+        "Atlantis II needs its four discs, and {} not among the chosen files. Put the \
+         CDs' images (.iso, .bin, .mdf, .nrg...) or copies of them (for example folders \
+         CD1 to CD4, each holding the disc's DATAS_A2 folder) in the folder of the \
+         installed game or in a folder inside it, then choose the folder again.",
         match list.as_slice() {
             [one] => format!("{one} is"),
             _ => format!("{} are", list.join(", ")),

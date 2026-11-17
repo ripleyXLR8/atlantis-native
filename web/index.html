@@ -116,7 +116,9 @@
   }
   .menu-item:hover .sun, .menu-item:focus-within .sun { opacity: 1; transform: translateY(-50%) scale(1); }
   .menu-item:focus-within { outline: 1px dotted var(--gold); outline-offset: 2px; }
-  #dir { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  #dir, #images { position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .images-pick { display: block; position: relative; cursor: pointer; color: #8fc2ff; text-decoration: underline; margin-top: 4px; }
+  .images-pick:focus-within { outline: 1px dotted var(--gold); outline-offset: 2px; }
   #status { min-height: 1.6em; text-align: center; color: var(--muted); margin: 0; font-style: italic; }
   #err { color: #ff9a8a; white-space: pre-wrap; margin: 10px 0 0; }
   /* The games' folders side by side, two to a row (one above the other on a phone). */
@@ -308,12 +310,15 @@
     <h2 class="gold">Atlantis: The Lost Tales</h2>
     <ul>
       <li><em>GOG.com</em>: the folder where the game is installed.</li>
-      <li><em>CD</em>: a folder holding <code>atlantis.exe</code> and
+      <li><em>CD</em>: the folder holding the images of the four CDs
+          (<code>.iso</code>, <code>.bin</code>, <code>.img</code>,
+          <code>.mdf</code> or <code>.nrg</code>), or choose the image files
+          themselves below; or a folder holding <code>atlantis.exe</code> and
           <code>BIGCD1.BIG</code> to <code>BIGCD4.BIG</code>, copied from the
           four discs.</li>
-      <li><em>DVD</em> (Cryo, 1998): the DVD drive, or a copy of a side
-          (the folder holding <code>FACE_A</code> or <code>FACE_B</code>);
-          then choose the language.</li>
+      <li><em>DVD</em> (Cryo, 1998): the DVD drive, a copy of a side
+          (the folder holding <code>FACE_A</code> or <code>FACE_B</code>),
+          or the folder of the sides' images; then choose the language.</li>
     </ul>
     </section>
     <section>
@@ -323,11 +328,14 @@
           one holding <code>Game.exe</code> and <code>DATAS_A2</code>).</li>
       <li><em>CD</em> (French, also with patch 1.01, or North American): the folder where the
           game is installed (the one holding <code>atlantis2.exe</code>,
-          <code>wam</code> and <code>scenar</code>), with a copy of each of
-          the four CDs in it, for example in folders <code>CD1</code> to
+          <code>wam</code> and <code>scenar</code>), with the images of the
+          four CDs (<code>.iso</code>, <code>.bin</code>, <code>.mdf</code>,
+          <code>.nrg</code>…) in it or in a folder inside it; or a folder
+          holding both the installed game and the images (for example
+          <code>Atlantis 2</code> and <code>ISO</code> side by side). Copies
+          of the CDs do too, for example folders <code>CD1</code> to
           <code>CD4</code>, each holding the disc's <code>DATAS_A2</code>
-          folder. The browser reads files, not CD images
-          (<code>.iso</code>…): copy the discs' files.</li>
+          folder.</li>
     </ul>
     </section>
     <section>
@@ -338,13 +346,13 @@
           and <code>Datas</code>).</li>
       <li><em>CD</em> (French, 2001, three CDs): the folder where the game
           is installed (the one holding <code>Atlantis3.exe</code> and
-          <code>Datas</code>), with a copy of each of the three CDs in it,
-          for example in folders <code>CD1</code> to <code>CD3</code>, each
-          holding the disc's <code>Datas</code> folder and its
-          <code>Atlantis3.cd</code> file; or the folder holding both the
-          installed game and the copies. The browser reads files, not CD
-          images (<code>.iso</code>…): copy the discs' files. Other
-          editions are untested.</li>
+          <code>Datas</code>), with the images of the three CDs
+          (<code>.iso</code>, <code>.bin</code>, <code>.mdf</code>,
+          <code>.nrg</code>…) in it or in a folder inside it; or the folder
+          holding both the installed game and the images. Copies of the CDs
+          do too, for example folders <code>CD1</code> to <code>CD3</code>,
+          each holding the disc's <code>Datas</code> folder and its
+          <code>Atlantis3.cd</code> file. Other editions are untested.</li>
     </ul>
     </section>
     <section>
@@ -367,6 +375,9 @@
     <div class="choose">
       <label class="menu-item"><svg class="sun" viewBox="0 0 40 40"><use href="#sun"/></svg><span class="gold">Choose your game folder</span>
         <input type="file" id="dir" webkitdirectory></label>
+      <label class="small images-pick">or choose the CD image files of
+        <i>Atlantis: The Lost Tales</i>
+        <input type="file" id="images" multiple accept=".iso,.bin,.img,.mdf,.nrg"></label>
     </div>
     <p id="status"></p>
     <p id="err"></p>
@@ -489,6 +500,9 @@
     }
   };
   document.getElementById("dir").addEventListener("change", (e) => open(e.target.files));
+  // The first game's CD images picked as files (no folder: the images at
+  // the top).
+  document.getElementById("images").addEventListener("change", (e) => open(e.target.files));
   // The end-to-end runs whose driver cannot pick a folder (Firefox's
   // WebDriver BiDi sets files one by one): the files and their paths.
   window.atlantisTestOpen = (files, paths) => open(files, undefined, undefined, paths);

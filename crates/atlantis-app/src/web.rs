@@ -32,6 +32,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+use atlantis_data::disc_image::{DiscImage, DiscSet, ImageBytes};
 use atlantis_data::dvd::DvdLanguage;
 use atlantis_data::{BigArchive, FileSource, Game};
 use atlantis_engine::hooks::{HookFuture, Loader};
@@ -431,6 +432,15 @@ pub async fn start(
         start_atlantis2(all, layout)?;
         return Ok("atlantis2".into());
     }
+    // The first game's CD images or Cryo's DVD's, when the folder holds no
+    // copy of its files: the game read from them, a part at a time.
+    let paths: Vec<&str> = all.keys().map(String::as_str).collect();
+    if !crate::web_layout::holds_lost_tales(&paths) {
+        let folders = crate::web_layout::image_folders(&paths);
+        if !folders.is_empty() {
+            return start_from_images(all, folders, language).await;
+        }
+    }
     // Cryo's DVD: one of its languages.
     let mut dvd = atlantis_data::dvd::languages_in_paths(all.keys().map(String::as_str));
     // Only the languages whose program the port knows (the desktop library
@@ -587,21 +597,6 @@ pub async fn start(
         },
         None => false,
     };
-    if let Some(name) =
-        atlantis_engine::subtitles::cjk_font_file(code_page).filter(|_| !player_font)
-    {
-        let url = format!("fonts/{name}");
-        match fetch_url(&url).await {
-            Ok(data) => {
-                if atlantis_engine::subtitles::provide_cjk_font(code_page, data) {
-                    log::info!("subtitles: {url}");
-                } else {
-                    log::warn!("{url}: not a font");
-                }
-            }
-            Err(e) => log::warn!("{url}: {e:?}"),
-        }
-    }
     // The members that decide which bug fixes the options menu lists
     // (`FixData`: the texts' `ß`, the discs' revisions), kept.
     for (name, disc) in atlantis_engine::FixData::members(&game) {
@@ -619,6 +614,34 @@ pub async fn start(
             Err(e) => log::warn!("{name}: {e:?}"),
         }
     }
+    launch_atlantis1(game, player_font, Rc::new(WebLoader { files: by_key, web })).await?;
+    Ok("atlantis".into())
+}
+
+/// Starts the first game `game`, its files read through `loader`:
+/// fetches the Chinese releases' subtitle font unless the player has
+/// theirs (`player_font`), lists the bug fixes, opens the saves.
+async fn launch_atlantis1(
+    game: Game,
+    player_font: bool,
+    loader: Rc<dyn Loader>,
+) -> Result<(), JsValue> {
+    let code_page = game.exe.build.text_code_page;
+    if let Some(name) =
+        atlantis_engine::subtitles::cjk_font_file(code_page).filter(|_| !player_font)
+    {
+        let url = format!("fonts/{name}");
+        match fetch_url(&url).await {
+            Ok(data) => {
+                if atlantis_engine::subtitles::provide_cjk_font(code_page, data) {
+                    log::info!("subtitles: {url}");
+                } else {
+                    log::warn!("{url}: not a font");
+                }
+            }
+            Err(e) => log::warn!("{url}: {e:?}"),
+        }
+    }
     let fixes = atlantis_engine::BugFix::of_game(&game);
     let saves: Rc<dyn SaveStore> = match WebStore::new(game.exe.build.name) {
         Some(store) => Rc::new(store),
@@ -631,7 +654,7 @@ pub async fn start(
         .unwrap_or_default()
         .graphics;
     let options = atlantis_engine::Options {
-        loader: Rc::new(WebLoader { files: by_key, web }),
+        loader,
         ..options_with_settings(saves.clone(), false, Start::Boot)
     };
     let edition = game.edition();
@@ -643,7 +666,7 @@ pub async fn start(
             .with_graphics(graphics, Some(saves))
             .with_edition(&edition, fixes),
     );
-    Ok("atlantis".into())
+    Ok(())
 }
 
 /// In the browser, outside full screen: the canvas as large as the page
@@ -804,10 +827,19 @@ fn read_picked_part(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
 }
 
 fn read_picked_part_now(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
+    let mut out = vec![0u8; len];
+    read_picked_into(index, offset, &mut out).then_some(out)
+}
+
+/// Fills `out` with the bytes at `offset` of picked file `index`, at once
+/// (by parts of [`READ_PART`]).
+fn read_picked_into(index: usize, offset: u64, out: &mut [u8]) -> bool {
     PICKED.with(|p| {
         let files = p.borrow();
-        let f = files.get(index)?;
-        let mut out = vec![0u8; len];
+        let Some(f) = files.get(index) else {
+            return false;
+        };
+        let len = out.len();
         let mut at = 0usize;
         while at < len {
             let n = (len - at).min(READ_PART as usize);
@@ -818,11 +850,11 @@ fn read_picked_part_now(index: usize, offset: u64, len: usize) -> Option<Vec<u8>
                 (start + n as u64) as f64,
                 &mut out[at..at + n],
             ) {
-                return None;
+                return false;
             }
             at += n;
         }
-        Some(out)
+        true
     })
 }
 
@@ -842,13 +874,17 @@ const AHEAD_KEPT: usize = 4;
 thread_local! {
     /// The parts read ahead, the newest last.
     static AHEAD: RefCell<Vec<Ahead>> = const { RefCell::new(Vec::new()) };
+    /// The parts of the images that hold the members the first game's
+    /// scene needs ([`ImageLoader`]), until the next scene's.
+    static MEMBERS: RefCell<Vec<Ahead>> = const { RefCell::new(Vec::new()) };
+    /// The parts [`ImageLoader`] is collecting, while it asks for them.
+    static COLLECTING: RefCell<Option<Vec<(usize, u64, usize)>>> = const { RefCell::new(None) };
 }
 
 /// Bytes `offset..offset + len` of picked file `index` from a part read
 /// ahead, if one holds them and has arrived.
 fn take_ahead(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
-    AHEAD.with(|a| {
-        let a = a.borrow();
+    let from = |a: &Vec<Ahead>| -> Option<Vec<u8>> {
         let p = a.iter().find(|p| {
             p.index == index && p.offset <= offset && offset + len as u64 <= p.offset + p.len as u64
         })?;
@@ -856,7 +892,57 @@ fn take_ahead(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
         let d = d.as_ref()?;
         let at = usize::try_from(offset - p.offset).ok()?;
         d.get(at..at + len).map(<[u8]>::to_vec)
-    })
+    };
+    AHEAD
+        .with(|a| from(&a.borrow()))
+        .or_else(|| MEMBERS.with(|m| from(&m.borrow())))
+}
+
+/// Bytes `offset..offset + len` of picked file `index` read in the
+/// background, unless asked for already; while the first game's
+/// [`ImageLoader`] collects the parts a scene needs, noted for it.
+fn read_ahead_part(index: usize, offset: u64, len: usize) {
+    if len == 0 {
+        return;
+    }
+    let collected = COLLECTING.with(|c| {
+        c.borrow_mut()
+            .as_mut()
+            .map(|parts| parts.push((index, offset, len)))
+            .is_some()
+    });
+    if collected {
+        return;
+    }
+    let Some(file) = PICKED.with(|p| p.borrow().get(index).cloned()) else {
+        return;
+    };
+    let data = Rc::new(RefCell::new(None));
+    let fresh = AHEAD.with(|a| {
+        let mut a = a.borrow_mut();
+        if a.iter().any(|p| p.index == index && p.offset == offset) {
+            return false;
+        }
+        if a.len() >= AHEAD_KEPT {
+            a.remove(0);
+        }
+        a.push(Ahead {
+            index,
+            offset,
+            len,
+            data: data.clone(),
+        });
+        true
+    });
+    if fresh {
+        wasm_bindgen_futures::spawn_local(async move {
+            if let Ok(d) = fetch(&file, offset, len as u64).await {
+                if d.len() == len {
+                    *data.borrow_mut() = Some(d);
+                }
+            }
+        });
+    }
 }
 
 /// A folder of the picked files (Atlantis II's installed folder, a disc's
@@ -923,38 +1009,7 @@ impl FileSource for PickedDir {
             return;
         };
         let len = usize::try_from(size.saturating_sub(offset)).map_or(len, |rest| rest.min(len));
-        if len == 0 {
-            return;
-        }
-        let Some(file) = PICKED.with(|p| p.borrow().get(index).cloned()) else {
-            return;
-        };
-        let data = Rc::new(RefCell::new(None));
-        let fresh = AHEAD.with(|a| {
-            let mut a = a.borrow_mut();
-            if a.iter().any(|p| p.index == index && p.offset == offset) {
-                return false;
-            }
-            if a.len() >= AHEAD_KEPT {
-                a.remove(0);
-            }
-            a.push(Ahead {
-                index,
-                offset,
-                len,
-                data: data.clone(),
-            });
-            true
-        });
-        if fresh {
-            wasm_bindgen_futures::spawn_local(async move {
-                if let Ok(d) = fetch(&file, offset, len as u64).await {
-                    if d.len() == len {
-                        *data.borrow_mut() = Some(d);
-                    }
-                }
-            });
-        }
+        read_ahead_part(index, offset, len);
     }
 
     fn has_dir(&self, name: &str) -> bool {
@@ -984,6 +1039,213 @@ fn keep_picked(all: HashMap<String, File>) -> HashMap<String, (usize, u64)> {
     index
 }
 
+/// A picked CD image's bytes ([`DiscImage`]'s source in the browser):
+/// read at once when the image reader asks for them ([`read_picked`]),
+/// or from a part read ahead or fetched for the first game's loader.
+struct PickedImage {
+    /// Its index in [`PICKED`].
+    index: usize,
+    size: u64,
+}
+
+impl ImageBytes for PickedImage {
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> bool {
+        let len = buf.len();
+        if offset.saturating_add(len as u64) > self.size {
+            return false;
+        }
+        if let Some(d) = take_ahead(self.index, offset, len) {
+            buf.copy_from_slice(&d);
+            return true;
+        }
+        let t = web_time::Instant::now();
+        let ok = read_picked_into(self.index, offset, buf);
+        READ_TIME.with(|r| r.set(r.get() + t.elapsed()));
+        let ms = t.elapsed().as_secs_f64() * 1e3;
+        if ms > SLOW_READ_MS {
+            log::info!("image {}: {len} bytes read in {ms:.0} ms", self.index);
+        }
+        if !ok {
+            log::warn!("image {}: the browser could not read it", self.index);
+        }
+        ok
+    }
+
+    fn read_ahead(&self, offset: u64, len: u64) {
+        let len = len.min(self.size.saturating_sub(offset));
+        if let Ok(len) = usize::try_from(len) {
+            read_ahead_part(self.index, offset, len);
+        }
+    }
+}
+
+/// The disc candidate at `place` of the picked files (`index`): a CD
+/// image ([`crate::web_layout::is_image`], read by parts through the
+/// desktop's reader) or a folder; `None` for an image that holds no ISO
+/// 9660 file system.
+fn picked_source(
+    index: &HashMap<String, (usize, u64)>,
+    place: &str,
+) -> Option<Arc<dyn FileSource>> {
+    if crate::web_layout::is_image(place) {
+        let &(i, size) = index.get(place)?;
+        let img = DiscImage::from_bytes(place, Box::new(PickedImage { index: i, size }));
+        if img.is_none() {
+            log::info!("{place}: not a CD image the game reads");
+        }
+        Some(Arc::new(img?))
+    } else {
+        Some(Arc::new(PickedDir::new(index, place)))
+    }
+}
+
+/// The disc candidates at `places` among the picked files.
+fn picked_sources(
+    index: &HashMap<String, (usize, u64)>,
+    places: &[String],
+) -> Vec<(String, Arc<dyn FileSource>)> {
+    places
+        .iter()
+        .filter_map(|p| {
+            let name = if p.is_empty() { "/" } else { p.as_str() };
+            Some((name.to_string(), picked_source(index, p)?))
+        })
+        .collect()
+}
+
+/// The first game from CD images: the images of the first of `folders`
+/// that holds it (its CDs' images, or Cryo's DVD's sides, then the
+/// language as from the DVD's copies), read a part at a time; the members
+/// a scene needs fetched in the background before it reads them
+/// ([`ImageLoader`]).
+async fn start_from_images(
+    all: HashMap<String, File>,
+    folders: Vec<(String, Vec<String>)>,
+    language: Option<String>,
+) -> Result<JsValue, JsValue> {
+    use atlantis_data::dvd::{self, DvdFiles};
+    let index = keep_picked(all);
+    let mut other = None;
+    for (folder, images) in folders {
+        let set = DiscSet {
+            images: images
+                .iter()
+                .filter_map(|p| {
+                    let &(i, size) = index.get(p)?;
+                    DiscImage::from_bytes(p.as_str(), Box::new(PickedImage { index: i, size }))
+                })
+                .collect(),
+        };
+        if set.images.is_empty() {
+            continue;
+        }
+        let set: Arc<dyn FileSource> = Arc::new(set);
+        let languages: Vec<&'static DvdLanguage> = dvd::languages_in(set.as_ref())
+            .into_iter()
+            .filter(|l| DvdFiles::new(set.clone(), l).is_some())
+            .collect();
+        let source: Arc<dyn FileSource> = if !languages.is_empty() {
+            let known: Vec<&'static DvdLanguage> = languages
+                .into_iter()
+                .filter(|l| {
+                    set.read(&format!("{}/ATLANTIS.EXE", l.path()))
+                        .is_some_and(|b| atlantis_data::exe::build_of(&b).is_some())
+                })
+                .collect();
+            let chosen = match &language {
+                Some(want) => known.iter().find(|l| l.folder.eq_ignore_ascii_case(want)),
+                None if known.len() == 1 => known.first(),
+                None => None,
+            };
+            let Some(l) = chosen else {
+                let list: Vec<String> = known
+                    .iter()
+                    .map(|l| format!("{}={}", l.folder, l.language))
+                    .collect();
+                return Err(format!("LANGUAGES:{}", list.join(";")).into());
+            };
+            log::info!("the DVD's {} ({}) from its images", l.language, l.path());
+            Arc::new(DvdFiles::new(set, l).ok_or("the DVD's language")?)
+        } else if set.size("atlantis.exe").is_some() {
+            set
+        } else {
+            if !atlantis2_data::files::disc_numbers_of(set.as_ref()).is_empty() {
+                other.get_or_insert(crate::web_layout::A2_DISCS_ONLY);
+            } else if atlantis3_data::discs::disc_number(set.as_ref()) != 0 {
+                other.get_or_insert(crate::web_layout::A3_DISCS_ONLY);
+            }
+            continue;
+        };
+        log::info!("{folder}: the game from {} disc images", images.len());
+        let top: Vec<String> = images
+            .iter()
+            .map(|p| p.rsplit('/').next().unwrap_or(p).to_string())
+            .collect();
+        let game = Game::open(source.clone()).map_err(|e| -> JsValue {
+            if let atlantis_data::GameError::UnknownExecutable(_) = e {
+                let text = crate::guide::explain(&top, "you chose", &e);
+                let url = crate::guide::EditionReport::collect(source.as_ref(), &top, true)
+                    .map(|r| r.url("web", &crate::version_string()))
+                    .unwrap_or_else(|| crate::guide::NEW_ISSUE_URL.to_string());
+                return format!("{text}\n\nREPORT:{url}").into();
+            }
+            let text = crate::guide::explain(&top, "you chose", &e);
+            format!("{text}\n\nHelp: {}", crate::guide::HELP_URL).into()
+        })?;
+        // The player's own subtitle font beside the images.
+        let code_page = game.exe.build.text_code_page;
+        let player_font = atlantis_engine::subtitles::player_font(code_page)
+            .and_then(|(name, _)| index.get(&format!("{folder}{}", key(name))))
+            .and_then(|&(i, size)| read_picked_part(i, 0, 4.min(size as usize)))
+            .is_some_and(|head| atlantis_engine::subtitles::is_font_header(&head));
+        launch_atlantis1(game, player_font, Rc::new(ImageLoader)).await?;
+        return Ok("atlantis".into());
+    }
+    let text =
+        other.unwrap_or("The CD images among the chosen files hold no game Atlantis Native knows.");
+    Err(format!("{text}\n\nHelp: {}", crate::guide::HELP_URL).into())
+}
+
+/// The first game's loader when it is read from CD images: the members a
+/// scene needs ([`Loader::prefetch`]) are fetched in the background, as
+/// the parts of the images that hold them ([`FileSource::read_ahead`]
+/// through the image reader), and the engine's reads then find them
+/// there; what was not fetched is read at once.
+struct ImageLoader;
+
+impl Loader for ImageLoader {
+    fn prefetch<'a>(&'a self, big: &'a BigArchive, names: &'a [String]) -> HookFuture<'a, ()> {
+        Box::pin(async move {
+            COLLECTING.with(|c| *c.borrow_mut() = Some(Vec::new()));
+            for name in names {
+                if let Some((file, offset, size)) = big.locate(name) {
+                    big.source().read_ahead(&file, offset, size);
+                }
+            }
+            let wanted = COLLECTING
+                .with(|c| c.borrow_mut().take())
+                .unwrap_or_default();
+            let mut got = Vec::with_capacity(wanted.len());
+            for (index, offset, len) in wanted {
+                let Some(file) = PICKED.with(|p| p.borrow().get(index).cloned()) else {
+                    continue;
+                };
+                match fetch(&file, offset, len as u64).await {
+                    Ok(d) if d.len() == len => got.push(Ahead {
+                        index,
+                        offset,
+                        len,
+                        data: Rc::new(RefCell::new(Some(d))),
+                    }),
+                    Ok(_) => {}
+                    Err(e) => log::warn!("image {index}: {e:?}"),
+                }
+            }
+            MEMBERS.with(|m| *m.borrow_mut() = got);
+        })
+    }
+}
+
 /// Atlantis III from its installed folder among the picked files
 /// ([`crate::a3_web`]), the saves in the browser's storage.
 fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
@@ -992,15 +1254,7 @@ fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsVa
         crate::web_layout::a3_discs(&paths, install)
     };
     let index = keep_picked(all);
-    let discs: Vec<(String, Arc<dyn FileSource>)> = discs
-        .iter()
-        .map(|p| {
-            (
-                p.clone(),
-                Arc::new(PickedDir::new(&index, p)) as Arc<dyn FileSource>,
-            )
-        })
-        .collect();
+    let discs = picked_sources(&index, &discs);
     let store: Rc<dyn SaveStore> = match WebStore::new("atlantis3") {
         Some(s) => Rc::new(s),
         None => {
@@ -1079,17 +1333,7 @@ fn start_atlantis2(
         )),
         e => help(&e.to_string()),
     })?;
-    let discs: Vec<(String, Arc<dyn FileSource>)> = layout
-        .discs
-        .iter()
-        .map(|p| {
-            let name = if p.is_empty() { "/" } else { p.as_str() };
-            (
-                name.to_string(),
-                Arc::new(PickedDir::new(&index, p)) as Arc<dyn FileSource>,
-            )
-        })
-        .collect();
+    let discs = picked_sources(&index, &layout.discs);
     let mut files = atlantis2_data::A2Files::new(Arc::new(install), discs);
     files.set_exe(exe_name, build);
     let found = files.disc_numbers();
