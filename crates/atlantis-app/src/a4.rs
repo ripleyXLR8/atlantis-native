@@ -235,6 +235,9 @@ struct Viewer {
     /// a document).
     gui_down: bool,
     last: (f64, f64),
+    /// The input manager's last pointer moves, for the speed at a drag's
+    /// release.
+    moves: atlantis4_engine::view::MoveHistory,
     size: (u32, u32),
     /// When the next frame is due (the game's update, then a draw if the
     /// picture changed).
@@ -320,7 +323,8 @@ impl Viewer {
     /// The frame animations, then the `OnAnimationFinished` callbacks of
     /// those that finished; the movie, then `OnMovieFinished` if it ended.
     fn tick(&mut self, el: &ActiveEventLoop) {
-        let now = self.now_ms();
+        let now_us = self.clock.us();
+        let now = now_us as f64 / 1000.0;
         self.front.tick(now, &mut self.saves);
         self.front_actions(el);
         if self.script.is_none() {
@@ -329,6 +333,11 @@ impl Viewer {
             return;
         }
         let finished = self.game.borrow_mut().update(now);
+        // The view update (`0x0052ab40`) after the animations': the
+        // inertia of the last drag.
+        if !self.front.active() {
+            self.game.borrow_mut().coast(now_us);
+        }
         // `TeSoundManager::update` ran first in the frame: its signals'
         // callbacks (`OnSoundStopped`) come before the animations'.
         let sounds = self.game.borrow_mut().sound_callbacks();
@@ -635,6 +644,16 @@ impl Viewer {
     }
 
     fn release(&mut self) {
+        // The drag's end (0x0052a950(0), from the warp's mouse-up and the
+        // per-frame button check): the view coasts on at the pointer's
+        // speed.
+        {
+            let now_us = self.clock.us();
+            let speed = self.moves.speed(now_us);
+            let mut g = self.game.borrow_mut();
+            let inverse = g.inverse_look;
+            g.inertia.release(speed, inverse, now_us);
+        }
         let Some(down) = self.down.take() else { return };
         let Some(up) = self.pointer else { return };
         if self.front.active() || self.front.in_transition() {
@@ -840,6 +859,11 @@ impl ApplicationHandler for Viewer {
             WindowEvent::CursorMoved { position, .. } => {
                 let p = (position.x, position.y);
                 self.pointer = Some(p);
+                // The input manager records every move (0x0050a7e0), in
+                // the drag's convention (y up).
+                let now_us = self.clock.us();
+                self.moves
+                    .moved(p.0.floor() as i32, -(p.1.floor() as i32), now_us);
                 if self.front.active() || self.front.in_transition() {
                     let (w, h) = self.size;
                     let now = self.now_ms();
@@ -896,6 +920,10 @@ impl ApplicationHandler for Viewer {
                         self.gui_down = self.game.borrow_mut().gui_press(w, h, p.0, p.1);
                         if !self.gui_down && self.in_movie() {
                             self.game.borrow_mut().movie_press(w, h, p.0, p.1);
+                        } else if !self.gui_down && self.game.borrow().warp_takes_input() {
+                            // The warp's press handler (0x00521f20): a
+                            // drag starts, the inertia stops.
+                            self.game.borrow_mut().inertia.press();
                         }
                     }
                 }
@@ -1323,6 +1351,7 @@ fn open_viewer(
         down: None,
         gui_down: false,
         last: (0.0, 0.0),
+        moves: atlantis4_engine::view::MoveHistory::default(),
         size: (WIDTH, HEIGHT),
         next_frame: Instant::now(),
         shown: None,

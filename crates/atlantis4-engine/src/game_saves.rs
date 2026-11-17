@@ -188,6 +188,8 @@ impl Game {
         // A new game's view (@ 0x005296bf): yaw = pitch = 0, the limits
         // reset; a save's `Orientation` follows.
         self.view = crate::view::View::default();
+        // No drag, both velocities 0 (@ 0x005296d5, 0x00529706).
+        self.inertia = crate::view::Inertia::default();
         self.ended = false;
         self.planks = None;
     }

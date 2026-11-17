@@ -268,3 +268,71 @@ fn frame_animation_is_the_originals() {
 
 /// Edge clicks whose hits are exactly the original's.
 const EXACT_EDGES: usize = 7;
+
+/// The inertia after a drag (`tests/golden/a4_view_inertia.txt`): the
+/// pointer's speed `0x0050a240`, the velocity curve `0x00408f70` with its
+/// setter `0x00521d20`, the per-frame step `0x0052ae0a..0x0052ae67`.
+#[test]
+fn inertia_is_the_originals_to_the_bit() {
+    use atlantis4_engine::view::{coast_velocity, set_velocity, Inertia, MoveHistory};
+    let lines = golden("a4_view_inertia.txt");
+    let (mut speeds, mut curves, mut clamps, mut coasts) = (0, 0, 0, 0);
+    for l in &lines {
+        let w: Vec<&str> = l.split_whitespace().collect();
+        let arrow = w.iter().position(|x| *x == "->").unwrap();
+        let out = &w[arrow + 1..];
+        match w[0] {
+            "speed" => {
+                let el: u64 = w[1].parse().unwrap();
+                let n: usize = w[2].parse().unwrap();
+                let mut m = MoveHistory::default();
+                for i in 0..n {
+                    let dt = f32::from_bits(u32::from_str_radix(w[3 + 3 * i], 16).unwrap());
+                    m.push(
+                        dt,
+                        w[4 + 3 * i].parse().unwrap(),
+                        w[5 + 3 * i].parse().unwrap(),
+                    );
+                }
+                let since = (el as f64 / 1e6) as f32;
+                let want: (i32, i32) = (out[0].parse().unwrap(), out[1].parse().unwrap());
+                assert_eq!(m.speed_after(since), want, "{l}");
+                speeds += 1;
+            }
+            "curve" => {
+                let v = f(w[1].parse().unwrap());
+                let t: f64 = w[2].parse().unwrap();
+                let (got, done) = coast_velocity(v, t);
+                assert_eq!(
+                    (got, done),
+                    (f(out[0].parse().unwrap()), out[1] == "1"),
+                    "{l}"
+                );
+                curves += 1;
+            }
+            "clamp" => {
+                let v = f(w[1].parse().unwrap());
+                assert_eq!(set_velocity(v), f(out[0].parse().unwrap()), "{l}");
+                clamps += 1;
+            }
+            "coast" => {
+                let v = nums(&w[1..arrow].join(" "));
+                let mut view = View {
+                    yaw: f(v[0]),
+                    pitch: f(v[1]),
+                    ..View::default()
+                };
+                view.reset_limits();
+                let mut i = Inertia::default();
+                i.v_yaw = f(v[2]);
+                i.v_pitch = f(v[3]);
+                i.coast(&mut view, v[4] as u64);
+                let want = (f(out[0].parse().unwrap()), f(out[1].parse().unwrap()));
+                assert_eq!((view.yaw, view.pitch), want, "{l}");
+                coasts += 1;
+            }
+            _ => panic!("{l}"),
+        }
+    }
+    assert_eq!((speeds, curves, clamps, coasts), (208, 136, 8, 66));
+}
