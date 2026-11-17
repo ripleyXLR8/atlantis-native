@@ -174,8 +174,8 @@ those of the latest commit:
 
 The web version of the latest commit is also online:
 **https://ripleyxlr8.github.io/atlantis-native/** (Chrome, Edge, Firefox
-or Safari), for the four games (Atlantis II not yet tried in Safari,
-Atlantis III and Atlantis Evolution tried in Edge only). Pick
+or Safari), for the four games (tried in Edge and Firefox, Atlantis II
+in Chrome too; not yet in Safari). Pick
 your game folder there: its files are read inside your browser and never
 sent anywhere; the saves stay in that browser.
 

@@ -253,9 +253,13 @@ whatever the counts say.
 The web page, **https://ripleyxlr8.github.io/atlantis-native/** (or the
 `atlantis-native-web.zip` of the nightly release, served over HTTP),
 plays the four games in Chrome, Edge, Firefox or Safari on a computer
-with a mouse and a keyboard (Atlantis II has been tried in Chrome, Edge
-and Firefox, not yet in Safari; Atlantis III and Atlantis Evolution in
-Edge only; Atlantis Evolution needs WebGL 2 for its full speed). **Choose your game folder** and pick the
+with a mouse and a keyboard. Atlantis II has been tried in Edge, Chrome
+and Firefox. Atlantis III (GOG.com and the French CD) and Atlantis
+Evolution (GOG.com and the 2004 CD) have been tried in Firefox from the
+start page through a new game's film and first scene to a save and its
+load, and in Edge (a Chromium browser, as Chrome is). No game has been
+tried in Safari yet. Atlantis Evolution needs WebGL 2 for its full
+speed. **Choose your game folder** and pick the
 folder of your game; the browser asks to confirm that the page may read
 it. The
 files stay where they are: the page reads them inside the browser, a

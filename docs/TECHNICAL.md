@@ -1273,7 +1273,18 @@ original's cube and the faces' preparation. In headless Firefox (which
 composites the page in software) the original graphics take 2.8 ms
 (view) and 7.0 ms (dialog); in HD its presentation is that compositor's
 (24 ms), so HD in Firefox with a graphics card has not been measured.
-Safari has not been run.
+Safari has not been run. Atlantis III and Atlantis Evolution were run
+end to end in headless Firefox too (WebDriver BiDi, the files set one
+by one; atlantis-re's `ffdrive.py` with the page's `atlantis3` /
+`atlantis4` testing aids): GOG.com's Atlantis III and the French CD
+(the start page, a new game's film, the Hoggar's first view, from disc
+2 for the CD, a save through the game's menu, the page loaded again and
+the save continued), GOG.com's Atlantis Evolution (the start page, the
+intro film and its skip button, the boat's first view, the autosave
+`save.xml` in the storage, the page loaded again and *Continue*) and
+the 2004 CD's program (its logos, the start page, a new game's film,
+the cabin's first view, a save and its load); none showed a
+difference from Edge.
 
 A pass is due every 16.7 ms (60 a second). Headless Chrome measures the
 same (original graphics 1.5 and 4.5 ms, HD 3.8 and 11.7 ms). With the
