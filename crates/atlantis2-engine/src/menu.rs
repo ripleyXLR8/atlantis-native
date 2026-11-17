@@ -1124,10 +1124,9 @@ impl Menu {
         state: bool,
         action: i32,
     ) {
-        let kind = WidgetKind::Blink {
-            state,
-            cycle: host.ticks(),
-        };
+        // The constructor @ 0x0046dd80 clears the cycle's start
+        // (@ 0x0046dd93); the input sets it.
+        let kind = WidgetKind::Blink { state, cycle: 0 };
         let w = self.widget(host, name, kind, x, y, text, action);
         page.widgets.push(w);
     }
@@ -1303,6 +1302,11 @@ impl Menu {
             self.draw_with(out, ticks, t.as_mut());
             self.hd_texts = t;
         }
+        if let Some(p) = self.page.as_mut() {
+            for w in &mut p.widgets {
+                w.after_draw(ticks);
+            }
+        }
         let act = if reads_input(self.state) {
             self.action(host)
         } else {
@@ -1374,6 +1378,7 @@ impl Menu {
     /// (@ 0x00472378..0x004723b2).
     fn action(&mut self, host: &mut dyn MenuHost) -> i32 {
         let fpu = host.fpu();
+        let ticks = host.ticks();
         let input = &mut self.input;
         let Some(p) = self.page.as_mut() else {
             return 0;
@@ -1385,7 +1390,7 @@ impl Menu {
             return if c.done { action::CREDITS_END } else { 0 };
         }
         for w in p.widgets.iter_mut() {
-            let a = w.input(input, fpu, &mut self.values, &mut self.chosen);
+            let a = w.input(input, fpu, &mut self.values, &mut self.chosen, ticks);
             if a != 0 {
                 input.click = false;
                 return a;
@@ -1976,8 +1981,16 @@ impl Widget {
     /// tooltip's count, the blink's cycle.
     fn before_draw(&mut self, input: &Input, ticks: u32) {
         self.tooltip_step(input.x, input.y, ticks);
+    }
+
+    /// What the draw of the widget changes once it is drawn: the blink's
+    /// cycle, on, restarts after 10 ticks, after its frame 0 was drawn and
+    /// only while it is visible (0x0046de20 @ 0x0046de55..0x0046de6d).
+    fn after_draw(&mut self, ticks: u32) {
+        if !self.visible {
+            return;
+        }
         if let WidgetKind::Blink { state: true, cycle } = &mut self.kind {
-            // FUN_0046de20: the cycle restarts after 10 ticks.
             if ticks.wrapping_sub(*cycle) > 10 {
                 *cycle = ticks;
             }
@@ -1994,9 +2007,10 @@ impl Widget {
         self.before_draw(input, ticks);
         let sprite = self.visible && self.frame(ticks, input).is_some();
         let tip = self.visible && self.tip_drawn(ticks);
+        self.after_draw(ticks);
         let mut values = [0.0; 4];
         let mut chosen = None;
-        let act = self.input(input, Fpu::default(), &mut values, &mut chosen);
+        let act = self.input(input, Fpu::default(), &mut values, &mut chosen, ticks);
         (sprite, tip, act)
     }
 
@@ -2084,6 +2098,7 @@ impl Widget {
         fpu: Fpu,
         values: &mut [f32; 4],
         chosen: &mut Option<ListEntry>,
+        ticks: u32,
     ) -> i32 {
         let live = self.visible && self.enabled;
         let (mx, my) = (input.x, input.y);
@@ -2115,9 +2130,13 @@ impl Widget {
                     0
                 }
             }
-            WidgetKind::Blink { state, .. } => {
+            WidgetKind::Blink { state, cycle } => {
+                // @ 0x0046dde0: the state flipped and the cycle restarted
+                // at the click (@ 0x0046de11..0x0046de17), so a blink
+                // turned on stays hidden for its first 5 ticks.
                 if live && input.click && inside {
                     *state = !*state;
+                    *cycle = ticks;
                     self.action
                 } else {
                     0

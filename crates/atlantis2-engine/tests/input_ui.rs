@@ -263,7 +263,9 @@ fn the_tooltips_count_as_the_originals() {
 
 /// The blinking toggle (vtable 0x005c6468) frame by frame: its draw
 /// @ 0x0046de20 with its own tooltip @ 0x0046dea0, then its input
-/// @ 0x0046dde0 when the step clicks. On, the label is drawn at every
+/// @ 0x0046dde0 when the step clicks: the sprite (hidden for the first 5
+/// ticks of each cycle, the cycle restarted by a click and, once frame 0
+/// is drawn, after 10 ticks), the label. On, the label is drawn at every
 /// draw of the visible widget, the mouse anywhere and enabled or not; off,
 /// the hover count without the enabled test.
 #[test]
@@ -313,13 +315,20 @@ fn the_blink_as_the_originals() {
                 click: n[5] != 0,
                 ..Input::default()
             };
-            let (_sprite, text, act) = w.frame_step(&input, t);
-            let WidgetKind::Blink { state, .. } = w.kind else {
+            let (sprite, text, act) = w.frame_step(&input, t);
+            let WidgetKind::Blink { state, cycle } = w.kind else {
                 panic!()
             };
             assert_eq!(
-                (text, act, state, w.tip_state()),
-                (n[7] > 0, n[8] as i32, n[9] != 0, (n[11] as u32, n[12] != 0)),
+                (sprite, text, act, state, cycle, w.tip_state()),
+                (
+                    n[6] > 0,
+                    n[7] > 0,
+                    n[8] as i32,
+                    n[9] != 0,
+                    n[10] as u32,
+                    (n[11] as u32, n[12] != 0)
+                ),
                 "{head}: {row}"
             );
         }
