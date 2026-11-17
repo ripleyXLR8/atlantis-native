@@ -1149,13 +1149,58 @@ The page's `start` decides which game the picked files hold from their
 paths alone (`crates/atlantis-app/src/web_layout.rs`, tested natively and
 in WebAssembly): Atlantis II's installed folder is the shallowest one
 holding `atlantis2.exe`, or `Game.exe` beside `wam` and `scenar`; its
-discs are the folders holding a `datas_a2` folder among the installed
-folder, the folders directly inside it, the picked folder and the
-folders directly inside that (the desktop's `disc_candidates`, in its
+disc candidates are the folders holding a `datas_a2` folder and the CD
+images (`web_layout::is_image`: `.iso`, `.bin`, `.img`, `.mdf`, `.nrg`)
+among the installed folder, the folders directly inside it, the picked
+folder and the folders directly inside that (the desktop's
+`disc_candidates`, in its order: a folder's copy, then its images in name
 order; GOG.com's installation is its own four discs). A folder of both
 games answers `GAMES:` and the page asks, as for the DVD's languages.
 The four discs are required at once: the desktop's CD page looks in its
 folders again for a disc asked for, the browser cannot be given one.
+
+The CD images are read by the desktop's reader
+(`atlantis_data::disc_image`: the layouts, ISO 9660 and Joliet, the
+disc markers then decide which disc an image is, as on the desktop),
+over the picked file: `DiscImage::from_bytes` takes an `ImageBytes`
+(the desktop's is its file; the browser's `web::PickedImage` reads the
+parts the reader asks for at once, as `PickedDir` does, never the whole
+image: opening one reads its volume descriptors and its directories, a
+few KB). A raw image (2352-byte sectors) is read by spans of sectors,
+1024 at most a read, the 2048 user bytes of each taken from it, so that
+a part costs one request whatever the layout; a part read ahead
+(`FileSource::read_ahead`, a cinematic read by parts) is passed on as
+the span of the image the read then asks for, which `PickedDir`'s
+background reads serve (`read_ahead_part`). Atlantis III's French CD
+takes its candidates the same way (`web_layout::a3_discs`: the entries
+of the installed folder in name order, a copy or an image, the other
+folders' entries after them; then the picked folder's), and the first
+game the images of the shallowest folder holding some
+(`web_layout::image_folders`; picked as files with the page's second
+picker, they are at the top), when the picked files hold no
+`atlantis.exe`: its CDs' images (a `DiscSet`), or Cryo's DVD's sides,
+the language asked for as from the copies (`LANGUAGES:`; `DvdFiles` over
+the images). Its engine awaits its loader before a scene's reads, as
+with the copies (`WebLoader`): `ImageLoader` asks the image reader for
+the parts of the images that hold the members (`read_ahead`, collected
+rather than started) and fetches them in the background
+(`Blob.arrayBuffer`), the engine's reads then served from them; what
+was not fetched is read at once. Images of Atlantis II's or III's discs
+picked without the installed game are told so (`A2_DISCS_ONLY`,
+`A3_DISCS_ONLY`). Tested: the reader over a source that records its
+reads (`disc_image`'s `reads_by_parts_give_the_same_bytes`: every layout,
+parts of 1 byte to 512 KB give the whole file's bytes, a part read ahead
+is the span then read, a raw read never over a batch), the layouts with
+images (`web_layout`'s tests), and the players' images on disk read as
+the browser reads them (`web_layout::tests::on_disk`: Atlantis II's
+French, Polish and North American CDs with `ATLANTIS2_DATA[_PL|_US]` /
+`ATLANTIS2_DISCS[_PL|_US]`, a cinematic of disc 1 by parts of 512 KB as
+the desktop's whole read; Atlantis III's French CD with
+`ATLANTIS3_CD_FR` / `ATLANTIS3_DISCS_FR`, disc 2 for a new game; the
+first game's ISO, raw `.bin`, `.mdf` and Nero images with the
+`ATLANTIS_ISO_*` / `ATLANTIS_BIN_*` / `ATLANTIS_MDF_ES` /
+`ATLANTIS_NRG_IT` folders, the edition the desktop's, and the DVD's
+sides with `ATLANTIS_DVD_A` / `ATLANTIS_DVD_B`).
 
 Atlantis II's engine reads a file when it needs it and waits for it, as
 the original does (138 places, the `FileSource` of `A2Files`), where the

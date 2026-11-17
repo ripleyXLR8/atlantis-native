@@ -271,32 +271,39 @@ the players, saves and settings are kept in the browser.
 What to pick:
 
 - *Atlantis: The Lost Tales*: as for the desktop, the GOG.com folder, a
-  folder holding `atlantis.exe` and the four `BIGCD` archives, or Cryo's
-  DVD (the drive or a copy of a side, then the language). CD images
-  cannot be read in the browser.
+  folder holding `atlantis.exe` and the four `BIGCD` archives, the folder
+  holding the images of the four CDs (`.iso`, `.bin`, `.img`, `.mdf` or
+  `.nrg`; or a folder above it: the images of the first folder holding
+  some are taken), or Cryo's DVD (the drive, a copy of a side, or the
+  folder of the sides' images; then the language). The CD images can
+  also be picked themselves: *or choose the CD image files* under the
+  folder button (select the four). The images are read a part at a
+  time, never whole; `.cue` and `.mds` files are not needed.
 - *Atlantis II*, GOG.com or the Italian *Atlantis Collection*: the
   installation folder (the one holding `Game.exe` and `DATAS_A2`).
 - *Atlantis II*, CD (the French CD, also patched to 1.01, the North
   American *Beyond Atlantis* or the Polish CD): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
-  with a copy of each of the four CDs in it, for example in folders
-  `CD1` to `CD4`, each holding the disc's `DATAS_A2` folder (copy the
-  whole disc, or at least its `DATAS_A2`). The copies may also sit beside
-  the installed folder: then pick the folder holding both (for example
-  `Atlantis 2` and `CD1` to `CD4` side by side). The browser reads files,
-  not CD images, and the four discs are needed at once (no disc can be
-  added while the game runs).
+  with the images of the four CDs (`.iso`, `.bin`, `.img`, `.mdf` or
+  `.nrg`) in it or in a folder inside it, or copies of the CDs (for
+  example folders `CD1` to `CD4`, each holding the disc's `DATAS_A2`
+  folder: copy the whole disc, or at least its `DATAS_A2`). The images or
+  copies may also sit beside the installed folder: then pick the folder
+  holding both (for example `Atlantis 2` and `ISO` side by side). The
+  images are read a part at a time, as on the desktop; the four discs
+  are needed at once (no disc can be added while the game runs).
 - *Atlantis III*, GOG.com (English, French, German or Spanish): the
   installation folder (the one
   holding `Game.exe` and `Datas`).
 - *Atlantis III*, the French CD (2001, three CDs): the folder of the
-  installed game (the one holding `Atlantis3.exe` and `Datas`), with a
-  copy of each of the three CDs in it, for example in folders `CD1` to
-  `CD3`, each holding the disc's `Datas` folder and its `Atlantis3.cd1`
-  (`cd2`, `cd3`) file (copy the whole disc). The copies may also sit
-  beside the installed folder: then pick the folder holding both. The
-  browser reads files, not CD images; the discs are taken as on the
-  desktop (the one the game asks for, at once).
+  installed game (the one holding `Atlantis3.exe` and `Datas`), with the
+  images of the three CDs (`.iso`, `.bin`, `.img`, `.mdf` or `.nrg`) in
+  it or in a folder inside it, or copies of the CDs (for example folders
+  `CD1` to `CD3`, each holding the disc's `Datas` folder and its
+  `Atlantis3.cd1` (`cd2`, `cd3`) file: copy the whole disc). The images
+  or copies may also sit beside the installed folder: then pick the
+  folder holding both. The images are read a part at a time; the discs
+  are taken as on the desktop (the one the game asks for, at once).
 - *Atlantis III*, either edition: its saves and `Atlantis3.cfg` are
   kept in the browser under `atlantis-native/atlantis3/`; its controls
   are the desktop's (see [Atlantis III](#atlantis-iii)): a click takes

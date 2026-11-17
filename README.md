@@ -271,10 +271,10 @@ For *Atlantis II*:
 
 | Release | Languages | What to point it at |
 |---|---|---|
-| CD (1999, version 1.00) | French | the folder of the installed game (with `atlantis2.exe`), the images of its four CDs (or copies of the CDs) in it or in a folder inside it; in the browser, copies of the CDs (folders `CD1` to `CD4`, say, each holding the disc's `DATAS_A2`): it reads files, not images |
+| CD (1999, version 1.00) | French | the folder of the installed game (with `atlantis2.exe`), the images of its four CDs (or copies of the CDs) in it or in a folder inside it; in the browser too (the images read a part at a time), or the folder holding both the installed game and the images |
 | CD with the official patch 1.01 | French or English (one executable for both; tested with the French CD) | the same, with the patched `atlantis2.exe` |
-| CD, North American release (*Beyond Atlantis*, DreamCatcher, 2000, 4 CDs; its own program, version 1.01's code) | English | the same as the French CD; in the browser, copies of the CDs |
-| CD, Polish release (1999, 4 CDs; its own program, version 1.01's code; texts in Windows-1250) | Polish | the same as the French CD (the installed folder, with the images or copies of the four CDs); in the browser, copies of the CDs |
+| CD, North American release (*Beyond Atlantis*, DreamCatcher, 2000, 4 CDs; its own program, version 1.01's code) | English | the same as the French CD |
+| CD, Polish release (1999, 4 CDs; its own program, version 1.01's code; texts in Windows-1250) | Polish | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
 | [GOG.com](https://www.gog.com/) (version 1.01; the builds of 2018, June 2022 and July 2022) | English, French, German, Spanish (one executable for all four) | the installation folder |
 | *Atlantis Collection*, Italian DVD compilation (2014; shown as *Italian Collection (patch 1.01)*, its program being version 1.01 patched almost as GOG's 2018 build) | Italian | the folder its installer creates for *Atlantis 2 - Beyond Atlantis* (with `Game.exe` and `DATAS_A2`) |
 
@@ -286,7 +286,7 @@ For *Atlantis III*:
 | Release | Languages | What to point it at |
 |---|---|---|
 | [GOG.com](https://www.gog.com/) (*Atlantis 3 - The New World*; `Game.exe` of 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`) | English, French, German, Spanish | the installation folder (the one holding `Game.exe` and `Datas`) |
-| French CD (Cryo, 2001, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `f81dd8d2e49003b2ba53b48b4a21c2ec`) | French | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (or copies of the CDs) in it or in a folder inside it; in the browser, copies of the CDs (folders `CD1` to `CD3`, say, each holding the disc's `Datas` and `Atlantis3.cd<n>`), in it or beside it: it reads files, not images |
+| French CD (Cryo, 2001, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `f81dd8d2e49003b2ba53b48b4a21c2ec`) | French | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (or copies of the CDs) in it or in a folder inside it, or beside it in the folder picked (in the browser too: the images are read a part at a time) |
 
 GOG.com ships the same `Game.exe` in its four languages; the language is
 read from the installation (the language GOG.com's installer records),
