@@ -2446,6 +2446,26 @@ impl Game {
         }
     }
 
+    /// The cross (`Cursor`, @ 0x00440a6a..0x00440b6c): five pixels up and
+    /// across through the centre, coloured by the zone or green over a
+    /// place sprite.
+    fn draw_cross(&mut self, zone_kind: Option<i32>, sprite: bool) {
+        if !self.startup.config.cursor {
+            return;
+        }
+        let argb = cross_colour(zone_kind, sprite);
+        // Two lines of 0x004e9a00: the colour as the surface stores it
+        // (RGB565 truncated; x8r8g8b8 the ARGB value, alpha included).
+        let (cx, cy, w) = (self.width / 2, self.height / 2, self.width);
+        with_px!(&mut self.screen, s => {
+            let px = PagePixel::from_argb(argb);
+            for k in 0..5 {
+                s[(cy + k - 2) * w + cx] = px;
+                s[cy * w + cx + k - 2] = px;
+            }
+        });
+    }
+
     /// @ 0x00440a30 → @ 0x00428060: the cursor of the zone under the
     /// centre, centred on the screen's centre, animated at 15 frames a
     /// second of real time; none without a zone.
@@ -2455,25 +2475,14 @@ impl Game {
             .and_then(|i| self.place.wam.view(self.place.view?)?.zones.get(i))
             .map(|z| z.kind);
         let hit = self.cursor_hit;
-        if self.startup.config.cursor {
-            // The cross (`Cursor`, @ 0x00440a6a..0x00440b6c): five pixels
-            // up and across through the centre.
-            let argb = cross_colour(zone_kind, hit.is_some());
-            // Two lines of 0x004e9a00: the colour as the surface stores it
-            // (RGB565 truncated; x8r8g8b8 the ARGB value, alpha included).
-            let (cx, cy, w) = (self.width / 2, self.height / 2, self.width);
-            with_px!(&mut self.screen, s => {
-                let px = PagePixel::from_argb(argb);
-                for k in 0..5 {
-                    s[(cy + k - 2) * w + cx] = px;
-                    s[cy * w + cx + k - 2] = px;
-                }
-            });
-        }
-        // The object in the hand, centred on the screen (@ 0x00428500,
-        // `<World>ObjetsEnMain.SPR`), the zone's cursor over it; the 2004
-        // program's from its bag (FUN_00429780).
+        // The object in the hand first, centred on the screen (@ 0x00428500
+        // called @ 0x00440a44, `<World>ObjetsEnMain.SPR`), then the cross
+        // (@ 0x00440b1c / 0x00440b7b) and the zone's cursor over it; the
+        // 2004 program's from its bag (FUN_00429780).
         if self.files.is_evolution_2004() {
+            // The 2004 program's order as before: the cross, then its bag's
+            // object.
+            self.draw_cross(zone_kind, hit.is_some());
             self.draw_hand_2004();
         } else if let Some(sprite) = self
             .script
@@ -2495,6 +2504,9 @@ impl Game {
                     1.0,
                 );
             }
+        }
+        if !self.files.is_evolution_2004() {
+            self.draw_cross(zone_kind, hit.is_some());
         }
         // @ 0x00440b9f: the place sprite under the centre first (its
         // state's click kind, the cursor kind), else the zone (mode 0);
