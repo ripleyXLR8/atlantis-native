@@ -107,6 +107,22 @@ impl Inventory {
         }
     }
 
+    /// The 2004 inventory frame's step (@ 0x00428ed9..0x00428f93): when
+    /// more than 1/50 s passed since the last step, alpha + 0.2 below 1,
+    /// else 1.0, open or not (the frame that closes the inventory takes
+    /// it too).
+    pub fn fade_in_step(&mut self, now: f64) {
+        if now - self.fade_time <= 1.0 / 50.0 {
+            return;
+        }
+        self.fade_time = now;
+        self.alpha = if self.alpha < 1.0 {
+            self.alpha + 0.2
+        } else {
+            1.0
+        };
+    }
+
     /// The slot under the pointer (@ 0x00429b80): pointer y > H − 78 and
     /// 0 < px − margin < 80 × slots; the entry's index among the shown.
     pub fn slot_at(&self, width: usize, height: usize, pointer: (i32, i32)) -> Option<usize> {

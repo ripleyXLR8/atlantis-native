@@ -289,6 +289,12 @@ impl Game {
         -1
     }
 
+    /// Tests: the inventory's alpha (0x006e7d28).
+    #[doc(hidden)]
+    pub fn inventory_alpha(&self) -> f32 {
+        self.inventory.alpha
+    }
+
     /// The inventory's frame while open (FUN_00428940).
     pub(crate) fn inventory_frame_2004(&mut self) {
         if self.inv2004.examine.is_none() {
@@ -314,14 +320,16 @@ impl Game {
         for a in inv::action(right, left, examining, pick, hand) {
             self.inventory_action_2004(a, hand);
         }
-        if self.mode == Mode::Inventory {
-            if self.dialog2004.is_some() {
-                self.light_dialog_2004();
-            }
-            // FUN_00476320's Gameboy test (@ 0x00428ed1).
-            self.carte_hand_2004();
-            self.inventory.fade_step(self.now);
-        } else if self.mode == Mode::Subjects {
+        // Every path of the buttons reaches 0x00428ecb, the frame that
+        // closed the inventory too: FUN_00476320(mode) (the light dialog's
+        // pass, the Gameboy test), then the open fade's step
+        // (@ 0x00428ed9..0x00428f93) whether or not it is still open.
+        if self.dialog2004.is_some() {
+            self.light_dialog_2004();
+        }
+        self.carte_hand_2004();
+        self.inventory.fade_in_step(self.now);
+        if self.mode == Mode::Subjects {
             // A follower chosen: the subject menu's part of the same call
             // (@ 0x00429097).
             self.overlay_frame();

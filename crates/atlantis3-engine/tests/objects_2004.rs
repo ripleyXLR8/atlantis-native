@@ -286,6 +286,39 @@ fn chapter_1_by_clicks() {
     write_ppm(&g, "trunk_back.ppm");
 }
 
+/// The frame that closes the inventory still ends with FUN_00428940's
+/// pass at 0x00428ecb: the light dialog, the Gameboy test and the open
+/// fade's step (+0.2 below 1), before the warp fades it out by 0.2 steps.
+#[test]
+fn the_closing_frame_takes_one_more_fade_in_step() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    g.right_click();
+    assert_eq!(g.mode(), Mode::Inventory);
+    assert_eq!(g.inventory_alpha(), 0.0);
+    // 30 ms a frame: one step each (more than 1/50 s apart).
+    t += 0.03;
+    g.step(t);
+    assert_eq!(g.inventory_alpha(), 0.2);
+    g.set_pointer(500, 300);
+    g.right_click();
+    t += 0.03;
+    g.step(t);
+    assert!(!g.inventory_open());
+    assert_eq!(g.mode(), Mode::Warp);
+    assert_eq!(g.inventory_alpha(), 0.4);
+    let mut seen = vec![];
+    for _ in 0..3 {
+        t += 0.03;
+        g.step(t);
+        seen.push(g.inventory_alpha());
+    }
+    // Down to 0 one step later than from 0.2 (the closing frame's alpha
+    // without that step).
+    assert_eq!(seen, [0.2, 0.0, 0.0]);
+}
+
 #[test]
 fn compositions_and_the_big_view() {
     let Some((mut g, mut t)) = cabin() else {
