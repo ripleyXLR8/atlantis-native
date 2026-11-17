@@ -364,6 +364,32 @@ impl Game {
         }
     }
 
+    /// FUN_0042fb20, the Escape from the panorama's (FUN_0042c560's mode-3
+    /// case, @ 0x0042c5ba before the menu's set-up and @ 0x0042c618
+    /// after it), with the sound on: `FSOUND_StopSound(6)` and `(7)`
+    /// (@ 0x0042fb4b..0x0042fb54), then for each busy 3D channel its
+    /// sample's channel index := −1, the FMOD channel stopped, the channel
+    /// freed (busy 0, name cleared, channel −1). The samples stay loaded.
+    pub(crate) fn stop_all_sfx_2004(&mut self) {
+        if !self.music2004.enabled {
+            return;
+        }
+        self.audio.stop(CHANNEL_SOUND);
+        self.audio.stop(CHANNEL_VOICE);
+        self.sfx2004.ends = [None; 2];
+        for k in 0..SFX3D_SLOTS {
+            if self.sfx2004.slots[k].take().is_none() {
+                continue;
+            }
+            for s in self.sfx2004.samples.values_mut() {
+                if s.slot == Some(k) {
+                    s.slot = None;
+                }
+            }
+            self.audio.stop(CHANNEL_SFX3D_2004 + k);
+        }
+    }
+
     /// The end of the music update (FUN_00430380 @ 0x00430853..0x00430b7b,
     /// after the couches, at each 15 Hz update with the sound on): for
     /// each sample of the map whose loop byte (+0x3c) is 0, `IsPlaying`

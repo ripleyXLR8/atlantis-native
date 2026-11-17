@@ -218,10 +218,19 @@ impl Game {
                 }
             }
             Mode::Warp => {
+                let evolution = self.files.is_evolution_2004();
+                // The 2004 program stops its effects first and again after
+                // the menu's set-up (FUN_0042fb20 @ 0x0042c5ba, 0x0042c618).
+                if evolution {
+                    self.stop_all_sfx_2004();
+                }
                 // The voice slots stopped and freed (@ 0x0042ad09), not
                 // from the inventory (@ 0x0042af2b).
                 self.voices_clear();
                 self.open_menu();
+                if evolution {
+                    self.stop_all_sfx_2004();
+                }
             }
             Mode::Inventory => {
                 // @ 0x0042af2b: the subtitle line cleared (the voices and
