@@ -896,18 +896,23 @@ impl Menu {
                     action::BACK,
                     false,
                 );
-                self.list(host, &mut page, 108, 129, 420, 300);
+                let saves = self.list(host, &mut page, 108, 129, 420, 300);
                 self.erase_mode = false;
-                self.blink(
-                    host,
-                    &mut page,
-                    "b_erase.spr",
-                    t(&tx, l, 2),
-                    590,
-                    65,
-                    false,
-                    action::ERASE,
-                );
+                // FUN_0048abf0 creates the erase button only when the list
+                // holds a save (`test esi, esi` / `je` @ 0x0048add6; 1.01
+                // @ 0x0048ae66).
+                if saves != 0 {
+                    self.blink(
+                        host,
+                        &mut page,
+                        "b_erase.spr",
+                        t(&tx, l, 2),
+                        590,
+                        65,
+                        false,
+                        action::ERASE,
+                    );
+                }
                 self.yes_no(host, &mut page);
             }
             PageKind::Cd(n) => {
@@ -1153,7 +1158,17 @@ impl Menu {
     /// bar at the list's right (x + w, y + h / 2; its track 10 to the left
     /// and 106 up from there, 20 wide and 200 long, the knob 10 right and
     /// 6 down from the track).
-    fn list(&mut self, host: &mut dyn MenuHost, page: &mut Page, x: i32, y: i32, w: i32, h: i32) {
+    /// FUN_00471f60: returns the number of saves put in the list (EBX,
+    /// one per slot whose header scans, returned @ 0x00472302).
+    fn list(
+        &mut self,
+        host: &mut dyn MenuHost,
+        page: &mut Page,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+    ) -> usize {
         let player = host.player();
         host.set_player(player);
         let mut entries: Vec<ListEntry> = Vec::new();
@@ -1170,6 +1185,7 @@ impl Menu {
                 .unwrap_or(entries.len());
             entries.insert(at, e);
         }
+        let count = entries.len();
         let (bx, by) = (x + w, y + h / 2);
         let bar = ScrollBar {
             x: bx,
@@ -1207,6 +1223,7 @@ impl Menu {
             bottom: y + h,
         };
         page.widgets.push(wd);
+        count
     }
 
     /// The yes / no box, hidden until a question.

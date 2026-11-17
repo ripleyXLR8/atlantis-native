@@ -247,7 +247,7 @@ fn the_texts_and_the_pages() {
             &[
                 "b_back.spr",
                 "Listbox",
-                "b_erase.spr",
+                // No save: no erase button (FUN_0048abf0 @ 0x0048add6).
                 "c_yn.spr",
                 "b_oui.spr",
                 "b_non.spr",
@@ -595,6 +595,19 @@ fn saving_and_loading_through_the_menus() {
     assert!(dir.join("save").join("ATL00_00.SAV").exists());
     assert_eq!((r.page(), r.menu().state), (Some(PageKind::Load), 0));
     assert!(!r.menu().erase_mode);
+    // Erasing the last save: the page built again has no erase button
+    // (FUN_0048abf0 creates it only for a non-empty list, @ 0x0048add6).
+    let p = r.menu().page.as_ref().unwrap();
+    assert!(p.widget("b_erase.spr").is_some());
+    r.press_widget("b_erase.spr");
+    r.press(108 + 30, 129 + 30);
+    assert_eq!(r.menu().state, state::ASK_ERASE);
+    r.press_widget("b_oui.spr");
+    assert!(!dir.join("save").join("ATL00_00.SAV").exists());
+    assert_eq!((r.page(), r.menu().state), (Some(PageKind::Load), 0));
+    let p = r.menu().page.as_ref().unwrap();
+    assert!(p.widget("b_erase.spr").is_none());
+    assert!(p.widget("Listbox").is_some());
     r.e.escape();
     assert_eq!(r.e.loop_type, LoopType::Warp);
 
