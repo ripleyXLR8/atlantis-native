@@ -177,6 +177,36 @@ const SCENARIOS: [Scenario; 8] = [
     },
 ];
 
+/// The scenarios run with the menu's CD page open (the harness's loop
+/// type 5 and menu state 9): at a track's end FUN_00486ad0 makes the
+/// callback @ 0x00485080 replay the current music from its start
+/// (@ 0x004850b2..0x004850d1), the list's choice (its `rand()` drawn)
+/// dropped; with an empty list too, where the ring would loop.
+const CD_SCENARIOS: [Scenario; 2] = [
+    Scenario {
+        tag: "m16.list.cd",
+        music: 16,
+        mark: 0,
+        loops: 0,
+        list: "16,14)",
+        steps: None,
+        step: 0x1000,
+    },
+    Scenario {
+        tag: "m30.nolist.cd",
+        music: 30,
+        mark: 0,
+        loops: 0,
+        list: "",
+        steps: None,
+        step: 0x1000,
+    },
+];
+
+fn cd_page(s: &Scenario) -> bool {
+    s.tag.ends_with(".cd")
+}
+
 /// The player started as the harness starts it.
 fn start(files: &A2Files, s: &Scenario) -> (Stream, SimRing, Rand) {
     let mut st = Stream::default();
@@ -216,6 +246,7 @@ fn run(files: &A2Files, s: &Scenario, fixes: MusicFixes) -> Vec<String> {
             &mut ring,
             s.list.as_bytes(),
             s.music,
+            cd_page(s),
             &mut rand,
             &mut ld,
             fixes,
@@ -288,6 +319,18 @@ fn golden_rows(s: &Scenario) -> Vec<&'static str> {
 fn ring_matches_the_original() {
     let Some(files) = files() else { return };
     for s in &SCENARIOS {
+        let got = run(&files, s, MusicFixes::default());
+        assert_eq!(got, golden_rows(s), "{}", s.tag);
+    }
+}
+
+/// On the CD page a track's end replays the current music from its start
+/// (the `.cd` scenarios: muzik16 again instead of the list's muzik14;
+/// muzik30 opened again instead of the ring looping on an empty list).
+#[test]
+fn the_cd_page_replays_the_current_music() {
+    let Some(files) = files() else { return };
+    for s in &CD_SCENARIOS {
         let got = run(&files, s, MusicFixes::default());
         assert_eq!(got, golden_rows(s), "{}", s.tag);
     }
@@ -369,6 +412,7 @@ fn hear_fixed(
             &mut ring,
             s.list.as_bytes(),
             s.music,
+            cd_page(s),
             &mut rand,
             &mut ld,
             fixes,

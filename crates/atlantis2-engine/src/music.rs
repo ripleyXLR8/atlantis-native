@@ -576,13 +576,17 @@ impl Stream {
     /// next music is written right after the old track's end, which is
     /// heard to its last sample; with [`MusicFixes::restart`] the rewind
     /// succeeds and the track goes on from its start there. True when the
-    /// ring was written.
+    /// ring was written. `replay_current`: FUN_00486ad0's answer (the menu's
+    /// CD page open: loop type 5, menu state 9), for which the callback,
+    /// its `select` drawn, takes `current_music` at mark 0 with no loops
+    /// instead (@ 0x004850b2..0x004850d1), music 0 being none.
     #[allow(clippy::too_many_arguments)]
     pub fn refill(
         &mut self,
         ring: &mut dyn Ring,
         list: &[u8],
         current_music: i32,
+        replay_current: bool,
         rand: &mut Rand,
         load: &mut dyn FnMut(i32) -> Option<MusicData>,
         fixes: MusicFixes,
@@ -620,7 +624,18 @@ impl Stream {
             return true;
         }
         if self.loops < 2 {
-            if let Some((e, count)) = select(rand, list, current_music, self.current_mark) {
+            let mut chosen = select(rand, list, current_music, self.current_mark);
+            if replay_current {
+                chosen = (current_music != 0).then_some((
+                    Entry {
+                        music: current_music,
+                        mark: 0,
+                        loops: 0,
+                    },
+                    0,
+                ));
+            }
+            if let Some((e, count)) = chosen {
                 let mut mark = if count == 1 { 0 } else { e.mark };
                 let old = self.music();
                 self.file = None;

@@ -313,6 +313,14 @@ impl Engine {
     /// bug fixes ([`crate::BugFix`]) play every track to its end and an
     /// ended track again from its start.
     fn music_refill(&mut self) -> bool {
+        // FUN_00486ad0, asked by the end-of-track callback: the menu's CD
+        // page (loop type 5, menu state 9, set only by AtlMenu_start_CD
+        // @ 0x00486a1a) replays the current music.
+        let cd_page = self.loop_type == super::LoopType::Menu
+            && self
+                .menu
+                .as_ref()
+                .is_some_and(|m| m.state == crate::menu::state::CD);
         let files = &self.files;
         let mut load = |n: i32| load_music(files, n);
         let mut ring = self.voices.music_ring();
@@ -320,6 +328,7 @@ impl Engine {
             &mut ring,
             &self.player.list,
             self.player.current,
+            cd_page,
             &mut self.rand,
             &mut load,
             self.enhancements.fixes.music(),

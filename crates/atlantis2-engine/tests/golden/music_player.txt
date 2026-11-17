@@ -16,6 +16,8 @@
 # m01.edge: a random mark at the rand() = 0x7fff edge (srand(0xf01bf641) before the start): its
 # init rows, then `mark= marks= fatal=` (the mark played @ 0x006725a4, the file's marks, the fatal
 # reports and the first one's format string); GotoMark's fatal ends the start there.
+# The .cd scenarios: the menu's CD page open (loop type 5 @ 0x006d8520, menu state 9 @ 0x006d174c),
+# for which FUN_00486ad0 makes the callback replay the current music at mark 0, no loops.
 m30.start.init ('open', 'muzik30.apc')
 m30.start.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
 m30.start.init ('setvol', -3)
@@ -75,3 +77,19 @@ m30.nolist.s1468.init ('setvol', -3)
 m30.nolist.s1468.step15649 ('remove', 'muzik30.apc') heard_before=22971264 segment_md5=06ff8292b015a298711cb8d1ed51d0a3 segment_bytes=22971264 cursor=68380
 m30.nolist.s1468.step15649 ('loadmusik', '30)') heard_before=22971264 segment_md5=06ff8292b015a298711cb8d1ed51d0a3 segment_bytes=22971264 cursor=68380
 m30.nolist.s1468.end steps=15948 heard=23411664 md5=4a5e717a4154723e71d54bfceca8161b segment_md5=4a5e717a4154723e71d54bfceca8161b segment_bytes=23411664 pos=0 write=64000 state=4 loopsleft=0 mark=0
+m16.list.cd.init ('open', 'muzik16.apc')
+m16.list.cd.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
+m16.list.cd.init ('setvol', -3)
+m16.list.cd.step5121 ('open', 'muzik16.apc') heard_before=20971520 segment_md5=13533a0396c6e5f2c8d985881fef657b segment_bytes=20971520 cursor=6c000
+m16.list.cd.step5121 ('setpos', 442368, 0) heard_before=20971520 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m16.list.cd.step10242 ('open', 'muzik16.apc') heard_before=41947136 segment_md5=74a70110069273d2ba69849edbb4d2a5 segment_bytes=20975616 cursor=6c000
+m16.list.cd.step10242 ('setpos', 442368, 446464) heard_before=41947136 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m16.list.cd.end steps=10541 heard=43175936 md5=229ce44e005bc77868542d859f618916 segment_md5=6c7e436d78bdea93b95af97258633032 segment_bytes=1228800 pos=1736704 write=14000 state=4 loopsleft=0 mark=0
+m30.nolist.cd.init ('open', 'muzik30.apc')
+m30.nolist.cd.init ('createplay', 0, 524288, 1, 22050, 16, 2, -10000)
+m30.nolist.cd.init ('setvol', -3)
+m30.nolist.cd.step5610 ('open', 'muzik30.apc') heard_before=22974464 segment_md5=af454ca0655770c9e0dbbf1b7b93ccc3 segment_bytes=22974464 cursor=6c000
+m30.nolist.cd.step5610 ('setpos', 442368, 430080) heard_before=22974464 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m30.nolist.cd.step11219 ('open', 'muzik30.apc') heard_before=45948928 segment_md5=af454ca0655770c9e0dbbf1b7b93ccc3 segment_bytes=22974464 cursor=6c000
+m30.nolist.cd.step11219 ('setpos', 442368, 348160) heard_before=45948928 segment_md5=d41d8cd98f00b204e9800998ecf8427e segment_bytes=0 cursor=6c000
+m30.nolist.cd.end steps=11518 heard=47177728 md5=13998073edd6c3735e29ddd3d338e4de segment_md5=08008e645bc0877c2a5d437879b88113 segment_bytes=1228800 pos=1736704 write=14000 state=4 loopsleft=0 mark=0
