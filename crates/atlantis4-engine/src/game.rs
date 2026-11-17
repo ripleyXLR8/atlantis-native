@@ -640,11 +640,16 @@ impl Game {
         finished
     }
 
-    /// The view update's inertia step at `now_us` (`0x0052ae0a..0x0052ae62`):
-    /// not while `game+0x4038` is clear (a movie, `FinishGame`).
-    pub fn coast(&mut self, now_us: u64) {
+    /// The view update at `now_us` (`0x0052ab40`), not while `game+0x4038`
+    /// is clear (a movie, `FinishGame`): with the button up, a drag in
+    /// progress ends at the pointer's `speed` (@ 0x0052ac0e); then the
+    /// inertia's step (`0x0052ae0a..0x0052ae62`).
+    pub fn view_update(&mut self, now_us: u64, held: bool, speed: (i32, i32)) {
         if self.movie.is_some() || self.planks.is_some() {
             return;
+        }
+        if !held {
+            self.inertia.release(speed, self.inverse_look, now_us);
         }
         self.inertia.coast(&mut self.view, now_us);
     }

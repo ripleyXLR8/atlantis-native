@@ -336,7 +336,8 @@ impl Viewer {
         // The view update (`0x0052ab40`) after the animations': the
         // inertia of the last drag.
         if !self.front.active() {
-            self.game.borrow_mut().coast(now_us);
+            let (held, speed) = (self.down.is_some(), self.moves.speed(now_us));
+            self.game.borrow_mut().view_update(now_us, held, speed);
         }
         // `TeSoundManager::update` ran first in the frame: its signals'
         // callbacks (`OnSoundStopped`) come before the animations'.
@@ -644,16 +645,6 @@ impl Viewer {
     }
 
     fn release(&mut self) {
-        // The drag's end (0x0052a950(0), from the warp's mouse-up and the
-        // per-frame button check): the view coasts on at the pointer's
-        // speed.
-        {
-            let now_us = self.clock.us();
-            let speed = self.moves.speed(now_us);
-            let mut g = self.game.borrow_mut();
-            let inverse = g.inverse_look;
-            g.inertia.release(speed, inverse, now_us);
-        }
         let Some(down) = self.down.take() else { return };
         let Some(up) = self.pointer else { return };
         if self.front.active() || self.front.in_transition() {
@@ -683,11 +674,34 @@ impl Viewer {
             }
             return;
         }
-        if !is_click((down.0 as f32, down.1 as f32), (up.0 as f32, up.1 as f32)) {
+        // A HUD button's validation takes a release on it first: the
+        // warp's mouse-up does not run (the drag then ends in the next
+        // view update).
+        {
+            let (w, h) = self.size;
+            if self.game.borrow_mut().hud_takes_release(w, h, up.0, up.1) {
+                return;
+            }
+        }
+        // The warp's mouse-up (0x00523a80): the click, then the drag's end
+        // (0x0052a950(0)): the view coasts on at the pointer's speed.
+        let click = is_click((down.0 as f32, down.1 as f32), (up.0 as f32, up.1 as f32));
+        let hit = if click {
+            let (w, h) = self.size;
+            self.game.borrow().click(w, h, up.0 as i32, up.1 as i32)
+        } else {
+            None
+        };
+        {
+            let now_us = self.clock.us();
+            let speed = self.moves.speed(now_us);
+            let mut g = self.game.borrow_mut();
+            let inverse = g.inverse_look;
+            g.inertia.release(speed, inverse, now_us);
+        }
+        if !click {
             return;
         }
-        let (w, h) = self.size;
-        let hit = self.game.borrow().click(w, h, up.0 as i32, up.1 as i32);
         log::info!("click at {up:?}: {hit:?}");
         if let Some(name) = hit {
             // The warp's click callback (`+0xbc`): `OnWarpObjectHit(name)`.

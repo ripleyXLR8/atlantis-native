@@ -142,6 +142,51 @@ fn the_screens_are_laid_out_from_the_files() {
     assert!(b.width > 10.0 && b.height > 10.0);
 }
 
+/// `InGame.lua`'s edge strips (`upButton`, `downButton`, `leftButton`,
+/// `rightButton`): visible buttons with no handler that take the presses
+/// and releases within a few pixels of each edge, so the view neither
+/// turns nor clicks there.
+#[test]
+fn the_hud_edge_strips_take_the_presses_at_the_edges() {
+    let Some(dir) = install() else { return };
+    let (files, _) = A4Files::open_dir(&dir).unwrap();
+    let lang = files.language();
+    let mut s = Screens::load(&files, &lang);
+    let inv = atlantis4_engine::inventory::Inventory::new(&Screens::slots(&s.inventory));
+    let mut taken = |x: f64, y: f64| {
+        let t = s.press(&inv, false, false, W, H, x, y);
+        let (actions, took) = s.release(&inv, false, false, W, H, x, y);
+        assert!(actions.is_empty(), "{x},{y}: {actions:?}");
+        assert_eq!(t, took);
+        t
+    };
+    // 0.005 of the window: rows 0..2 and 765..767, columns 0..5 and
+    // 1360..1364 (the right strip starts at 1365 × 1.001 − 6.825).
+    for (x, y) in [
+        (683.0, 0.0),
+        (683.0, 2.5),
+        (683.0, 767.0),
+        (683.0, 765.0),
+        (0.0, 384.0),
+        (5.0, 384.0),
+        (1364.0, 384.0),
+        (1360.0, 384.0),
+    ] {
+        assert!(taken(x, y), "{x},{y}");
+    }
+    for (x, y) in [
+        (683.0, 3.5),
+        (683.0, 764.0),
+        (7.0, 384.0),
+        (1357.0, 384.0),
+        (683.0, 384.0),
+    ] {
+        assert!(!taken(x, y), "{x},{y}");
+    }
+    assert!(s.hud_takes_release(&inv, false, false, W, H, 683.0, 0.0));
+    assert!(!s.hud_takes_release(&inv, false, false, W, H, 683.0, 100.0));
+}
+
 #[test]
 fn every_object_and_document_of_the_scripts_is_known() {
     let Some(dir) = install() else { return };

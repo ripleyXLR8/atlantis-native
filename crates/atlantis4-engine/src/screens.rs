@@ -84,6 +84,10 @@ pub const NOTIFY_LUA: &str = "GUI/Notify.lua";
 pub const DIARY_LUA: &str = "Diary/DiaryGUI.lua";
 /// The HUD button's sound (0x00524cc0).
 pub const HUD_SOUND: &str = "Sounds/SFX/ChoixMenu.wav";
+
+/// `InGame.lua`'s edge strips (`Percent` 1.0 × 0.005 or 0.005 × 1.0, just
+/// outside each edge).
+pub const EDGE_BUTTONS: [&str; 4] = ["upButton", "downButton", "leftButton", "rightButton"];
 /// The notification's text before the name (0x005284e0).
 pub const NOTIFY_FORMAT: &str = "<section style=\"center\" /><color r=\"0\" g=\"0\" b=\"0\"/><font file=\"Common/Fonts/Arial_r_16.tef\" />";
 /// An object's picture (0x004107f0: `Inventory/Objects/` + id + `.png`).
@@ -113,6 +117,10 @@ pub enum Target {
     /// The inventory's background, an empty slot: swallowed.
     Inventory,
     Hud,
+    /// `InGame.lua`'s `upButton`, `downButton`, `leftButton`,
+    /// `rightButton`: strips along the window's edges with no handler,
+    /// which still take the presses and releases on them.
+    Edge,
 }
 
 /// What a validated click asks the game to do.
@@ -489,7 +497,38 @@ impl Screens {
         {
             return Some(Target::Hud);
         }
+        // Visible buttons without a handler (nothing looks them up by
+        // name): the press handler `0x004e5030` and the validation
+        // `0x004e52c0` still consume what hits them, before the warp's
+        // handlers (priority -1000.0 @ 0x005296a0, 0x0052963f).
+        if EDGE_BUTTONS.iter().any(|name| {
+            Self::rect_of(&self.in_game, name, width, height).is_some_and(|r| r.contains(x, y))
+        }) {
+            return Some(Target::Edge);
+        }
         None
+    }
+
+    /// Whether a release at (`x`, `y`) falls on one of the HUD's buttons
+    /// (the inventory button, an edge strip): their validation
+    /// (`0x004e52c0`) consumes any release on them, pressed there or not,
+    /// so the warp's mouse-up does not see it.
+    #[allow(clippy::too_many_arguments)]
+    pub fn hud_takes_release(
+        &mut self,
+        inv: &Inventory,
+        doc_shown: bool,
+        in_movie: bool,
+        width: u32,
+        height: u32,
+        x: f64,
+        y: f64,
+    ) -> bool {
+        self.layout(width, height);
+        matches!(
+            self.target(inv, doc_shown, in_movie, width, height, x, y),
+            Some(Target::Hud | Target::Edge)
+        )
     }
 
     /// A press: whether a screen took it.
@@ -607,7 +646,7 @@ impl Screens {
                 out.extend(sound(&self.documents, "zoomed"));
                 out.push(Action::ZoomedClicked);
             }
-            Target::Notify | Target::Inventory => {}
+            Target::Notify | Target::Inventory | Target::Edge => {}
         }
         (out, took)
     }

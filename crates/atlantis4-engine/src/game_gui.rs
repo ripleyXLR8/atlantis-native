@@ -151,6 +151,23 @@ impl Game {
             .press(inventory, doc, movie, width, height, x, y)
     }
 
+    /// Whether a release at (`x`, `y`) falls on a HUD button, which
+    /// consumes it before the warp's mouse-up ([`Screens::hud_takes_release`]).
+    pub fn hud_takes_release(&mut self, width: u32, height: u32, x: f64, y: f64) -> bool {
+        if !self.warp_takes_input() {
+            return false;
+        }
+        let (doc, movie) = (self.documents.shown.is_some(), self.movie.is_some());
+        self.gui();
+        let Game {
+            screens, inventory, ..
+        } = self;
+        screens
+            .as_mut()
+            .expect("screens")
+            .hud_takes_release(inventory, doc, movie, width, height, x, y)
+    }
+
     /// The pointer moved to (`x`, `y`) with the button held.
     pub fn gui_drag(&mut self, x: f64, y: f64) {
         if let Some(s) = self.screens.as_mut() {
