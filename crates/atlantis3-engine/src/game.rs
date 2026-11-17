@@ -1821,6 +1821,10 @@ impl Game {
                 m.tick(b);
             }
         });
+        // The same update's end: the sample sweep (@ 0x00430853).
+        if ticked && self.music2004.enabled {
+            self.sweep_sfx_2004();
+        }
     }
 
     // ---- videos -------------------------------------------------------

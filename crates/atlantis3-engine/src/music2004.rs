@@ -587,8 +587,9 @@ impl Music2004 {
     ///
     /// Not ported: the global volume's fade 0x006ea324 (nothing sets it,
     /// [CONFIRMED-STATIC]), the stream 0x006e0200 closed outside mode 5
-    /// (@ 0x00430524, not music: [UNKNOWN] what it is), and the sample
-    /// cache's sweep (@ 0x00430853).
+    /// (@ 0x00430524, not music: [UNKNOWN] what it is). The sample
+    /// cache's sweep that ends the update (@ 0x00430853) is the game's
+    /// `sweep_sfx_2004`.
     pub fn tick(&mut self, b: &mut dyn Backend) {
         if !self.enabled {
             return;
