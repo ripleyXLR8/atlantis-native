@@ -16,6 +16,7 @@ use atlantis3_data::evolution2004::Evolution2004Source;
 use atlantis3_data::A3Files;
 use atlantis3_engine::game::{Game, Mode};
 use atlantis3_engine::menu::{PAGE_LOAD, PAGE_MAIN, PAGE_OPTIONS, PAGE_SAVE, PAGE_START};
+use atlantis3_engine::music2004::Fade;
 use atlantis3_engine::px::Surface;
 
 fn game() -> Option<Game> {
@@ -243,6 +244,7 @@ fn new_game_save_and_load_from_the_menus() {
     let list: Vec<&str> = g.menus().list().map(|(n, _)| n).collect();
     assert_eq!(list, ["game1_1.sav"]);
     shot(&g, "a4cd_load_page.png");
+    let opened = g.music2004_opened.len();
     click_on(&mut g, &mut t, b"SAVE1");
     frames(&mut g, &mut t, 2);
     assert_eq!(g.mode(), Mode::Warp);
@@ -269,6 +271,39 @@ fn new_game_save_and_load_from_the_menus() {
     assert_eq!(s.bag.iter().map(|e| e.id).collect::<Vec<_>>(), bag);
     let couches: Vec<String> = g.music2004.slots.iter().map(|s| s.name.clone()).collect();
     assert!(couches[0].ends_with("muzik20.mls"), "{couches:?}");
+    // The loader cut every couche (FUN_00431d10(0) @ 0x00460cdd) before
+    // the `/INIT` ran: its three lists start again from their first
+    // track, muzik20 with its 3 s fade-in from 0.
+    assert_eq!(
+        g.music2004_opened[opened..],
+        [
+            "music/muzik20.ogg",
+            "music/muzik21.ogg",
+            "music/muzik24.ogg"
+        ]
+    );
+    assert_eq!(g.music2004.slots[0].fade, Fade::Up);
+    assert!(
+        g.music2004.slots[0].cur < 10.0,
+        "{}",
+        g.music2004.slots[0].cur
+    );
+    // The in-game menu's `BT_QUIT`: the start page cuts the music on its
+    // first pass (@ 0x004578a0).
+    g.escape();
+    // The button hovered first (the menu's first frames after the
+    // Escape).
+    let (x, y) = point_of(&g, PAGE_MAIN, b"BT_QUIT");
+    g.set_pointer(x, y);
+    frames(&mut g, &mut t, 2);
+    click_on(&mut g, &mut t, b"BT_QUIT");
+    assert_eq!(g.menu_page().map(|p| p.0), Some(PAGE_START));
+    frames(&mut g, &mut t, 1);
+    assert!(g
+        .music2004
+        .slots
+        .iter()
+        .all(|s| !s.stream && s.volume == 0.0));
 }
 
 #[test]

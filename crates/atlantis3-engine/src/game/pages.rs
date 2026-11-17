@@ -283,6 +283,11 @@ impl Game {
         if self.texts.is_none() {
             self.texts();
         }
+        // The 2004 start page (FUN_00457850) cuts every music couche on
+        // each of its passes (@ 0x004578a0, FUN_00431d10(0)).
+        if self.files.is_evolution_2004() && self.menus.page == PAGE_START {
+            self.with_music_2004(|m, b| m.stop_all(b));
+        }
         let mut host = Saves {
             saves: &self.saves,
             dir: self.save_dir.as_deref(),

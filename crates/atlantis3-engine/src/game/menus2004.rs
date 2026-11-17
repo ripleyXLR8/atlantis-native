@@ -128,6 +128,9 @@ impl Game {
         // @ 0x00460cd7, right after `LOADING` := 1: the followers' list
         // emptied (FUN_0043d710), before the chapter's `/INIT` runs.
         self.inv2004.followers.clear();
+        // @ 0x00460cdd: every music couche cut at once (FUN_00431d10(0)),
+        // so the `/INIT`'s `STARTMUSIK`s start their lists afresh.
+        self.with_music_2004(|m, b| m.stop_all(b));
         let vars = g.vars.clone();
         let ok = self.with_script(|s, h| s.load_2004(h, &data, &vars));
         if ok {

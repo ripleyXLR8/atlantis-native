@@ -529,6 +529,16 @@ impl Music2004 {
         s.loaded = false;
     }
 
+    /// FUN_00431d10(0): every couche stopped at once ([`Music2004::stop`]
+    /// without fade, couches 0..4). Called on every pass of the start page
+    /// (FUN_00457850 @ 0x004578a0) and by the loader right after the
+    /// followers' clear (FUN_00460b50 @ 0x00460cdd).
+    pub fn stop_all(&mut self, b: &mut dyn Backend) {
+        for ch in 0..SLOTS {
+            self.stop(b, ch, false);
+        }
+    }
+
     /// FUN_004319e0(ch, fade, target): with `fade` and a track fade-out,
     /// [`Fade::Down`] to `target` in `tpsfo` ms; else the stream closed at
     /// once and the end flag set (the tracks kept).
@@ -1095,6 +1105,36 @@ mod tests {
         // Outside 1..5: nothing.
         assert!(!m.stop_musik(&mut b, 0, true));
         assert!(!m.stop_musik(&mut b, 6, true));
+    }
+
+    #[test]
+    fn stop_all_cuts_every_couche_without_its_fade_out() {
+        let mut b = fake(&[
+            ("a.mls", "a.ogg vol=100 tpsfi=0 tpsfo=2000\r\n"),
+            ("b.mls", "b.ogg vol=100 tpsfi=2000 tpsfo=2000\r\n"),
+        ]);
+        let mut m = Music2004::default();
+        m.start_musik(&mut b, 1, "a");
+        m.start_musik(&mut b, 3, "b");
+        m.stop_all(&mut b);
+        for ch in 0..SLOTS {
+            assert!(!m.slots[ch].stream && !m.slots[ch].loaded, "{ch}");
+            assert_eq!(m.slots[ch].volume, 0.0);
+        }
+        assert_eq!(b.closed, vec![0, 1, 2, 3, 4]);
+        assert_eq!((b.playing[0], b.playing[2]), (false, false));
+        // The same list again starts from its first track with its fade-in.
+        m.start_musik(&mut b, 3, "b");
+        assert_eq!(b.opened.len(), 3);
+        assert_eq!(m.slots[2].fade, Fade::Up);
+        // Without the sound started, nothing.
+        let mut m = Music2004 {
+            enabled: false,
+            ..Music2004::default()
+        };
+        let mut b = fake(&[]);
+        m.stop_all(&mut b);
+        assert!(b.closed.is_empty());
     }
 
     #[test]
