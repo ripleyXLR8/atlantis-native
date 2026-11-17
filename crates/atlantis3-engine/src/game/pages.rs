@@ -12,7 +12,7 @@ use std::path::Path;
 use atlantis2_engine::warp::A3Raster;
 
 use super::{Game, Mode};
-use crate::audio::{csm_gain, CHANNEL_MUSIC, CHANNEL_PLACE};
+use crate::audio::{csm_gain, CHANNEL_MUSIC};
 use crate::menu::{Env, Event, Host, Input, Menus, Page, PAGE_MAIN, PAGE_START};
 
 /// Where a thumbnail is kept among the saves: `spr_<W>/<name>.spr` (the
@@ -177,7 +177,7 @@ impl Game {
         if !self.enter_menu(PAGE_MAIN) {
             return false;
         }
-        self.audio.stop(CHANNEL_PLACE);
+        self.place_sounds_stop();
         self.subtitle = None;
         self.menus.capture = Some(capture);
         true
@@ -210,7 +210,7 @@ impl Game {
             Mode::Video if self.video.as_ref().is_some_and(|v| v.travel) => self.escape_travel(),
             Mode::Warp if self.menus.demo => {
                 self.menus.demo = false;
-                self.audio.stop(CHANNEL_PLACE);
+                self.place_sounds_stop();
                 self.subtitle = None;
                 self.voices_clear();
                 if self.enter_menu(PAGE_START) {

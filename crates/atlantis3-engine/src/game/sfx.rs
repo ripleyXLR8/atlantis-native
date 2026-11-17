@@ -198,9 +198,9 @@ impl Game {
     }
 
     /// Every sound object stopped (@ 0x00433580: a walk of the sound
-    /// library's map stopping each); the place's ambient sounds with them
-    /// [INFERRED: the ambient objects belong to the same map]. Logged `snd
-    /// stopall`.
+    /// library's map stopping each); every place sound with them (the
+    /// place sounds are in that map: `AtlSound_LoadSfx` @ 0x004329e0
+    /// inserts there). Logged `snd stopall`.
     pub(crate) fn sfx_stop_all(&mut self) {
         self.tr(|| "snd stopall".into());
         for i in 0..self.csounds.objects.len() {
@@ -211,7 +211,7 @@ impl Game {
                 }
             }
         }
-        self.audio.stop(crate::audio::CHANNEL_PLACE);
+        self.place_sounds_stop();
     }
 
     /// The voice file of a dialog's line (`GetApcNameFromDial`

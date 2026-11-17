@@ -3069,6 +3069,15 @@ impl Game {
         }
     }
 
+    /// Every place-sound channel stopped: the place sounds' part of the
+    /// stop of every sound (@ 0x00433580 walks the whole sound map
+    /// 0x00759340, where `AtlSound_LoadSfx` put the place sounds).
+    pub(crate) fn place_sounds_stop(&mut self) {
+        for ch in CHANNEL_PLACE..CHANNEL_VOICE {
+            self.audio.stop(ch);
+        }
+    }
+
     /// The place sounds of a warp frame (@ 0x004024b0): each active source
     /// whose sound is silent starts its first file again (one `rand()`
     /// drawn and dropped); the gains follow the listener. The original

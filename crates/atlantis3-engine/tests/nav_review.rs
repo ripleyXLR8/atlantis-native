@@ -6,7 +6,10 @@
 //!
 //! Needs the game: `ATLANTIS3_DATA`.
 
+use std::sync::Arc;
+
 use atlantis3_data::A3Files;
+use atlantis3_engine::audio::{CHANNEL_PLACE, CHANNEL_VOICE};
 use atlantis3_engine::{cross_colour, Game, Mode};
 
 /// Hoggar view 4 at `yaw` degrees, pitch 0, after one warp frame.
@@ -167,4 +170,28 @@ fn the_free_pointer_follows_the_mouse_in_the_warp() {
     assert!(g.turning());
     g.mouse_motion(100, 100);
     assert_eq!(g.pointer(), (400, 300));
+}
+
+/// A looping sound on `ch` (as a place sound).
+fn play_on(g: &Game, ch: usize) {
+    g.audio
+        .play(ch, 22050, 1, Arc::new(vec![0; 2205]), true, [1.0, 1.0]);
+}
+
+/// F5: the warp's Escape stops every sound of the sound map (0x00433580
+/// @ 0x0042acff / 0x0042ad5c), every place sound with them, not only the
+/// first place channel.
+#[test]
+fn escape_stops_every_place_sound() {
+    let Some((mut g, _)) = hoggar_view_4(108.0) else {
+        return;
+    };
+    for ch in [CHANNEL_PLACE, CHANNEL_PLACE + 1, CHANNEL_VOICE - 1] {
+        play_on(&g, ch);
+    }
+    g.escape();
+    assert_eq!(g.mode(), Mode::Menu);
+    for ch in CHANNEL_PLACE..CHANNEL_VOICE {
+        assert!(!g.audio.is_playing(ch), "place channel {ch}");
+    }
 }
