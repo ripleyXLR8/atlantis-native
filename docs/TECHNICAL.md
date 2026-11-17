@@ -2294,7 +2294,10 @@ back) into `yucatan-*.png`.
   variable 2), and the warp frames draw nothing while it is 2 (the
   screen frozen) until a `vue=` or a move to another place clears it, as
   chapter 59's door uses it over `miniature.wam` view 122, whose
-  panorama is on no disc; **the special events** (`TestSpecialEvent`,
+  panorama is on no disc; the centre's zone is then picked in the old
+  view's zone list, which only a real entry replaces (@ 0x0045a092) and a
+  place's load clears, so a click in the arrival frame takes view 22's
+  door zone again; **the special events** (`TestSpecialEvent`,
   FUN_00484880, `script/frame.rs`): events 1-6 are the labyrinth's six
   demons (view and frame each), events 7 and 8 Yucatán's `CHAC`; checked
   case by case against the original (`scripts_worlds_events.txt`) and
@@ -3626,7 +3629,10 @@ back) into `yucatan-*.png`.
   same chunk, and every track is heard to its end. Each alone leaves the
   other case as the original (the golden's runs replayed with one fix
   on: the scenarios it does not fix match row for row). A music playing
-  first fades out; a new one starts at the music volume (14 in a dialog);
+  first fades out, and the fade's end stops it and closes its file
+  before anything else (`FUN_004778f0` from the fade step, @ 0x00476f52),
+  the new one opening at the next pass; a new one starts at the music
+  volume (14 in a dialog);
   `stopmusik` fades out and stops; the films (20 %) and the dialogs
   (16 %) duck it with the fade machine of the dialogs (127 units a
   second). The files are read from the discs: the original plays
@@ -4014,7 +4020,11 @@ back) into `yucatan-*.png`.
   disc no drive holds; the port reads every disc it found as if each
   were in a drive of its own, so it asks only for a disc that was not
   found, polls the folders the discs were looked for in every 101 ticks
-  (state 9: `100 < ticks − start`) and goes on when the disc is there.
+  (state 9: `100 < ticks − start`) and goes on when the disc is there;
+  while it waits, a music track's end replays the current music from
+  its start (`FUN_00486ad0` in the end-of-track callback, checked
+  against the original's player under emulation,
+  `golden/music_player.txt`).
   "Disk full" and "write error" (FUN_00486c60, FUN_00486d10) are opened
   only by the copy, when the free space is short or a block's read or
   write is short; the port writes no copy, so they never open. Not known, and
@@ -4053,7 +4063,10 @@ back) into `yucatan-*.png`.
   (`FUN_004801d0`, `FUN_004808a0`), not the surface's, so behind a head at
   800 x 600 the panorama, drawn on the 640 x 480 surface, is 1.25 times
   narrower than at 640 x 480: the original's way (the head, in its own
-  640 x 480 viewport, is the same). At 800 wide the menus' dimmed backdrop
+  640 x 480 viewport, is the same). A dialog's passes before its first
+  line draw nothing and leave the screen as it was (the dispatcher skips
+  the enlargement and the flip while the line's kind is −1,
+  @ 0x0049cea6). At 800 wide the menus' dimmed backdrop
   is black (`FUN_00470430`). Each loop type change sets the camera again
   (centre, 76° for the size drawn, under the x87 control word of the
   moment), at 640 x 480 too, as the original does on every path of
@@ -4122,7 +4135,13 @@ back) into `yucatan-*.png`.
   run after each, even empty; the bytes the original leaves to chance
   written as 0). A raw file of 69288 bytes loads too and is saved again
   compressed. Saving writes the player's first free slot; the load page
-  lists the valid ones newest first and can erase one. A load does what
+  lists the valid ones newest first and can erase one: its blinking erase
+  button exists only when the list holds a save (`FUN_0048abf0`
+  @ 0x0048add6), restarts its blink when clicked, and while erase mode is
+  on keeps its label drawn, wherever the pointer is and during the
+  question too (the blink's own tooltip, @ 0x0046dea0; checked against
+  the original's draw, tooltip and input under emulation,
+  `golden/input_ui.txt`). A load does what
   the original's does: the 35 globals back, the chapter's script loaded,
   the world set (the hand emptied), the place loaded and the saved view
   entered at the saved angles with no arrival scan and no per-view reset,
