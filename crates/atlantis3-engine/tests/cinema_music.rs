@@ -104,3 +104,31 @@ fn the_start_page_stops_the_music() {
     g.step(t);
     assert!(!g.audio.is_playing(CHANNEL_MUSIC), "the start page");
 }
+
+/// Escape in the warp stops every sound object (@ 0x0042acff → 0x00433580,
+/// the whole sound map 0x00759340): a `PLAYSOUND` effect (8 s) does not
+/// play on under the in-game menu.
+#[test]
+fn escape_in_the_warp_stops_the_sound_objects() {
+    use atlantis3_engine::audio::{CHANNEL_OBJECTS, OBJECT_CHANNELS};
+    let Some(dir) = atlantis3_data::testing::install_dir() else {
+        return;
+    };
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    g.run_command("(monde=1)");
+    g.set_world(1);
+    assert!(g.load_place("hoggar.wam"));
+    g.reset_camera();
+    g.enter_at(5, 0.0, 0.0);
+    g.step(100.0);
+    let objects = |g: &Game| {
+        (CHANNEL_OBJECTS..CHANNEL_OBJECTS + OBJECT_CHANNELS)
+            .filter(|&c| g.audio.is_playing(c))
+            .count()
+    };
+    g.run_command("(PlaySound=112)");
+    assert_eq!(objects(&g), 1, "sound112");
+    g.escape();
+    assert_eq!(g.mode(), Mode::Menu);
+    assert_eq!(objects(&g), 0, "under the menu");
+}

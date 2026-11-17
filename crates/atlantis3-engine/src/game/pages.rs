@@ -210,6 +210,8 @@ impl Game {
             Mode::Video if self.video.as_ref().is_some_and(|v| v.travel) => self.escape_travel(),
             Mode::Warp if self.menus.demo => {
                 self.menus.demo = false;
+                // Every sound object stopped (@ 0x0042ace0 → 0x00433580).
+                self.sfx_stop_all();
                 self.audio.stop(CHANNEL_PLACE);
                 self.subtitle = None;
                 self.voices_clear();
@@ -218,8 +220,12 @@ impl Game {
                 }
             }
             Mode::Warp => {
-                // The voice slots stopped and freed (@ 0x0042ad09), not
-                // from the inventory (@ 0x0042af2b).
+                // Every sound object stopped (@ 0x0042acff → 0x00433580:
+                // the sound map 0x00759340 walked, `PLAYSOUND`'s and the
+                // puzzles' sounds with the rest), then the voice slots
+                // stopped and freed (@ 0x0042ad09), not from the inventory
+                // (@ 0x0042af2b).
+                self.sfx_stop_all();
                 self.voices_clear();
                 self.open_menu();
             }
