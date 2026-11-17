@@ -129,6 +129,11 @@ pub(crate) struct Display {
     /// The 640 x 480 surface (@ 0x006166f8), kept between frames as the
     /// original's.
     pub small: Vec<u16>,
+    /// Whether the pass shows its frame: the dispatcher's
+    /// `AtlDisplay_AutoBlit` and flip. The dialog loop's case skips both
+    /// while the dialog has no line yet (kind −1, atlantis2-cd-fr-2199552
+    /// @ 0x0049cea6..0x0049cea9 before 0x00402bd0 and 0x0058fdb0).
+    pub shown: bool,
 }
 
 impl Display {
@@ -139,6 +144,7 @@ impl Display {
             native: true,
             logical: (width, height),
             small: Vec::new(),
+            shown: true,
         }
     }
 

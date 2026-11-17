@@ -145,10 +145,14 @@ impl Engine {
             self.pass_surface(None);
             return;
         };
+        self.display.shown = true;
         if self.on_small_surface() {
             let mut small = std::mem::take(&mut self.display.small);
             self.pass_surface(Some(&mut small));
-            if !self.display.native {
+            // Not when the pass drew nothing: the screen keeps the last
+            // frame shown (a dialog before its first line, as
+            // @ 0x0049cea9 skips the blit and the flip).
+            if !self.display.native && self.display.shown {
                 blit_640_to_800(&small, out, w);
             }
             self.display.small = small;

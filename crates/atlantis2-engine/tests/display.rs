@@ -284,6 +284,46 @@ fn the_dialogs_by_number() {
     assert!(NATIVE_DIALOGS.contains(&44));
 }
 
+/// A dialog's passes before its first line at 800 x 600: the dispatcher's
+/// case 2 skips `AtlDisplay_AutoBlit` and the flip while the line's kind
+/// is −1 (atlantis2-cd-fr-2199552 @ 0x0049cea6..0x0049cea9; 1.01 the
+/// same), so the screen keeps the panorama the dialog was asked in until
+/// the 15 Hz tick's sequencer picks line 0 (0x004801d0 @ 0x00480210).
+#[test]
+fn a_dialog_before_its_first_line_leaves_the_screen_at_800x600() {
+    let Some(files) = game() else { return };
+    let mut r = Run::new(files, scratch("dialog-start", 800, 600));
+    r.new_game();
+    // Something stale on the 640 x 480 surface: a menu page.
+    r.e.escape();
+    r.wait(2);
+    r.e.escape();
+    r.wait(2);
+    assert_eq!(r.e.loop_type, LoopType::Warp);
+    // The shaman's dialog in Tibet, not drawn natively.
+    assert!(!NATIVE_DIALOGS.contains(&360));
+    r.e.start_dialog(360).unwrap();
+    assert_eq!(r.e.loop_type, LoopType::Dialog);
+    let mut blank = 0;
+    for _ in 0..8 {
+        let kind = r.e.dialog().map_or(-1, |d| d.kind());
+        if kind >= 0 {
+            break;
+        }
+        let before = r.screen.clone();
+        r.step();
+        assert!(r.screen == before, "a pass before the first line drew");
+        blank += 1;
+    }
+    assert!(blank > 0);
+    assert!(r.e.dialog().map_or(-1, |d| d.kind()) >= 0);
+    // The first line's pass: the 640 x 480 surface enlarged.
+    let before = r.screen.clone();
+    r.step();
+    assert_eq!((r.e.width(), r.e.height()), (640, 480));
+    assert!(r.screen != before);
+}
+
 /// `MESSAGE_CLIC` at 800 x 600: `AtlMain_SetLoopType` draws loop type 10
 /// natively as the panorama (FUN_0049da90 @ 0x0049daa4: types 0 and 10
 /// → FUN_00402960(1)), so the frozen panorama and the text are drawn at

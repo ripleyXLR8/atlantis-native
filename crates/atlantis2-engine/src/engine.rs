@@ -1924,6 +1924,10 @@ impl Engine {
         self.frame();
         let kind = self.dialog.as_ref().map_or(-1, Dialog::kind);
         if kind < 0 {
+            // The dispatcher's case 2 then skips AutoBlit and the flip
+            // (@ 0x0049cea6..0x0049cea9): at 800 x 600 the screen keeps
+            // the last frame shown, not the 640 x 480 surface enlarged.
+            self.display.shown = false;
             return;
         }
         if kind != 3 {
