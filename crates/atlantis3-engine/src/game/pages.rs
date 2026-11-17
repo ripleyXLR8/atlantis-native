@@ -296,6 +296,12 @@ impl Game {
             now: self.now,
             pointer: self.pointer,
         };
+        // The start page's handler stops both music slots at once in every
+        // frame (0x00452000 @ 0x0045204d..0x00452050: 0x00433d30(0)); the
+        // last track's name (0x00759328) is kept.
+        if !self.files.is_evolution_2004() && self.menus.page == crate::menu::PAGE_START {
+            self.audio.stop(CHANNEL_MUSIC);
+        }
         let events = self.menus.frame(&mut env, &mut self.screen);
         // The original has one click byte (0x007592b8) for the menus and
         // the warp: the press sets it in every mode (@ 0x004315a5), and

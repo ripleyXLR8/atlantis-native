@@ -71,3 +71,36 @@ fn after_a_film_the_last_track_that_started() {
     g.finish_video();
     assert!(g.audio.is_playing(CHANNEL_MUSIC), "Muzik06 again");
 }
+
+/// The start page stops the music in every frame (0x00452000
+/// @ 0x0045204d..0x00452050: 0x00433d30(0), both slots stopped at once):
+/// after Escape and the in-game menu's `BT_QUIT` the start page is silent;
+/// the in-game menu itself keeps the music.
+#[test]
+fn the_start_page_stops_the_music() {
+    let Some(dir) = atlantis3_data::testing::install_dir() else {
+        return;
+    };
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    g.run_command("(monde=1)");
+    g.set_world(1);
+    assert!(g.load_place("hoggar.wam"));
+    g.reset_camera();
+    g.enter_at(5, 0.0, 0.0);
+    g.run_command("(StartMusik=4)");
+    assert!(g.audio.is_playing(CHANNEL_MUSIC));
+    let mut t = 100.0;
+    g.step(t);
+    g.escape();
+    assert_eq!(g.mode(), Mode::Menu);
+    for _ in 0..3 {
+        t += 1.0 / 30.0;
+        g.step(t);
+    }
+    assert!(g.audio.is_playing(CHANNEL_MUSIC), "the in-game menu");
+    // `BT_QUIT` of `i_princ` (menu.rs): the start page.
+    g.menus_mut().page = atlantis3_engine::menu::PAGE_START;
+    t += 1.0 / 30.0;
+    g.step(t);
+    assert!(!g.audio.is_playing(CHANNEL_MUSIC), "the start page");
+}
