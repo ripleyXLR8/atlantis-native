@@ -1764,13 +1764,7 @@ impl Page {
     /// animated buttons' frames, the credits' clock.
     fn update(&mut self, input: &Input, ticks: u32, flag: bool, fpu: Fpu, clock: f64) {
         for w in &mut self.widgets {
-            w.tooltip_step(input.x, input.y, ticks);
-            if let WidgetKind::Blink { state: true, cycle } = &mut w.kind {
-                // FUN_0046de20: the cycle restarts after 10 ticks.
-                if ticks.wrapping_sub(*cycle) > 10 {
-                    *cycle = ticks;
-                }
-            }
+            w.before_draw(input, ticks);
             if let WidgetKind::Animated {
                 count,
                 frame,
@@ -1848,14 +1842,11 @@ impl Page {
                     });
                 }
             }
-            // The tooltip (FUN_0046d750) of every button class: after 10
-            // ticks in the box, centred on it (kept on the screen), its
-            // top at the box's top, black under white one pixel up-left.
-            let button = !matches!(
-                w.kind,
-                WidgetKind::Sprite | WidgetKind::Slider { .. } | WidgetKind::List(_)
-            );
-            if button && !w.text.is_empty() && w.tip_shown(ticks) {
+            // The tooltip (FUN_0046d750, the blink's @ 0x0046dea0) of
+            // every button class: centred on the box (kept on the screen),
+            // its top at the box's top, black under white one pixel
+            // up-left.
+            if w.tip_drawn(ticks) {
                 let (tw, _) = f.extent(&w.text);
                 let cx = (w.hit.left + w.hit.right) / 2;
                 let x = (cx - tw / 2).clamp(0, (WIDTH as i32 - tw).max(0));
@@ -1933,10 +1924,22 @@ impl Widget {
     /// in the box is noted at every draw, enabled or not (@ 0x0046d8a0),
     /// so a widget enabled with the mouse already in its box keeps the
     /// count it had (@ 0x0046d784..0x0046d791). Nothing while hidden.
+    ///
+    /// The blinking toggle has its own tooltip (@ 0x0046dea0, vtable
+    /// 0x005c6468 slot 15): on (+0x50 set, @ 0x0046dec9), it leaves the
+    /// count's start alone; off, it restarts the count when the mouse
+    /// enters the box without testing whether the widget is enabled
+    /// (@ 0x0046dfb5..0x0046dfd0). Both note the in-the-box flag
+    /// (@ 0x0046e0ef).
     pub fn tooltip_step(&mut self, x: i32, y: i32, ticks: u32) {
         if self.visible {
             let inside = self.hit.holds(x, y);
-            if self.enabled && inside && !self.tip_inside {
+            let restart = match self.kind {
+                WidgetKind::Blink { state: true, .. } => false,
+                WidgetKind::Blink { state: false, .. } => inside && !self.tip_inside,
+                _ => self.enabled && inside && !self.tip_inside,
+            };
+            if restart {
                 self.tip_start = ticks;
             }
             self.tip_inside = inside;
@@ -1945,9 +1948,56 @@ impl Widget {
 
     /// Whether its tooltip is drawn at tick `ticks` (FUN_0046d750: the
     /// widget enabled, the mouse in its box, more than 10 ticks since the
-    /// count's start).
+    /// count's start). The blink's (@ 0x0046dea0): on, always, wherever
+    /// the mouse is and enabled or not (@ 0x0046ded4..0x0046e0da); off,
+    /// the mouse in its box for more than 10 ticks, enabled or not
+    /// (@ 0x0046dfc4..0x0046dfec).
     pub fn tip_shown(&self, ticks: u32) -> bool {
-        self.enabled && self.tip_inside && (ticks.wrapping_sub(self.tip_start) as i32) > 10
+        let counted = self.tip_inside && (ticks.wrapping_sub(self.tip_start) as i32) > 10;
+        match self.kind {
+            WidgetKind::Blink { state: true, .. } => true,
+            WidgetKind::Blink { state: false, .. } => counted,
+            _ => self.enabled && counted,
+        }
+    }
+
+    /// Whether the draw of the visible widget writes its tooltip: the
+    /// button classes' (not the plain sprite, the slider nor the list),
+    /// with a text, when [`Widget::tip_shown`].
+    fn tip_drawn(&self, ticks: u32) -> bool {
+        let button = !matches!(
+            self.kind,
+            WidgetKind::Sprite | WidgetKind::Slider { .. } | WidgetKind::List(_)
+        );
+        button && !self.text.is_empty() && self.tip_shown(ticks)
+    }
+
+    /// What the page's update does to the widget before its draw: the
+    /// tooltip's count, the blink's cycle.
+    fn before_draw(&mut self, input: &Input, ticks: u32) {
+        self.tooltip_step(input.x, input.y, ticks);
+        if let WidgetKind::Blink { state: true, cycle } = &mut self.kind {
+            // FUN_0046de20: the cycle restarts after 10 ticks.
+            if ticks.wrapping_sub(*cycle) > 10 {
+                *cycle = ticks;
+            }
+        }
+    }
+
+    /// One menu frame of a button-class widget on its own (not an
+    /// animated button, whose press the page's update handles), as the
+    /// page runs it: the update, the draw, then the input with `input`
+    /// (a test hook: the emulated golden `input_ui.txt`'s `blink`
+    /// section). Returns whether its sprite and its tooltip were drawn,
+    /// and the input's action.
+    pub fn frame_step(&mut self, input: &Input, ticks: u32) -> (bool, bool, i32) {
+        self.before_draw(input, ticks);
+        let sprite = self.visible && self.frame(ticks, input).is_some();
+        let tip = self.visible && self.tip_drawn(ticks);
+        let mut values = [0.0; 4];
+        let mut chosen = None;
+        let act = self.input(input, Fpu::default(), &mut values, &mut chosen);
+        (sprite, tip, act)
     }
 
     /// The tooltip's count start (+0x48) and in-the-box flag (+0x4c).

@@ -1,7 +1,8 @@
 //! The menus' slides, the widgets' tooltips and the bag's object names
 //! against the original (`tests/golden/input_ui.txt`, its header there):
 //! the menu frame FUN_00486eb0 run with each frame's action given and its
-//! page calls recorded, the tooltip FUN_0046d750 on a widget, and the
+//! page calls recorded, the tooltip FUN_0046d750 on a widget, the
+//! blinking toggle's draw, tooltip and input, and the
 //! loader FUN_00474810 on the installed `loc\Messages.txt` and on a
 //! synthetic file.
 //!
@@ -23,7 +24,7 @@ use atlantis2_data::save::{entry, SystemTime};
 use atlantis2_data::{A2Files, Folder};
 use atlantis2_engine::bag::{UiBank, UiDraw};
 use atlantis2_engine::engine::PASS;
-use atlantis2_engine::menu::{PageKind, Rect};
+use atlantis2_engine::menu::{Input, PageKind, Rect, WidgetKind};
 use atlantis2_engine::{CursorBank, Engine, Fpu, LoopType, Variant};
 use md5::{Digest, Md5};
 
@@ -256,6 +257,71 @@ fn the_tooltips_count_as_the_originals() {
             let drawn = w.visible && w.tip_shown(t);
             assert_eq!(drawn, n[5] > 0, "{head}: {row}");
             assert_eq!(w.tip_state(), (n[6] as u32, n[7] != 0), "{head}: {row}");
+        }
+    }
+}
+
+/// The blinking toggle (vtable 0x005c6468) frame by frame: its draw
+/// @ 0x0046de20 with its own tooltip @ 0x0046dea0, then its input
+/// @ 0x0046dde0 when the step clicks. On, the label is drawn at every
+/// draw of the visible widget, the mouse anywhere and enabled or not; off,
+/// the hover count without the enabled test.
+#[test]
+fn the_blink_as_the_originals() {
+    let Some(files) = game() else { return };
+    let mut e = Engine::new_game(files, Variant::PII, Fpu::Chop, 640, 480).unwrap();
+    e.end_video();
+    e.open_main_menu();
+    let base = {
+        let p = e.menu().unwrap().page.as_ref().unwrap();
+        p.widgets
+            .iter()
+            .find(|w| !w.text.is_empty())
+            .expect("a widget with a tooltip")
+            .clone()
+    };
+    let cases = sections("blink: ");
+    assert_eq!(cases.len(), 6);
+    for (head, rows) in cases {
+        let mut w = base.clone();
+        // The constructor @ 0x0046dd80: off, cycle 0; action 13.
+        w.kind = WidgetKind::Blink {
+            state: false,
+            cycle: 0,
+        };
+        w.action = 13;
+        w.hit = Rect {
+            left: 100,
+            top: 100,
+            right: 200,
+            bottom: 140,
+        };
+        for row in rows {
+            // t<T> ptr (<x>,<y>) enabled <e> visible <v> click <c>: sprite <s>
+            // text <n> action <a> state <st> cycle <cy> start <s> inside <i>
+            let n: Vec<i64> = row
+                .split(|c: char| !c.is_ascii_digit())
+                .filter(|t| !t.is_empty())
+                .map(|t| t.parse().unwrap())
+                .collect();
+            let (t, x, y) = (n[0] as u32, n[1] as i32, n[2] as i32);
+            w.enabled = n[3] != 0;
+            w.visible = n[4] != 0;
+            let input = Input {
+                x,
+                y,
+                click: n[5] != 0,
+                ..Input::default()
+            };
+            let (_sprite, text, act) = w.frame_step(&input, t);
+            let WidgetKind::Blink { state, .. } = w.kind else {
+                panic!()
+            };
+            assert_eq!(
+                (text, act, state, w.tip_state()),
+                (n[7] > 0, n[8] as i32, n[9] != 0, (n[11] as u32, n[12] != 0)),
+                "{head}: {row}"
+            );
         }
     }
 }
