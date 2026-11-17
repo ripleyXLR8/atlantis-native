@@ -1205,6 +1205,14 @@ impl Game {
         if self.mode != Mode::Warp || self.moving.turn.is_some() {
             return;
         }
+        // The free pointer follows the mouse in the warp too: the callback
+        // skips it only while a move turns or the demo runs (0x007812d4)
+        // (@ 0x004313b7..0x00431444); the in-game menu starts with it
+        // there (the warp's Escape does not centre it).
+        if !self.menus.demo {
+            self.pointer.0 = (self.pointer.0 + dx).clamp(0, self.width as i32 - 1);
+            self.pointer.1 = (self.pointer.1 + dy).clamp(0, self.height as i32 - 1);
+        }
         self.look.mouse(self.camera.fpu, dx, dy);
         self.centre = self.pick_centre();
     }

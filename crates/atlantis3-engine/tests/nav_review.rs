@@ -133,3 +133,38 @@ fn a_double_click_on_a_move_skips_the_travel_video() {
     g.click();
     assert!(walk_to_view_5(&mut g, t), "presses 0.24 s apart");
 }
+
+/// F7: the mouse callback moves and clamps the free pointer
+/// (0x007592b0 / 0x007592b4) in every mode except the warp while a move
+/// turns (@ 0x004313b7..0x00431444); the warp's Escape does not centre it
+/// and the menu draws its pointer from it.
+#[test]
+fn the_free_pointer_follows_the_mouse_in_the_warp() {
+    let Some((mut g, t)) = hoggar_view_4(108.0) else {
+        return;
+    };
+    g.set_pointer(400, 300);
+    g.mouse_motion(100, -50);
+    assert_eq!(g.pointer(), (500, 250));
+    g.mouse_motion(1000, 1000);
+    assert_eq!(g.pointer(), (799, 599));
+    g.mouse_motion(-30, -40);
+    assert_eq!(g.pointer(), (769, 559));
+    g.step(t + 0.04);
+    g.escape();
+    assert_eq!(g.mode(), Mode::Menu);
+    assert_eq!(
+        g.pointer(),
+        (769, 559),
+        "the menu's pointer where the warp left it"
+    );
+
+    // While a move turns the pointer stays.
+    let (mut g, t) = hoggar_view_4(108.0).unwrap();
+    g.set_pointer(400, 300);
+    g.click();
+    g.step(t + 0.04);
+    assert!(g.turning());
+    g.mouse_motion(100, 100);
+    assert_eq!(g.pointer(), (400, 300));
+}
