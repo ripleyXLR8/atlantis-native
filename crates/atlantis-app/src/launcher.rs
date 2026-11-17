@@ -132,6 +132,9 @@ fn split_label(e: &LauncherEntry) -> (Option<&'static str>, &str) {
     match e.label.strip_prefix(name) {
         Some("") => (Some(name), ""),
         Some(rest) if rest.starts_with(", ") => (Some(name), &rest[2..]),
+        // A year after the name ("Atlantis Evolution (2004), CD, English"):
+        // the name in gold, the year with the edition.
+        Some(rest) if rest.starts_with(" (") => (Some(name), &rest[1..]),
         _ if !e.found => (Some(name), &e.label),
         _ => (None, &e.label),
     }
@@ -793,6 +796,14 @@ mod tests {
         assert_eq!(
             split_label(&e("Atlantis III, GOG.com, French", true, a3)),
             (Some("Atlantis III"), "GOG.com, French")
+        );
+        assert_eq!(
+            split_label(&e(
+                "Atlantis Evolution (2004), CD, English",
+                true,
+                Some(GameKind::Atlantis4)
+            )),
+            (Some("Atlantis Evolution"), "(2004), CD, English")
         );
         assert_eq!(
             split_label(&e("Not found: the folder was moved", false, a2)),
