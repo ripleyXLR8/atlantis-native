@@ -1180,7 +1180,9 @@ game the images of the shallowest folder holding some
 picker, they are at the top), when the picked files hold no
 `atlantis.exe`: its CDs' images (a `DiscSet`), or Cryo's DVD's sides,
 the language asked for as from the copies (`LANGUAGES:`; `DvdFiles` over
-the images). Its engine awaits its loader before a scene's reads, as
+the images). The program and the first MiB of each archive (its directory,
+which `BigArchive::mount` reads entry by entry: two requests an entry,
+minutes in all) are fetched first and kept, as from the copies. Its engine awaits its loader before a scene's reads, as
 with the copies (`WebLoader`): `ImageLoader` asks the image reader for
 the parts of the images that hold the members (`read_ahead`, collected
 rather than started) and fetches them in the background

@@ -877,6 +877,9 @@ thread_local! {
     /// The parts of the images that hold the members the first game's
     /// scene needs ([`ImageLoader`]), until the next scene's.
     static MEMBERS: RefCell<Vec<Ahead>> = const { RefCell::new(Vec::new()) };
+    /// The parts of the images that hold the first game's program and its
+    /// archives' directories, kept.
+    static HEADS: RefCell<Vec<Ahead>> = const { RefCell::new(Vec::new()) };
     /// The parts [`ImageLoader`] is collecting, while it asks for them.
     static COLLECTING: RefCell<Option<Vec<(usize, u64, usize)>>> = const { RefCell::new(None) };
 }
@@ -896,6 +899,7 @@ fn take_ahead(index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
     AHEAD
         .with(|a| from(&a.borrow()))
         .or_else(|| MEMBERS.with(|m| from(&m.borrow())))
+        .or_else(|| HEADS.with(|h| from(&h.borrow())))
 }
 
 /// Bytes `offset..offset + len` of picked file `index` read in the
@@ -1177,6 +1181,22 @@ async fn start_from_images(
             continue;
         };
         log::info!("{folder}: the game from {} disc images", images.len());
+        // The program and the archives' directories (read entry by entry
+        // as the game opens: a request each would take minutes), fetched
+        // first and kept, as from the copies.
+        let heads = fetch_collected(|| {
+            if let Some(size) = source.size("atlantis.exe") {
+                source.read_ahead("atlantis.exe", 0, size as usize);
+            }
+            for n in 1..=4 {
+                let name = format!("bigcd{n}.big");
+                if let Some(size) = source.size(&name) {
+                    source.read_ahead(&name, 0, ARCHIVE_HEAD.min(size) as usize);
+                }
+            }
+        })
+        .await;
+        HEADS.with(|h| *h.borrow_mut() = heads);
         let top: Vec<String> = images
             .iter()
             .map(|p| p.rsplit('/').next().unwrap_or(p).to_string())
@@ -1206,6 +1226,34 @@ async fn start_from_images(
     Err(format!("{text}\n\nHelp: {}", crate::guide::HELP_URL).into())
 }
 
+/// The parts of the picked files that `ask` announces
+/// ([`FileSource::read_ahead`] through the image reader), collected rather
+/// than read in the background, then fetched (`Blob.arrayBuffer`).
+async fn fetch_collected(ask: impl FnOnce()) -> Vec<Ahead> {
+    COLLECTING.with(|c| *c.borrow_mut() = Some(Vec::new()));
+    ask();
+    let wanted = COLLECTING
+        .with(|c| c.borrow_mut().take())
+        .unwrap_or_default();
+    let mut got = Vec::with_capacity(wanted.len());
+    for (index, offset, len) in wanted {
+        let Some(file) = PICKED.with(|p| p.borrow().get(index).cloned()) else {
+            continue;
+        };
+        match fetch(&file, offset, len as u64).await {
+            Ok(d) if d.len() == len => got.push(Ahead {
+                index,
+                offset,
+                len,
+                data: Rc::new(RefCell::new(Some(d))),
+            }),
+            Ok(_) => {}
+            Err(e) => log::warn!("image {index}: {e:?}"),
+        }
+    }
+    got
+}
+
 /// The first game's loader when it is read from CD images: the members a
 /// scene needs ([`Loader::prefetch`]) are fetched in the background, as
 /// the parts of the images that hold them ([`FileSource::read_ahead`]
@@ -1216,31 +1264,14 @@ struct ImageLoader;
 impl Loader for ImageLoader {
     fn prefetch<'a>(&'a self, big: &'a BigArchive, names: &'a [String]) -> HookFuture<'a, ()> {
         Box::pin(async move {
-            COLLECTING.with(|c| *c.borrow_mut() = Some(Vec::new()));
-            for name in names {
-                if let Some((file, offset, size)) = big.locate(name) {
-                    big.source().read_ahead(&file, offset, size);
+            let got = fetch_collected(|| {
+                for name in names {
+                    if let Some((file, offset, size)) = big.locate(name) {
+                        big.source().read_ahead(&file, offset, size);
+                    }
                 }
-            }
-            let wanted = COLLECTING
-                .with(|c| c.borrow_mut().take())
-                .unwrap_or_default();
-            let mut got = Vec::with_capacity(wanted.len());
-            for (index, offset, len) in wanted {
-                let Some(file) = PICKED.with(|p| p.borrow().get(index).cloned()) else {
-                    continue;
-                };
-                match fetch(&file, offset, len as u64).await {
-                    Ok(d) if d.len() == len => got.push(Ahead {
-                        index,
-                        offset,
-                        len,
-                        data: Rc::new(RefCell::new(Some(d))),
-                    }),
-                    Ok(_) => {}
-                    Err(e) => log::warn!("image {index}: {e:?}"),
-                }
-            }
+            })
+            .await;
             MEMBERS.with(|m| *m.borrow_mut() = got);
         })
     }
