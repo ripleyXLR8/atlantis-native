@@ -19,8 +19,10 @@
 //! taken as made until a `delmusik`.
 //!
 //! Nothing else runs during the copy: no 15 Hz tick, no frame of the
-//! game, and the mouse's and the keys' events wait in DirectInput's buffer
-//! until it ends ([`Input`]).
+//! game, no input poll. The keys' events wait in DirectInput's buffer
+//! until it ends; the mouse, read by its state, gives then only its
+//! buttons' change since the poll before the copy and the copy's whole
+//! motion ([`Input`]).
 //!
 //! The disk-full and disk-error pages (FUN_00486c60, FUN_00486d10) open
 //! only from that copy: when the free space (FUN_0040de60) is below a
@@ -60,24 +62,52 @@ pub struct Media {
     copy_page: bool,
     /// A disc asked for and not found: the CD page opens at the next pass.
     cd_request: Option<u8>,
+    /// The mouse's buttons (left, right) as the game last saw them: the
+    /// input poll's previous state (@ 0x006e1f04).
+    buttons: [bool; 2],
     /// The input that came during the copy, given to the game after it.
-    held_input: Vec<Input>,
+    held: Held,
 }
 
-/// An input event held during a music copy: the copy's loop never returns
-/// to the application's, where the input is read (FUN_0058e9f0, given to
-/// the application's loop @ 0x0058f78a), and DirectInput keeps the mouse's
-/// and the keys' events in its buffer (`GetDeviceData`, vtable +0x28, @
-/// 0x0058ea35) until then.
+/// An input event, held during a music copy: the copy's loop never
+/// returns to the application's, where the input is read (FUN_0058e9f0,
+/// given to the application's loop @ 0x0058f78a, its only reference in
+/// 1.00 and 1.01; `CopyMusikToDrive` @ 0x00479480..0x00479d70 calls no
+/// poll). The keyboard is buffered: `GetDeviceData` (vtable +0x28,
+/// @ 0x0058ea35, up to 256 events) gives every key event of the copy
+/// afterwards. The mouse is not: `GetDeviceState` (vtable +0x24,
+/// @ 0x0058eaf5) gives its motion since the last read (lX / lY, one motion
+/// callback with them when not zero, @ 0x0058eb43..0x0058eb70) and the
+/// buttons as they are; a button's press callback runs when it is down
+/// and was up at the previous poll, its release callback for the opposite
+/// (buttons 0 to 3 in turn, @ 0x0058ec28..0x0058ec8b, the state kept
+/// @ 0x0058ec93). So a press and its release made during the copy are
+/// never seen.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Input {
     Click(f64),
     Release,
     Right,
+    RightRelease,
     Motion(i32, i32),
     PointerMoved(i32, i32),
     Pointer(i32, i32),
     Escape,
+}
+
+/// The input of a music copy, as the first poll after it sees it.
+#[derive(Debug, Default)]
+struct Held {
+    /// Escape's key events, in DirectInput's buffer.
+    escapes: u32,
+    /// The mouse's motion over the copy (the turn's).
+    motion: (i32, i32),
+    /// The system pointer's motion over the copy (the menus').
+    pointer_moved: (i32, i32),
+    /// The system pointer's last place.
+    pointer: Option<(i32, i32)>,
+    /// The buttons as they are now, when one went down or up.
+    buttons: Option<[bool; 2]>,
 }
 
 impl Media {
@@ -207,28 +237,75 @@ impl Engine {
             self.media.copy_page = false;
             self.with_menu(|m, e| m.stop(e));
             self.with_script(|s, h| s.copy_ended(h));
-            for i in std::mem::take(&mut self.media.held_input) {
-                match i {
-                    Input::Click(t) => self.click(t),
-                    Input::Release => self.release(),
-                    Input::Right => self.right_click(),
-                    Input::Motion(dx, dy) => self.mouse_motion(dx, dy),
-                    Input::PointerMoved(dx, dy) => self.pointer_moved(dx, dy),
-                    Input::Pointer(x, y) => self.pointer(x, y),
-                    // A copy started by one of them holds the rest again.
-                    Input::Escape => self.escape(),
-                }
-            }
+            self.held_input();
         }
     }
 
-    /// During a music copy the input waits for its end: true when
-    /// `input` was held.
+    /// The first input poll after a copy (FUN_0058e9f0): the keyboard's
+    /// buffered events first (@ 0x0058ea35), then the mouse's state
+    /// (@ 0x0058eaf5): one motion with the copy's sum, clamped once
+    /// (@ 0x0040c440..0x0040c49a), then the left and the right button's
+    /// press or release when it changed since the poll before the copy,
+    /// at this pass's time (FUN_004c3440 in FUN_0040c510). A copy started
+    /// by one of them holds the rest again.
+    fn held_input(&mut self) {
+        let held = std::mem::take(&mut self.media.held);
+        for _ in 0..held.escapes {
+            self.escape();
+        }
+        if held.motion != (0, 0) {
+            self.mouse_motion(held.motion.0, held.motion.1);
+        }
+        if held.pointer_moved != (0, 0) {
+            self.pointer_moved(held.pointer_moved.0, held.pointer_moved.1);
+        }
+        if let Some((x, y)) = held.pointer {
+            self.pointer(x, y);
+        }
+        let Some(now) = held.buttons else { return };
+        let was = self.media.buttons;
+        match (was[0], now[0]) {
+            (false, true) => self.click(self.clock),
+            (true, false) => self.release(),
+            _ => {}
+        }
+        match (was[1], now[1]) {
+            (false, true) => self.right_click(),
+            (true, false) => self.right_release(),
+            _ => {}
+        }
+    }
+
+    /// During a music copy the input waits for its end ([`Input`]): true
+    /// when `input` was held. Outside one, the buttons' state is kept.
     pub(super) fn hold_input(&mut self, input: Input) -> bool {
+        let button = match input {
+            Input::Click(_) => Some((0, true)),
+            Input::Release => Some((0, false)),
+            Input::Right => Some((1, true)),
+            Input::RightRelease => Some((1, false)),
+            _ => None,
+        };
         if !self.copying() {
+            if let Some((b, down)) = button {
+                self.media.buttons[b] = down;
+            }
             return false;
         }
-        self.media.held_input.push(input);
+        let was = self.media.buttons;
+        let h = &mut self.media.held;
+        let add =
+            |(x, y): (i32, i32), dx: i32, dy: i32| (x.saturating_add(dx), y.saturating_add(dy));
+        match input {
+            Input::Motion(dx, dy) => h.motion = add(h.motion, dx, dy),
+            Input::PointerMoved(dx, dy) => h.pointer_moved = add(h.pointer_moved, dx, dy),
+            Input::Pointer(x, y) => h.pointer = Some((x, y)),
+            Input::Escape => h.escapes += 1,
+            _ => {
+                let (b, down) = button.expect("a button");
+                h.buttons.get_or_insert(was)[b] = down;
+            }
+        }
         true
     }
 

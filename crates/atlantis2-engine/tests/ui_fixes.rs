@@ -688,6 +688,92 @@ fn a_music_copy_holds_the_scheduler_until_its_end() {
     assert_eq!(e.ticks, t0 + 2);
 }
 
+/// R2-1 (2026-11-17 review, round 2): the mouse during a music copy. The
+/// copy polls no input (FUN_0058e9f0's only reference is its registration
+/// @ 0x0058f78a), and the mouse is read by its state (`GetDeviceState`
+/// @ 0x0058eaf5): a press and its release during the copy are never seen;
+/// a button down at its end and up before it is one press at the first
+/// poll after it; the copy's motion is one move with the sum, the pointer
+/// clamped once.
+#[test]
+fn a_click_during_a_music_copy_is_not_seen() {
+    let Some(files) = game() else { return };
+    let mut clock = 0.0;
+    let mut e = Engine::boot(files, Variant::default(), Fpu::default(), 640, 480).unwrap();
+    e.set_data_dir(Some(scratch("copy-clicks")));
+    e.start_new_game().unwrap();
+    page_frames(&mut e, &mut clock);
+    e.end_video();
+    for _ in 0..30 {
+        clock += PASS;
+        e.set_clock(clock);
+        e.pass(None);
+    }
+    assert_eq!(e.loop_type, LoopType::Warp);
+    e.trace = true;
+    let clicks = |e: &mut Engine| {
+        std::mem::take(&mut e.events)
+            .into_iter()
+            .filter(|v| matches!(v, Event::Click { .. }))
+            .count()
+    };
+    let copy = |e: &mut Engine| {
+        e.run_command(b"(delmusik=1)");
+        e.run_command(b"(LOADMUSIK=1)");
+        assert!(e.copying());
+    };
+    // Pressed and released during the copy, both buttons: nothing.
+    copy(&mut e);
+    e.events.clear();
+    e.click(clock);
+    e.release();
+    e.right_click();
+    e.right_release();
+    page_frames(&mut e, &mut clock);
+    assert_eq!(clicks(&mut e), 0);
+    assert!(!e.bar.open);
+    assert!(!e.button_held());
+    // Pressed during the copy and held at its end: one press, after it.
+    copy(&mut e);
+    e.click(clock);
+    e.release();
+    e.click(clock);
+    assert_eq!(clicks(&mut e), 0, "held");
+    page_frames(&mut e, &mut clock);
+    assert_eq!(clicks(&mut e), 1);
+    assert!(e.button_held());
+    // Released during the copy: the release after it.
+    copy(&mut e);
+    e.release();
+    assert!(e.button_held(), "held");
+    page_frames(&mut e, &mut clock);
+    assert!(!e.button_held());
+    assert_eq!(clicks(&mut e), 0);
+    // The right button held from before the copy to after it: no new
+    // press (the bar stays open); the motion summed, clamped once.
+    e.right_click();
+    assert!(e.bar.open);
+    let at = e.pointer;
+    copy(&mut e);
+    e.mouse_motion(1000, 0);
+    e.mouse_motion(-1000, 0);
+    e.right_release();
+    e.right_click();
+    page_frames(&mut e, &mut clock);
+    assert!(e.bar.open);
+    assert_eq!(e.pointer, at);
+    // Released during the copy: the release only (the bar stays open).
+    copy(&mut e);
+    e.right_release();
+    page_frames(&mut e, &mut clock);
+    assert!(e.bar.open);
+    // Pressed during the copy, held at its end: the bar closes once.
+    copy(&mut e);
+    e.right_click();
+    page_frames(&mut e, &mut clock);
+    assert!(!e.bar.open);
+}
+
 /// The disk-full and disk-error pages only come from a copy the port does
 /// not write: the golden's cases show them only after a short read or
 /// write, or too little free space.

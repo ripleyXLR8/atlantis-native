@@ -180,6 +180,14 @@ impl Engine {
         self.pointer.1 = (self.pointer.1 + dy).clamp(0, h - 1);
     }
 
+    /// The right button released: the release callback (FUN_0040c660)
+    /// acts only when the previous poll had the left button alone down
+    /// (@ 0x0040c660), so nothing for this one; its state is kept for a
+    /// music copy ([`super::media::Input`]).
+    pub fn right_release(&mut self) {
+        self.hold_input(super::media::Input::RightRelease);
+    }
+
     /// The right button (FUN_0040c510, button code 2): outside the
     /// panorama it only sets the click's companion flag (@ 0x006569a0); in
     /// the panorama, with no dialog and no overlay, it toggles the bar:

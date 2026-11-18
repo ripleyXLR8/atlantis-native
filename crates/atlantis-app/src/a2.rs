@@ -1991,8 +1991,10 @@ fn mouse_button(
     now: f64,
 ) -> bool {
     if !pressed {
-        if button == MouseButton::Left {
-            engine.release();
+        match button {
+            MouseButton::Left => engine.release(),
+            MouseButton::Right => engine.right_release(),
+            _ => {}
         }
         return false;
     }

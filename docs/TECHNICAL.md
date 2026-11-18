@@ -4014,8 +4014,11 @@ back) into `yucatan-*.png`.
   started it goes on after its last frame, a tick due in that pass runs
   then and the next one is counted from that pass's time, so it is due
   in the first pass after the page), the music machine runs once a frame (the menu frame's call), and
-  the mouse's and the keys' events wait until the end (DirectInput's
-  buffer). Checked against the original's copy under emulation
+  the input waits until the end as the original's first poll after the
+  copy sees it: Escape's events each (DirectInput's buffer), the
+  mouse by its state (`GetDeviceState`), so its whole motion once and a
+  button's press or release only when its state changed since before
+  the copy (a click made and released meanwhile is never seen). Checked against the original's copy under emulation
   (`tests/ui_fixes.rs`). The CD page (FUN_0040dff0) asks for a world's
   disc no drive holds; the port reads every disc it found as if each
   were in a drive of its own, so it asks only for a disc that was not
