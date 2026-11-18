@@ -62,7 +62,14 @@ Uninstalling the app deletes them too.
 | Back button | Escape: the game's menu. On the "no game" screen it closes the app. |
 
 The on-screen keyboard opens while the first game's player screen takes
-a name. A connected keyboard works as on the desktop.
+a name. The game's picture is then drawn smaller, above the keyboard. If
+the keyboard is closed, a tap on the screen opens it again. Letters,
+Backspace and Enter (the keyboard's tick) reach the game. It works with
+keyboards that type through an input connection, such as Gboard, as well
+as with those that send keys. A connected keyboard works as on the
+desktop. Back (the button or the gesture) goes to the game as Escape.
+Android's predictive back would otherwise close the app. Back only closes
+the app on the "no game" screen.
 
 ## What it does
 

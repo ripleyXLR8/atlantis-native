@@ -1102,10 +1102,16 @@ impl App {
         #[cfg(target_arch = "wasm32")]
         let launcher = false;
         let (sw, sh) = (size.width as usize, size.height as usize);
+        // The height the picture fits in: the window's; on Android the
+        // part above the on-screen keyboard while it is shown.
+        #[cfg(not(target_os = "android"))]
+        let fit_h = sh;
+        #[cfg(target_os = "android")]
+        let fit_h = sh.saturating_sub(android_saf::ime_height()).max(sh / 4);
         // Nearest scaling keeping the 4:3 aspect, black bars.
-        let scale = (sw as f64 / W as f64).min(sh as f64 / H as f64);
+        let scale = (sw as f64 / W as f64).min(fit_h as f64 / H as f64);
         let (dw, dh) = ((W as f64 * scale) as usize, (H as f64 * scale) as usize);
-        let (ox, oy) = ((sw - dw) / 2, (sh - dh) / 2);
+        let (ox, oy) = ((sw - dw) / 2, (fit_h - dh) / 2);
         self.viewport = Viewport {
             ox: ox as f64,
             oy: oy as f64,

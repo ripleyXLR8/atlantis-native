@@ -708,7 +708,10 @@ pub(crate) struct TouchState {
     keyboard: bool,
     /// The engine's inputs, one per engine step (a press is seen after
     /// the pointer's move, a release after its press).
-    queue: VecDeque<Input>,
+    queue: VecDeque<Option<Input>>,
+    /// Where the finger went down (the game's screen): a tap clicks
+    /// there, whatever small motion the finger made (see [`TAP_SLOP`]).
+    down_at: (i32, i32),
 }
 
 impl App {
@@ -732,6 +735,11 @@ impl App {
             }
             return;
         }
+        // The player screen's name entry: a tap shows the on-screen
+        // keyboard again (closed by the player).
+        if t.phase == TouchPhase::Ended && self.touch.keyboard {
+            crate::android_saf::show_keyboard(true);
+        }
         // The "no game" screen: a tap opens the folder picker.
         if self.runner.is_none() && self.touch.picker {
             if t.phase == TouchPhase::Ended && crate::android_saf::pick_folder() {
@@ -748,7 +756,7 @@ impl App {
                     // Three fingers: the port's options menu (F10).
                     cancel_left(st, self.sys.mouse());
                     let queue = std::mem::take(&mut st.queue);
-                    for i in queue {
+                    for i in queue.into_iter().flatten() {
                         self.sys.push_input(i);
                     }
                     self.touch = TouchState {
@@ -763,12 +771,19 @@ impl App {
                     st.two = false;
                     st.dragged = false;
                     if !self.locked {
-                        self.sys.push_input(Input::MouseMove { x: sx, y: sy });
-                        st.queue.push_back(Input::MouseDown {
+                        // The pointer there first, a step without input,
+                        // then the press: the game's menus hit-test the
+                        // pointer of the pass before the press (the
+                        // subject menu, FUN_004211f0), and highlight on
+                        // the move.
+                        st.down_at = (sx, sy);
+                        st.queue.push_back(Some(Input::MouseMove { x: sx, y: sy }));
+                        st.queue.push_back(None);
+                        st.queue.push_back(Some(Input::MouseDown {
                             button: MouseButton::Left,
                             x: sx,
                             y: sy,
-                        });
+                        }));
                         st.left_down = true;
                     }
                 } else if !st.two {
@@ -797,11 +812,17 @@ impl App {
                     let s = self.viewport.scale.max(1e-6);
                     self.relative((x - lx) / s, (y - ly) / s);
                 } else {
+                    // A finger moving a little (less than TAP_SLOP from
+                    // where it went down) is still a tap there.
+                    if !st.dragged && (x - from.0).hypot(y - from.1) <= TAP_SLOP {
+                        return;
+                    }
+                    st.dragged = true;
                     let m = Input::MouseMove { x: sx, y: sy };
                     if st.queue.is_empty() {
                         self.sys.push_input(m);
                     } else {
-                        st.queue.push_back(m);
+                        st.queue.push_back(Some(m));
                     }
                 }
             }
@@ -812,43 +833,44 @@ impl App {
                     if t.phase == TouchPhase::Cancelled {
                         cancel_left(st, (sx, sy));
                     } else if st.left_down {
-                        st.queue.push_back(Input::MouseUp {
+                        let (ux, uy) = if st.dragged { (sx, sy) } else { st.down_at };
+                        st.queue.push_back(Some(Input::MouseUp {
                             button: MouseButton::Left,
-                            x: sx,
-                            y: sy,
-                        });
+                            x: ux,
+                            y: uy,
+                        }));
                         st.left_down = false;
                     } else if self.locked && !st.dragged {
                         // The panoramic view: a tap clicks where the view
                         // points.
                         let (mx, my) = self.sys.mouse();
                         let button = MouseButton::Left;
-                        st.queue.push_back(Input::MouseDown {
+                        st.queue.push_back(Some(Input::MouseDown {
                             button,
                             x: mx,
                             y: my,
-                        });
-                        st.queue.push_back(Input::MouseUp {
+                        }));
+                        st.queue.push_back(Some(Input::MouseUp {
                             button,
                             x: mx,
                             y: my,
-                        });
+                        }));
                     }
                 }
                 if st.fingers.is_empty() {
                     if st.two && t.phase == TouchPhase::Ended {
                         let (mx, my) = self.sys.mouse();
                         let button = MouseButton::Right;
-                        st.queue.push_back(Input::MouseDown {
+                        st.queue.push_back(Some(Input::MouseDown {
                             button,
                             x: mx,
                             y: my,
-                        });
-                        st.queue.push_back(Input::MouseUp {
+                        }));
+                        st.queue.push_back(Some(Input::MouseUp {
                             button,
                             x: mx,
                             y: my,
-                        });
+                        }));
                     }
                     st.primary = None;
                     st.two = false;
@@ -870,7 +892,7 @@ impl App {
                 Typed::Text(text) => text.chars().map(EngineKey::Char).collect(),
                 Typed::Key(66) => vec![EngineKey::Enter],
                 Typed::Key(67) => vec![EngineKey::Backspace],
-                Typed::Key(_) => Vec::new(),
+                Typed::Key(_) | Typed::Redraw => Vec::new(),
                 Typed::Back => {
                     if self.runner.is_none() && !self.menu.is_open() {
                         log::info!("Back on the \"no game\" screen: the app ends");
@@ -885,8 +907,8 @@ impl App {
                     let action = self.menu.key(k, self.menu_values());
                     self.menu_action(action);
                 } else if self.runner.is_some() {
-                    self.touch.queue.push_back(Input::KeyDown(k));
-                    self.touch.queue.push_back(Input::KeyUp(k));
+                    self.touch.queue.push_back(Some(Input::KeyDown(k)));
+                    self.touch.queue.push_back(Some(Input::KeyUp(k)));
                 }
             }
         }
@@ -899,7 +921,7 @@ impl App {
     /// and shows the on-screen keyboard while the player screen takes
     /// the letters (hidden after).
     pub(crate) fn feed_touch(&mut self) {
-        if let Some(i) = self.touch.queue.pop_front() {
+        if let Some(Some(i)) = self.touch.queue.pop_front() {
             self.sys.push_input(i);
         }
         let entry = self
@@ -965,21 +987,22 @@ fn cancel_left(st: &mut TouchState, at: (i32, i32)) {
     st.queue.retain(|i| {
         !matches!(
             i,
-            Input::MouseDown {
+            Some(Input::MouseDown {
                 button: MouseButton::Left,
                 ..
-            }
+            })
         )
     });
     if st.queue.len() == before {
-        st.queue.push_back(Input::MouseUp {
+        st.queue.push_back(Some(Input::MouseUp {
             button: MouseButton::Left,
             x: at.0,
             y: at.1,
-        });
+        }));
     } else {
         // (its moves go with it)
-        st.queue.retain(|i| !matches!(i, Input::MouseMove { .. }));
+        st.queue
+            .retain(|i| !matches!(i, None | Some(Input::MouseMove { .. })));
     }
 }
 

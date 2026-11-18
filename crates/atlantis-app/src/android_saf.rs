@@ -49,6 +49,11 @@ pub(crate) fn init(vm: *mut c_void, activity: *mut c_void) {
                 fnPtr: key_typed as *mut c_void,
             },
             JNINativeMethod {
+                name: c"imeHeight".as_ptr() as *mut _,
+                signature: c"(I)V".as_ptr() as *mut _,
+                fnPtr: ime_height_changed as *mut c_void,
+            },
+            JNINativeMethod {
                 name: c"backPressed".as_ptr() as *mut _,
                 signature: c"()V".as_ptr() as *mut _,
                 fnPtr: back_pressed as *mut c_void,
@@ -81,6 +86,8 @@ pub(crate) enum Typed {
     /// Android's key code (66 Enter, 67 Backspace).
     Key(i32),
     Back,
+    /// (only a redraw: the keyboard's height changed)
+    Redraw,
 }
 
 static TYPED: Mutex<Vec<Typed>> = Mutex::new(Vec::new());
@@ -109,13 +116,31 @@ pub(crate) fn take_typed() -> Vec<Typed> {
 /// `AtlantisActivity.textTyped(String)`.
 extern "system" fn text_typed(env: *mut JNIEnv, _class: jclass, text: jstring) {
     if let Some(t) = unsafe { rust_string(env, text) } {
+        log::debug!("typed {t:?}");
         typed(Typed::Text(t));
     }
 }
 
 /// `AtlantisActivity.keyTyped(int)`.
 extern "system" fn key_typed(_env: *mut JNIEnv, _class: jclass, code: jni_sys::jint) {
+    log::debug!("typed key {code}");
     typed(Typed::Key(code));
+}
+
+/// The on-screen keyboard's height over the window, in pixels (0: hidden).
+static IME_HEIGHT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+pub(crate) fn ime_height() -> usize {
+    IME_HEIGHT.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// `AtlantisActivity.imeHeight(int)`: the picture is drawn above it.
+extern "system" fn ime_height_changed(_env: *mut JNIEnv, _class: jclass, h: jni_sys::jint) {
+    let h = usize::try_from(h).unwrap_or(0);
+    if IME_HEIGHT.swap(h, std::sync::atomic::Ordering::Relaxed) != h {
+        log::info!("on-screen keyboard: {h} pixels high");
+        typed(Typed::Redraw);
+    }
 }
 
 /// `AtlantisActivity.backPressed()`.

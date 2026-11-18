@@ -54,11 +54,19 @@ public class AtlantisActivity extends NativeActivity {
      *  67 Backspace). */
     private static native void keyTyped(int keyCode);
 
+    /** The on-screen keyboard's height over the window, in pixels (0:
+     *  hidden): the game's picture is drawn above it. */
+    private static native void imeHeight(int pixels);
+
     /** The Back button. */
     private static native void backPressed();
 
     /** The view the on-screen keyboard types into (see TextView). */
     private TextView textView;
+
+    /** The on-screen keyboard is wanted (shown again when the window gets
+     *  the focus back: a request made without the focus is dropped). */
+    private boolean wantKeyboard;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,6 +74,16 @@ public class AtlantisActivity extends NativeActivity {
         immersive();
         textView = new TextView(this);
         addContentView(textView, new ViewGroup.LayoutParams(1, 1));
+        if (Build.VERSION.SDK_INT >= 30) {
+            getWindow().getDecorView().setOnApplyWindowInsetsListener(
+                    new View.OnApplyWindowInsetsListener() {
+                        @Override
+                        public WindowInsets onApplyWindowInsets(View v, WindowInsets insets) {
+                            imeHeight(insets.getInsets(WindowInsets.Type.ime()).bottom);
+                            return v.onApplyWindowInsets(insets);
+                        }
+                    });
+        }
         if (Build.VERSION.SDK_INT >= 33) {
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
                     OnBackInvokedDispatcher.PRIORITY_DEFAULT,
@@ -90,23 +108,44 @@ public class AtlantisActivity extends NativeActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                InputMethodManager imm =
-                        (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
-                if (imm == null || textView == null) {
-                    return;
-                }
-                if (show) {
-                    textView.setFocusable(true);
-                    textView.setFocusableInTouchMode(true);
-                    textView.requestFocus();
-                    imm.restartInput(textView);
-                    imm.showSoftInput(textView, 0);
-                } else {
-                    imm.hideSoftInputFromWindow(textView.getWindowToken(), 0);
-                    textView.clearFocus();
-                }
+                wantKeyboard = show;
+                applyKeyboard();
             }
         });
+    }
+
+    /** The on-screen keyboard as wanted (on the UI thread). */
+    private void applyKeyboard() {
+        final InputMethodManager imm =
+                (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm == null || textView == null) {
+            return;
+        }
+        if (wantKeyboard) {
+            textView.setFocusable(true);
+            textView.setFocusableInTouchMode(true);
+            textView.requestFocus();
+            imm.restartInput(textView);
+            // (once the view has the focus)
+            textView.post(new Runnable() {
+                @Override
+                public void run() {
+                    if (!wantKeyboard) {
+                        return;
+                    }
+                    if (Build.VERSION.SDK_INT >= 30) {
+                        WindowInsetsController c = getWindow().getInsetsController();
+                        if (c != null) {
+                            c.show(WindowInsets.Type.ime());
+                        }
+                    }
+                    imm.showSoftInput(textView, 0);
+                }
+            });
+        } else {
+            imm.hideSoftInputFromWindow(textView.getWindowToken(), 0);
+            textView.clearFocus();
+        }
     }
 
     /** A view that takes the on-screen keyboard's text: each character
@@ -219,6 +258,9 @@ public class AtlantisActivity extends NativeActivity {
         super.onWindowFocusChanged(hasFocus);
         if (hasFocus) {
             immersive();
+            if (wantKeyboard) {
+                applyKeyboard();
+            }
         }
     }
 
