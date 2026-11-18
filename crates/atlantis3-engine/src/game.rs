@@ -330,6 +330,10 @@ pub struct Game {
     coord: Coord,
     listener: [f32; 3],
     place_sounds: BTreeMap<String, Source>,
+    /// The place sounds playing, one per sound file (the sound map
+    /// 0x00759340 holds one CSM sound per name), on the channels
+    /// `CHANNEL_PLACE + k`: the file and the position it was started at.
+    place_voices: Vec<Option<(String, [f32; 3])>>,
     /// A dialog the port does not play: the waiting section goes on at the
     /// next warp frame, as after the dialog's end.
     resume_next: bool,
@@ -598,6 +602,7 @@ impl Game {
             coord: Coord::default(),
             listener: [0.0; 3],
             place_sounds: BTreeMap::new(),
+            place_voices: vec![None; CHANNEL_VOICE - CHANNEL_PLACE],
             pointer: (0, 0),
             prev_mode: Mode::Warp,
             inventory: Default::default(),
@@ -3095,15 +3100,86 @@ impl Game {
         }
     }
 
-    /// The place sounds of a warp frame (@ 0x004024b0): each active source
-    /// whose sound is silent starts its first file again (one `rand()`
-    /// drawn and dropped); the gains follow the listener. The original
-    /// hands the positions to DirectSound3D (minimum distance 100,
-    /// rolloff 1, the listener facing the camera's −Z, heights dropped);
-    /// here the gain is 100 / distance beyond 100 and the side's share of
-    /// the direction in the listener's frame pans it, DirectSound3D's own
-    /// panning law being Windows'.
+    /// The place sounds of a warp frame (@ 0x004024b0): in map order, each
+    /// active source none of whose files plays (0x00402590: 0x00433780 on
+    /// each file's name, the sound map holding one sound per name) draws
+    /// one `rand()` and starts its first file at its position
+    /// (0x00433280). So the objects of a view naming the same file share
+    /// one voice, started by the first of them (CFuner's three torches,
+    /// `2ta1_a.apc`, at `TorcheDroite`); a voice of the previous view goes
+    /// on at its old position until it ends, and the new view's other
+    /// files start at once on free channels. The gains follow the
+    /// listener. The original hands the positions to DirectSound3D
+    /// (minimum distance 100, rolloff 1, the listener facing the camera's
+    /// −Z, heights dropped); here the gain is 100 / distance beyond 100
+    /// and the side's share of the direction in the listener's frame pans
+    /// it, DirectSound3D's own panning law being Windows'.
     fn place_sounds_frame(&mut self) {
+        if self.files.is_evolution_2004() {
+            self.place_sounds_frame_2004();
+            return;
+        }
+        // The voices that ended free their channels.
+        for (k, v) in self.place_voices.iter_mut().enumerate() {
+            if v.is_some() && !self.audio.is_playing(CHANNEL_PLACE + k) {
+                *v = None;
+            }
+        }
+        let entries: Vec<Source> = self.place_sounds.values().cloned().collect();
+        for src in &entries {
+            let busy = src.files.iter().any(|f| {
+                self.place_voices
+                    .iter()
+                    .flatten()
+                    .any(|(v, _)| v.eq_ignore_ascii_case(f))
+            });
+            if busy {
+                continue;
+            }
+            if !self.stub_rand {
+                self.rand.rand();
+            }
+            let Some(first) = src.files.first() else {
+                continue;
+            };
+            let Some(k) = self.place_voices.iter().position(Option::is_none) else {
+                log::debug!("no free place channel for {first}");
+                continue;
+            };
+            if let Some((rate, chans, pcm)) = self.sound(&format!("sfx/{first}")) {
+                let gains = self.place_gains(src.pos);
+                self.audio
+                    .play(CHANNEL_PLACE + k, rate, chans, pcm, false, gains);
+                self.place_voices[k] = Some((first.clone(), src.pos));
+            }
+        }
+        for k in 0..self.place_voices.len() {
+            if let Some((_, pos)) = self.place_voices[k] {
+                let gains = self.place_gains(pos);
+                self.audio.set_gain(CHANNEL_PLACE + k, gains);
+            }
+        }
+    }
+
+    /// Tests: the place sounds playing, by channel: the file and the
+    /// position it was started at.
+    #[doc(hidden)]
+    pub fn test_place_voices(&self) -> Vec<(usize, String, [f32; 3])> {
+        self.place_voices
+            .iter()
+            .enumerate()
+            .filter_map(|(k, v)| {
+                let (f, p) = v.as_ref()?;
+                self.audio
+                    .is_playing(CHANNEL_PLACE + k)
+                    .then(|| (CHANNEL_PLACE + k, f.clone(), *p))
+            })
+            .collect()
+    }
+
+    /// The left and right gains of a place sound at `pos` for the
+    /// listener as the camera turns it.
+    fn place_gains(&self, pos: [f32; 3]) -> [f32; 2] {
         let (yaw, pitch) = self.camera.angles();
         let (ps, pc) = (f64::from(pitch).sin(), f64::from(pitch).cos());
         let (ys, yc) = (f64::from(yaw).sin(), f64::from(yaw).cos());
@@ -3121,29 +3197,32 @@ impl Game {
             0.0,
             f64::from(self.listener[1]),
         ];
+        let d = [f64::from(pos[0]) - l[0], 0.0, f64::from(pos[1]) - l[2]];
+        let dist = (d[0] * d[0] + d[2] * d[2]).sqrt();
+        let att = if dist > 100.0 { 100.0 / dist } else { 1.0 };
+        let pan = if dist > 0.0 {
+            (d[0] * right[0] + d[2] * right[2]) / dist
+        } else {
+            0.0
+        };
+        let g = base * att as f32;
+        [
+            g * (1.0 - pan).min(1.0) as f32,
+            g * (1.0 + pan).min(1.0) as f32,
+        ]
+    }
+
+    /// The 2004 program's place sounds as before: the k-th active source
+    /// on the channel `CHANNEL_PLACE + k`, restarted when that channel is
+    /// silent, its gain set to the source's.
+    fn place_sounds_frame_2004(&mut self) {
         let entries: Vec<Source> = self.place_sounds.values().cloned().collect();
         for (k, src) in entries.iter().enumerate() {
             let ch = CHANNEL_PLACE + k;
             if ch >= CHANNEL_VOICE {
                 break;
             }
-            let d = [
-                f64::from(src.pos[0]) - l[0],
-                0.0,
-                f64::from(src.pos[1]) - l[2],
-            ];
-            let dist = (d[0] * d[0] + d[2] * d[2]).sqrt();
-            let att = if dist > 100.0 { 100.0 / dist } else { 1.0 };
-            let pan = if dist > 0.0 {
-                (d[0] * right[0] + d[2] * right[2]) / dist
-            } else {
-                0.0
-            };
-            let g = base * att as f32;
-            let gains = [
-                g * (1.0 - pan).min(1.0) as f32,
-                g * (1.0 + pan).min(1.0) as f32,
-            ];
+            let gains = self.place_gains(src.pos);
             if !self.audio.is_playing(ch) {
                 if !self.stub_rand {
                     self.rand.rand();

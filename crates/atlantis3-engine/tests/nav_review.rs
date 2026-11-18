@@ -235,3 +235,90 @@ fn skipping_a_cinematic_stops_the_other_sounds() {
     g.finish_video();
     assert!(g.audio.is_playing(CHANNEL_PLACE));
 }
+
+/// Place `wam` of world `world` entered at `view` (no cube drawn), one
+/// warp frame run.
+fn place_at(wam: &str, world: i32, view: u32) -> Option<(Game, f64)> {
+    let dir = atlantis3_data::testing::install_dir()?;
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    g.flat_warp = true;
+    assert!(g.board_begin(wam, world));
+    let t = 100.0;
+    g.board_enter_at(view, 0.0, 0.0, t);
+    let t = t + 0.04;
+    g.step(t);
+    assert_eq!(g.mode(), Mode::Warp);
+    Some((g, t))
+}
+
+/// The files of the voices playing, sorted, lower case.
+fn voice_files(g: &Game) -> Vec<String> {
+    let mut v: Vec<String> = g
+        .test_place_voices()
+        .into_iter()
+        .map(|(_, f, _)| f.to_ascii_lowercase())
+        .collect();
+    v.sort();
+    v
+}
+
+/// F3: 0x00402590 starts an active source's first file only when none of
+/// its files plays, tested by name on the sound map that holds one sound
+/// per file (0x00433780; 0x00433280 plays that entry). CFuner's three
+/// torches name `2ta1_a.apc`: one voice, at `TorcheDroite` (the first in
+/// map order), as `place-sounds.md` of atlantis3-re works out for view 4.
+#[test]
+fn place_sounds_sharing_a_file_play_once() {
+    let Some((mut g, mut t)) = place_at("CFuner.wam", 1, 4) else {
+        return;
+    };
+    let v = g.test_place_voices();
+    assert_eq!(v.len(), 1, "{v:?}");
+    assert!(v[0].1.eq_ignore_ascii_case("2ta1_a.apc"), "{v:?}");
+    assert_eq!(v[0].2, [-16.0, -169.761, 164.0]);
+    // Frames later, still one voice; another CFuner view keeps it where it
+    // started (the map is rebuilt, the file is playing).
+    for _ in 0..10 {
+        t += 0.04;
+        g.step(t);
+    }
+    assert_eq!(g.test_place_voices().len(), 1);
+    g.board_enter_at(1, 0.0, 0.0, t);
+    t += 0.04;
+    g.step(t);
+    let v = g.test_place_voices();
+    assert_eq!(v.len(), 1, "{v:?}");
+    assert_eq!(v[0].2, [-16.0, -169.761, 164.0]);
+}
+
+/// F3: a new view's source whose file is not playing starts at once,
+/// while the previous view's voices end at their old positions (the view
+/// entry 0x00401f30 clears the map without stopping anything). LDMorts
+/// view 13 → 14: `waa_a` and `palmiers` play on, the torches' `2ta1_a`
+/// starts.
+#[test]
+fn a_new_views_place_sound_starts_at_once() {
+    let Some((mut g, mut t)) = place_at("LDMorts.wam", 2, 13) else {
+        return;
+    };
+    let before = voice_files(&g);
+    assert!(before.iter().any(|f| f.starts_with("waa_a")), "{before:?}");
+    let old = g.test_place_voices();
+    g.board_enter_at(14, 0.0, 0.0, t);
+    t += 0.04;
+    g.step(t);
+    let after = voice_files(&g);
+    assert!(after.iter().any(|f| f == "2ta1_a.apc"), "{after:?}");
+    for f in &before {
+        assert!(after.contains(f), "{f} still plays: {after:?}");
+    }
+    // One voice per file, the old ones where they started.
+    let mut dedup = after.clone();
+    dedup.dedup();
+    assert_eq!(dedup, after);
+    for (ch, f, p) in g.test_place_voices() {
+        if let Some(o) = old.iter().find(|o| o.0 == ch) {
+            assert_eq!((&o.1, o.2), (&f, p));
+        }
+    }
+}
