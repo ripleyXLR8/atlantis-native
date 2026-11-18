@@ -22,14 +22,17 @@ use crate::setup::{self, GameKind};
 use atlantis_engine::persist::{user_data_dir, DirStore};
 use atlantis_engine::SaveStore;
 
-/// The log file of a run without a terminal, in the per-user data folder,
+/// The log file of a run without a terminal, in the data folder,
 /// rewritten at every start.
 pub const LOG_FILE: &str = "atlantis-native.log";
 /// The log of the session before.
 pub const PREV_LOG_FILE: &str = "atlantis-native.previous.log";
 
-/// The per-user data folder, or a folder next to the current one when the
-/// system gives none.
+/// The data folder (`--data-dir`, `ATLANTIS_NATIVE_DATA`, the portable
+/// mode's `data` folder or the per-user folder: see
+/// [`atlantis_engine::persist::data_dir_and_source`]), or a folder next to
+/// the current one when the system gives none. Everything the desktop
+/// program writes outside the game folder is under it.
 pub fn data_dir() -> PathBuf {
     user_data_dir().unwrap_or_else(|| PathBuf::from("atlantis-native-data"))
 }
