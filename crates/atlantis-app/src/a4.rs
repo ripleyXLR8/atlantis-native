@@ -733,6 +733,16 @@ impl Viewer {
 }
 
 impl ApplicationHandler for Viewer {
+    /// Android: the activity's window is gone (the app in the
+    /// background); `resumed` makes another, with its context.
+    #[cfg(target_os = "android")]
+    fn suspended(&mut self, _el: &ActiveEventLoop) {
+        self.gl = None;
+        self.surface = None;
+        self.window = None;
+        crate::android::pause_audio(&self._audio, true);
+    }
+
     #[cfg(target_arch = "wasm32")]
     fn resumed(&mut self, el: &ActiveEventLoop) {
         self.resumed_web(el);
@@ -740,6 +750,8 @@ impl ApplicationHandler for Viewer {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn resumed(&mut self, el: &ActiveEventLoop) {
+        #[cfg(target_os = "android")]
+        crate::android::pause_audio(&self._audio, false);
         if self.window.is_some() {
             return;
         }
@@ -819,6 +831,19 @@ impl ApplicationHandler for Viewer {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        // Android: the activity is being destroyed; in the background
+        // (no window), the game waits.
+        #[cfg(target_os = "android")]
+        {
+            if crate::android::destroyed() {
+                el.exit();
+                return;
+            }
+            if self.window.is_none() {
+                el.set_control_flow(ControlFlow::Wait);
+                return;
+            }
+        }
         let now = Instant::now();
         if now >= self.next_frame {
             let t0 = Instant::now();
@@ -845,6 +870,14 @@ impl ApplicationHandler for Viewer {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        // Android: the touch screen as the mouse, Back as Escape.
+        #[cfg(target_os = "android")]
+        if let Some(events) = crate::android::mode_events(&event) {
+            for e in events {
+                self.window_event(el, _id, e);
+            }
+            return;
+        }
         // The page's own events (the redraws, the keys, a hidden page) and
         // the sound's start at the first click.
         #[cfg(target_arch = "wasm32")]

@@ -71,6 +71,19 @@ for i in 1 2 3; do
 done
 sleep 4
 adb exec-out screencap -p > "$out/screen-round-trips.png"
+# A relaunch of the activity in place (a display cutout overlay changes
+# the resource paths, which no manifest flag covers): the app goes on in
+# the new activity.
+overlay=com.android.internal.display.cutout.emulation.corner
+relaunched=skipped
+if adb shell cmd overlay list 2>/dev/null | grep -q "$overlay"; then
+    adb shell cmd overlay enable "$overlay"
+    sleep 6
+    adb exec-out screencap -p > "$out/screen-relaunched.png"
+    adb shell cmd overlay disable "$overlay"
+    sleep 6
+    relaunched=yes
+fi
 # A tap on the "no game" screen: the system's folder picker; Back
 # closes it, and the app is shown again.
 adb shell input tap 320 160
@@ -110,6 +123,12 @@ if grep -q "activity destroyed" "$out/logcat-app.txt"; then
     grep -q "the game goes on in the new activity" "$out/logcat-app.txt" ||
         fail "the activity was destroyed and the app did not go on in a new one"
 fi
+if [ "$relaunched" = yes ]; then
+    grep -q "the game goes on in the new activity" "$out/logcat-app.txt" ||
+        fail "no new activity after the relaunch (or the app did not go on in it)"
+else
+    echo "(no display cutout overlay: the relaunch is not checked)"
+fi
 [ -n "$pid2" ] || fail "the app was not running after its returns from the background"
 [ "$pid2" = "$pid" ] || fail "the app was started again ($pid, then $pid2)"
 grep -q "panicked\|Fatal signal" "$out/logcat-app.txt" && fail "the app crashed"
@@ -123,4 +142,35 @@ grep -q "chosen folder: atlantis.exe (11 bytes) is not a known build" "$out/logc
     fail "the chosen folder's atlantis.exe was not read"
 made=$(grep -c "resumed: window made" "$out/logcat-app.txt")
 [ "$made" -ge 5 ] || fail "the window was made $made times (5 expected: at the start, after each return)"
+
+# Atlantis II, III and Evolution: a folder of each (its program and one
+# file, not a game) in the app's own folder, one after the other: the app
+# finds it and says it does not open (or that the game could not start).
+games=/sdcard/Android/data/$pkg/files/game
+for g in A2 A3 A4; do
+    adb shell am force-stop "$pkg"
+    adb shell "rm -rf $games/*"
+    case $g in
+    A2) adb shell "mkdir -p $games/A2 && echo x > $games/A2/atlantis2.exe" ;;
+    A3) adb shell "mkdir -p $games/A3/Datas/scenar && echo x > $games/A3/Game.exe &&
+            echo x > $games/A3/Datas/scenar/defnames.con" ;;
+    A4) adb shell "mkdir -p $games/A4/3D && echo x > '$games/A4/Atlantis Evolution.exe' &&
+            echo x > $games/A4/3D/OnGameEnter.lua" ;;
+    esac
+    adb logcat -b all -c
+    start
+    sleep 8
+    adb exec-out screencap -p > "$out/screen-$g.png"
+    adb logcat -d > "$out/logcat-$g.txt"
+    grep AtlantisNative "$out/logcat-$g.txt" | grep -v "glue:" | tail -20
+    grep -q "panicked\|Fatal signal" "$out/logcat-$g.txt" && fail "$g: the app crashed"
+    case $g in
+    A2) name="Atlantis II" ;;
+    A3) name="Atlantis III" ;;
+    A4) name="Atlantis Evolution" ;;
+    esac
+    grep -q "$name found in .* but it does not open\|The game could not start\|could not start" \
+        "$out/logcat-$g.txt" || fail "$g: not found, or no error shown"
+done
+adb shell "rm -rf $games/*"
 echo "smoke test passed (pid $pid)"

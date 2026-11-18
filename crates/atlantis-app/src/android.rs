@@ -112,6 +112,123 @@ pub(crate) fn destroyed() -> bool {
     DESTROYED.load(Ordering::SeqCst)
 }
 
+/// The sound of Atlantis II, III or Evolution held (`pause`) while the
+/// app is in the background, or played again.
+pub(crate) fn pause_audio(stream: &Option<cpal::Stream>, pause: bool) {
+    use cpal::traits::StreamTrait;
+    if let Some(s) = stream {
+        let r = if pause {
+            s.pause().map_err(|e| e.to_string())
+        } else {
+            s.play().map_err(|e| e.to_string())
+        };
+        if let Err(e) = r {
+            log::warn!("sound output: {e}");
+        }
+    }
+}
+
+/// The fingers on the screen in Atlantis II, III or Evolution's window.
+#[derive(Default)]
+struct ModeTouch {
+    fingers: Vec<u64>,
+    /// A second finger came: a right click when they lift.
+    two: bool,
+    /// The left button is down.
+    left: bool,
+    /// The first finger's place.
+    at: (f64, f64),
+}
+
+static MODE_TOUCH: std::sync::Mutex<Option<ModeTouch>> = std::sync::Mutex::new(None);
+
+/// Atlantis II, III and Evolution's windows on Android: the events to
+/// handle in place of `event`, `None` to handle it as it is. A finger is
+/// the mouse with its left button held (a tap: a click there), a tap
+/// with two fingers a right click, the Back button Escape.
+pub(crate) fn mode_events(
+    event: &winit::event::WindowEvent,
+) -> Option<Vec<winit::event::WindowEvent>> {
+    use winit::dpi::PhysicalPosition;
+    use winit::event::{DeviceId, ElementState, MouseButton as Button, WindowEvent};
+    use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
+    let device_id = DeviceId::dummy();
+    let moved = |(x, y): (f64, f64)| WindowEvent::CursorMoved {
+        device_id,
+        position: PhysicalPosition::new(x, y),
+    };
+    let button = |state, button| WindowEvent::MouseInput {
+        device_id,
+        state,
+        button,
+    };
+    match event {
+        WindowEvent::KeyboardInput {
+            device_id,
+            event: k,
+            is_synthetic,
+        } if k.logical_key == Key::Named(NamedKey::BrowserBack) => {
+            let mut k = k.clone();
+            k.logical_key = Key::Named(NamedKey::Escape);
+            k.physical_key = PhysicalKey::Code(KeyCode::Escape);
+            Some(vec![WindowEvent::KeyboardInput {
+                device_id: *device_id,
+                event: k,
+                is_synthetic: *is_synthetic,
+            }])
+        }
+        WindowEvent::Touch(t) => {
+            let mut guard = MODE_TOUCH.lock().unwrap();
+            let st = guard.get_or_insert_with(ModeTouch::default);
+            let at = (t.location.x, t.location.y);
+            let mut out = Vec::new();
+            match t.phase {
+                TouchPhase::Started => {
+                    st.fingers.retain(|f| *f != t.id);
+                    st.fingers.push(t.id);
+                    if st.fingers.len() == 1 {
+                        st.two = false;
+                        st.at = at;
+                        st.left = true;
+                        out.push(moved(at));
+                        out.push(button(ElementState::Pressed, Button::Left));
+                    } else if !st.two {
+                        st.two = true;
+                        if st.left {
+                            st.left = false;
+                            out.push(button(ElementState::Released, Button::Left));
+                        }
+                    }
+                }
+                TouchPhase::Moved => {
+                    if st.fingers.first() == Some(&t.id) && !st.two {
+                        st.at = at;
+                        out.push(moved(at));
+                    }
+                }
+                TouchPhase::Ended | TouchPhase::Cancelled => {
+                    st.fingers.retain(|f| *f != t.id);
+                    if st.left {
+                        st.left = false;
+                        out.push(moved(at));
+                        out.push(button(ElementState::Released, Button::Left));
+                    }
+                    if st.fingers.is_empty() {
+                        if st.two && t.phase == TouchPhase::Ended {
+                            out.push(moved(st.at));
+                            out.push(button(ElementState::Pressed, Button::Right));
+                            out.push(button(ElementState::Released, Button::Right));
+                        }
+                        st.two = false;
+                    }
+                }
+            }
+            Some(out)
+        }
+        _ => None,
+    }
+}
+
 /// The entry point android-activity calls on its own thread, once the
 /// activity is created.
 #[no_mangle]
@@ -152,6 +269,7 @@ fn android_main(activity: AndroidApp) {
         WindowManagerFlags::empty(),
     );
     let game_dir = activity.external_data_path().map(|p| p.join("game"));
+    GAME_DIR.lock().unwrap().clone_from(&game_dir);
     if let Some(dir) = &game_dir {
         // Made at once, so that it shows in a file manager or over USB.
         if let Err(e) = std::fs::create_dir_all(dir) {
@@ -173,16 +291,45 @@ fn android_main(activity: AndroidApp) {
             app
         }
         None => {
-            let session = Session::new(data_dir(), false, false, false, Start::Boot);
-            let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
-            // (no game library's screen on Android yet)
-            app.menu.set_library(false);
+            let mut app = front_end();
             app.android_start(game_dir);
             app
         }
     };
-    if let Err(e) = event_loop.run_app(&mut app) {
-        log::error!("event loop: {e}");
+    let mut event_loop = event_loop;
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    // The first game's front end (also the "no game" screen), unless
+    // Atlantis II, III or Evolution was found: their own modes, on the
+    // same event loop, after it (as the desktop's `main`).
+    if !app.session().is_some_and(|s| s.wants_own_mode()) {
+        if let Err(e) = event_loop.run_app_on_demand(&mut app) {
+            log::error!("event loop: {e}");
+        }
+    }
+    if !destroyed() {
+        if let Some(session) = app.session_mut() {
+            let (a2, a3, a4) = (
+                session.take_atlantis2(),
+                session.take_atlantis3(),
+                session.take_atlantis4(),
+            );
+            if a2.is_some() || a3.is_some() || a4.is_some() {
+                drop(app);
+                let Err(why) = run_other_game(&mut event_loop, a2, a3, a4) else {
+                    log::info!("event loop ended");
+                    return;
+                };
+                // Its error on the "no game" screen.
+                log::error!("the game could not start: {why}");
+                app = front_end();
+                app.show_notice(&["The game could not start:".to_string(), why]);
+                if !destroyed() {
+                    if let Err(e) = event_loop.run_app_on_demand(&mut app) {
+                        log::error!("event loop: {e}");
+                    }
+                }
+            }
+        }
     }
     if destroyed() {
         // Destroyed by Android (not left by the player): kept for the
@@ -195,6 +342,43 @@ fn android_main(activity: AndroidApp) {
         log::info!("event loop ended");
     }
     // android-activity then finishes the activity and ends this thread.
+}
+
+/// The first game's front end, without a game.
+fn front_end() -> App {
+    let session = Session::new(data_dir(), false, false, false, Start::Boot);
+    let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
+    // (no game library's screen on Android yet)
+    app.menu.set_library(false);
+    app
+}
+
+/// The app's own game folder (`<external files>/game`).
+static GAME_DIR: std::sync::Mutex<Option<PathBuf>> = std::sync::Mutex::new(None);
+
+/// Atlantis II, III or Evolution in its own mode (the folder found),
+/// until it ends or the activity is destroyed (the next activity finds
+/// the game again and starts it anew).
+fn run_other_game(
+    el: &mut EventLoop<()>,
+    a2: Option<PathBuf>,
+    a3: Option<PathBuf>,
+    a4: Option<PathBuf>,
+) -> Result<(), String> {
+    let run = if let Some(dir) = a2 {
+        let enhancements = crate::a2::stored_settings().enhancements;
+        crate::a2::open(&dir, &[], &crate::a2::A2Start::default(), enhancements).and_then(
+            |(engine, label)| crate::a2::run_window_on(el, engine, label, true, None, false),
+        )
+    } else if let Some(dir) = a4 {
+        crate::a4::run_window_on(el, &dir, true, false, false)
+    } else if let Some(dir) = a3 {
+        crate::a3::open(&dir, &[], false)
+            .and_then(|(game, _)| crate::a3::run_window_on(el, game, true, false))
+    } else {
+        return Ok(());
+    };
+    run.map(|_| ())
 }
 
 /// The file keeping the folder chosen in the picker (its tree URI).
@@ -285,13 +469,19 @@ impl App {
             return;
         };
         match find_game(&dir) {
+            // (Atlantis II, III and Evolution: their own modes, after this
+            // front end's event loop, `android_main`)
             Found::Game(opened, dir) => self.play_opened(opened, &dir),
-            Found::Other(label, dir) => {
+            Found::Broken(name, dir, why) => {
+                log::info!(
+                    "{name} found in {} but it does not open: {why}",
+                    dir.display()
+                );
                 self.show_notice(&[
-                    format!("{label} found in"),
+                    format!("{name} found in"),
                     dir.display().to_string(),
-                    String::new(),
-                    "This Android version plays Atlantis: The Lost Tales only.".to_string(),
+                    "but it does not open:".to_string(),
+                    why,
                 ]);
             }
             Found::Nothing(dir) => {
@@ -325,10 +515,17 @@ impl App {
             }
             FoundInTree::Other(name) => {
                 if explain {
+                    let dir = GAME_DIR
+                        .lock()
+                        .unwrap()
+                        .as_ref()
+                        .map_or_else(String::new, |d| d.display().to_string());
                     self.show_notice(&[
                         format!("{name} found in the chosen folder."),
                         String::new(),
-                        "This Android version plays Atlantis: The Lost Tales only.".to_string(),
+                        format!("{name} is played from the app's own folder for now: copy it to"),
+                        dir,
+                        "and start the app again.".to_string(),
                     ]);
                 }
                 false
@@ -375,10 +572,22 @@ impl App {
 
 /// What the game folder holds.
 enum Found {
+    /// A game that opens (any of the four).
     Game(Opened, PathBuf),
-    /// Another game (its label): not playable in this version.
-    Other(String, PathBuf),
+    /// A game's files that do not open: its name, folder, and why.
+    Broken(&'static str, PathBuf, String),
     Nothing(PathBuf),
+}
+
+/// A game's name.
+fn game_name(kind: crate::setup::GameKind) -> &'static str {
+    use crate::setup::GameKind;
+    match kind {
+        GameKind::LostTales => "Atlantis: The Lost Tales",
+        GameKind::Atlantis2 => "Atlantis II",
+        GameKind::Atlantis3 => "Atlantis III",
+        GameKind::Atlantis4 => "Atlantis Evolution",
+    }
 }
 
 /// The game in `dir` or in a folder directly inside it (the first that
@@ -395,26 +604,23 @@ fn find_game(dir: &Path) -> Found {
         .unwrap_or_default();
     subs.sort();
     candidates.extend(subs);
-    let mut other = None;
+    let mut broken = None;
     for c in candidates {
         match open_any(&c) {
-            Ok(opened @ Opened::LostTales(..)) => {
+            Ok(opened) => {
                 log::info!("{}: {}", c.display(), opened.label());
                 return Found::Game(opened, c);
             }
-            Ok(opened) => {
-                log::info!(
-                    "{}: {} (not played on Android yet)",
-                    c.display(),
-                    opened.label()
-                );
-                other.get_or_insert((opened.label(), c));
+            Err(e) => {
+                log::info!("{}: {e}", c.display());
+                if let Some(kind) = crate::setup::kind_of(&c) {
+                    broken.get_or_insert((game_name(kind), c, e));
+                }
             }
-            Err(e) => log::info!("{}: {e}", c.display()),
         }
     }
-    match other {
-        Some((label, c)) => Found::Other(label, c),
+    match broken {
+        Some((name, c, e)) => Found::Broken(name, c, e),
         None => Found::Nothing(dir.to_path_buf()),
     }
 }
