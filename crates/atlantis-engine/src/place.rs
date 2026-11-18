@@ -157,6 +157,7 @@ impl Engine {
     /// at those frames. The place is not entered again: no place event,
     /// the mouse is not moved.
     pub(crate) async fn reload_view_after_puzzle(&mut self) {
+        let pump_mark = self.puzzle_pump_mark.take();
         let Some(index) = self.current_place else {
             return;
         };
@@ -166,6 +167,15 @@ impl Engine {
         };
         if self.load_cyclo(&cyclo).await {
             self.recomposite_sprite_layer();
+            // FUN_0044a424 sets the pointer only (0x0044a70b / 0x0044a715):
+            // a motion made since the puzzle's last pumping poll (the
+            // eclipse's 80 win passes poll nothing, FUN_00441724) is still
+            // queued, and the next poll's WM_MOUSEMOVE (0x00419c10..
+            // 0x00419c29; the film of CHAPI012's Cinema=30) puts the
+            // pointer at the cursor. The mark is that poll's mouse.
+            if let Some(mark) = pump_mark {
+                self.pointer_mouse_mark = mark;
+            }
         }
     }
 

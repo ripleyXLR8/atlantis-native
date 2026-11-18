@@ -110,9 +110,11 @@ pub enum BugFix {
     /// The LOAD list shows the player's checkpoints in ascending chapters.
     /// Off, as the original (`FUN_0041cf78` @ 0x0041d16a..0x0041d1f3,
     /// [`crate::ui::menus::original_load_order`]): the names in the order
-    /// the folder lists them go through a swap pass whose two tests
-    /// (strcmp, then the lengths) disagree on names of one- and two-digit
-    /// chapters, so `pa1 .. pa6 pa9 pa11` show `1 .. 6 11 9`. Either way
+    /// the folder lists them (NTFS's name order on every host,
+    /// [`crate::ui::menus::ntfs_listing_order`]) go through a swap pass
+    /// whose two tests (strcmp, then the lengths) disagree on names of one-
+    /// and two-digit chapters, so `pa1 pa11 pa2 .. pa6 pa9` show
+    /// `1 6 5 4 3 2 9 11`. Either way
     /// the list holds the `p<letter>*.gam` files, the first 0x80, without
     /// chapter 0 ([`crate::engine::Engine::player_checkpoints`]).
     LoadOrder,
