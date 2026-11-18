@@ -666,7 +666,7 @@ impl BugFix {
             BugFix::LoadOrder => &[
                 "The original sorts the LOAD list with two tests that",
                 "disagree on chapters of one and two digits: chapters",
-                "1 to 6, 9 and 11 are listed 1 to 6, 11, 9.",
+                "1 to 6, 9 and 11 show as 1, 6, 5, 4, 3, 2, 9, 11.",
             ],
             BugFix::HexagonPieces => &[
                 "This build places the hexagon puzzle's pieces only",

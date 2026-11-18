@@ -156,6 +156,19 @@ pub fn ingame_menu_outcome(record: Option<usize>, load_exit: u8, quit_exit: u8) 
     }
 }
 
+/// The names in the order FindFirstFileA / FindNextFileA list them on an
+/// NTFS volume: its directory index is sorted by the names upcased
+/// (ASCII for the save names). The order on a FAT volume (Windows 9x) is
+/// the directory's slot order, which depends on the volume's history
+/// (creations, deletions, copies) that no save store keeps; a store's own
+/// listing (`read_dir` on ext4 / APFS, `localStorage` on the web) is
+/// neither. So the LOAD pass gets this order on every host: what the
+/// original shows on any NT-family Windows (round 9, ui F2).
+pub(crate) fn ntfs_listing_order(mut names: Vec<String>) -> Vec<String> {
+    names.sort_by_cached_key(|n| n.to_ascii_uppercase());
+    names
+}
+
 /// The original's LOAD list (`FUN_0041cf78`): the file names of `names`
 /// that `p<letter>*.gam` matches (without regard to case, as
 /// FindFirstFileA), in `names`' order (FindFirstFile / FindNextFile's
@@ -169,9 +182,10 @@ pub fn ingame_menu_outcome(record: Option<usize>, load_exit: u8, quit_exit: u8) 
 /// on names of different lengths, so the result is not sorted: `pa1 ..
 /// pa6 pa9 pa11` give `pa1 .. pa6 pa11 pa9`. Every build has this pass
 /// (the same code, addresses aside). Which order Windows lists a folder
-/// in (directory order on FAT, alphabetical on NTFS) is the file
-/// system's [INFERRED]; the port takes its save store's listing, which
-/// on Windows is the same FindFirstFile order.
+/// in is the file system's: directory slot order on FAT, the index's
+/// case-insensitive name order on NTFS [INFERRED, not in the program].
+/// [`Engine::player_checkpoints`] feeds the pass the NTFS order
+/// ([`ntfs_listing_order`]) on every host.
 pub(crate) fn original_load_order(names: &[String], letter: u8) -> Vec<String> {
     let letter = letter.to_ascii_lowercase();
     let mut v: Vec<String> = names
@@ -844,7 +858,8 @@ impl Engine {
     /// an end; no build writes one.
     pub(crate) fn player_checkpoints(&self) -> Vec<u8> {
         let letter = self.players.letters[self.player.min(MAX_PLAYERS - 1)];
-        let mut v: Vec<u8> = original_load_order(&self.saves.list(), letter)
+        let listed = ntfs_listing_order(self.saves.list());
+        let mut v: Vec<u8> = original_load_order(&listed, letter)
             .iter()
             .filter_map(|n| checkpoint_chapter(n, letter))
             .filter(|&c| c != 0)
@@ -1347,7 +1362,7 @@ mod record_table_tests {
 
 #[cfg(test)]
 mod load_order_tests {
-    use super::original_load_order;
+    use super::{ntfs_listing_order, original_load_order};
     use crate::enhancements::{BugFix, Enhancements};
     use crate::persist::SaveStore;
     use crate::test_support::with_engine;
@@ -1483,8 +1498,54 @@ mod load_order_tests {
             return;
         }
         let fixed = vec![1, 2, 3, 4, 5, 6, 9, 11];
-        let shown = vec![1, 2, 3, 4, 5, 6, 11, 9];
+        // The pass on the NTFS listing pa1 pa11 pa2 .. pa9
+        // (`original_load_order_is_the_original_pass`).
+        let shown = vec![1, 6, 5, 4, 3, 2, 9, 11];
         assert_eq!(*got.borrow(), [fixed.clone(), shown.clone(), shown, fixed]);
+    }
+
+    /// The LOAD pass gets the NTFS listing order whatever order the store
+    /// lists its files in (round 9, ui F2): with the fix off, two stores
+    /// holding the same checkpoints written in different orders give the
+    /// same rows.
+    #[test]
+    fn the_load_pass_gets_the_ntfs_order_whatever_the_store_lists() {
+        assert_eq!(
+            ntfs_listing_order(names(&[9, 2, 11, 1, 3])),
+            names(&[1, 11, 2, 3, 9])
+        );
+        let mixed = vec![
+            "PA2.GAM".to_string(),
+            "pa11.gam".to_string(),
+            "Pa1.gam".to_string(),
+        ];
+        assert_eq!(
+            ntfs_listing_order(mixed),
+            ["Pa1.gam", "pa11.gam", "PA2.GAM"]
+        );
+        let got = Rc::new(RefCell::new(Vec::new()));
+        let g2 = got.clone();
+        let ran = with_engine(
+            "the_load_pass_gets_the_ntfs_order_whatever_the_store_lists",
+            move |mut e| async move {
+                e.set_enhancements(Enhancements::original());
+                let letter = e.players.letters[e.player];
+                for order in [[1, 2, 3, 4, 5, 6, 9, 11], [11, 9, 6, 5, 4, 3, 2, 1]] {
+                    let store = Rc::new(Listed::default());
+                    for c in order {
+                        store.write(&atlantis_data::saves::checkpoint_name(letter, c), b"");
+                    }
+                    e.saves = store;
+                    g2.borrow_mut().push(e.player_checkpoints());
+                }
+            },
+            |_, _| {},
+        );
+        if ran {
+            let got = got.borrow();
+            assert_eq!(got[0], [1, 6, 5, 4, 3, 2, 9, 11]);
+            assert_eq!(got[0], got[1]);
+        }
     }
 }
 
