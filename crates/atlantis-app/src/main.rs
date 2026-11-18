@@ -108,11 +108,16 @@
 //! `--support-screen` shows it at once (see `atlantis_app::support`).
 //!
 //! The players, the checkpoints (the original's `players.atl` and
-//! `p<letter><chapter>.gam`) and `settings.ini` are kept in the per-user
-//! data folder (`~/.local/share/atlantis-native/<build>` on Linux,
-//! `%APPDATA%\atlantis-native\<build>` on Windows, `~/Library/Application
-//! Support/atlantis-native/<build>` on macOS); `settings.ini` also holds
-//! the enhancements.
+//! `p<letter><chapter>.gam`) and `settings.ini` are kept in the data
+//! folder (`<data folder>/<build>`); `settings.ini` also holds the
+//! enhancements. The data folder is `--data-dir <folder>`, else the one
+//! `ATLANTIS_NATIVE_DATA` names, else, in the portable mode
+//! (`portable.txt` or a `data` folder beside the executable, or beside
+//! the `.app` on macOS), that `data` folder, else the per-user folder
+//! (`~/.local/share/atlantis-native` on Linux, `%APPDATA%\atlantis-native`
+//! on Windows, `~/Library/Application Support/atlantis-native` on macOS;
+//! see `atlantis_engine::persist::data_dir_and_source`). `--help` prints
+//! the options.
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
@@ -141,6 +146,27 @@ fn main() {
         // opened from the Finder.
         .filter(|a| !a.starts_with("-psn_"))
         .collect();
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        print!("{}", atlantis_app::cli::HELP);
+        return;
+    }
+    // `--data-dir <folder>`: the data folder of this run, before the log
+    // (which goes in it) and anything else reads or writes there.
+    match atlantis_app::cli::take_data_dir(&mut args) {
+        Ok(Some(dir)) => {
+            let dir = std::path::absolute(&dir).unwrap_or(dir);
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                eprintln!("--data-dir {}: {e}", dir.display());
+                std::process::exit(2);
+            }
+            atlantis_engine::persist::set_data_dir_override(Some(dir));
+        }
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(2);
+        }
+    }
     let headless = args.iter().any(|a| a == "--headless");
     let log_file = init_log(headless);
     // Atlantis Evolution's development viewer.
@@ -211,6 +237,9 @@ fn main() {
     atlantis_app::watchdog::start();
     if let Some(path) = &log_file {
         log::info!("log in {}", path.display());
+    }
+    if let Some((dir, source)) = atlantis_engine::persist::data_dir_and_source() {
+        log::info!("data folder {} ({source:?})", dir.display());
     }
     let mut flag = |name: &str| match args.iter().position(|a| a == name) {
         Some(i) => {

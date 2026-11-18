@@ -48,6 +48,8 @@ mod a4_prefetch;
 mod a4_wasm_tests;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod cli;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
 pub mod dock_icon;
 #[cfg(target_arch = "wasm32")]
