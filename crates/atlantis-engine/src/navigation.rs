@@ -461,6 +461,11 @@ impl Engine {
         // No warp frame presented since the loop was entered: the port's
         // pass polls first, the original's polls last (0x0041c5f2).
         let mut entered = true;
+        // AngleWarpY as the previous pass started: FUN_0041bfa0 keeps the
+        // frame-start angle in a local (fistp [ebp-8] @ 0x0041c0e3, before
+        // the look step 0x0041c1c3) that the bow test after the frame's
+        // poll reads (0x0041c637).
+        let mut frame_start_angle_y = self.vars.get("anglewarpy");
         while !left_pressed && !exit {
             // Windows sees a press at its cursor (`WarpPointer::cursor`,
             // the loop's pointer once a motion or a SetCursorPos set it):
@@ -506,6 +511,25 @@ impl Engine {
             let bow_click = self.bow_mode && clicked;
             if self.bow_mode {
                 clicked = false;
+            }
+            // The bow step right after the poll that ends the original's
+            // frame (0x0041c61d..0x0041c678), before the next frame's look
+            // step, timer scan (FUN_0042be3c @ 0x0041c369) and drawing: a
+            // left edge in bow mode shoots when the AngleWarpY that frame
+            // started with is below 20, then the arrow frame steps while
+            // TirFleche is set. The timer scan of this pass sees TirFleche
+            // = 1 and the bow is drawn with arrow frame 1 (0x0041c40b).
+            // The first pass has had no poll.
+            if !entered {
+                let mut tir = self.vars.get("tirfleche");
+                atlantis_data::sprite_anim::bow_frame_step(
+                    self.bow_mode,
+                    bow_click,
+                    frame_start_angle_y,
+                    &mut tir,
+                    &mut self.arrow_frame,
+                );
+                self.vars.set("tirfleche", tir);
             }
             // A bar request a timer section of the previous pass left (a
             // right press during its lines): the original's pass ends its
@@ -573,9 +597,11 @@ impl Engine {
                         .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
                     self.mark_pointer_mouse();
                     self.cursor_shown = CURSOR_UNSET;
-                    // The loop entered again (0x0041c003 / 0x0041c00d).
+                    // The loop entered again (0x0041c003 / 0x0041c00d),
+                    // the arrow frame at 0 (0x0041c017).
                     unpumped = (0, 0);
                     self.pointer.loop_entry();
+                    self.arrow_frame = 0;
                     entered = true;
                     // The original's warp loop returns the clicked character
                     // (0x0041c71e) after this frame's timers (0x0041c369);
@@ -754,6 +780,7 @@ impl Engine {
                 self.warp.beta_limit(),
             );
             self.angle_warp = (look.angle_warp_x, look.angle_warp_y);
+            frame_start_angle_y = look.angle_warp_y;
             self.vars.set("anglewarpx", look.angle_warp_x);
             self.vars.set("anglewarpy", look.angle_warp_y);
             self.set_view(alpha, beta);
@@ -814,18 +841,6 @@ impl Engine {
             if self.debug_overlay.get() {
                 self.draw_debug_overlay();
             }
-            // The arrow shot (0x0041c61d..0x0041c6a0), after the frame is
-            // drawn.
-            let mut tir = self.vars.get("tirfleche");
-            let angle_y = self.vars.get("anglewarpy");
-            atlantis_data::sprite_anim::bow_frame_step(
-                self.bow_mode,
-                bow_click,
-                angle_y,
-                &mut tir,
-                &mut self.arrow_frame,
-            );
-            self.vars.set("tirfleche", tir);
             // FUN_00432178, the last call of the frame: the ambient sounds,
             // then the NewSound poll FUN_00432a64.
             self.poll_new_sound().await;
@@ -2360,5 +2375,127 @@ mod tests {
         let original_still = alpha_after_left_arrow(Enhancements::original(), false).unwrap();
         assert_ne!(turned, still);
         assert_eq!(original, original_still);
+    }
+
+    /// At each warp frame's timer scan: TirFleche, the arrow frame and bow
+    /// mode; at call `press_at` a left press (and the view's tilt set to
+    /// `tilt_then`), at `escape_at` a right press and an Escape.
+    struct BowRecord {
+        seen: Rc<RefCell<Vec<(i32, u8, bool)>>>,
+        press_at: usize,
+        tilt_then: Option<f32>,
+        right_escape_at: usize,
+    }
+
+    impl ScriptHooks for BowRecord {
+        fn warp_frame<'a>(&'a mut self, e: &'a mut Engine) -> HookFuture<'a, bool> {
+            let n = self.seen.borrow().len();
+            self.seen
+                .borrow_mut()
+                .push((e.vars.get("tirfleche"), e.arrow_frame, e.bow_mode));
+            if n == self.press_at {
+                if let Some(beta) = self.tilt_then {
+                    e.set_view(e.warp.alpha(), beta);
+                }
+                button(&e.sys, MouseButton::Left, true);
+            }
+            if n == self.right_escape_at {
+                button(&e.sys, MouseButton::Right, true);
+                e.sys.push_input(Input::KeyDown(Key::Escape));
+                e.sys.push_input(Input::KeyUp(Key::Escape));
+            }
+            ready(false)
+        }
+    }
+
+    /// The warp loop in bow mode in place 1 with the view tilted to
+    /// `tilt` degrees; the timer-scan records of its first passes.
+    fn bow_run(
+        test: &str,
+        tilt: f32,
+        press_at: usize,
+        tilt_then: Option<f32>,
+        right_escape_at: usize,
+    ) -> Option<Vec<(i32, u8, bool)>> {
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let (s2, s3) = (seen.clone(), seen.clone());
+        let rad = |deg: f32| deg / 180.0 * std::f32::consts::PI;
+        let mut frames = 0u32;
+        let ran = with_engine(
+            test,
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.set_view(1.0, rad(tilt));
+                e.pointer.prev_alpha = e.warp.alpha();
+                e.pointer.prev_beta = e.warp.beta();
+                e.bow_mode = true;
+                let mut hooks = BowRecord {
+                    seen: s2,
+                    press_at,
+                    tilt_then: tilt_then.map(rad),
+                    right_escape_at,
+                };
+                e.handle_warp(&mut hooks).await;
+            },
+            move |sys, _| {
+                frames += 1;
+                let n = s3.borrow().len();
+                if n == press_at + 3 {
+                    button(sys, MouseButton::Left, false);
+                }
+                if n == right_escape_at + 3 {
+                    button(sys, MouseButton::Right, false);
+                }
+                if n >= 12 || frames > 400 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        ran.then(|| seen.borrow().clone())
+    }
+
+    /// FUN_0041bfa0 tests a bow click right after the frame's poll
+    /// (0x0041c61d..0x0041c653) and steps the arrow frame (0x0041c678)
+    /// before the next frame's timer scan (0x0041c369): the timer section
+    /// of the pass whose poll read the click sees TirFleche = 1 and arrow
+    /// frame 1 (round 9, navigation).
+    #[test]
+    fn a_bow_shot_is_seen_by_the_timer_scan_of_its_pass() {
+        let Some(seen) = bow_run(
+            "a_bow_shot_is_seen_by_the_timer_scan_of_its_pass",
+            10.5,
+            2,
+            None,
+            usize::MAX,
+        ) else {
+            return;
+        };
+        assert_eq!(seen[2].0, 0, "{seen:?}");
+        assert_eq!(seen[3], (1, 1, true), "{seen:?}");
+        assert_eq!(seen[4], (1, 2, true), "{seen:?}");
+    }
+
+    /// The shot's AngleWarpY < 20 test reads the angle the original's frame
+    /// started with (the local [ebp-8], 0x0041c0e3 / 0x0041c637), not the
+    /// one of the frame after: a view tilted from 21 to 19 degrees in the
+    /// frame whose poll reads the click shoots nothing.
+    #[test]
+    fn a_bow_shot_tests_the_angle_its_frame_started_with() {
+        let Some(seen) = bow_run(
+            "a_bow_shot_tests_the_angle_its_frame_started_with",
+            21.5,
+            2,
+            Some(19.5),
+            usize::MAX,
+        ) else {
+            return;
+        };
+        assert!(seen.len() >= 8, "{seen:?}");
+        assert!(
+            seen.iter().all(|&(tir, frame, _)| tir == 0 && frame == 0),
+            "{seen:?}"
+        );
     }
 }
