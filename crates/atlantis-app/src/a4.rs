@@ -26,7 +26,8 @@
 //! original's default: full screen at the desktop's size unless its
 //! `options.xml` asks for a window). The port's own: F11 and Alt+Enter
 //! switch the full screen. The port's settings are in `atlantis4/settings.ini`
-//! ([`A4Settings`]: the language, the renderer, the full screen).
+//! ([`A4Settings`]: the language, the renderer, the full screen, the bug
+//! fixes of [`atlantis4_engine::fixes`]; `--original` turns the fixes off).
 //!
 //! The language is the original's: `lang.ini`'s (GOG.com's installer
 //! writes the one chosen in its client), else `options.xml`'s
@@ -55,7 +56,9 @@
 //! screen (the intro at a new game) over a black background: while it
 //! runs the view does not turn and clicks go to the movie's buttons (a
 //! click shows or hides the skip button at the top right, a click on it
-//! ends the movie), and its end calls `OnMovieFinished`. The sounds play
+//! ends the movie), and its end calls `OnMovieFinished`; with the port's
+//! `fix_skip_films` (on unless `--original`), Escape or Space does what a
+//! click on that button does. The sounds play
 //! as the original mixes them (`atlantis4_engine::sound`, `oalmix`): the
 //! music, the node's `PlaySound` sounds and ambiences, `OnSoundStopped`,
 //! the `AddToBag` notification, and a movie's sound file on the `video`
@@ -109,7 +112,7 @@ use atlantis4_engine::pick::is_click;
 #[cfg(not(target_arch = "wasm32"))]
 use atlantis4_engine::saves::BackupFolder;
 use atlantis4_engine::saves::SaveStore;
-use atlantis4_engine::Game;
+use atlantis4_engine::{Fixes, Game};
 #[cfg(not(target_arch = "wasm32"))]
 use atlantis4_script::{new_game, read_boot_vars, BootValue, EngineRef, ErrorMode};
 use atlantis4_script::{Options, Script, Value};
@@ -504,6 +507,24 @@ impl Viewer {
         }
     }
 
+    /// `fix_skip_films`: Escape or Space during a film does what the skip
+    /// button's click does, when that button could take a click (the
+    /// game shown, no planks over it); the film's end then runs as at its
+    /// last frame, `OnMovieFinished` included. A press held since the
+    /// film is dropped, as the film's buttons took it.
+    fn skip_film(&mut self) {
+        if self.script.is_none() || self.front.active() || self.front.in_transition() {
+            return;
+        }
+        let ended = self.game.borrow_mut().skip_movie();
+        if let Some(name) = ended {
+            if !self.gui_down {
+                self.down = None;
+            }
+            self.movie_finished(name);
+        }
+    }
+
     fn movie_finished(&mut self, name: String) {
         let arg = [Value::Str(name.into_bytes())];
         self.callback("OnMovieFinished", &arg);
@@ -858,7 +879,8 @@ impl ApplicationHandler for Viewer {
                 }
             }
             // The port's keys (the original reads none for the window):
-            // F11 and Alt+Enter switch the full screen.
+            // F11 and Alt+Enter switch the full screen; Escape and Space
+            // skip a film (`fix_skip_films`).
             #[cfg(not(target_arch = "wasm32"))]
             WindowEvent::KeyboardInput { event, .. }
                 if event.state == ElementState::Pressed && !event.repeat =>
@@ -866,6 +888,7 @@ impl ApplicationHandler for Viewer {
                 match event.logical_key {
                     Key::Named(NamedKey::Enter) if self.desk.alt => self.toggle_fullscreen(),
                     Key::Named(NamedKey::F11) => self.toggle_fullscreen(),
+                    Key::Named(NamedKey::Escape | NamedKey::Space) => self.skip_film(),
                     _ => {}
                 }
             }
@@ -1155,6 +1178,8 @@ pub struct A4Settings {
     /// Start in full screen (`fullscreen = on|off`; on: the original runs
     /// full screen unless its `options.xml` asks for a window).
     pub fullscreen: bool,
+    /// The bug fixes (`fix_… = 0|1`, [`atlantis4_engine::fixes`]).
+    pub fixes: Fixes,
 }
 
 impl Default for A4Settings {
@@ -1163,6 +1188,7 @@ impl Default for A4Settings {
             language: None,
             cpu: false,
             fullscreen: true,
+            fixes: Fixes::default(),
         }
     }
 }
@@ -1204,7 +1230,7 @@ impl A4Settings {
                             s.fullscreen = false;
                             true
                         }
-                        _ => false,
+                        (key, _) => s.fixes.set(key, &v).unwrap_or(false),
                     }
                 }
                 None => false,
@@ -1228,10 +1254,12 @@ impl A4Settings {
              # (the processor, the reference)\n\
              renderer = {}\n\
              # Start in full screen (F11 or Alt+Enter switches it)\n\
-             fullscreen = {}\n",
+             fullscreen = {}\n\
+             {}",
             self.language.as_deref().unwrap_or("auto"),
             if self.cpu { "cpu" } else { "gpu" },
             if self.fullscreen { "on" } else { "off" },
+            self.fixes.lines(),
         )
     }
 }
@@ -1243,11 +1271,19 @@ fn settings_path() -> std::path::PathBuf {
 }
 
 /// `settings.ini` at `path`, written with the defaults when there is none
-/// (as the other games').
+/// (as the other games'); a file of an earlier version, without the bug
+/// fixes' keys, is written again with them (its own values kept).
 #[cfg(not(target_arch = "wasm32"))]
 pub fn load_settings(path: &Path) -> A4Settings {
     match std::fs::read(path) {
-        Ok(b) => A4Settings::parse(&String::from_utf8_lossy(&b)),
+        Ok(b) => {
+            let text = String::from_utf8_lossy(&b);
+            let s = A4Settings::parse(&text);
+            if !text.to_ascii_lowercase().contains("fix_skip_films") {
+                save_settings(path, &s);
+            }
+            s
+        }
         Err(_) => {
             let s = A4Settings::default();
             save_settings(path, &s);
@@ -1269,7 +1305,7 @@ fn save_settings(path: &Path, s: &A4Settings) {
 /// The game at `dir` ready for its window: starting as `start` says,
 /// drawing as `render` says, in `language` when given (Native's choice),
 /// else in the install's (`lang.ini`, as the original), full screen as
-/// `fullscreen` says.
+/// `fullscreen` says, with the bug fixes `fixes`.
 #[cfg(not(target_arch = "wasm32"))]
 fn open_viewer(
     dir: &Path,
@@ -1277,6 +1313,7 @@ fn open_viewer(
     render: Render,
     language: Option<&str>,
     fullscreen: bool,
+    fixes: Fixes,
 ) -> Result<Viewer, String> {
     let (files, build) =
         A4Files::open_dir(dir).map_err(|e| crate::setup::explain_atlantis4(dir, &e))?;
@@ -1288,6 +1325,8 @@ fn open_viewer(
     );
     let clock = GameClock::new();
     let mut g = Game::new(files, HEIGHT);
+    log::info!("{fixes:?}");
+    g.fixes = fixes;
     // `play()` reads the clock at the call (a movie started by a script).
     let c = clock.clone();
     g.clock_us = Some(Box::new(move || c.us()));
@@ -1378,7 +1417,7 @@ fn open_viewer(
 /// starting as `start` says, drawing as `render` says, in `language` when
 /// given (`--lang`), else in `settings.ini`'s or the install's; in a
 /// window unless `fullscreen`. `settings.ini` is neither used for the
-/// renderer nor written.
+/// renderer nor written; the bug fixes are all on.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn run_view(
     dir: &Path,
@@ -1387,7 +1426,14 @@ pub fn run_view(
     language: Option<&str>,
     fullscreen: bool,
 ) -> Result<(), String> {
-    let mut app = open_viewer(dir, start_at, render, language, fullscreen)?;
+    let mut app = open_viewer(
+        dir,
+        start_at,
+        render,
+        language,
+        fullscreen,
+        Fixes::default(),
+    )?;
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     el.run_app(&mut app)
         .map_err(|e| format!("The window failed: {e}"))
@@ -1401,16 +1447,18 @@ const SHIFT_GRACE: Duration = Duration::from_millis(2000);
 /// The game at `dir` as the program plays it (a folder on the command
 /// line, or the game library's choice, on its event loop `el`): the
 /// splashes and the main menu, as `settings.ini` says (the language, the
-/// renderer, the full screen; `fullscreen` forces the last); with
-/// `shift_grace` (the library's one game, started without its screen)
-/// Shift held in the first moments goes back to the library. Returns when
-/// the window closes.
+/// renderer, the full screen, the bug fixes; `fullscreen` forces the
+/// full screen, `original` (`--original`) turns every fix off for this run
+/// without writing the file); with `shift_grace` (the library's one game,
+/// started without its screen) Shift held in the first moments goes back
+/// to the library. Returns when the window closes.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn run_window_on(
     el: &mut EventLoop<()>,
     dir: &Path,
     fullscreen: bool,
     shift_grace: bool,
+    original: bool,
 ) -> Result<crate::a2::Ended, String> {
     use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     // The 2004 CD program: Atlantis III's engine, its own window.
@@ -1429,6 +1477,11 @@ pub fn run_window_on(
         render,
         settings.language.as_deref(),
         fullscreen || settings.fullscreen,
+        if original {
+            Fixes::original()
+        } else {
+            settings.fixes
+        },
     )?;
     app.desk.settings = Some(settings);
     app.desk.shift_until = shift_grace.then(|| Instant::now() + SHIFT_GRACE);
@@ -1464,6 +1517,13 @@ mod tests {
             A4Settings::parse("language = de\nlanguage = auto").language,
             None
         );
+        // The bug fixes' keys, on by default.
+        assert!(d.fixes.skip_films);
+        assert!(d.to_text().contains("\nfix_skip_films = 1\n"));
+        let off = A4Settings::parse("fix_skip_films = 0\n");
+        assert!(!off.fixes.skip_films);
+        assert_eq!(A4Settings::parse(&off.to_text()), off);
+        assert!(A4Settings::parse("fix_skip_films = maybe").fixes.skip_films);
     }
 
     #[test]
@@ -1475,8 +1535,18 @@ mod tests {
         assert!(std::fs::read_to_string(&p)
             .unwrap()
             .contains("fullscreen = on"));
+        // An earlier version's file: written again with the fixes' keys,
+        // its own values kept.
         std::fs::write(&p, "renderer = cpu\n").unwrap();
         assert!(load_settings(&p).cpu);
+        let text = std::fs::read_to_string(&p).unwrap();
+        assert!(text.contains("renderer = cpu") && text.contains("fix_skip_films = 1"));
+        std::fs::write(&p, "fix_skip_films = off\n").unwrap();
+        assert!(!load_settings(&p).fixes.skip_films);
+        assert_eq!(
+            std::fs::read_to_string(&p).unwrap(),
+            "fix_skip_films = off\n"
+        );
         let _ = std::fs::remove_dir_all(&d);
     }
 

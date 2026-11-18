@@ -269,3 +269,140 @@ fn the_end_goes_back_to_the_main_menu_through_the_planks() {
     assert!(text.contains("<WarpName name=\"3D/LZ/0004.wp\" />"));
     assert!(g.has_autosave());
 }
+
+/// A new game up to its intro: the planks opened on `Bateau_CA/0001`,
+/// `Videos/intro.ogv` playing.
+fn in_the_intro() -> Option<App> {
+    let mut a = app()?;
+    a.click_front("newGameButton");
+    a.tick_to(4000.0);
+    a.tick_to(5000.0);
+    a.tick_to(6000.0);
+    assert_eq!(a.node(), "3D/Bateau_CA/0001.wp");
+    assert_eq!(
+        a.game.borrow().movie.as_ref().map(|m| m.path.clone()),
+        Some("Videos/intro.ogv".to_string())
+    );
+    Some(a)
+}
+
+/// How the film playing ends: `skip` (`fix_skip_films`'s key, one second
+/// in) or played through (the frame animation past its last frame);
+/// then `OnMovieFinished` as the viewer runs it.
+fn end_film(a: &mut App, skip: bool) {
+    let (start, end) = {
+        let g = a.game.borrow();
+        let anim = g.movie.as_ref().unwrap().sprite.as_ref().unwrap().anim;
+        let len = f64::from(anim.n) / f64::from(anim.fps) * 1000.0;
+        (anim.start_ms, anim.start_ms + len + 100.0)
+    };
+    let name = if skip {
+        assert!(a.game.borrow_mut().update_movie(start + 1000.0).is_none());
+        a.game.borrow_mut().skip_movie()
+    } else {
+        assert!(a.game.borrow_mut().update_movie(end - 200.0).is_none());
+        a.game.borrow_mut().update_movie(end)
+    }
+    .expect("the film ends");
+    a.script
+        .as_mut()
+        .unwrap()
+        .callback("OnMovieFinished", &[Value::Str(name.into_bytes())])
+        .unwrap();
+    a.callbacks();
+}
+
+/// What a film's end leaves: the node, the Lua globals, the inventory,
+/// the documents, the music and the `video` channel, the movie's cues.
+fn after_film(a: &App) -> String {
+    let g = a.game.borrow();
+    format!(
+        "{}\n{:?}\n{:?}\n{:?}\nmusic {} {}\nvideo {}\nmovie {}\n{:?}",
+        a.node(),
+        a.globals(),
+        g.inventory,
+        g.documents,
+        g.sounds.music.path(),
+        g.sounds.music.is_playing(),
+        g.sounds.video.is_playing(),
+        g.movie.is_some(),
+        g.movie_cues,
+    )
+}
+
+/// `fix_skip_films`: Escape or Space during a film runs the film's one
+/// end (@ 0x00524740) sooner: after the intro (the matches in the bag,
+/// the first tutorial shown) and after the credits film
+/// `generique.ogv` (whose `OnMovieFinished` changes the node to
+/// `Barque_ME/0001`) the game is the same as after the film played
+/// through.
+#[test]
+fn a_skipped_film_ends_as_one_played_through() {
+    let Some(mut played) = in_the_intro() else {
+        return;
+    };
+    let mut skipped = in_the_intro().unwrap();
+    assert!(skipped.game.borrow().fixes.skip_films);
+    end_film(&mut played, false);
+    end_film(&mut skipped, true);
+    let after = after_film(&played);
+    assert_eq!(after_film(&skipped), after);
+    assert!(
+        after.contains("ALLUMETTES") && after.contains("Tuto_360"),
+        "{after}"
+    );
+    assert!(after.contains("music Sounds/Musiques/muzik20.ogg true\nvideo false\nmovie false"));
+
+    // The credits film, from the trunk taken and the evacuation: through
+    // the door to `Bateau_CO/0003`.
+    for a in [&mut played, &mut skipped] {
+        for _ in 0..2 {
+            a.game.borrow_mut().hide_document();
+            a.callbacks();
+        }
+        let s = a.script.as_mut().unwrap();
+        s.run_chunk(b"CO_Evacuation = true CA_MALLE_Taken = true", b"t");
+        s.callback(
+            "OnWarpObjectHit",
+            &[Value::Str(b"3D\\Bateau_CO\\0003.wp".to_vec())],
+        )
+        .unwrap();
+        assert_eq!(
+            a.game.borrow().movie.as_ref().map(|m| m.path.clone()),
+            Some("Videos/generique.ogv".to_string())
+        );
+    }
+    end_film(&mut played, false);
+    end_film(&mut skipped, true);
+    assert!(played.node().contains("Barque_ME"), "{}", played.node());
+    assert_eq!(after_film(&skipped), after_film(&played));
+}
+
+/// With the fix off (`--original`, `fix_skip_films = 0`), the key does
+/// nothing: the intro plays on, and ends at its last frame.
+#[test]
+fn without_the_fix_a_key_does_not_skip() {
+    let Some(mut a) = in_the_intro() else { return };
+    a.game.borrow_mut().fixes = atlantis4_engine::Fixes::original();
+    let start = {
+        let g = a.game.borrow();
+        g.movie
+            .as_ref()
+            .unwrap()
+            .sprite
+            .as_ref()
+            .unwrap()
+            .anim
+            .start_ms
+    };
+    assert!(a.game.borrow_mut().update_movie(start + 1000.0).is_none());
+    assert_eq!(a.game.borrow_mut().skip_movie(), None);
+    {
+        let g = a.game.borrow();
+        let m = g.movie.as_ref().expect("still playing");
+        assert!(m.sprite.as_ref().unwrap().anim.playing);
+        assert!(g.sounds.video.is_playing() && !g.sounds.music.is_playing());
+    }
+    end_film(&mut a, false);
+    assert!(a.game.borrow().movie.is_none());
+}

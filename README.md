@@ -153,8 +153,9 @@ Atlantis Native contains none of them.</sub>
   screenshots; on the desktop and in the browser.
 - 🌊 **Atlantis Evolution**: GOG.com's edition in English, French,
   German, Italian and Spanish, its interface laid out on any window size
-  as the original lays it out, full screen or windowed; on the desktop
-  and in the browser. Its original 2004 CD program is in the game library
+  as the original lays it out, full screen or windowed; Escape or Space
+  skips a film (a bug fix: the original has only its skip button); on
+  the desktop and in the browser. Its original 2004 CD program is in the game library
   too, as a preview.
 - 🌐 **In the browser**: the four games, read from your own folder; the
   CD editions of the first three also from their disc images (`.iso`,

@@ -37,6 +37,8 @@
 //! - [`menus`]: the front end (splashes, main menu, confirmations,
 //!   options, credits, load screen, the planks' transition);
 //! - [`options`]: `options.xml` and the volume steps;
+//! - [`fixes`]: the port's bug fixes (`settings.ini`), off with
+//!   `--original`;
 //! - [`saves`], [`game_saves`]: the saves on disk (`SaveGame`,
 //!   `Game::load`'s save branch, the chapter slots), `Game::leave` /
 //!   `Game::enter`, `FinishGame` ([`ending`]), and what the menus see of
@@ -50,6 +52,7 @@ pub mod cube;
 pub mod dialog;
 pub mod documents;
 pub mod ending;
+pub mod fixes;
 pub mod frame_anim;
 pub mod game;
 mod game_gui;
@@ -75,6 +78,7 @@ pub mod view;
 pub mod warp;
 
 pub use camera::Camera;
+pub use fixes::Fixes;
 pub use game::Game;
 pub use node::Node;
 pub use view::View;
