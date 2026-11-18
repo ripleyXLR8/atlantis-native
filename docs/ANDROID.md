@@ -27,14 +27,22 @@ Either of these:
   the folder that holds the game and press "Use this folder", then
   "Allow". The app remembers the folder (Android keeps the permission)
   and opens it at every start. The folder can hold:
-  - the files of the game's CD (`atlantis.exe` and its `BIGCD` archives),
-    or a copy of an installed game;
-  - the images of the four CDs (`.iso`, `.bin`, `.img`, `.mdf`, `.nrg`);
-  - either of the above in a folder directly inside it.
+  - Atlantis: The Lost Tales: the files of its CD (`atlantis.exe` and its
+    `BIGCD` archives), a copy of an installed game, or the images of its
+    four CDs (`.iso`, `.bin`, `.img`, `.mdf`, `.nrg`);
+  - Atlantis II, III or Evolution: a copy of the installed game (the
+    folder with its program). The CD releases of Atlantis II and III
+    also need their discs: a copy of each disc, or its image, in the
+    installed game's folder, in a folder inside it, or in a folder
+    beside it in the chosen folder. Atlantis II needs its four discs
+    there, as the game cannot be given another one while it runs;
+  - any of the above in a folder directly inside it.
 
   The files are read where they are, by parts, through the Storage Access
-  Framework. Nothing is copied. Only Atlantis: The Lost Tales can be
-  played from a chosen folder for now.
+  Framework. Nothing is copied. Evolution's 2004 CD program is played
+  from the app's own folder only, for now. When Android ends the app
+  while Atlantis II, III or Evolution runs, the next start opens the
+  game again at its menu: the game's own saves are kept.
 - **The app's own folder**, used when no chosen folder holds a game:
 
       /sdcard/Android/data/io.github.ripleyxlr8.atlantisnative/files/game
@@ -178,8 +186,11 @@ the workspace's version.
   hands its front end over to the next activity's `android_main`.
 - **The vendored winit.** winit 0.30 refuses a second event loop in a
   process. `vendor/winit` is winit 0.30.13 with that check skipped on
-  Android only (`[patch.crates-io]` in the workspace's `Cargo.toml`). The
-  other platforms build the same code as the published crate.
+  Android only (`[patch.crates-io]` in the workspace's `Cargo.toml`), and
+  with `platform::android::key_event`: the key events the app makes for
+  Back and the on-screen keyboard's text in Atlantis II, III and
+  Evolution, which reach it outside winit. The other platforms build the
+  same code as the published crate.
 - **What is Android-only.** Everything specific to Android is behind
   `cfg(target_os = "android")`. On Android cpal is 0.16, whose AAudio
   output is pure Rust (desktop and web stay on 0.15), and the rfd dialogs

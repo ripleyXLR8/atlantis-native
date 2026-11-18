@@ -186,3 +186,23 @@ pub mod activity {
     #[doc(hidden)]
     pub struct AndroidApp;
 }
+
+/// Atlantis Native's patch: a key event made by the application (the
+/// Back button and the on-screen keyboard's text, which reach it
+/// outside winit's input queue), sent to its own handler.
+pub fn key_event(
+    physical_key: crate::keyboard::PhysicalKey,
+    logical_key: crate::keyboard::Key,
+    text: Option<crate::keyboard::SmolStr>,
+    state: crate::event::ElementState,
+) -> crate::event::KeyEvent {
+    crate::event::KeyEvent {
+        physical_key,
+        logical_key,
+        text,
+        location: crate::keyboard::KeyLocation::Standard,
+        state,
+        repeat: false,
+        platform_specific: crate::platform_impl::KeyEventExtra {},
+    }
+}

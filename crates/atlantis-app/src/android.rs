@@ -228,6 +228,60 @@ pub(crate) fn mode_events(
     }
 }
 
+/// Atlantis II, III and Evolution's windows on Android: the Back button
+/// (Escape) and the on-screen keyboard's text and keys, which reach the
+/// app outside winit (`AtlantisActivity`), as the window's key events.
+pub(crate) fn mode_typed() -> Vec<winit::event::WindowEvent> {
+    use crate::android_saf::Typed;
+    use winit::event::{DeviceId, ElementState, WindowEvent};
+    use winit::keyboard::{Key, KeyCode, NamedKey, NativeKeyCode, PhysicalKey, SmolStr};
+    use winit::platform::android::key_event;
+    let mut out = Vec::new();
+    let mut press = |physical: PhysicalKey, logical: Key, text: Option<SmolStr>| {
+        for state in [ElementState::Pressed, ElementState::Released] {
+            let text = (state == ElementState::Pressed)
+                .then(|| text.clone())
+                .flatten();
+            out.push(WindowEvent::KeyboardInput {
+                device_id: DeviceId::dummy(),
+                event: key_event(physical, logical.clone(), text, state),
+                is_synthetic: false,
+            });
+        }
+    };
+    for t in crate::android_saf::take_typed() {
+        match t {
+            Typed::Back => press(
+                PhysicalKey::Code(KeyCode::Escape),
+                Key::Named(NamedKey::Escape),
+                None,
+            ),
+            Typed::Key(66) => press(
+                PhysicalKey::Code(KeyCode::Enter),
+                Key::Named(NamedKey::Enter),
+                Some(SmolStr::new("\r")),
+            ),
+            Typed::Key(67) => press(
+                PhysicalKey::Code(KeyCode::Backspace),
+                Key::Named(NamedKey::Backspace),
+                None,
+            ),
+            Typed::Text(text) => {
+                for c in text.chars() {
+                    let s = SmolStr::new(c.to_string());
+                    press(
+                        PhysicalKey::Unidentified(NativeKeyCode::Unidentified),
+                        Key::Character(s.clone()),
+                        Some(s),
+                    );
+                }
+            }
+            Typed::Key(_) | Typed::Redraw => {}
+        }
+    }
+    out
+}
+
 /// The entry point android-activity calls on its own thread, once the
 /// activity is created.
 #[no_mangle]
@@ -301,32 +355,40 @@ fn android_main(activity: AndroidApp) {
     // The first game's front end (also the "no game" screen), unless
     // Atlantis II, III or Evolution was found: their own modes, on the
     // same event loop, after it (as the desktop's `main`).
-    if !app.session().is_some_and(|s| s.wants_own_mode()) {
+    if !app.session().is_some_and(|s| s.wants_own_mode()) && app.android_other.is_none() {
         if let Err(e) = event_loop.run_app_on_demand(&mut app) {
             log::error!("event loop: {e}");
         }
     }
     if !destroyed() {
-        if let Some(session) = app.session_mut() {
-            let (a2, a3, a4) = (
-                session.take_atlantis2(),
-                session.take_atlantis3(),
-                session.take_atlantis4(),
-            );
-            if a2.is_some() || a3.is_some() || a4.is_some() {
-                drop(app);
-                let Err(why) = run_other_game(&mut event_loop, a2, a3, a4) else {
-                    log::info!("event loop ended");
-                    return;
-                };
-                // Its error on the "no game" screen.
-                log::error!("the game could not start: {why}");
-                app = front_end();
-                app.show_notice(&["The game could not start:".to_string(), why]);
-                if !destroyed() {
-                    if let Err(e) = event_loop.run_app_on_demand(&mut app) {
-                        log::error!("event loop: {e}");
-                    }
+        let tree_game = app.android_other.take();
+        let dirs = app
+            .session_mut()
+            .map(|s| (s.take_atlantis2(), s.take_atlantis3(), s.take_atlantis4()));
+        let next = match (tree_game, dirs) {
+            (Some(game), _) => Some(Next::Tree(game)),
+            (None, Some((a2, a3, a4))) if a2.is_some() || a3.is_some() || a4.is_some() => {
+                Some(Next::Dirs(a2, a3, a4))
+            }
+            _ => None,
+        };
+        if let Some(next) = next {
+            drop(app);
+            let ran = match next {
+                Next::Tree(game) => run_tree_game(&mut event_loop, game),
+                Next::Dirs(a2, a3, a4) => run_other_game(&mut event_loop, a2, a3, a4),
+            };
+            let Err(why) = ran else {
+                log::info!("event loop ended");
+                return;
+            };
+            // Its error on the "no game" screen.
+            log::error!("the game could not start: {why}");
+            app = front_end();
+            app.show_notice(&["The game could not start:".to_string(), why]);
+            if !destroyed() {
+                if let Err(e) = event_loop.run_app_on_demand(&mut app) {
+                    log::error!("event loop: {e}");
                 }
             }
         }
@@ -342,6 +404,14 @@ fn android_main(activity: AndroidApp) {
         log::info!("event loop ended");
     }
     // android-activity then finishes the activity and ends this thread.
+}
+
+/// The game played after the first game's front end.
+enum Next {
+    /// From a chosen folder.
+    Tree(OtherGame),
+    /// From the app's own folder: Atlantis II's, III's or Evolution's.
+    Dirs(Option<PathBuf>, Option<PathBuf>, Option<PathBuf>),
 }
 
 /// The first game's front end, without a game.
@@ -389,36 +459,61 @@ fn chosen_folder_file() -> PathBuf {
 /// What a folder chosen in the picker holds.
 enum FoundInTree {
     Game(Box<atlantis_data::Game>),
-    /// Another game (its name): not played from a chosen folder yet.
-    Other(&'static str),
+    /// Atlantis II, III or Evolution, played in its own mode after the
+    /// first game's front end ([`android_main`]).
+    Other(OtherGame),
+    /// A game not played from a chosen folder yet (its name).
+    Unsupported(&'static str),
     Nothing(String),
+}
+
+/// Atlantis II, III or Evolution in a chosen folder: its install folder,
+/// and the folders and CD images its discs may be in (the other folders
+/// of the chosen one, those inside the install, and the install itself).
+pub(crate) struct OtherGame {
+    kind: crate::setup::GameKind,
+    install: Arc<dyn atlantis_data::FileSource>,
+    discs: Vec<(String, Arc<dyn atlantis_data::FileSource>)>,
 }
 
 /// The game in the chosen folder `tree` or in a folder directly inside it
 /// (the first that opens, in name order): its files, or the images of its
 /// CDs.
 fn find_game_in_tree(tree: &str) -> FoundInTree {
+    use crate::setup::GameKind;
     use atlantis_data::FileSource;
     let Some(top) = crate::android_saf::SafDir::top(tree) else {
         return FoundInTree::Nothing("the folder cannot be read".to_string());
     };
-    let mut candidates = vec![top];
-    let subs = candidates[0].subfolders();
-    candidates.extend(subs);
+    let subs = top.subfolders();
+    let candidates: Vec<Arc<crate::android_saf::SafDir>> =
+        std::iter::once(top).chain(subs).map(Arc::new).collect();
     let mut first_error = None;
-    let mut other = None;
-    for c in candidates {
-        // The other games, by their program files.
-        let names: Vec<String> = c.list("").iter().map(|n| n.to_lowercase()).collect();
-        let has = |n: &str| names.iter().any(|x| x == n);
-        if has("atlantis2.exe") {
-            other.get_or_insert("Atlantis II");
-        } else if has("atlantis evolution.exe") {
-            other.get_or_insert("Atlantis Evolution");
-        } else if has("game.exe") && has("datas") {
-            other.get_or_insert("Atlantis III");
+    let mut other: Option<(GameKind, usize)> = None;
+    let mut unsupported = None;
+    for (i, c) in candidates.iter().enumerate() {
+        // The other games, by their program files, then checked.
+        if other.is_none() {
+            let names: Vec<String> = c.list("").iter().map(|n| n.to_lowercase()).collect();
+            let has = |n: &str| names.iter().any(|x| x == n);
+            let src: Arc<dyn FileSource> = c.clone();
+            if (has("atlantis2.exe") || (has("game.exe") && !has("datas")))
+                && atlantis2_data::files::find_exe(&*src).is_ok()
+            {
+                other = Some((GameKind::Atlantis2, i));
+            } else if has("datas")
+                && (has("game.exe") || has("atlantis3.exe"))
+                && atlantis3_data::A3Files::new(src.clone()).build().is_ok()
+            {
+                other = Some((GameKind::Atlantis3, i));
+            } else if has("atlantis evolution.exe") {
+                if atlantis4_data::A4Files::new(src).build().is_ok() {
+                    other = Some((GameKind::Atlantis4, i));
+                } else {
+                    unsupported.get_or_insert("Atlantis Evolution (2004)");
+                }
+            }
         }
-        let c = Arc::new(c);
         let opened = match atlantis_data::Game::open(c.clone()) {
             Ok(g) => Ok(g),
             Err(e) => match c.disc_set() {
@@ -437,9 +532,60 @@ fn find_game_in_tree(tree: &str) -> FoundInTree {
             }
         }
     }
-    match other {
-        Some(name) => FoundInTree::Other(name),
+    if let Some((kind, i)) = other {
+        log::info!("chosen folder: {}", game_name(kind));
+        let install = candidates[i].clone();
+        let mut dirs: Vec<Arc<crate::android_saf::SafDir>> = candidates
+            .iter()
+            .enumerate()
+            .filter(|&(j, _)| j != i)
+            .map(|(_, c)| c.clone())
+            .collect();
+        dirs.extend(install.subfolders().into_iter().map(Arc::new));
+        dirs.push(install.clone());
+        let mut discs: Vec<(String, Arc<dyn FileSource>)> = Vec::new();
+        for (n, d) in dirs.into_iter().enumerate() {
+            if let Some(set) = d.disc_set() {
+                discs.push((format!("images in folder {n}"), Arc::new(set)));
+            }
+            discs.push((format!("folder {n}"), d));
+        }
+        return FoundInTree::Other(OtherGame {
+            kind,
+            install,
+            discs,
+        });
+    }
+    match unsupported {
+        Some(name) => FoundInTree::Unsupported(name),
         None => FoundInTree::Nothing(first_error.unwrap_or_default()),
+    }
+}
+
+/// Atlantis II, III or Evolution from a chosen folder on `el`, until it
+/// ends or the activity is destroyed (the next activity opens the folder
+/// again and starts it anew).
+fn run_tree_game(el: &mut EventLoop<()>, game: OtherGame) -> Result<(), String> {
+    use crate::setup::GameKind;
+    let shown = Path::new("The chosen folder");
+    match game.kind {
+        GameKind::Atlantis2 => {
+            let (engine, label) = crate::a2::boot_source(game.install, game.discs)?;
+            crate::a2::run_window_on(el, engine, label, true, None, false).map(|_| ())
+        }
+        GameKind::Atlantis3 => {
+            let (g, _) =
+                crate::a3::open_source_in(game.install, game.discs, shown, &crate::a3::data_dir())?;
+            crate::a3::run_window_on(el, g, true, false).map(|_| ())
+        }
+        GameKind::Atlantis4 => {
+            let files = atlantis4_data::A4Files::new(game.install);
+            let build = files
+                .build()
+                .map_err(|e| crate::setup::explain_atlantis4(shown, &e))?;
+            crate::a4::run_files_on(el, files, build)
+        }
+        GameKind::LostTales => Ok(()),
     }
 }
 
@@ -513,7 +659,19 @@ impl App {
                 self.play_game(*game, None);
                 true
             }
-            FoundInTree::Other(name) => {
+            FoundInTree::Other(game) => {
+                if let Err(e) = std::fs::create_dir_all(data_dir())
+                    .and_then(|()| std::fs::write(chosen_folder_file(), tree))
+                {
+                    log::warn!("the chosen folder not kept: {e}");
+                }
+                self.touch.picker = false;
+                // (played in its own mode once this front end's event
+                // loop ends, android_main)
+                self.android_other = Some(game);
+                true
+            }
+            FoundInTree::Unsupported(name) => {
                 if explain {
                     let dir = GAME_DIR
                         .lock()
@@ -536,8 +694,8 @@ impl App {
                         "No game found in the chosen folder.".to_string(),
                         why,
                         String::new(),
-                        "Choose the folder holding atlantis.exe and the BIGCD files,".to_string(),
-                        "or the images of the CDs.".to_string(),
+                        "Choose the folder of one of the four games (its CD's files or an installed copy),".to_string(),
+                        "or the images of its CDs.".to_string(),
                     ]);
                 }
                 false
@@ -559,7 +717,7 @@ impl App {
     }
 
     /// The picker's answer, once it came (the activity resumed).
-    pub(crate) fn poll_picked(&mut self) {
+    pub(crate) fn poll_picked(&mut self, el: &winit::event_loop::ActiveEventLoop) {
         let Some(tree) = crate::android_saf::take_picked() else {
             return;
         };
@@ -567,6 +725,11 @@ impl App {
             return;
         }
         self.open_tree(&tree, true);
+        if self.android_other.is_some() {
+            // Atlantis II, III or Evolution: its own mode, after this
+            // event loop.
+            el.exit();
+        }
     }
 }
 

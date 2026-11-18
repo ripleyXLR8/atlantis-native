@@ -843,6 +843,12 @@ impl ApplicationHandler for Viewer {
                 el.set_control_flow(ControlFlow::Wait);
                 return;
             }
+            // Back and the on-screen keyboard's text.
+            if let Some(id) = self.window.as_ref().map(|w| w.id()) {
+                for e in crate::android::mode_typed() {
+                    self.window_event(el, id, e);
+                }
+            }
         }
         let now = Instant::now();
         if now >= self.next_frame {
@@ -1350,6 +1356,20 @@ fn open_viewer(
 ) -> Result<Viewer, String> {
     let (files, build) =
         A4Files::open_dir(dir).map_err(|e| crate::setup::explain_atlantis4(dir, &e))?;
+    open_viewer_files(files, build, start_at, render, language, fullscreen, fixes)
+}
+
+/// [`open_viewer`] with the install's files given (`build` theirs).
+#[cfg(not(target_arch = "wasm32"))]
+fn open_viewer_files(
+    files: A4Files,
+    build: &'static atlantis4_data::exe::Build,
+    start_at: Start,
+    render: Render,
+    language: Option<&str>,
+    fullscreen: bool,
+    fixes: Fixes,
+) -> Result<Viewer, String> {
     log::info!(
         "Atlantis Evolution {}, {}; saves and settings in {}",
         build.id,
@@ -1486,6 +1506,35 @@ const SHIFT_GRACE: Duration = Duration::from_millis(2000);
 /// started without its screen) Shift held in the first moments goes back
 /// to the library. Returns when the window closes.
 #[cfg(not(target_arch = "wasm32"))]
+/// Android: Atlantis Evolution from `files` (a folder chosen in the
+/// picker, read through `FileSource`) on `el`, full screen, until it
+/// ends.
+#[cfg(target_os = "android")]
+pub fn run_files_on(
+    el: &mut EventLoop<()>,
+    files: A4Files,
+    build: &'static atlantis4_data::exe::Build,
+) -> Result<(), String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    let settings = load_settings(&settings_path());
+    let render = Render {
+        cpu: settings.cpu,
+        check: false,
+    };
+    let mut app = open_viewer_files(
+        files,
+        build,
+        Start::Menus,
+        render,
+        settings.language.as_deref(),
+        true,
+        settings.fixes,
+    )?;
+    app.desk.settings = Some(settings);
+    el.run_app_on_demand(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))
+}
+
 pub fn run_window_on(
     el: &mut EventLoop<()>,
     dir: &Path,

@@ -296,6 +296,10 @@ pub struct App {
     /// picture, when shown.
     #[cfg(target_os = "android")]
     menu_button: Option<android::Rect>,
+    /// Android: Atlantis II, III or Evolution found in the chosen folder,
+    /// played once this front end's event loop ends.
+    #[cfg(target_os = "android")]
+    android_other: Option<android::OtherGame>,
 }
 
 impl App {
@@ -438,6 +442,8 @@ impl App {
             bag_button: None,
             #[cfg(target_os = "android")]
             menu_button: None,
+            #[cfg(target_os = "android")]
+            android_other: None,
         }
     }
 
@@ -1567,7 +1573,7 @@ impl ApplicationHandler for App {
         // text, the Back button.
         #[cfg(target_os = "android")]
         {
-            self.poll_picked();
+            self.poll_picked(el);
             self.poll_typed(el);
         }
         // In the browser the redraw loop keeps itself going (see

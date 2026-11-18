@@ -78,7 +78,7 @@ pub fn label(dir: &Path) -> Result<String, OpenError> {
 /// The install with `Datas\Atlantis3.cfg` taken from the player's folder
 /// once the menus wrote it there (the game's folder stays untouched).
 struct WithCfg {
-    install: StdDir,
+    install: Arc<dyn FileSource>,
     cfg: PathBuf,
     /// The settings file's name in the install (`Datas/Atlantis3.cfg`;
     /// the 2004 program's `datas/Atlantis4.cfg`, as
@@ -162,13 +162,54 @@ pub fn open_in_with_discs(
     let cfg_path = base.join("Atlantis3.cfg");
     let files = A3Files::with_discs(
         Arc::new(WithCfg {
-            install: StdDir::new(dir),
+            install: Arc::new(StdDir::new(dir)),
             cfg: cfg_path.clone(),
             name: atlantis3_data::cfg::CFG_PATH,
         }),
         dir,
         discs,
     );
+    open_files_in(files, dir, base, fixes, cfg_path)
+}
+
+/// The game from `install` (a folder chosen on Android: its files read
+/// through `FileSource`) with the retail CD's discs among `discs`, its
+/// saves, `Atlantis3.cfg` and `settings.ini` in `base`; `shown` names the
+/// folder in the errors.
+#[cfg(target_os = "android")]
+pub fn open_source_in(
+    install: Arc<dyn FileSource>,
+    discs: Vec<(String, Arc<dyn FileSource>)>,
+    shown: &Path,
+    base: &Path,
+) -> Result<(Game, String), String> {
+    let _ = std::fs::create_dir_all(base);
+    let fixes = fixes_in(base, false);
+    let cfg_path = base.join("Atlantis3.cfg");
+    let install: Arc<dyn FileSource> = Arc::new(WithCfg {
+        install,
+        cfg: cfg_path.clone(),
+        name: atlantis3_data::cfg::CFG_PATH,
+    });
+    let files = A3Files::new(install.clone());
+    let files = match files.build() {
+        Ok(b) if b.release.disc_test() => A3Files::cd(Arc::new(
+            atlantis3_data::discs::CdSource::new(install, discs),
+        )),
+        _ => files,
+    };
+    open_files_in(files, shown, base, fixes, cfg_path)
+}
+
+/// The game from `files` (in `dir`, named in the errors), its saves in
+/// `base`, with `fixes`, the menus writing `cfg_path`.
+fn open_files_in(
+    files: A3Files,
+    dir: &Path,
+    base: &Path,
+    fixes: Fixes,
+    cfg_path: PathBuf,
+) -> Result<(Game, String), String> {
     let label = files
         .edition_label()
         .map_err(|e| crate::setup::explain_atlantis3(dir, &e))?;
@@ -519,6 +560,13 @@ impl ApplicationHandler for A3App {
             el.exit();
             return;
         }
+        // Android: Back and the on-screen keyboard's text.
+        #[cfg(target_os = "android")]
+        if let Some(id) = self.window.as_ref().map(|w| w.id()) {
+            for e in crate::android::mode_typed() {
+                self.window_event(el, id, e);
+            }
+        }
         el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
     }
 
@@ -739,7 +787,7 @@ pub fn open_evolution_2004(dir: &Path, base: &Path) -> Result<Game, String> {
     let _ = std::fs::create_dir_all(base);
     let cfg_path = base.join("Atlantis4.cfg");
     let src = Evolution2004Source::new(Arc::new(WithCfg {
-        install: StdDir::new(dir),
+        install: Arc::new(StdDir::new(dir)),
         cfg: cfg_path.clone(),
         name: "datas/Atlantis4.cfg",
     }));

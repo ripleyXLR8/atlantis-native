@@ -606,6 +606,38 @@ pub fn boot_files(
     Ok((engine, format!("Game: {label}")))
 }
 
+/// Android: the game from a chosen folder, `install` with its discs
+/// among `discs` (every disc there: the game cannot be given another one
+/// while it runs), booted to the player menu under the start-up intro as
+/// the desktop starts it, its saves in the data folder.
+#[cfg(target_os = "android")]
+pub fn boot_source(
+    install: std::sync::Arc<dyn atlantis_data::FileSource>,
+    discs: Vec<(String, std::sync::Arc<dyn atlantis_data::FileSource>)>,
+) -> Result<(Engine, String), String> {
+    let (exe_name, build, _) = atlantis2_data::files::find_exe(&*install)
+        .map_err(|e| format!("The chosen folder: {e}"))?;
+    let mut files = A2Files::new(install, discs);
+    files.set_exe(exe_name, build);
+    let found = files.disc_numbers();
+    let missing: Vec<String> = (1..=4u8)
+        .filter(|n| !found.contains(n))
+        .map(|n| n.to_string())
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "Atlantis II's discs {} are not in the chosen folder: put a copy of each disc \
+             (or its image) in a folder inside it, beside the installed game.",
+            missing.join(", ")
+        ));
+    }
+    let enhancements = stored_settings().enhancements;
+    let (mut engine, label) =
+        boot_files(files, enhancements, |e| e.set_data_dir(Some(data_dir())))?;
+    A2Start::default().begin(&mut engine, false)?;
+    Ok((engine, label))
+}
+
 /// `--headless`: runs `frames` frames of [`PASS`] without input (the 15 Hz
 /// ticks run on the scheduler's clock), prints where the game is, and writes the
 /// screen to `screenshot` (PNG) when given.
@@ -1738,6 +1770,13 @@ impl ApplicationHandler for A2App {
         if crate::android::destroyed() {
             el.exit();
             return;
+        }
+        // Android: Back and the on-screen keyboard's text.
+        #[cfg(target_os = "android")]
+        if let Some(id) = self.window.as_ref().map(|w| w.id()) {
+            for e in crate::android::mode_typed() {
+                self.window_event(el, id, e);
+            }
         }
         // In the browser the redraws keep themselves going (see
         // RedrawRequested).
