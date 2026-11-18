@@ -707,13 +707,18 @@ impl Scripts {
         // LastVue != 0, unless a move replaces it (0x00423def); until then
         // the scans read ArriveeVue = LastVue (the departure scan of an exit
         // click after a timer's chapter=).
-        if !self.in_place_arrival_scan
-            && !self.init_running
-            && e.last_vue != 0
-            && e.current_place_id.is_some()
-        {
-            e.arrival_scan_pending = true;
-            e.arrival_from_vue = e.last_vue;
+        // With LastVue = 0 the chapter's ARRIVEEVUE = 0 replaces what an
+        // earlier Vue= of the pass left (0x0042777d..0x00427798), so the
+        // place loop runs no arrival scan (cmp [ARRIVEEVUE],0 / je @
+        // 0x00423b5a..0x00423b61): after ChangeWam=charge1.wam, whose record
+        // 0 has id 0, a Vue= leaves LastVue = 0 (CHAPI026 / CHAPI056 /014).
+        if !self.in_place_arrival_scan && !self.init_running && e.current_place_id.is_some() {
+            if e.last_vue != 0 {
+                e.arrival_scan_pending = true;
+                e.arrival_from_vue = e.last_vue;
+            } else {
+                e.arrival_scan_pending = false;
+            }
         }
     }
 
@@ -824,7 +829,13 @@ impl Scripts {
         let from = from.unwrap_or(0);
         e.vars.set("arriveevue", i32::from(from));
         e.vars.set("clicperso", 0);
-        e.arrival_scan_pending = vars::vue_queues_arrival_scan(self.in_place_arrival_scan);
+        // ARRIVEEVUE = the id of the place left (0x0042a688..0x0042a68d): a
+        // place with id 0 (record 0 of CHARGE1.WAM after a ChangeWam) leaves
+        // it 0, and the place loop runs no arrival scan (@ 0x00423b5a). In
+        // the /INIT block the chapter load sets ARRIVEEVUE = LastVue after
+        // it (FUN_00425eb0, then 0x0042777d; `take_arrival_after_load`).
+        e.arrival_scan_pending = (from != 0 || self.init_running)
+            && vars::vue_queues_arrival_scan(self.in_place_arrival_scan);
         e.arrival_from_vue = from;
     }
 

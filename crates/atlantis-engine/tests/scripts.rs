@@ -1800,6 +1800,58 @@ fn chapter_change_loads_the_next_con() {
     find(&ev, 0, |e| *e == Event::ChapterLoaded(2));
 }
 
+/// CHAPI026 /014's ChangeWam=charge1.wam, Vue=175, Chapter=27: record 0 of
+/// CHARGE1.WAM has id 0, so the Vue= leaves ARRIVEEVUE = LastVue = 0
+/// (`FUN_0042a100` @ 0x0042a688, 0x0042a6b0) and queues no arrival scan
+/// (cmp [ARRIVEEVUE],0 / je @ 0x00423b5a); the Chapter= sets ARRIVEEVUE =
+/// LastVue = 0 (0x0042777d..0x00427798), which keeps the place loop from
+/// any arrival scan.
+#[test]
+fn vue_from_place_id_0_queues_no_arrival_scan() {
+    let Some(g) = game("vue_from_place_id_0_queues_no_arrival_scan") else {
+        return;
+    };
+    let sys = Sys::new(Mixer::new());
+    let result = Rc::new(RefCell::new(None));
+    let (s2, r2) = (sys.clone(), result.clone());
+    let task = async move {
+        let mut e = Engine::new(s2, g, Rc::new(DirectLoader));
+        let mut scripts = Scripts::new();
+        e.new_game(&mut scripts, false).await;
+        scripts
+            .exec_set(&mut e, None, "changewam=charge1.wam")
+            .await;
+        let place = e.current_place_id;
+        scripts.exec_set(&mut e, None, "vue=175").await;
+        let after_vue = (
+            e.current_place_id,
+            e.last_vue,
+            e.vars.get("arriveevue"),
+            e.arrival_scan_pending,
+        );
+        scripts.exec_set(&mut e, None, "chapter=27").await;
+        *r2.borrow_mut() = Some((
+            place,
+            after_vue,
+            scripts.chapter,
+            e.vars.get("arriveevue"),
+            e.arrival_scan_pending,
+        ));
+    };
+    let mut runner = Runner::new(sys, task);
+    let mut frame = 0;
+    while runner.step(frame * 16) {
+        frame += 1;
+        assert!(frame < 100_000);
+    }
+    let (place, after_vue, chapter, arrivee, pending) = result.borrow().unwrap();
+    assert_eq!(place, Some(0));
+    assert_eq!(after_vue, (Some(175), 0, 0, false));
+    assert_eq!(chapter, 27);
+    assert_eq!(arrivee, 0);
+    assert!(!pending);
+}
+
 /// The game's scripts, with the view aimed at the next move of a route at
 /// each arrival (as a player would turn to it).
 struct Route {
