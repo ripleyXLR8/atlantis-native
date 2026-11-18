@@ -77,6 +77,8 @@ pub fn install_panic_hook(boxed: bool) {
 pub fn error_box(text: &str) {
     eprintln!("{text}");
     log::error!("{text}");
+    // (Android: no message box; the log goes to logcat)
+    #[cfg(not(target_os = "android"))]
     rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
         .set_title("Atlantis Native")
@@ -443,6 +445,7 @@ pub fn describe(dir: &Path) -> LauncherEntry {
 }
 
 /// The answer to a three-button question.
+#[cfg_attr(target_os = "android", allow(dead_code))]
 enum Choice {
     First,
     Second,
@@ -452,6 +455,13 @@ enum Choice {
 /// A question in the system's message box with three labelled buttons
 /// (closing the box counts as the third).
 fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
+    // Android: no message box, the question is closed.
+    #[cfg(target_os = "android")]
+    {
+        log::warn!("{text} ({first} / {second} / {third}): no message box");
+        return Choice::Third;
+    }
+    #[cfg(not(target_os = "android"))]
     let r = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Info)
         .set_title("Atlantis Native")
@@ -462,17 +472,24 @@ fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
             third.to_string(),
         ))
         .show();
-    match r {
+    #[cfg(not(target_os = "android"))]
+    return match r {
         rfd::MessageDialogResult::Custom(s) if s == first => Choice::First,
         rfd::MessageDialogResult::Yes => Choice::First,
         rfd::MessageDialogResult::Custom(s) if s == second => Choice::Second,
         rfd::MessageDialogResult::No => Choice::Second,
         _ => Choice::Third,
-    }
+    };
 }
 
 /// A question with two labelled buttons: true for the first.
 fn ask2(text: &str, first: &str, second: &str) -> bool {
+    #[cfg(target_os = "android")]
+    {
+        log::warn!("{text} ({first} / {second}): no message box");
+        return false;
+    }
+    #[cfg(not(target_os = "android"))]
     let r = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Info)
         .set_title("Atlantis Native")
@@ -482,8 +499,9 @@ fn ask2(text: &str, first: &str, second: &str) -> bool {
             second.to_string(),
         ))
         .show();
-    matches!(r, rfd::MessageDialogResult::Ok)
-        || matches!(r, rfd::MessageDialogResult::Custom(s) if s == first)
+    #[cfg(not(target_os = "android"))]
+    return matches!(r, rfd::MessageDialogResult::Ok)
+        || matches!(r, rfd::MessageDialogResult::Custom(s) if s == first);
 }
 
 /// Copies the game from the player's four CDs, one after the other, into
@@ -671,8 +689,16 @@ fn report_edition(dir: &Path) {
 /// the folder is a CD drive of the first game. The game and its folder;
 /// for Cryo's DVD, each of its languages found ([`dvd_locations`]), each
 /// its own edition. `None` when the player cancels.
+#[cfg_attr(target_os = "android", allow(unreachable_code))]
 pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
     loop {
+        // Android: no folder picker yet (docs/ANDROID.md).
+        #[cfg(target_os = "android")]
+        let dir: PathBuf = {
+            let _ = give_up;
+            return None;
+        };
+        #[cfg(not(target_os = "android"))]
         let dir = rfd::FileDialog::new()
             .set_title(
                 "Choose the folder of your game (the one with atlantis.exe, atlantis2.exe for Atlantis II, Game.exe, or Atlantis Evolution.exe)",

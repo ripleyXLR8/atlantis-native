@@ -552,7 +552,8 @@ pub(crate) fn current_time() -> TimeT {
 // Standard streams (stdin, stdout, stderr)
 // ---------------------------------------------------------------------------
 
-#[cfg(target_os = "linux")]
+// (Android's bionic exports the same three symbols from API 23 on.)
+#[cfg(any(target_os = "linux", target_os = "android"))]
 #[allow(unsafe_code)]
 unsafe extern "C" {
     static stdin: *mut LibcFile;
