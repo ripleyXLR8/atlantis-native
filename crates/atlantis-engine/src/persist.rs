@@ -54,7 +54,10 @@ impl SaveStore for MemStore {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use dir::{user_data_dir, DirStore};
+pub use dir::{
+    data_dir_and_source, per_user_data_dir, portable_bases, portable_data_dir, resolve_data_dir,
+    set_data_dir_override, user_data_dir, DataDirSource, DirStore, PORTABLE_DATA, PORTABLE_MARKER,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 mod dir {
@@ -127,29 +130,248 @@ mod dir {
         }
     }
 
-    /// The per-user data folder of the port: `$XDG_DATA_HOME/atlantis-native`
-    /// (or `~/.local/share/atlantis-native`) on Linux and the other Unix
-    /// systems, `~/Library/Application Support/atlantis-native` on macOS,
-    /// `%APPDATA%\atlantis-native` on Windows; or the folder
-    /// `ATLANTIS_NATIVE_DATA` names (tests and trial runs that must not
-    /// touch the player's saves).
-    pub fn user_data_dir() -> Option<PathBuf> {
-        let env = |k: &str| {
-            std::env::var_os(k)
-                .filter(|v| !v.is_empty())
-                .map(PathBuf::from)
-        };
-        if let Some(dir) = env("ATLANTIS_NATIVE_DATA") {
-            return Some(dir);
+    /// The folder named by `--data-dir` for this run, set once by the
+    /// desktop program before anything is read or written.
+    static DATA_DIR_OVERRIDE: std::sync::RwLock<Option<PathBuf>> = std::sync::RwLock::new(None);
+
+    /// `--data-dir <folder>`: the data folder of this run, over every
+    /// other rule ([`user_data_dir`]).
+    pub fn set_data_dir_override(dir: Option<PathBuf>) {
+        if let Ok(mut d) = DATA_DIR_OVERRIDE.write() {
+            *d = dir;
         }
+    }
+
+    /// The file whose presence beside the executable turns the portable
+    /// mode on.
+    pub const PORTABLE_MARKER: &str = "portable.txt";
+    /// The portable data folder's name, beside the executable (its
+    /// presence turns the portable mode on too).
+    pub const PORTABLE_DATA: &str = "data";
+
+    /// Where the data folder came from ([`resolve_data_dir`]).
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum DataDirSource {
+        /// `--data-dir <folder>`.
+        CommandLine,
+        /// The `ATLANTIS_NATIVE_DATA` environment variable.
+        Environment,
+        /// `portable.txt` or `data/` beside the executable.
+        Portable,
+        /// The system's per-user folder.
+        PerUser,
+    }
+
+    /// The folders the portable mode looks in for its marker: the
+    /// executable's own folder and, on macOS (`macos`), the folder holding
+    /// the application bundle when the executable is
+    /// `<X>.app/Contents/MacOS/<exe>` (first: that is the folder the
+    /// player sees).
+    pub fn portable_bases(exe: &Path, macos: bool) -> Vec<PathBuf> {
+        let mut out = Vec::new();
+        let Some(exe_dir) = exe.parent() else {
+            return out;
+        };
+        if macos {
+            let macos_dir = exe_dir;
+            let contents = macos_dir.parent();
+            let bundle = contents.and_then(Path::parent);
+            let is_bundle = macos_dir.file_name().is_some_and(|n| n == "MacOS")
+                && contents
+                    .and_then(Path::file_name)
+                    .is_some_and(|n| n == "Contents")
+                && bundle
+                    .and_then(Path::extension)
+                    .is_some_and(|e| e.eq_ignore_ascii_case("app"));
+            if let Some(outer) = bundle.and_then(Path::parent).filter(|_| is_bundle) {
+                out.push(outer.to_path_buf());
+            }
+        }
+        out.push(exe_dir.to_path_buf());
+        out
+    }
+
+    /// The portable data folder (`<base>/data`) of the first of `bases`
+    /// holding `portable.txt` or a `data` folder.
+    pub fn portable_data_dir(bases: &[PathBuf]) -> Option<PathBuf> {
+        bases
+            .iter()
+            .find(|b| b.join(PORTABLE_MARKER).is_file() || b.join(PORTABLE_DATA).is_dir())
+            .map(|b| b.join(PORTABLE_DATA))
+    }
+
+    /// The data folder by the rules, from their inputs (no global state,
+    /// for the tests): `--data-dir` (`cli`), else `ATLANTIS_NATIVE_DATA`
+    /// (`env`, empty counts as unset), else the portable mode (`bases`,
+    /// see [`portable_bases`]; none on the web or Android), else the
+    /// system's per-user folder (`per_user`).
+    pub fn resolve_data_dir(
+        cli: Option<PathBuf>,
+        env: Option<PathBuf>,
+        bases: &[PathBuf],
+        per_user: Option<PathBuf>,
+    ) -> Option<(PathBuf, DataDirSource)> {
+        if let Some(d) = cli.filter(|d| !d.as_os_str().is_empty()) {
+            return Some((d, DataDirSource::CommandLine));
+        }
+        if let Some(d) = env.filter(|d| !d.as_os_str().is_empty()) {
+            return Some((d, DataDirSource::Environment));
+        }
+        if let Some(d) = portable_data_dir(bases) {
+            return Some((d, DataDirSource::Portable));
+        }
+        per_user.map(|d| (d, DataDirSource::PerUser))
+    }
+
+    /// The system's per-user data folder of the port:
+    /// `$XDG_DATA_HOME/atlantis-native` (or `~/.local/share/atlantis-native`)
+    /// on Linux and the other Unix systems, `~/Library/Application
+    /// Support/atlantis-native` on macOS, `%APPDATA%\atlantis-native` on
+    /// Windows.
+    pub fn per_user_data_dir() -> Option<PathBuf> {
         let base = if cfg!(windows) {
-            env("APPDATA")
+            env_path("APPDATA")
         } else if cfg!(target_os = "macos") {
-            env("HOME").map(|h| h.join("Library").join("Application Support"))
+            env_path("HOME").map(|h| h.join("Library").join("Application Support"))
         } else {
-            env("XDG_DATA_HOME").or_else(|| env("HOME").map(|h| h.join(".local").join("share")))
+            env_path("XDG_DATA_HOME")
+                .or_else(|| env_path("HOME").map(|h| h.join(".local").join("share")))
         }?;
         Some(base.join("atlantis-native"))
+    }
+
+    fn env_path(k: &str) -> Option<PathBuf> {
+        std::env::var_os(k)
+            .filter(|v| !v.is_empty())
+            .map(PathBuf::from)
+    }
+
+    /// The data folder of the port and where it came from: `--data-dir`
+    /// ([`set_data_dir_override`]), else the folder `ATLANTIS_NATIVE_DATA`
+    /// names (tests and trial runs that must not touch the player's
+    /// saves), else, in the portable mode (`portable.txt` or a `data`
+    /// folder beside the executable, or beside the `.app` on macOS), the
+    /// `data` folder there (made if missing), else
+    /// [`per_user_data_dir`].
+    pub fn data_dir_and_source() -> Option<(PathBuf, DataDirSource)> {
+        let cli = DATA_DIR_OVERRIDE.read().ok().and_then(|d| d.clone());
+        let bases = if cfg!(target_os = "android") {
+            Vec::new()
+        } else {
+            std::env::current_exe()
+                .ok()
+                .map(|exe| portable_bases(&exe, cfg!(target_os = "macos")))
+                .unwrap_or_default()
+        };
+        let found = resolve_data_dir(
+            cli,
+            env_path("ATLANTIS_NATIVE_DATA"),
+            &bases,
+            per_user_data_dir(),
+        );
+        if let Some((d, DataDirSource::Portable)) = &found {
+            let _ = std::fs::create_dir_all(d);
+        }
+        found
+    }
+
+    /// The data folder of the port (see [`data_dir_and_source`]): the
+    /// saves, settings, game library and log.
+    pub fn user_data_dir() -> Option<PathBuf> {
+        data_dir_and_source().map(|(d, _)| d)
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        /// A fresh folder of the test's own.
+        fn scratch(name: &str) -> PathBuf {
+            let d = std::env::temp_dir()
+                .join(format!("atlantis-portable-{}-{name}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&d);
+            std::fs::create_dir_all(&d).unwrap();
+            d
+        }
+
+        fn p(s: &str) -> Option<PathBuf> {
+            Some(PathBuf::from(s))
+        }
+
+        #[test]
+        fn command_line_first() {
+            let d = scratch("cli");
+            std::fs::write(d.join(PORTABLE_MARKER), b"").unwrap();
+            let r = resolve_data_dir(p("/cli"), p("/env"), &[d.clone()], p("/user"));
+            assert_eq!(r, Some((PathBuf::from("/cli"), DataDirSource::CommandLine)));
+        }
+
+        #[test]
+        fn environment_over_portable() {
+            let d = scratch("env");
+            std::fs::write(d.join(PORTABLE_MARKER), b"").unwrap();
+            let r = resolve_data_dir(None, p("/env"), &[d.clone()], p("/user"));
+            assert_eq!(r, Some((PathBuf::from("/env"), DataDirSource::Environment)));
+            // Empty values count as unset.
+            let r = resolve_data_dir(p(""), p(""), &[d.clone()], p("/user"));
+            assert_eq!(r, Some((d.join("data"), DataDirSource::Portable)));
+        }
+
+        #[test]
+        fn portable_by_marker_or_data_folder() {
+            let d = scratch("marker");
+            let user = Some((PathBuf::from("/user"), DataDirSource::PerUser));
+            // No marker: nothing changes for the players of before.
+            assert_eq!(resolve_data_dir(None, None, &[d.clone()], p("/user")), user);
+            std::fs::write(d.join(PORTABLE_MARKER), b"").unwrap();
+            assert_eq!(
+                resolve_data_dir(None, None, &[d.clone()], p("/user")),
+                Some((d.join("data"), DataDirSource::Portable))
+            );
+            let e = scratch("datafolder");
+            std::fs::create_dir_all(e.join(PORTABLE_DATA)).unwrap();
+            assert_eq!(
+                resolve_data_dir(None, None, &[e.clone()], p("/user")),
+                Some((e.join("data"), DataDirSource::Portable))
+            );
+            // A file named `data` is no marker.
+            let f = scratch("datafile");
+            std::fs::write(f.join(PORTABLE_DATA), b"").unwrap();
+            assert_eq!(resolve_data_dir(None, None, &[f], p("/user")), user);
+            assert_eq!(resolve_data_dir(None, None, &[], None), None);
+        }
+
+        #[test]
+        fn mac_bundle_folder() {
+            let exe = Path::new("/Games/Atlantis Native.app/Contents/MacOS/atlantis-native");
+            assert_eq!(
+                portable_bases(exe, true),
+                vec![
+                    PathBuf::from("/Games"),
+                    PathBuf::from("/Games/Atlantis Native.app/Contents/MacOS"),
+                ]
+            );
+            assert_eq!(
+                portable_bases(exe, false),
+                vec![PathBuf::from("/Games/Atlantis Native.app/Contents/MacOS")]
+            );
+            // Not in a bundle: the executable's folder alone.
+            let exe = Path::new("/Games/atlantis/atlantis-native");
+            assert_eq!(
+                portable_bases(exe, true),
+                vec![PathBuf::from("/Games/atlantis")]
+            );
+            // The bundle's folder wins over the executable's.
+            let d = scratch("mac");
+            let macos = d.join("A.app").join("Contents").join("MacOS");
+            std::fs::create_dir_all(&macos).unwrap();
+            std::fs::write(d.join(PORTABLE_MARKER), b"").unwrap();
+            std::fs::write(macos.join(PORTABLE_MARKER), b"").unwrap();
+            let bases = portable_bases(&macos.join("atlantis-native"), true);
+            assert_eq!(portable_data_dir(&bases), Some(d.join("data")));
+            std::fs::remove_file(d.join(PORTABLE_MARKER)).unwrap();
+            assert_eq!(portable_data_dir(&bases), Some(macos.join("data")));
+        }
     }
 }
 
