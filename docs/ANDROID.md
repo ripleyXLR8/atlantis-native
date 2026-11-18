@@ -62,6 +62,10 @@ It does:
 - keep the screen on while it runs;
 - stop the game's clock and close the sound when the app goes to the
   background, and carry on where it was when the app comes back.
+  If Android destroys the activity while it is in the background (low
+  memory, or "Don't keep activities" in the developer options), the app
+  closes. The game then starts again from its last checkpoint, as after a
+  restart of the desktop build.
 
 It does not yet:
 - pick a game folder elsewhere (the Storage Access Framework);
@@ -100,6 +104,12 @@ How it fits together:
   the package (with 16 KB pages), and `apksigner` signs it.
 - Package `io.github.ripleyxlr8.atlantisnative`, minSdk 26 (cpal's AAudio
   output needs it), targetSdk 36.
+- The manifest's `android.app.func_name` points at
+  `atlantis_native_on_create`. That function calls android-activity's
+  entry point and then wraps the activity's `onDestroy`. winit 0.30 does
+  not pass `onDestroy` on, yet android-activity waits in it for
+  `android_main` to return. So the app ends its event loop there, then
+  its process, because winit allows one event loop per process.
 - Everything specific to Android is behind `cfg(target_os = "android")`.
   On Android cpal is 0.16, whose AAudio output is pure Rust (desktop and
   web stay on 0.15), and the rfd dialogs are left out.
