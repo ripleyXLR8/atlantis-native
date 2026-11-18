@@ -1412,6 +1412,14 @@ pub async fn run(sys: Rc<Sys>, game: Game, opts: Options) {
     } else {
         if let Start::Puzzle { id, object } = start {
             e.vars.set("objetenmain", object);
+            // The port's direct puzzle start has no warp loop to leave the
+            // game pointer: it is where the mouse is (the puzzle's entry
+            // read keeps the pointer it starts with, as the original's
+            // loops make no poll before their first present).
+            while e.sys.poll_event().is_some() {}
+            let m = e.sys.mouse();
+            e.pointer.mouse_moved(m);
+            e.pointer_mouse_mark = m;
             let r = crate::puzzle::play_puzzle(&mut e, hooks.as_mut(), id).await;
             log::warn!("puzzle {id} ended with FinPuzzle {r}");
             e.vars.set("objetenmain", 0);

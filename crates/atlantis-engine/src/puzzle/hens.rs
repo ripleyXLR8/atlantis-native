@@ -576,6 +576,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
         h: PuzzleHost::new(e, hooks),
         banks: [b0, b1, b2],
     };
+    host.h.first_read_unpumped = true;
     host.h.screen.pictures = vec![bg];
     host.h.sounds = sounds;
     let r = game.run(&mut host).await;

@@ -323,6 +323,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
         pz1l,
         pz2l,
     };
+    host.h.first_read_unpumped = true;
     host.h.screen.pictures = vec![bg];
     host.h.sounds = sounds;
     let r = game.run(&mut host).await;

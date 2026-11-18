@@ -300,6 +300,7 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
         h: PuzzleHost::new(e, hooks),
         cursors,
     };
+    host.h.first_read_unpumped = true;
     host.h.screen.pictures = vec![bg];
     host.h.screen.frames = frames;
     host.h.sounds = sounds;

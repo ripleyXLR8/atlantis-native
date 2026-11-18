@@ -416,6 +416,21 @@ impl Engine {
 
     /// The warp loop `FUN_0041bfa0`: the view until a click. Returns the
     /// zone clicked (0 for none) or [`WARP_ABORT`].
+    /// The warp loop left (unlocked) with `unpumped`, the motion of the
+    /// frame whose poll saw a left press edge and returned before its
+    /// pump (`FUN_0041a298` @ 0x0041a2b5): it moved the Windows cursor
+    /// (clamped as [`WarpPointer::follow`]) and its WM_MOUSEMOVE is still
+    /// to be retrieved. The system mouse goes there and the mark stays at
+    /// the cursor the pointer knows, so the next poll that pumps (a
+    /// puzzle's first one after its first present, a dialog's, the turn's)
+    /// moves the pointer to it (0x00419c10..0x00419c29).
+    fn leave_warp_mouse(&mut self, unpumped: (i32, i32)) {
+        let mut moved = self.pointer;
+        moved.follow(unpumped.0, unpumped.1);
+        self.sys.set_mouse_pos(moved.cursor.0, moved.cursor.1);
+        self.pointer_mouse_mark = self.pointer.cursor;
+    }
+
     pub async fn handle_warp(&mut self, hooks: &mut dyn ScriptHooks) -> u32 {
         let mut exit = false;
         let mut action = 0u32;
@@ -557,10 +572,9 @@ impl Engine {
             if clicked && centre_perso >= 0x100 {
                 self.sys.set_mouse_locked(false);
                 // The original leaves the loop with the mouse at the
-                // Windows cursor; the dialog's mouse motions set the pointer.
-                self.sys
-                    .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
-                self.mark_pointer_mouse();
+                // Windows cursor; the dialog's mouse motions set the pointer,
+                // that of this frame's press included.
+                self.leave_warp_mouse(std::mem::take(&mut unpumped));
                 // ClicZone = the zone under the pointer: the warp loop
                 // returns it with the NPC (0x0041c71e) and the place loop
                 // stores it before FUN_004278a0 (0x00423c1c); it returns to
@@ -859,10 +873,9 @@ impl Engine {
 
         self.sys.set_mouse_locked(false);
         // The mouse at the Windows cursor; motions from here on set the
-        // pointer to it.
-        self.sys
-            .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
-        self.mark_pointer_mouse();
+        // pointer to it, that of the frame whose poll saw the click
+        // included.
+        self.leave_warp_mouse(unpumped);
         // The click that ended the loop: Windows paired it with the last
         // press whatever loop read that one (the press that cut the
         // previous move's film, or ended a line), and pairs the next press
@@ -2522,5 +2535,63 @@ mod tests {
         assert!(seen.len() >= 12, "the warp loop stopped: {seen:?}");
         assert!(seen[2].2);
         assert!(!seen[seen.len() - 1].2, "{seen:?}");
+    }
+
+    /// The motion of the frame whose poll saw the click that ends the warp
+    /// loop: `FUN_0041a298` returned before its pump (0x0041a2b5), the
+    /// motion moved the Windows cursor and its WM_MOUSEMOVE waits. With
+    /// the pointer apart from the cursor (after a panorama load), a puzzle
+    /// entered on that click keeps the pointer for its entry read (no poll
+    /// of the original before its first present) and its first pumping
+    /// read puts it at the cursor plus that motion (round 9, puzzles-1).
+    #[test]
+    fn the_click_frames_motion_reaches_the_puzzles_pointer() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let frames = Rc::new(Cell::new(0u32));
+        let f2 = frames.clone();
+        let ran = with_engine(
+            "the_click_frames_motion_reaches_the_puzzles_pointer",
+            move |mut e| async move {
+                e.sys.set_mouse_pos(600, 450);
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                e.set_view(1.0, 0.0);
+                e.pointer.prev_alpha = e.warp.alpha();
+                e.pointer.prev_beta = e.warp.beta();
+                assert_eq!(e.pointer.pos, (320, 320));
+                let mut hooks = RecordAlpha {
+                    alpha: Rc::new(RefCell::new(Vec::new())),
+                };
+                e.handle_warp(&mut hooks).await;
+                let at_exit = (e.pointer.pos, e.pointer.cursor, e.sys.mouse());
+                let mut host = crate::puzzle::PuzzleHost::new(&mut e, &mut hooks);
+                let entry = host.read_entry();
+                let first = host.read_input();
+                g2.set(Some((at_exit, (entry.x, entry.y), (first.x, first.y))));
+            },
+            move |sys, _| {
+                if !sys.mouse_locked() {
+                    return;
+                }
+                let n = f2.get() + 1;
+                f2.set(n);
+                if n == 5 {
+                    sys.push_input(Input::MouseDelta { dx: 7, dy: -3 });
+                    button(sys, MouseButton::Left, true);
+                }
+                if n == 6 {
+                    button(sys, MouseButton::Left, false);
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (at_exit, entry, first) = got.get().expect("the warp loop did not end");
+        assert_eq!(at_exit, ((320, 320), (600, 450), (607, 447)));
+        assert_eq!(entry, (320, 320));
+        assert_eq!(first, (607, 447));
     }
 }

@@ -264,6 +264,8 @@ pub struct PuzzleInput {
     /// left press edge: `FUN_0041a298` returns before its pump on one,
     /// 0x0041a2b5); the entry mark until one did.
     pub pump_mark: Option<(i32, i32)>,
+    /// Reads made.
+    reads: u64,
 }
 
 impl PuzzleInput {
@@ -297,6 +299,25 @@ impl PuzzleInput {
         }
     }
 
+    /// [`PuzzleInput::read`] for the puzzle's first read when it stands
+    /// for no poll of the original (an entry read): the events are taken,
+    /// but the pointer the puzzle started with stays until a poll pumps
+    /// the motion (0x00419c10..0x00419c29), and nothing counts as pumped.
+    /// Any later read is a [`PuzzleInput::read`].
+    pub fn read_unpumped(&mut self, sys: &Sys) -> PuzzleMouse {
+        let first = self.reads == 0;
+        let (held, pump_mark) = (self.held, self.pump_mark);
+        let mut m = self.read(sys);
+        if first {
+            if let Some((p, _)) = held {
+                self.held = held;
+                (m.x, m.y) = p;
+            }
+            self.pump_mark = pump_mark;
+        }
+        m
+    }
+
     /// The events since the last read, then the mouse. A press and its
     /// release between two reads count as a click when the edge latch
     /// reports it ([`Sys::poll_event`]).
@@ -307,6 +328,7 @@ impl PuzzleInput {
     /// [`PuzzleInput::read`], with the window message of each left press
     /// and release since the last read passed to `on_left` in order.
     pub fn read_with(&mut self, sys: &Sys, mut on_left: impl FnMut(LeftMessage)) -> PuzzleMouse {
+        self.reads += 1;
         let mut pressed = false;
         let mut right = false;
         let mut escape = false;
@@ -473,6 +495,12 @@ pub struct PuzzleHost<'a> {
     /// The pointer 0x004960ec / 0x004960f0 as the last pumped poll left it
     /// (see [`PuzzleHost::read_input_held_pointer`]).
     pub pointer: (i32, i32),
+    /// The next [`PuzzleHost::read_input_held_pointer`] is the read at the
+    /// top of a loop's first pass, which stands for no poll of the
+    /// original: the eclipse, hens and pieces loops poll after their
+    /// present (FUN_0041a298 at dc:35772, 37435, 38219): the pointer stays
+    /// held for that pass.
+    pub first_read_unpumped: bool,
 }
 
 impl<'a> PuzzleHost<'a> {
@@ -497,6 +525,7 @@ impl<'a> PuzzleHost<'a> {
             input,
             sounds: PuzzleSounds::default(),
             pointer,
+            first_read_unpumped: false,
         }
     }
 
@@ -523,10 +552,8 @@ impl<'a> PuzzleHost<'a> {
     /// 0x00442230, each after the present; meta and taquin 14 poll twice a
     /// pass, [`PuzzleHost::second_poll`]): no F5..F8 step.
     pub fn read_entry(&mut self) -> PuzzleMouse {
-        // No poll of the original: nothing pumped.
-        let pump_mark = self.input.pump_mark;
-        let m = self.input.read(&self.e.sys);
-        self.input.pump_mark = pump_mark;
+        // No poll of the original: nothing pumped, the pointer held.
+        let m = self.input.read_unpumped(&self.e.sys);
         poll_flags_with(self.e, &m, false);
         m
     }
@@ -554,6 +581,11 @@ impl<'a> PuzzleHost<'a> {
     /// (0x00419bfa), so the click and that pass's cursor are at the
     /// previous pass's pointer.
     pub fn read_input_held_pointer(&mut self) -> PuzzleMouse {
+        if std::mem::take(&mut self.first_read_unpumped) {
+            let m = self.input.read_unpumped(&self.e.sys);
+            poll_flags(self.e, &m);
+            return self.held_pointer(m);
+        }
         let m = self.read_input();
         self.held_pointer(m)
     }
