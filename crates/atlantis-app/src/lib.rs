@@ -1376,6 +1376,15 @@ impl ApplicationHandler for App {
         watchdog::enter(watchdog::Phase::Resumed);
         #[cfg(not(target_arch = "wasm32"))]
         let _guard = WatchdogLeave;
+        #[cfg(target_os = "android")]
+        log::info!(
+            "resumed: window {}",
+            if self.window.is_some() {
+                "kept"
+            } else {
+                "made"
+            }
+        );
         if self.window.is_some() {
             return;
         }

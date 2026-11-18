@@ -48,9 +48,16 @@ const TAP_SLOP: f64 = 24.0;
 fn android_main(activity: AndroidApp) {
     android_logger::init_once(
         android_logger::Config::default()
-            .with_max_level(log::LevelFilter::Info)
+            .with_max_level(log::LevelFilter::Debug)
+            .with_filter(
+                android_logger::FilterBuilder::new()
+                    .parse("info,android_activity=debug,winit=debug")
+                    .build(),
+            )
             .with_tag("AtlantisNative"),
     );
+    // A handler that does not return is logged (its phase).
+    crate::watchdog::start();
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         log::error!("{info}");
@@ -418,6 +425,7 @@ impl App {
         self.sys.mixer.set_paused(true);
         self.touch = TouchState::default();
         self.suspended_at.get_or_insert_with(web_time::Instant::now);
+        log::info!("suspended: window dropped");
     }
 
     /// The activity is back (a new window): the game goes on where it
