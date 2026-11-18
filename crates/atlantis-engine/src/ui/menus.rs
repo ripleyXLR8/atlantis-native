@@ -654,6 +654,13 @@ impl Engine {
         // (the text menus never draw lines 2 and 4 of this menu hovered).
         let sprite_menus = self.game.exe.build.menu_sprite_banks.is_some();
         let mut changed = false;
+        // FUN_0041d5f4 walks before its hit test (FUN_0041fb6c @ 0x0041d620,
+        // FUN_004210c0 @ 0x0041d62a, stored in 0x006cd850 @ 0x0041d634): each
+        // walk lights the record the previous pass found, the first one the
+        // clicked MAINMENU record FUN_0041c838 left there (1, @ 0x0041c9ae;
+        // FUN_0041ce8c does not write it): SOUND OPTIONS is lit on the
+        // first frame whatever the pointer is over.
+        let mut walk_hover = Some(1);
         loop {
             if self.should_abort() {
                 break;
@@ -663,6 +670,7 @@ impl Engine {
             let (mx, my) = self.menu_pointer(&mi);
             let under = menu.hit(mx, my, self.menu_table().as_deref());
             let hit = under.filter(|r| [1, 3, 5, 6].contains(r));
+            let hover = std::mem::replace(&mut walk_hover, if sprite_menus { under } else { hit });
             if mi.left_press {
                 self.menu_press_pairs();
                 match hit {
@@ -695,7 +703,7 @@ impl Engine {
                 }
             }
             let polls = menu.walk(
-                if sprite_menus { under } else { hit },
+                hover,
                 i32::from(self.subtitles),
                 i32::from(self.settings.omni3d_mode2),
                 self.menu_table(),
@@ -2143,5 +2151,84 @@ mod load_title_tests {
         assert!(!title.is_empty(), "no title");
         let left = title.iter().map(|&p| p % SCREEN_W).min().unwrap();
         assert!(left >= 320, "the title starts at x {left}");
+    }
+}
+
+#[cfg(test)]
+mod options_hover_tests {
+    use crate::sys::Input;
+    use crate::test_support::with_engine;
+    use crate::warp::{SCREEN_H, SCREEN_W};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    const N: usize = SCREEN_W * SCREEN_H;
+
+    /// The rows of OPTMENU's SOUND OPTIONS line (record 1: y 172..200).
+    fn line_1(s: &[u16]) -> Vec<u16> {
+        s[172 * SCREEN_W..200 * SCREEN_W].to_vec()
+    }
+
+    /// `FUN_0041d5f4` walks before its hit test (0x0041d620 / 0x0041d62a):
+    /// its first frame lights SOUND OPTIONS, the MAINMENU record clicked
+    /// (0x006cd850 = 1), with the pointer on MAINMENU's OPTIONS line, over
+    /// no OPTMENU record; the second frame lights the record the first
+    /// pass found there: none (round 9, ui).
+    #[test]
+    fn the_first_options_frame_lights_sound_options() {
+        let want = Rc::new(RefCell::new(None));
+        let w2 = want.clone();
+        let shots = Rc::new(RefCell::new(Vec::new()));
+        let s2 = shots.clone();
+        let start = Rc::new(std::cell::Cell::new(None::<u64>));
+        let st2 = start.clone();
+        let ran = with_engine(
+            "the_first_options_frame_lights_sound_options",
+            move |mut e| async move {
+                e.load_interface().await;
+                let bg = vec![0u16; N];
+                let mut m = e.load_menu("OPTMENU.TXT").await.unwrap();
+                let (sub, omni) = (i32::from(e.subtitles), i32::from(e.settings.omni3d_mode2));
+                let draw = |m: &mut super::Menu, hover| {
+                    m.walk(hover, sub, omni, None);
+                    let mut s = bg.clone();
+                    e.ui.draw_menu(&mut s, &m.walk);
+                    line_1(&s)
+                };
+                let lit = draw(&mut m, Some(1));
+                let unlit = draw(&mut m, None);
+                *w2.borrow_mut() = Some((lit, unlit));
+                // The pointer on MAINMENU's OPTIONS line.
+                e.sys.set_mouse_pos(200, 250);
+                e.pointer.pos = (200, 250);
+                e.mark_pointer_mouse();
+                st2.set(Some(e.sys.frames_presented()));
+                e.options_menu(&bg).await;
+            },
+            move |sys, _| {
+                let Some(n0) = start.get() else {
+                    return;
+                };
+                let n = sys.frames_presented() - n0;
+                if n as usize > s2.borrow().len() {
+                    s2.borrow_mut().push(line_1(&sys.screen.borrow()));
+                }
+                if n >= 3 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (lit, unlit) = want.borrow_mut().take().unwrap();
+        assert_ne!(lit, unlit);
+        let shots = shots.borrow();
+        assert!(shots.len() >= 2);
+        assert!(
+            shots[0] == lit,
+            "the first frame does not light SOUND OPTIONS"
+        );
+        assert!(shots[1] == unlit, "the second frame lights SOUND OPTIONS");
     }
 }
