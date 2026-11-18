@@ -155,8 +155,9 @@ adb logcat -b all -c
 adb shell input keyevent KEYCODE_BACK
 sleep 3
 adb logcat -d > "$out/logcat-back.txt"
-grep -q "Back on the \"no game\" screen" "$out/logcat-back.txt" ||
-    fail "Back did not reach the app"
+# (as a key on this emulator, as a callback on recent devices)
+grep -q "Back on the \"no game\" screen\|event loop ended" "$out/logcat-back.txt" ||
+    fail "Back did not end the app"
 
 # Atlantis II, III and Evolution: a folder of each (its program and one
 # file, not a game) in the app's own folder, one after the other: the app
