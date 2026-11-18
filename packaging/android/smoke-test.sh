@@ -143,6 +143,15 @@ grep -q "chosen folder: atlantis.exe (11 bytes) is not a known build" "$out/logc
 made=$(grep -c "resumed: window made" "$out/logcat-app.txt")
 [ "$made" -ge 5 ] || fail "the window was made $made times (5 expected: at the start, after each return)"
 
+# Back on the "no game" screen ends the app (Android's predictive back
+# reaches it as a callback, not as a key).
+adb logcat -b all -c
+adb shell input keyevent KEYCODE_BACK
+sleep 3
+adb logcat -d > "$out/logcat-back.txt"
+grep -q "Back on the \"no game\" screen" "$out/logcat-back.txt" ||
+    fail "Back did not reach the app"
+
 # Atlantis II, III and Evolution: a folder of each (its program and one
 # file, not a game) in the app's own folder, one after the other: the app
 # finds it and says it does not open (or that the game could not start).
