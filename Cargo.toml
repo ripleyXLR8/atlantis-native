@@ -18,7 +18,14 @@ members = [
 
 # Vendored third-party code, built as a path dependency only (its own test
 # suite and dev-dependencies stay outside this workspace).
-exclude = ["vendor/rilua"]
+exclude = ["vendor/rilua", "vendor/winit"]
+
+# winit 0.30.13 with one change, on Android only: an event loop may be
+# made again after the first has ended (each Android activity runs its
+# own; docs/ANDROID.md). The other platforms build the same code as the
+# published crate.
+[patch.crates-io]
+winit = { path = "vendor/winit" }
 
 [workspace.package]
 version = "0.8.0"

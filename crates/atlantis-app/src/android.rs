@@ -38,7 +38,22 @@ use crate::session::Session;
 use crate::App;
 
 /// The activity, for the on-screen keyboard.
-static ACTIVITY: std::sync::OnceLock<AndroidApp> = std::sync::OnceLock::new();
+static ACTIVITY: std::sync::Mutex<Option<AndroidApp>> = std::sync::Mutex::new(None);
+
+/// The front end of an activity Android destroyed (relaunched, or
+/// destroyed in the background while the process lives on), for the next
+/// activity of the process: the game goes on where it was.
+static CARRIED: std::sync::Mutex<Option<Carried>> = std::sync::Mutex::new(None);
+
+/// [`App`] between two activities' threads.
+struct Carried(App);
+
+// SAFETY: one `android_main` runs at a time (an activity's `onDestroy`
+// waits for its end before the next activity is created), and the front
+// end is handed over without its window, surface and sound stream
+// ([`App::android_suspend`]): what is left (the engine, its `Rc`s and
+// cells) is used by one thread after the other, never by two.
+unsafe impl Send for Carried {}
 
 /// A finger moving less than this (window pixels) from where it went
 /// down makes a tap, not a drag (the panoramic view).
@@ -101,6 +116,11 @@ pub(crate) fn destroyed() -> bool {
 /// activity is created.
 #[no_mangle]
 fn android_main(activity: AndroidApp) {
+    // Once per process (an activity may follow another in it).
+    static ONCE: std::sync::Once = std::sync::Once::new();
+    let first = !ONCE.is_completed();
+    ONCE.call_once(|| {});
+    DESTROYED.store(false, Ordering::SeqCst);
     android_logger::init_once(
         android_logger::Config::default()
             .with_max_level(log::LevelFilter::Debug)
@@ -111,15 +131,17 @@ fn android_main(activity: AndroidApp) {
             )
             .with_tag("AtlantisNative"),
     );
-    // A handler that does not return is logged (its phase).
-    crate::watchdog::start();
-    let default_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        log::error!("{info}");
-        default_hook(info);
-    }));
+    if first {
+        // A handler that does not return is logged (its phase).
+        crate::watchdog::start();
+        let default_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(move |info| {
+            log::error!("{info}");
+            default_hook(info);
+        }));
+    }
     log::info!("{}", crate::version_string());
-    let _ = ACTIVITY.set(activity.clone());
+    *ACTIVITY.lock().unwrap() = Some(activity.clone());
     if let Some(dir) = activity.internal_data_path() {
         atlantis_engine::persist::set_android_data_dir(dir);
     }
@@ -145,20 +167,34 @@ fn android_main(activity: AndroidApp) {
             return;
         }
     };
-    let session = Session::new(data_dir(), false, false, false, Start::Boot);
-    let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
-    // (no game library's screen on Android yet)
-    app.menu.set_library(false);
-    app.android_start(game_dir);
+    let mut app = match CARRIED.lock().unwrap().take() {
+        Some(Carried(app)) => {
+            log::info!("the game goes on in the new activity");
+            app
+        }
+        None => {
+            let session = Session::new(data_dir(), false, false, false, Start::Boot);
+            let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
+            // (no game library's screen on Android yet)
+            app.menu.set_library(false);
+            app.android_start(game_dir);
+            app
+        }
+    };
     if let Err(e) = event_loop.run_app(&mut app) {
         log::error!("event loop: {e}");
     }
-    drop(app);
-    // The process ends with the activity: winit makes one event loop per
-    // process, and the activity Android may create again in it would have
-    // none.
-    log::info!("event loop ended");
-    std::process::exit(0);
+    if destroyed() {
+        // Destroyed by Android (not left by the player): kept for the
+        // activity it may create next in this process.
+        app.android_suspend();
+        *CARRIED.lock().unwrap() = Some(Carried(app));
+        log::info!("event loop ended (activity destroyed)");
+    } else {
+        drop(app);
+        log::info!("event loop ended");
+    }
+    // android-activity then finishes the activity and ends this thread.
 }
 
 /// The file keeping the folder chosen in the picker (its tree URI).
@@ -631,7 +667,7 @@ impl App {
             .takes_key_repeat(atlantis_engine::sys::Key::Char('a'));
         if entry != self.touch.keyboard {
             self.touch.keyboard = entry;
-            if let Some(a) = ACTIVITY.get() {
+            if let Some(a) = ACTIVITY.lock().unwrap().as_ref() {
                 if entry {
                     a.show_soft_input(true);
                 } else {

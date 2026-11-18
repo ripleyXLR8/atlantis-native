@@ -29,6 +29,17 @@ start() {
 running() {
     adb shell pidof "$pkg" | tr -d '\r'
 }
+# Taps the element of the screen showing `text` (the system's picker);
+# false when there is none.
+tap_text() {
+    local xy
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+    adb pull /sdcard/ui.xml "$out/ui.xml" >/dev/null 2>&1
+    xy=$(python3 "$(dirname "$0")/tap-text.py" "$out/ui.xml" "$1")
+    [ -n "$xy" ] || { echo "no '$1' on the screen"; return 1; }
+    adb shell input tap $xy
+    sleep 2
+}
 
 adb wait-for-device
 # (root: the thread dump of a hang)
@@ -38,13 +49,8 @@ adb install -r "$apk" || exit 1
 adb logcat -b all -c
 start
 sleep 8
-# On the emulator, Android sometimes destroys the activity just after its
-# first start (the app then closes, as it does whenever its activity is
-# destroyed): once more.
-if [ -z "$(running)" ]; then
-    echo "the app closed after its start; starting it again"
-    start
-fi
+# (On the emulator, Android sometimes relaunches the activity just after
+# its first start: the app carries on in the new activity.)
 sleep 12
 adb exec-out screencap -p > "$out/screen.png"
 pid=$(running)
@@ -73,6 +79,25 @@ adb exec-out screencap -p > "$out/screen-picker.png"
 adb shell input keyevent KEYCODE_BACK
 sleep 4
 adb exec-out screencap -p > "$out/screen-after-picker.png"
+# A folder chosen in the picker (Download/AtlantisTest, holding an
+# atlantis.exe that is no game's): read through the Storage Access
+# Framework, the screen says what was found there.
+adb shell mkdir -p /sdcard/Download/AtlantisTest
+adb shell "echo not-a-game > /sdcard/Download/AtlantisTest/atlantis.exe"
+adb shell input tap 320 160
+sleep 4
+picked=no
+tap_text "Download" && tap_text "AtlantisTest" && tap_text "Use this folder" &&
+    tap_text "Allow" && picked=yes
+sleep 4
+adb exec-out screencap -p > "$out/screen-chosen-folder.png"
+if [ "$picked" = no ]; then
+    adb exec-out screencap -p > "$out/screen-picker-stuck.png"
+    adb shell input keyevent KEYCODE_BACK
+    sleep 2
+    adb shell input keyevent KEYCODE_BACK
+    sleep 2
+fi
 pid2=$(running)
 # The threads of the app (a hang shows where it waits).
 if [ -n "$pid2" ]; then
@@ -81,6 +106,10 @@ fi
 app_log
 cat "$out/logcat-app.txt"
 
+if grep -q "activity destroyed" "$out/logcat-app.txt"; then
+    grep -q "the game goes on in the new activity" "$out/logcat-app.txt" ||
+        fail "the activity was destroyed and the app did not go on in a new one"
+fi
 [ -n "$pid2" ] || fail "the app was not running after its returns from the background"
 [ "$pid2" = "$pid" ] || fail "the app was started again ($pid, then $pid2)"
 grep -q "panicked\|Fatal signal" "$out/logcat-app.txt" && fail "the app crashed"
@@ -89,6 +118,9 @@ grep -q "ANR in $pkg\|timeout for ActivityRecord.*$pkg\|hang: " "$out/logcat-app
 grep -q "No game found" "$out/logcat-app.txt" || fail "no 'No game found' line in the log"
 grep -q "folder picker opened" "$out/logcat-app.txt" || fail "the tap did not open the folder picker"
 grep -q "folder picked: none" "$out/logcat-app.txt" || fail "the picker's answer did not come back"
+[ "$picked" = yes ] || fail "the picker could not be driven to Download/AtlantisTest"
+grep -q "chosen folder: atlantis.exe (11 bytes) is not a known build" "$out/logcat-app.txt" ||
+    fail "the chosen folder's atlantis.exe was not read"
 made=$(grep -c "resumed: window made" "$out/logcat-app.txt")
 [ "$made" -ge 5 ] || fail "the window was made $made times (5 expected: at the start, after each return)"
 echo "smoke test passed (pid $pid)"
