@@ -1257,6 +1257,17 @@ impl Game {
         self.last_press = Some(self.now);
     }
 
+    /// Tests: a left press as the emulation harnesses make it (the click
+    /// byte 0x007592b8 set, not the press callback): never a double click,
+    /// however close to the previous press.
+    #[doc(hidden)]
+    pub fn harness_click(&mut self) {
+        self.click();
+        if !self.files.is_evolution_2004() {
+            self.double_click = false;
+        }
+    }
+
     /// The free pointer (inventory, subject menu).
     pub fn pointer(&self) -> (i32, i32) {
         self.pointer
