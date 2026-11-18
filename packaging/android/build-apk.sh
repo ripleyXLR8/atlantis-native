@@ -57,6 +57,23 @@ else
 fi
 echo "build-tools $bt, platform $platform, version $version_name ($version_code), ABIs ${abis[*]}"
 
+# Adds files (relative to the current folder) to a zip, stored or
+# compressed (zip itself where it is, Python's zipfile otherwise).
+add_to_zip() {
+    local zipfile=$1 stored=$2
+    shift 2
+    python3 - "$zipfile" "$stored" "$@" <<'PY'
+import os, sys, zipfile
+z, stored, paths = sys.argv[1], sys.argv[2] == "1", sys.argv[3:]
+mode = zipfile.ZIP_STORED if stored else zipfile.ZIP_DEFLATED
+with zipfile.ZipFile(z, "a", mode) as out:
+    for p in paths:
+        for root, _, files in os.walk(p) if os.path.isdir(p) else [("", [], [p])]:
+            for f in sorted(files):
+                out.write(os.path.join(root, f) if root else f)
+PY
+}
+
 work=$out/work
 rm -rf "$work"
 mkdir -p "$work/apk"
@@ -91,11 +108,11 @@ javac -source 11 -target 11 -Xlint:-options -classpath "$platform/android.jar" \
     -d "$work/classes" $(find "$here/java" -name '*.java')
 "$bt/d8" --release --min-api "$min_sdk" --lib "$platform/android.jar" \
     --output "$work/dex" $(find "$work/classes" -name '*.class')
-(cd "$work/dex" && zip -q "$work/unaligned.apk" classes.dex)
+(cd "$work/dex" && add_to_zip "$work/unaligned.apk" 0 classes.dex)
 
 # The libraries stored (not compressed): android:extractNativeLibs is
 # false, they are mapped from the APK, aligned by zipalign.
-(cd "$work/apk" && zip -q -0 -r "$work/unaligned.apk" lib)
+(cd "$work/apk" && add_to_zip "$work/unaligned.apk" 1 lib)
 if "$bt/zipalign" 2>&1 | grep -q -- '-P'; then
     "$bt/zipalign" -f -P 16 4 "$work/unaligned.apk" "$work/aligned.apk"
 else

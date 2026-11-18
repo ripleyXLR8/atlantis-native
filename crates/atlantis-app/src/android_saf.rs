@@ -32,12 +32,29 @@ pub(crate) fn init(vm: *mut c_void, activity: *mut c_void) {
     *ACTIVITY.lock().unwrap() = Some((vm as usize, activity as usize));
     let registered = with_env(|env, act| unsafe {
         let cls = call(env, |f| f.GetObjectClass)?(env, act);
-        let method = JNINativeMethod {
-            name: c"folderPicked".as_ptr() as *mut _,
-            signature: c"(Ljava/lang/String;)V".as_ptr() as *mut _,
-            fnPtr: folder_picked as *mut c_void,
-        };
-        let r = call(env, |f| f.RegisterNatives)?(env, cls, &method, 1);
+        let methods = [
+            JNINativeMethod {
+                name: c"folderPicked".as_ptr() as *mut _,
+                signature: c"(Ljava/lang/String;)V".as_ptr() as *mut _,
+                fnPtr: folder_picked as *mut c_void,
+            },
+            JNINativeMethod {
+                name: c"textTyped".as_ptr() as *mut _,
+                signature: c"(Ljava/lang/String;)V".as_ptr() as *mut _,
+                fnPtr: text_typed as *mut c_void,
+            },
+            JNINativeMethod {
+                name: c"keyTyped".as_ptr() as *mut _,
+                signature: c"(I)V".as_ptr() as *mut _,
+                fnPtr: key_typed as *mut c_void,
+            },
+            JNINativeMethod {
+                name: c"backPressed".as_ptr() as *mut _,
+                signature: c"()V".as_ptr() as *mut _,
+                fnPtr: back_pressed as *mut c_void,
+            },
+        ];
+        let r = call(env, |f| f.RegisterNatives)?(env, cls, methods.as_ptr(), methods.len() as i32);
         call(env, |f| f.DeleteLocalRef)?(env, cls);
         (r == JNI_OK).then_some(())
     });
@@ -54,6 +71,68 @@ extern "system" fn folder_picked(env: *mut JNIEnv, _class: jclass, uri: jstring)
         if uri.is_empty() { "none" } else { &uri }
     );
     *PICKED.lock().unwrap() = Some(uri);
+}
+
+/// What the activity passed on from the on-screen keyboard and the Back
+/// button, in order, until the event loop takes it.
+#[derive(Debug, PartialEq)]
+pub(crate) enum Typed {
+    Text(String),
+    /// Android's key code (66 Enter, 67 Backspace).
+    Key(i32),
+    Back,
+}
+
+static TYPED: Mutex<Vec<Typed>> = Mutex::new(Vec::new());
+
+/// The event loop woken for what [`TYPED`] got (a user event: winit's
+/// own wake-up is ignored without a redraw due).
+static WAKE: Mutex<Option<winit::event_loop::EventLoopProxy<()>>> = Mutex::new(None);
+
+/// The event loop to wake when the activity passes something on.
+pub(crate) fn set_waker(proxy: winit::event_loop::EventLoopProxy<()>) {
+    *WAKE.lock().unwrap() = Some(proxy);
+}
+
+fn typed(t: Typed) {
+    TYPED.lock().unwrap().push(t);
+    if let Some(p) = WAKE.lock().unwrap().as_ref() {
+        let _ = p.send_event(());
+    }
+}
+
+/// What came since the last call.
+pub(crate) fn take_typed() -> Vec<Typed> {
+    std::mem::take(&mut *TYPED.lock().unwrap())
+}
+
+/// `AtlantisActivity.textTyped(String)`.
+extern "system" fn text_typed(env: *mut JNIEnv, _class: jclass, text: jstring) {
+    if let Some(t) = unsafe { rust_string(env, text) } {
+        typed(Typed::Text(t));
+    }
+}
+
+/// `AtlantisActivity.keyTyped(int)`.
+extern "system" fn key_typed(_env: *mut JNIEnv, _class: jclass, code: jni_sys::jint) {
+    typed(Typed::Key(code));
+}
+
+/// `AtlantisActivity.backPressed()`.
+extern "system" fn back_pressed(_env: *mut JNIEnv, _class: jclass) {
+    log::info!("Back");
+    typed(Typed::Back);
+}
+
+/// Shows or hides the on-screen keyboard (typing into the activity's
+/// text view).
+pub(crate) fn show_keyboard(show: bool) -> bool {
+    with_env(|env, act| unsafe {
+        let m = method(env, act, c"showKeyboard", c"(Z)V")?;
+        call(env, |f| f.CallVoidMethodA)?(env, act, m, [jvalue { z: u8::from(show) }].as_ptr());
+        no_exception(env)
+    })
+    .is_some()
 }
 
 /// The picker's answer, once.

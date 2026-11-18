@@ -37,9 +37,6 @@ use crate::desktop::{data_dir, open_any, Opened};
 use crate::session::Session;
 use crate::App;
 
-/// The activity, for the on-screen keyboard.
-static ACTIVITY: std::sync::Mutex<Option<AndroidApp>> = std::sync::Mutex::new(None);
-
 /// The front end of an activity Android destroyed (relaunched, or
 /// destroyed in the background while the process lives on), for the next
 /// activity of the process: the game goes on where it was.
@@ -258,7 +255,6 @@ fn android_main(activity: AndroidApp) {
         }));
     }
     log::info!("{}", crate::version_string());
-    *ACTIVITY.lock().unwrap() = Some(activity.clone());
     if let Some(dir) = activity.internal_data_path() {
         atlantis_engine::persist::set_android_data_dir(dir);
     }
@@ -278,6 +274,7 @@ fn android_main(activity: AndroidApp) {
         log::info!("game folder {}", dir.display());
     }
     crate::android_saf::init(activity.vm_as_ptr(), activity.activity_as_ptr());
+    let _ = crate::android_saf::take_typed();
     let event_loop = match EventLoop::builder().with_android_app(activity).build() {
         Ok(el) => el,
         Err(e) => {
@@ -297,6 +294,7 @@ fn android_main(activity: AndroidApp) {
         }
     };
     let mut event_loop = event_loop;
+    crate::android_saf::set_waker(event_loop.create_proxy());
     use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     // The first game's front end (also the "no game" screen), unless
     // Atlantis II, III or Evolution was found: their own modes, on the
@@ -861,6 +859,42 @@ impl App {
         self.last_cursor = Some((x, y));
     }
 
+    /// The on-screen keyboard's text and keys, and the Back button: the
+    /// engine's keys (one input per step, after the touches queued), or
+    /// the options menu's; Back without a game leaves the app.
+    pub(crate) fn poll_typed(&mut self, el: &winit::event_loop::ActiveEventLoop) {
+        use crate::android_saf::Typed;
+        use atlantis_engine::sys::Key as EngineKey;
+        for t in crate::android_saf::take_typed() {
+            let keys: Vec<EngineKey> = match t {
+                Typed::Text(text) => text.chars().map(EngineKey::Char).collect(),
+                Typed::Key(66) => vec![EngineKey::Enter],
+                Typed::Key(67) => vec![EngineKey::Backspace],
+                Typed::Key(_) => Vec::new(),
+                Typed::Back => {
+                    if self.runner.is_none() && !self.menu.is_open() {
+                        log::info!("Back on the \"no game\" screen: the app ends");
+                        el.exit();
+                        return;
+                    }
+                    vec![EngineKey::Escape]
+                }
+            };
+            for k in keys {
+                if self.menu.is_open() {
+                    let action = self.menu.key(k, self.menu_values());
+                    self.menu_action(action);
+                } else if self.runner.is_some() {
+                    self.touch.queue.push_back(Input::KeyDown(k));
+                    self.touch.queue.push_back(Input::KeyUp(k));
+                }
+            }
+        }
+        if let Some(w) = &self.window {
+            w.request_redraw();
+        }
+    }
+
     /// Gives the engine the next queued touch input (before each step),
     /// and shows the on-screen keyboard while the player screen takes
     /// the letters (hidden after).
@@ -873,13 +907,11 @@ impl App {
             .takes_key_repeat(atlantis_engine::sys::Key::Char('a'));
         if entry != self.touch.keyboard {
             self.touch.keyboard = entry;
-            if let Some(a) = ACTIVITY.lock().unwrap().as_ref() {
-                if entry {
-                    a.show_soft_input(true);
-                } else {
-                    a.hide_soft_input(true);
-                }
-            }
+            log::info!(
+                "on-screen keyboard {}",
+                if entry { "shown" } else { "hidden" }
+            );
+            crate::android_saf::show_keyboard(entry);
         }
     }
 

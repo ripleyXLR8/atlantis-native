@@ -4,7 +4,12 @@
 // - the system's folder picker (ACTION_OPEN_DOCUMENT_TREE), its answer
 //   passed to the Rust code (folderPicked, registered from Rust), and the
 //   folder's documents listed and opened (the Storage Access Framework);
-// - the full screen without the status and navigation bars (immersive).
+// - the full screen without the status and navigation bars (immersive);
+// - the on-screen keyboard's text (keyboards such as Gboard commit text
+//   through an InputConnection, which NativeActivity's own view has not),
+//   passed on as characters and keys (TextView below);
+// - the Back button, which Android's predictive back would otherwise
+//   turn into the activity's end: passed on (backPressed).
 // The Rust code calls these methods through JNI (crates/atlantis-app/src/
 // android_saf.rs).
 package io.github.ripleyxlr8.atlantisnative;
@@ -19,7 +24,17 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.provider.DocumentsContract;
+import android.content.Context;
+import android.text.InputType;
+import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.inputmethod.BaseInputConnection;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputConnection;
+import android.view.inputmethod.InputMethodManager;
+import android.window.OnBackInvokedCallback;
+import android.window.OnBackInvokedDispatcher;
 import android.view.Window;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
@@ -32,10 +47,165 @@ public class AtlantisActivity extends NativeActivity {
     /** The folder chosen in the picker (its tree URI), "" when none was. */
     private static native void folderPicked(String treeUri);
 
+    /** Text the on-screen keyboard typed. */
+    private static native void textTyped(String text);
+
+    /** A key of the on-screen keyboard (Android's key code: 66 Enter,
+     *  67 Backspace). */
+    private static native void keyTyped(int keyCode);
+
+    /** The Back button. */
+    private static native void backPressed();
+
+    /** The view the on-screen keyboard types into (see TextView). */
+    private TextView textView;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         immersive();
+        textView = new TextView(this);
+        addContentView(textView, new ViewGroup.LayoutParams(1, 1));
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+                    new OnBackInvokedCallback() {
+                        @Override
+                        public void onBackInvoked() {
+                            backPressed();
+                        }
+                    });
+        }
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        // (before Android 13; the callback above from 13 on)
+        backPressed();
+    }
+
+    /** Shows or hides the on-screen keyboard (from any thread). */
+    public void showKeyboard(final boolean show) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                InputMethodManager imm =
+                        (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm == null || textView == null) {
+                    return;
+                }
+                if (show) {
+                    textView.setFocusable(true);
+                    textView.setFocusableInTouchMode(true);
+                    textView.requestFocus();
+                    imm.restartInput(textView);
+                    imm.showSoftInput(textView, 0);
+                } else {
+                    imm.hideSoftInputFromWindow(textView.getWindowToken(), 0);
+                    textView.clearFocus();
+                }
+            }
+        });
+    }
+
+    /** A view that takes the on-screen keyboard's text: each character
+     *  committed, each deletion and each key passed on at once (no text is
+     *  kept here; the game draws what it took). */
+    private static final class TextView extends View {
+        TextView(Context context) {
+            super(context);
+        }
+
+        @Override
+        public boolean onCheckIsTextEditor() {
+            return true;
+        }
+
+        @Override
+        public InputConnection onCreateInputConnection(EditorInfo info) {
+            // Characters one by one: no suggestions, no composing, no
+            // full-screen editor in landscape.
+            info.inputType = InputType.TYPE_CLASS_TEXT
+                    | InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                    | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+            info.imeOptions = EditorInfo.IME_ACTION_DONE
+                    | EditorInfo.IME_FLAG_NO_EXTRACT_UI
+                    | EditorInfo.IME_FLAG_NO_FULLSCREEN;
+            info.initialSelStart = 0;
+            info.initialSelEnd = 0;
+            return new BaseInputConnection(this, false) {
+                /** The text being composed, already passed on (a keyboard
+                 *  that composes all the same: its changes are passed on
+                 *  as deletions and characters). */
+                private String composing = "";
+
+                /** `text` in place of the composing text. */
+                private void replaceComposing(String text) {
+                    int same = 0;
+                    while (same < composing.length() && same < text.length()
+                            && composing.charAt(same) == text.charAt(same)) {
+                        same++;
+                    }
+                    for (int i = same; i < composing.length(); i++) {
+                        keyTyped(KeyEvent.KEYCODE_DEL);
+                    }
+                    if (same < text.length()) {
+                        textTyped(text.substring(same));
+                    }
+                    composing = text;
+                }
+
+                @Override
+                public boolean commitText(CharSequence text, int newCursorPosition) {
+                    replaceComposing(text == null ? "" : text.toString());
+                    composing = "";
+                    return true;
+                }
+
+                @Override
+                public boolean setComposingText(CharSequence text, int newCursorPosition) {
+                    replaceComposing(text == null ? "" : text.toString());
+                    return true;
+                }
+
+                @Override
+                public boolean finishComposingText() {
+                    composing = "";
+                    return true;
+                }
+
+                @Override
+                public boolean deleteSurroundingText(int beforeLength, int afterLength) {
+                    for (int i = 0; i < Math.max(beforeLength, 1); i++) {
+                        keyTyped(KeyEvent.KEYCODE_DEL);
+                    }
+                    return true;
+                }
+
+                @Override
+                public boolean sendKeyEvent(KeyEvent event) {
+                    if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                        int code = event.getKeyCode();
+                        int c = event.getUnicodeChar();
+                        if (code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_DEL) {
+                            keyTyped(code);
+                        } else if (c > 0) {
+                            textTyped(String.valueOf((char) c));
+                        } else {
+                            keyTyped(code);
+                        }
+                    }
+                    return true;
+                }
+
+                @Override
+                public boolean performEditorAction(int actionCode) {
+                    keyTyped(KeyEvent.KEYCODE_ENTER);
+                    return true;
+                }
+            };
+        }
     }
 
     @Override

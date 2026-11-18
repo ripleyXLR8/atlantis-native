@@ -1502,9 +1502,13 @@ impl ApplicationHandler for App {
             el.exit();
             return;
         }
-        // Android: the folder picker's answer.
+        // Android: the folder picker's answer, the on-screen keyboard's
+        // text, the Back button.
         #[cfg(target_os = "android")]
-        self.poll_picked();
+        {
+            self.poll_picked();
+            self.poll_typed(el);
+        }
         // In the browser the redraw loop keeps itself going (see
         // RedrawRequested).
         #[cfg(target_arch = "wasm32")]
