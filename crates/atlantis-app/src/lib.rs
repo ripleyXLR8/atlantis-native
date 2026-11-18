@@ -46,6 +46,8 @@ mod a4_gl;
 mod a4_prefetch;
 #[cfg(all(test, target_arch = "wasm32"))]
 mod a4_wasm_tests;
+#[cfg(target_os = "android")]
+mod android;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
@@ -278,6 +280,12 @@ pub struct App {
     /// The support screen, while it is shown (desktop).
     #[cfg(not(target_arch = "wasm32"))]
     support: Option<support::Shown>,
+    /// Android: the touch screen as the mouse, and when the activity
+    /// went to the background (the game's clock stopped since).
+    #[cfg(target_os = "android")]
+    touch: android::TouchState,
+    #[cfg(target_os = "android")]
+    suspended_at: Option<Instant>,
 }
 
 impl App {
@@ -412,6 +420,10 @@ impl App {
             session: None,
             #[cfg(not(target_arch = "wasm32"))]
             support: None,
+            #[cfg(target_os = "android")]
+            touch: android::TouchState::default(),
+            #[cfg(target_os = "android")]
+            suspended_at: None,
         }
     }
 
@@ -820,6 +832,8 @@ impl App {
         if self.menu.is_open() {
             return true; // paused
         }
+        #[cfg(target_os = "android")]
+        self.feed_touch();
         self.step_paced()
     }
 
@@ -1329,6 +1343,9 @@ impl App {
 fn engine_key(key: &Key) -> Option<EngineKey> {
     Some(match key {
         Key::Named(NamedKey::Escape) => EngineKey::Escape,
+        // Android's Back button.
+        #[cfg(target_os = "android")]
+        Key::Named(NamedKey::BrowserBack) => EngineKey::Escape,
         Key::Named(NamedKey::Enter) => EngineKey::Enter,
         Key::Named(NamedKey::Space) => EngineKey::Space,
         Key::Named(NamedKey::Backspace) => EngineKey::Backspace,
@@ -1451,6 +1468,15 @@ impl ApplicationHandler for App {
         if self.runner.is_some() {
             self.start_audio();
         }
+        #[cfg(target_os = "android")]
+        self.android_resume();
+    }
+
+    /// Android: the activity's window is gone (another app, the screen
+    /// off); [`ApplicationHandler::resumed`] makes a new one.
+    #[cfg(target_os = "android")]
+    fn suspended(&mut self, _el: &ActiveEventLoop) {
+        self.android_suspend();
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
@@ -1643,8 +1669,20 @@ impl ApplicationHandler for App {
                     }
                 }
             }
+            #[cfg(target_os = "android")]
+            WindowEvent::Touch(t) => self.touch(t),
             WindowEvent::ModifiersChanged(m) => self.alt = m.state().alt_key(),
             WindowEvent::KeyboardInput { event, .. } => {
+                // Android: Back without a game (the screen saying where to
+                // copy it) leaves the app.
+                #[cfg(target_os = "android")]
+                if self.runner.is_none()
+                    && !self.menu.is_open()
+                    && event.logical_key == Key::Named(NamedKey::BrowserBack)
+                {
+                    el.exit();
+                    return;
+                }
                 let key = engine_key(&event.logical_key);
                 let pressed = event.state == ElementState::Pressed;
                 // A key is a user gesture too: the browser's sound starts

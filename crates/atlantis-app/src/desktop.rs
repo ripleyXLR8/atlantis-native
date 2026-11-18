@@ -452,16 +452,17 @@ enum Choice {
     Third,
 }
 
+/// Android: no message box, the question is closed.
+#[cfg(target_os = "android")]
+fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
+    log::warn!("{text} ({first} / {second} / {third}): no message box");
+    Choice::Third
+}
+
 /// A question in the system's message box with three labelled buttons
 /// (closing the box counts as the third).
+#[cfg(not(target_os = "android"))]
 fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
-    // Android: no message box, the question is closed.
-    #[cfg(target_os = "android")]
-    {
-        log::warn!("{text} ({first} / {second} / {third}): no message box");
-        return Choice::Third;
-    }
-    #[cfg(not(target_os = "android"))]
     let r = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Info)
         .set_title("Atlantis Native")
@@ -472,24 +473,25 @@ fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
             third.to_string(),
         ))
         .show();
-    #[cfg(not(target_os = "android"))]
-    return match r {
+    match r {
         rfd::MessageDialogResult::Custom(s) if s == first => Choice::First,
         rfd::MessageDialogResult::Yes => Choice::First,
         rfd::MessageDialogResult::Custom(s) if s == second => Choice::Second,
         rfd::MessageDialogResult::No => Choice::Second,
         _ => Choice::Third,
-    };
+    }
+}
+
+/// Android: no message box, the question is closed.
+#[cfg(target_os = "android")]
+fn ask2(text: &str, first: &str, second: &str) -> bool {
+    log::warn!("{text} ({first} / {second}): no message box");
+    false
 }
 
 /// A question with two labelled buttons: true for the first.
+#[cfg(not(target_os = "android"))]
 fn ask2(text: &str, first: &str, second: &str) -> bool {
-    #[cfg(target_os = "android")]
-    {
-        log::warn!("{text} ({first} / {second}): no message box");
-        return false;
-    }
-    #[cfg(not(target_os = "android"))]
     let r = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Info)
         .set_title("Atlantis Native")
@@ -499,9 +501,8 @@ fn ask2(text: &str, first: &str, second: &str) -> bool {
             second.to_string(),
         ))
         .show();
-    #[cfg(not(target_os = "android"))]
-    return matches!(r, rfd::MessageDialogResult::Ok)
-        || matches!(r, rfd::MessageDialogResult::Custom(s) if s == first);
+    matches!(r, rfd::MessageDialogResult::Ok)
+        || matches!(r, rfd::MessageDialogResult::Custom(s) if s == first)
 }
 
 /// Copies the game from the player's four CDs, one after the other, into
@@ -668,6 +669,7 @@ pub fn first_start() -> Option<FirstStart> {
 
 /// Opens the project's new-issue page in the browser, filled in with the
 /// identifiers of the edition in `dir` (its files or its disc images).
+#[cfg_attr(target_os = "android", allow(dead_code))]
 fn report_edition(dir: &Path) {
     let names = setup::names_in(dir);
     let report = if names.iter().any(|n| n == "atlantis.exe") {
@@ -682,6 +684,13 @@ fn report_edition(dir: &Path) {
     }
 }
 
+/// Android: no folder picker yet (docs/ANDROID.md).
+#[cfg(target_os = "android")]
+pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
+    log::warn!("no folder picker ({give_up})");
+    None
+}
+
 /// The game folder the player chooses in the system's folder picker (of
 /// any game: the folder itself or one below it, [`setup::find_roots`];
 /// a folder holding two games or more asks which one), with a message saying what to do when the folder is not right (its
@@ -689,16 +698,9 @@ fn report_edition(dir: &Path) {
 /// the folder is a CD drive of the first game. The game and its folder;
 /// for Cryo's DVD, each of its languages found ([`dvd_locations`]), each
 /// its own edition. `None` when the player cancels.
-#[cfg_attr(target_os = "android", allow(unreachable_code))]
+#[cfg(not(target_os = "android"))]
 pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
     loop {
-        // Android: no folder picker yet (docs/ANDROID.md).
-        #[cfg(target_os = "android")]
-        let dir: PathBuf = {
-            let _ = give_up;
-            return None;
-        };
-        #[cfg(not(target_os = "android"))]
         let dir = rfd::FileDialog::new()
             .set_title(
                 "Choose the folder of your game (the one with atlantis.exe, atlantis2.exe for Atlantis II, Game.exe, or Atlantis Evolution.exe)",
@@ -856,6 +858,7 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
 
 /// Every language of the side of the DVD's language `root` (none when
 /// `root` is not one): a pick of a folder above the side's copy.
+#[cfg_attr(target_os = "android", allow(dead_code))]
 fn dvd_side_of(root: &Path) -> Vec<PathBuf> {
     dvd_language_of(root)
         .map(|(_, side)| dvd_languages_at(&side))
@@ -864,6 +867,7 @@ fn dvd_side_of(root: &Path) -> Vec<PathBuf> {
 
 /// The DVD's languages at `languages` that open, and the first error.
 #[allow(clippy::type_complexity)]
+#[cfg_attr(target_os = "android", allow(dead_code))]
 fn open_dvd_languages(
     languages: &[PathBuf],
 ) -> (Vec<(Opened, PathBuf)>, Option<(PathBuf, GameError)>) {
