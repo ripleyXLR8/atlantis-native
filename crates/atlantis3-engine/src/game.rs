@@ -36,6 +36,7 @@ use atlantis2_engine::place_sound::{sources, Source};
 use atlantis3_data::coord::Coord;
 use std::collections::{BTreeMap, HashMap};
 
+mod anim_sounds;
 mod board;
 mod carte2004;
 mod credits;
@@ -461,8 +462,9 @@ pub struct Game {
     #[doc(hidden)]
     pub story_sound_model: bool,
     /// Tests: the parts the whole-story harness stubs (the dialogs' set-up
-    /// and start, the place sounds' restarts) draw from a generator of
-    /// their own, leaving `rand` alone as the stubs do.
+    /// and start, the place sounds' restarts, the warp draw's sprite pass
+    /// with the place animations' sounds) draw from a generator of their
+    /// own or none, leaving `rand` alone as the stubs do.
     #[doc(hidden)]
     pub stub_rand: bool,
 }
@@ -2415,6 +2417,9 @@ impl Game {
         if self.slots.evolution {
             // FUN_00444e70 → FUN_00439fc0: the sounds before the sprites.
             self.anim_sounds_2004();
+        } else {
+            // The sprite pass @ 0x00440bf0 → 0x00439130 per shown slot.
+            self.anim_sounds_a3();
         }
         let sprites = self.slots.slots.iter().any(|s| s.shown);
         self.render_cube(&m, proj, sprites);
@@ -3159,6 +3164,8 @@ impl Game {
                 self.audio.set_gain(CHANNEL_PLACE + k, gains);
             }
         }
+        // The listener moved for the other 3D sounds too.
+        self.sfx_3d_gains();
     }
 
     /// Tests: the place sounds playing, by channel: the file and the

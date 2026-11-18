@@ -322,3 +322,77 @@ fn a_new_views_place_sound_starts_at_once() {
         }
     }
 }
+
+/// Place `wam` of world `world` with the view, among its views, whose
+/// place animations include a slot named `prefix...`, entered (a drawn
+/// warp frame); the slot forced shown, in mode 1, on frame 0.
+fn with_slot(wam: &str, world: i32, prefix: &str) -> Option<(Game, f64, String)> {
+    let dir = atlantis3_data::testing::install_dir()?;
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    assert!(g.board_begin(wam, world));
+    let ids: Vec<u32> = g
+        .wam()
+        .places
+        .iter()
+        .flat_map(|p| p.views.iter().map(|v| v.id))
+        .collect();
+    let t = 100.0;
+    for id in ids {
+        g.board_enter_at(id, 0.0, 0.0, t);
+        let Some(k) = g
+            .test_slots_mut()
+            .slots
+            .iter()
+            .position(|s| s.name.starts_with(prefix))
+        else {
+            continue;
+        };
+        let s = &mut g.test_slots_mut().slots[k];
+        s.shown = true;
+        s.mode = 1;
+        s.frame = 0;
+        let name = s.name.clone();
+        return Some((g, t, name));
+    }
+    panic!("no {prefix} slot in {wam}");
+}
+
+/// F2: the sprite pass 0x00440bf0 calls 0x00439130 for every shown slot;
+/// a slot in mode 1 on frame 0 with no dialog loads and plays
+/// `sfx\<first 4 characters>.apc` when it exists, in 3D at the Coord
+/// `Perso` position of `Mid(0, 2) + Mid(7, 3)` in upper case (the Hoggar
+/// guard `g1A2005007` → `G1007`; the WAM's state letter is upper case, as
+/// the original's slots name it, `tests/golden/spwz_pick.txt`).
+#[test]
+fn a_place_animation_plays_its_sound_at_frame_0() {
+    let Some((mut g, t, name)) = with_slot("hoggar.wam", 1, "g1A2") else {
+        return;
+    };
+    assert!(name.ends_with("007"), "{name}");
+    assert_eq!(g.test_sfx_state("sfx\\g1A2.apc"), None);
+    g.step(t + 0.04);
+    let (pos, playing) = g.test_sfx_state("sfx\\g1A2.apc").expect("loaded");
+    assert!(playing);
+    assert_eq!(pos, Some([4227.7, -118.329, 945.123]));
+}
+
+/// F2: a `pd` name (the tower's demon pawns, named in lower case by the
+/// tower's C code @ 0x004d46e0) is placed at the view's Coord `Warp`
+/// position shifted by (300 k, 0, 100 k), k = 1 for the letter `a`
+/// (@ 0x00439427..0x004394e0); `pda2` draws no `rand()`.
+#[test]
+fn a_pd_animation_plays_beside_the_view() {
+    let Some((mut g, t, name)) = with_slot("TourMagi.wam", 3, "pda2") else {
+        return;
+    };
+    g.step(t + 0.04);
+    let view = g.place().1.unwrap();
+    let w = g.test_coord_warp(view).unwrap_or([0.0; 3]);
+    let (pos, playing) = g.test_sfx_state("sfx\\pda2.apc").expect("loaded");
+    assert!(playing, "{name}");
+    let pos = pos.expect("in 3D");
+    let want = [w[0] + 300.0, w[1], w[2] + 100.0];
+    for k in 0..3 {
+        assert!((pos[k] - want[k]).abs() < 0.01, "{pos:?} {want:?}");
+    }
+}
