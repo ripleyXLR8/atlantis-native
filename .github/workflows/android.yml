@@ -33,17 +33,31 @@ jobs:
           yes | "$sdkmanager" --licenses >/dev/null || true
           "$sdkmanager" --install "platforms;android-36" "build-tools;36.0.0" >/dev/null
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+      # Without the release key (the repository's secrets, below), the
+      # APKs are signed with a debug key kept from one run to the next
+      # (the cache), so that a build installs over the one before.
+      - name: Debug key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android-debug/debug.keystore
+          key: android-debug-keystore
       - name: APK (arm64-v8a)
         env:
           APK_NAME: atlantis-native-android-arm64.apk
-          VERSION_CODE: ${{ github.run_number }}
+          BUILD_NUMBER: ${{ github.run_number }}
           OUT: ${{ github.workspace }}/dist/android
+          DEBUG_KEYSTORE: /home/runner/.android-debug/debug.keystore
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: packaging/android/build-apk.sh arm64-v8a
       - name: APK (x86_64, for the emulator)
         env:
           APK_NAME: atlantis-native-android-x86_64.apk
-          VERSION_CODE: ${{ github.run_number }}
+          BUILD_NUMBER: ${{ github.run_number }}
           OUT: ${{ github.workspace }}/dist/android
+          DEBUG_KEYSTORE: /home/runner/.android-debug/debug.keystore
         run: packaging/android/build-apk.sh x86_64
       - uses: actions/upload-artifact@v4
         with:

@@ -12,10 +12,20 @@
 # Environment:
 #   OUT            output folder (default: dist/android)
 #   APK_NAME       the APK's file name (default: atlantis-native-android.apk)
-#   VERSION_CODE   the APK's versionCode (default: 1)
-#   KEYSTORE, KEYSTORE_PASS, KEY_ALIAS
-#                  the signing key; default: a debug key made in $OUT
-#                  (each new key needs the old APK uninstalled first)
+#   BUILD_NUMBER   the build's number (CI: the run number; default 0): the
+#                  versionCode is the Cargo version's then this, so that
+#                  each build installs over the one before:
+#                  (major * 10000 + minor * 100 + patch) * 10000
+#                  + BUILD_NUMBER % 10000
+#   VERSION_CODE   the versionCode itself, in place of the above
+#   The release key (all three, or none):
+#   ANDROID_KEYSTORE_BASE64   the keystore (JKS or PKCS12), base64
+#   ANDROID_KEYSTORE_PASSWORD its password
+#   ANDROID_KEY_ALIAS         the key's alias
+#   ANDROID_KEY_PASSWORD      the key's password (default: the keystore's)
+#   Without them the APK is signed with a debug key: DEBUG_KEYSTORE
+#   (default $OUT/debug.keystore, made when missing; keep it from one
+#   build to the next, or each new key needs the old APK uninstalled).
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")" && pwd)
@@ -24,7 +34,6 @@ abis=("$@")
 [ ${#abis[@]} -gt 0 ] || abis=(arm64-v8a)
 out=${OUT:-$root/dist/android}
 apk_name=${APK_NAME:-atlantis-native-android.apk}
-version_code=${VERSION_CODE:-1}
 min_sdk=26
 target_sdk=36
 
@@ -39,6 +48,13 @@ if [ "$level" -lt "$target_sdk" ]; then
     exit 1
 fi
 version_name=$(sed -n 's/^version = "\(.*\)"/\1/p' "$root/Cargo.toml" | head -1)
+if [ -n "${VERSION_CODE:-}" ]; then
+    version_code=$VERSION_CODE
+else
+    IFS=. read -r major minor patch <<<"${version_name%%-*}"
+    build=$(( ${BUILD_NUMBER:-0} % 10000 ))
+    version_code=$(( (major * 10000 + minor * 100 + patch) * 10000 + build ))
+fi
 echo "build-tools $bt, platform $platform, version $version_name ($version_code), ABIs ${abis[*]}"
 
 work=$out/work
@@ -56,14 +72,17 @@ export RUSTFLAGS="${RUSTFLAGS:-} -C link-arg=-Wl,-z,max-page-size=16384"
 find "$work/apk/lib" -name '*.so' ! -name 'libatlantis_app.so' -delete
 ls -la "$work"/apk/lib/*/
 
-# The manifest and the icon.
+# The manifest and the icon; debuggable unless signed with the release
+# key.
+debug_flag=(--debug-mode)
+[ -z "${ANDROID_KEYSTORE_BASE64:-}" ] || debug_flag=()
 "$bt/aapt2" compile --dir "$here/res" -o "$work/res.zip"
 "$bt/aapt2" link -o "$work/unaligned.apk" \
     --manifest "$here/AndroidManifest.xml" \
     -I "$platform/android.jar" \
     --min-sdk-version "$min_sdk" --target-sdk-version "$target_sdk" \
     --version-code "$version_code" --version-name "$version_name" \
-    --debug-mode \
+    "${debug_flag[@]}" \
     "$work/res.zip"
 
 # The activity's Java code (java/), compiled to classes.dex.
@@ -83,17 +102,30 @@ else
     "$bt/zipalign" -f -p 4 "$work/unaligned.apk" "$work/aligned.apk"
 fi
 
-# Signed: the given key, else a debug key.
-keystore=${KEYSTORE:-$out/debug.keystore}
-pass=${KEYSTORE_PASS:-android}
-alias=${KEY_ALIAS:-androiddebugkey}
-if [ ! -f "$keystore" ]; then
-    keytool -genkeypair -keystore "$keystore" -storepass "$pass" -keypass "$pass" \
-        -alias "$alias" -keyalg RSA -keysize 2048 -validity 10000 \
-        -dname "CN=Android Debug,O=Android,C=US" >/dev/null
-fi
+# Signed: the release key when given, else a debug key.
 mkdir -p "$out"
-"$bt/apksigner" sign --ks "$keystore" --ks-pass "pass:$pass" --ks-key-alias "$alias" \
-    --out "$out/$apk_name" "$work/aligned.apk"
-"$bt/apksigner" verify "$out/$apk_name"
+if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+    : "${ANDROID_KEYSTORE_PASSWORD:?the release key needs ANDROID_KEYSTORE_PASSWORD}"
+    : "${ANDROID_KEY_ALIAS:?the release key needs ANDROID_KEY_ALIAS}"
+    export ANDROID_KEY_PASSWORD=${ANDROID_KEY_PASSWORD:-$ANDROID_KEYSTORE_PASSWORD}
+    keystore=$work/release.keystore
+    printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$keystore"
+    echo "signed with the release key ($ANDROID_KEY_ALIAS)"
+    "$bt/apksigner" sign --ks "$keystore" --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+        --ks-key-alias "$ANDROID_KEY_ALIAS" --key-pass env:ANDROID_KEY_PASSWORD \
+        --out "$out/$apk_name" "$work/aligned.apk"
+    rm -f "$keystore"
+else
+    keystore=${DEBUG_KEYSTORE:-$out/debug.keystore}
+    if [ ! -f "$keystore" ]; then
+        mkdir -p "$(dirname "$keystore")"
+        keytool -genkeypair -keystore "$keystore" -storepass android -keypass android \
+            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US" >/dev/null
+    fi
+    echo "signed with the debug key $keystore"
+    "$bt/apksigner" sign --ks "$keystore" --ks-pass pass:android \
+        --ks-key-alias androiddebugkey --out "$out/$apk_name" "$work/aligned.apk"
+fi
+"$bt/apksigner" verify --print-certs "$out/$apk_name" | head -3
 ls -la "$out/$apk_name"
