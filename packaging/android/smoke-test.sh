@@ -33,14 +33,18 @@ running() {
 # false when there is none.
 tap_text() {
     local xy="" try
-    # (uiautomator's dump fails now and then on a screen still changing)
-    for try in 1 2 3 4; do
+    # (uiautomator's dump fails now and then on a screen still changing,
+    # and an earlier dump left running can block the next ones: it is
+    # ended before trying again)
+    for try in 1 2 3 4 5 6 7 8; do
         adb shell rm -f /sdcard/ui.xml
-        adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+        adb shell timeout 20 uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
         adb pull /sdcard/ui.xml "$out/ui.xml" >/dev/null 2>&1
         xy=$(python3 "$(dirname "$0")/tap-text.py" "$out/ui.xml" "$1" 2>/dev/null)
         [ -n "$xy" ] && break
-        sleep 2
+        echo "uiautomator: no '$1' in the dump ($try, $(wc -c < "$out/ui.xml" 2>/dev/null || echo 0) bytes)"
+        adb shell pkill -f uiautomator >/dev/null 2>&1
+        sleep 3
     done
     [ -n "$xy" ] || { echo "no '$1' on the screen"; return 1; }
     adb shell input tap $xy
