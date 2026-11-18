@@ -215,6 +215,7 @@ dependencies = [
  "glow",
  "glutin",
  "glutin-winit",
+ "jni-sys 0.3.1",
  "js-sys",
  "libc",
  "log",

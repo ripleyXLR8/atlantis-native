@@ -7,7 +7,8 @@
 #
 # Needs cargo-ndk (`cargo install cargo-ndk`), the Rust targets of the
 # ABIs, ANDROID_SDK_ROOT (or ANDROID_HOME) with build-tools 35 or later
-# and a platform of API 36 or later, ANDROID_NDK_HOME, and keytool.
+# and a platform of API 36 or later, ANDROID_NDK_HOME, and a JDK (javac,
+# keytool).
 # Environment:
 #   OUT            output folder (default: dist/android)
 #   APK_NAME       the APK's file name (default: atlantis-native-android.apk)
@@ -64,6 +65,14 @@ ls -la "$work"/apk/lib/*/
     --version-code "$version_code" --version-name "$version_name" \
     --debug-mode \
     "$work/res.zip"
+
+# The activity's Java code (java/), compiled to classes.dex.
+mkdir -p "$work/classes" "$work/dex"
+javac -source 11 -target 11 -Xlint:-options -classpath "$platform/android.jar" \
+    -d "$work/classes" $(find "$here/java" -name '*.java')
+"$bt/d8" --release --min-api "$min_sdk" --lib "$platform/android.jar" \
+    --output "$work/dex" $(find "$work/classes" -name '*.class')
+(cd "$work/dex" && zip -q "$work/unaligned.apk" classes.dex)
 
 # The libraries stored (not compressed): android:extractNativeLibs is
 # false, they are mapped from the APK, aligned by zipalign.

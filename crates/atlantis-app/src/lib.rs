@@ -48,6 +48,8 @@ mod a4_prefetch;
 mod a4_wasm_tests;
 #[cfg(target_os = "android")]
 mod android;
+#[cfg(target_os = "android")]
+mod android_saf;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
@@ -1500,6 +1502,9 @@ impl ApplicationHandler for App {
             el.exit();
             return;
         }
+        // Android: the folder picker's answer.
+        #[cfg(target_os = "android")]
+        self.poll_picked();
         // In the browser the redraw loop keeps itself going (see
         // RedrawRequested).
         #[cfg(target_arch = "wasm32")]

@@ -21,6 +21,7 @@
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::subtitles::SubtitleFont;
@@ -136,6 +137,7 @@ fn android_main(activity: AndroidApp) {
         }
         log::info!("game folder {}", dir.display());
     }
+    crate::android_saf::init(activity.vm_as_ptr(), activity.activity_as_ptr());
     let event_loop = match EventLoop::builder().with_android_app(activity).build() {
         Ok(el) => el,
         Err(e) => {
@@ -147,33 +149,7 @@ fn android_main(activity: AndroidApp) {
     let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
     // (no game library's screen on Android yet)
     app.menu.set_library(false);
-    match game_dir.as_deref().map(find_game) {
-        Some(Found::Game(opened, dir)) => app.play_opened(opened, &dir),
-        Some(Found::Other(label, dir)) => {
-            app.pattern = notice(&[
-                format!("{label} found in"),
-                dir.display().to_string(),
-                String::new(),
-                "This first Android version plays".to_string(),
-                "Atlantis: The Lost Tales only.".to_string(),
-            ]);
-        }
-        Some(Found::Nothing(dir)) => {
-            log::info!("No game found: copy it to {}", dir.display());
-            app.pattern = notice(&[
-                "No game found.".to_string(),
-                String::new(),
-                "Copy the files of Atlantis: The Lost Tales".to_string(),
-                "(the CD's files, or the images of the CDs) to".to_string(),
-                dir.display().to_string(),
-                String::new(),
-                "then start the app again.".to_string(),
-            ]);
-        }
-        None => {
-            app.pattern = notice(&["No storage for the game's files.".to_string()]);
-        }
-    }
+    app.android_start(game_dir);
     if let Err(e) = event_loop.run_app(&mut app) {
         log::error!("event loop: {e}");
     }
@@ -183,6 +159,182 @@ fn android_main(activity: AndroidApp) {
     // none.
     log::info!("event loop ended");
     std::process::exit(0);
+}
+
+/// The file keeping the folder chosen in the picker (its tree URI).
+fn chosen_folder_file() -> PathBuf {
+    data_dir().join("android-game-folder.txt")
+}
+
+/// What a folder chosen in the picker holds.
+enum FoundInTree {
+    Game(Box<atlantis_data::Game>),
+    /// Another game (its name): not played from a chosen folder yet.
+    Other(&'static str),
+    Nothing(String),
+}
+
+/// The game in the chosen folder `tree` or in a folder directly inside it
+/// (the first that opens, in name order): its files, or the images of its
+/// CDs.
+fn find_game_in_tree(tree: &str) -> FoundInTree {
+    use atlantis_data::FileSource;
+    let Some(top) = crate::android_saf::SafDir::top(tree) else {
+        return FoundInTree::Nothing("the folder cannot be read".to_string());
+    };
+    let mut candidates = vec![top];
+    let subs = candidates[0].subfolders();
+    candidates.extend(subs);
+    let mut first_error = None;
+    let mut other = None;
+    for c in candidates {
+        // The other games, by their program files.
+        let names: Vec<String> = c.list("").iter().map(|n| n.to_lowercase()).collect();
+        let has = |n: &str| names.iter().any(|x| x == n);
+        if has("atlantis2.exe") {
+            other.get_or_insert("Atlantis II");
+        } else if has("atlantis evolution.exe") {
+            other.get_or_insert("Atlantis Evolution");
+        } else if has("game.exe") && has("datas") {
+            other.get_or_insert("Atlantis III");
+        }
+        let c = Arc::new(c);
+        let opened = match atlantis_data::Game::open(c.clone()) {
+            Ok(g) => Ok(g),
+            Err(e) => match c.disc_set() {
+                Some(set) => {
+                    log::info!("the game from {} disc images", set.images.len());
+                    atlantis_data::Game::open(Arc::new(set))
+                }
+                None => Err(e),
+            },
+        };
+        match opened {
+            Ok(g) => return FoundInTree::Game(Box::new(g)),
+            Err(e) => {
+                log::info!("chosen folder: {e}");
+                first_error.get_or_insert(e.to_string());
+            }
+        }
+    }
+    match other {
+        Some(name) => FoundInTree::Other(name),
+        None => FoundInTree::Nothing(first_error.unwrap_or_default()),
+    }
+}
+
+/// The tap's line at the foot of the "no game" screen.
+const TAP_TO_CHOOSE: &str = "Tap the screen to choose the game's folder.";
+
+impl App {
+    /// The game at start-up: in the folder chosen before (while the app
+    /// may still read it), else in the app's own folder `game_dir`, else
+    /// the screen saying where to put it (a tap opens the picker).
+    fn android_start(&mut self, game_dir: Option<PathBuf>) {
+        if let Ok(tree) = std::fs::read_to_string(chosen_folder_file()) {
+            let tree = tree.trim().to_string();
+            if !tree.is_empty() {
+                if crate::android_saf::can_read(&tree) {
+                    log::info!("the folder chosen before: {tree}");
+                    if self.open_tree(&tree, false) {
+                        return;
+                    }
+                } else {
+                    log::info!("the folder chosen before can no longer be read: {tree}");
+                }
+            }
+        }
+        let Some(dir) = game_dir else {
+            self.show_notice(&["No storage for the game's files.".to_string()]);
+            return;
+        };
+        match find_game(&dir) {
+            Found::Game(opened, dir) => self.play_opened(opened, &dir),
+            Found::Other(label, dir) => {
+                self.show_notice(&[
+                    format!("{label} found in"),
+                    dir.display().to_string(),
+                    String::new(),
+                    "This Android version plays Atlantis: The Lost Tales only.".to_string(),
+                ]);
+            }
+            Found::Nothing(dir) => {
+                log::info!("No game found: copy it to {}", dir.display());
+                self.show_notice(&[
+                    "No game found.".to_string(),
+                    String::new(),
+                    "Choose the folder of Atlantis: The Lost Tales (the CD's files, or the images of the CDs),".to_string(),
+                    "or copy the game to".to_string(),
+                    dir.display().to_string(),
+                    "and start the app again.".to_string(),
+                ]);
+            }
+        }
+    }
+
+    /// Plays the game in the chosen folder `tree` (kept for the next
+    /// starts); else, when `explain`, the screen says what was found.
+    /// Whether a game started.
+    fn open_tree(&mut self, tree: &str, explain: bool) -> bool {
+        match find_game_in_tree(tree) {
+            FoundInTree::Game(game) => {
+                if let Err(e) = std::fs::create_dir_all(data_dir())
+                    .and_then(|()| std::fs::write(chosen_folder_file(), tree))
+                {
+                    log::warn!("the chosen folder not kept: {e}");
+                }
+                self.touch.picker = false;
+                self.play_game(*game, None);
+                true
+            }
+            FoundInTree::Other(name) => {
+                if explain {
+                    self.show_notice(&[
+                        format!("{name} found in the chosen folder."),
+                        String::new(),
+                        "This Android version plays Atlantis: The Lost Tales only.".to_string(),
+                    ]);
+                }
+                false
+            }
+            FoundInTree::Nothing(why) => {
+                if explain {
+                    self.show_notice(&[
+                        "No game found in the chosen folder.".to_string(),
+                        why,
+                        String::new(),
+                        "Choose the folder holding atlantis.exe and the BIGCD files,".to_string(),
+                        "or the images of the CDs.".to_string(),
+                    ]);
+                }
+                false
+            }
+        }
+    }
+
+    /// The "no game" screen with `lines`, and the tap that opens the
+    /// picker.
+    fn show_notice(&mut self, lines: &[String]) {
+        let mut all = lines.to_vec();
+        all.push(String::new());
+        all.push(TAP_TO_CHOOSE.to_string());
+        self.pattern = notice(&all);
+        self.touch.picker = true;
+        if let Some(w) = &self.window {
+            w.request_redraw();
+        }
+    }
+
+    /// The picker's answer, once it came (the activity resumed).
+    pub(crate) fn poll_picked(&mut self) {
+        let Some(tree) = crate::android_saf::take_picked() else {
+            return;
+        };
+        if tree.is_empty() || self.runner.is_some() {
+            return;
+        }
+        self.open_tree(&tree, true);
+    }
 }
 
 /// What the game folder holds.
@@ -239,13 +391,15 @@ fn notice(lines: &[String]) -> Vec<u16> {
     const MARGIN: i32 = 24;
     let (w, h) = (SCREEN_W, SCREEN_H);
     let mut out = vec![BG; w * h];
-    let font = SubtitleFont::new();
+    // Large enough to be read on a small screen, where the 640x480
+    // picture is drawn smaller.
+    let font = SubtitleFont::with_size(22.0);
     let max_w = w as i32 - 2 * MARGIN;
     let mut rows: Vec<String> = Vec::new();
     for line in lines {
         rows.extend(wrap(line, |s| font.width(s.as_bytes()), max_w));
     }
-    let step = font.row_step().max(16) + 4;
+    let step = font.row_step().max(26) + 4;
     let total = step * rows.len() as i32;
     let mut y = (h as i32 - total) / 2;
     for row in &rows {
@@ -308,6 +462,8 @@ pub(crate) struct TouchState {
     dragged: bool,
     /// The left button is down in the engine (or queued down).
     left_down: bool,
+    /// The "no game" screen: a tap opens the folder picker.
+    pub(crate) picker: bool,
     /// The on-screen keyboard is shown (the player screen's name entry).
     keyboard: bool,
     /// The engine's inputs, one per engine step (a press is seen after
@@ -322,7 +478,10 @@ impl App {
         let (sx, sy) = self.viewport.to_screen(x, y);
         // The port's options menu: a tap is its click.
         if self.menu.is_open() {
-            self.touch = TouchState::default();
+            self.touch = TouchState {
+                picker: self.touch.picker,
+                ..TouchState::default()
+            };
             self.menu.pointer(sx, sy);
             if t.phase == TouchPhase::Ended {
                 let action = self.menu.click(sx, sy, self.menu_values());
@@ -330,6 +489,13 @@ impl App {
             }
             if let Some(w) = &self.window {
                 w.request_redraw();
+            }
+            return;
+        }
+        // The "no game" screen: a tap opens the folder picker.
+        if self.runner.is_none() && self.touch.picker {
+            if t.phase == TouchPhase::Ended && crate::android_saf::pick_folder() {
+                log::info!("folder picker opened");
             }
             return;
         }
@@ -345,7 +511,10 @@ impl App {
                     for i in queue {
                         self.sys.push_input(i);
                     }
-                    self.touch = TouchState::default();
+                    self.touch = TouchState {
+                        picker: self.touch.picker,
+                        ..TouchState::default()
+                    };
                     self.open_menu();
                     return;
                 }
@@ -482,7 +651,10 @@ impl App {
         self.audio = None;
         self.audio_pending = true;
         self.sys.mixer.set_paused(true);
-        self.touch = TouchState::default();
+        self.touch = TouchState {
+            picker: self.touch.picker,
+            ..TouchState::default()
+        };
         self.suspended_at.get_or_insert_with(web_time::Instant::now);
         log::info!("suspended: window dropped");
     }

@@ -24,7 +24,7 @@ fail() {
     exit 1
 }
 start() {
-    adb shell am start -W -n "$pkg/android.app.NativeActivity"
+    adb shell am start -W -n "$pkg/.AtlantisActivity"
 }
 running() {
     adb shell pidof "$pkg" | tr -d '\r'
@@ -60,15 +60,19 @@ adb exec-out screencap -p > "$out/screen-resumed.png"
 for i in 1 2 3; do
     adb shell input keyevent KEYCODE_HOME
     sleep 1
-    adb shell am start -n "$pkg/android.app.NativeActivity" >/dev/null
+    adb shell am start -n "$pkg/.AtlantisActivity" >/dev/null
     sleep 1
 done
 sleep 4
 adb exec-out screencap -p > "$out/screen-round-trips.png"
-# A tap on the screen.
-adb shell input tap 500 300
+# A tap on the "no game" screen: the system's folder picker; Back
+# closes it, and the app is shown again.
+adb shell input tap 320 160
 sleep 5
-adb exec-out screencap -p > "$out/screen-after-tap.png"
+adb exec-out screencap -p > "$out/screen-picker.png"
+adb shell input keyevent KEYCODE_BACK
+sleep 4
+adb exec-out screencap -p > "$out/screen-after-picker.png"
 pid2=$(running)
 # The threads of the app (a hang shows where it waits).
 if [ -n "$pid2" ]; then
@@ -83,6 +87,8 @@ grep -q "panicked\|Fatal signal" "$out/logcat-app.txt" && fail "the app crashed"
 grep -q "ANR in $pkg\|timeout for ActivityRecord.*$pkg\|hang: " "$out/logcat-app.txt" &&
     fail "the app stopped answering"
 grep -q "No game found" "$out/logcat-app.txt" || fail "no 'No game found' line in the log"
+grep -q "folder picker opened" "$out/logcat-app.txt" || fail "the tap did not open the folder picker"
+grep -q "folder picked: none" "$out/logcat-app.txt" || fail "the picker's answer did not come back"
 made=$(grep -c "resumed: window made" "$out/logcat-app.txt")
 [ "$made" -ge 5 ] || fail "the window was made $made times (5 expected: at the start, after each return)"
 echo "smoke test passed (pid $pid)"
