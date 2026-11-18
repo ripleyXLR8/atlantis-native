@@ -1193,10 +1193,16 @@ pub fn label(dir: &Path) -> Result<String, atlantis4_data::files::OpenError> {
         });
     }
     let (files, build) = A4Files::open_dir(dir)?;
-    Ok(match language_name(&files.language()) {
+    Ok(files_label(&files, build))
+}
+
+/// The edition of the installation `files` (`build` theirs), as [`label`]
+/// gives it.
+pub fn files_label(files: &A4Files, build: &atlantis4_data::exe::Build) -> String {
+    match language_name(&files.language()) {
         Some(name) => format!("{}, {name}", build.label),
         None => build.label.to_string(),
-    })
+    }
 }
 
 /// The name of the port's settings file, in [`data_dir`].

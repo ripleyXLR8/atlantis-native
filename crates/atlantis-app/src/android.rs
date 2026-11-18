@@ -352,57 +352,60 @@ fn android_main(activity: AndroidApp) {
     let mut event_loop = event_loop;
     crate::android_saf::set_waker(event_loop.create_proxy());
     use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
-    // The first game's front end (also the "no game" screen), unless
-    // Atlantis II, III or Evolution was found: their own modes, on the
-    // same event loop, after it (as the desktop's `main`).
-    if !app.session().is_some_and(|s| s.wants_own_mode()) && app.android_other.is_none() {
-        if let Err(e) = event_loop.run_app_on_demand(&mut app) {
-            log::error!("event loop: {e}");
+    loop {
+        // The first game's front end (also the game library's screen and
+        // the "no game" screen), unless Atlantis II, III or Evolution was
+        // chosen: their own modes, on the same event loop, after it (as
+        // the desktop's `main`).
+        if !app.session().is_some_and(|s| s.wants_own_mode()) && app.android_other.is_none() {
+            if let Err(e) = event_loop.run_app_on_demand(&mut app) {
+                log::error!("event loop: {e}");
+            }
         }
-    }
-    if !destroyed() {
+        if destroyed() {
+            // Destroyed by Android (not left by the player): kept for the
+            // activity it may create next in this process.
+            app.android_suspend();
+            *CARRIED.lock().unwrap() = Some(Carried(app));
+            log::info!("event loop ended (activity destroyed)");
+            return;
+        }
         let tree_game = app.android_other.take();
         let dirs = app
             .session_mut()
             .map(|s| (s.take_atlantis2(), s.take_atlantis3(), s.take_atlantis4()));
         let next = match (tree_game, dirs) {
-            (Some(game), _) => Some(Next::Tree(game)),
+            (Some(game), _) => Next::Tree(game),
             (None, Some((a2, a3, a4))) if a2.is_some() || a3.is_some() || a4.is_some() => {
-                Some(Next::Dirs(a2, a3, a4))
+                Next::Dirs(a2, a3, a4)
             }
-            _ => None,
+            // The player left the app.
+            _ => break,
         };
-        if let Some(next) = next {
-            drop(app);
-            let ran = match next {
-                Next::Tree(game) => run_tree_game(&mut event_loop, game),
-                Next::Dirs(a2, a3, a4) => run_other_game(&mut event_loop, a2, a3, a4),
-            };
-            let Err(why) = ran else {
-                log::info!("event loop ended");
-                return;
-            };
-            // Its error on the "no game" screen.
-            log::error!("the game could not start: {why}");
-            app = front_end();
-            app.show_notice(&["The game could not start:".to_string(), why]);
-            if !destroyed() {
-                if let Err(e) = event_loop.run_app_on_demand(&mut app) {
-                    log::error!("event loop: {e}");
-                }
-            }
-        }
-    }
-    if destroyed() {
-        // Destroyed by Android (not left by the player): kept for the
-        // activity it may create next in this process.
-        app.android_suspend();
-        *CARRIED.lock().unwrap() = Some(Carried(app));
-        log::info!("event loop ended (activity destroyed)");
-    } else {
         drop(app);
-        log::info!("event loop ended");
+        let ran = match next {
+            Next::Tree(game) => run_tree_game(&mut event_loop, game),
+            Next::Dirs(a2, a3, a4) => run_other_game(&mut event_loop, a2, a3, a4),
+        };
+        if destroyed() {
+            // (the next activity opens the library's first game again)
+            log::info!("event loop ended (activity destroyed)");
+            return;
+        }
+        // The game ended: the game library's screen, with its error if
+        // it could not start.
+        app = front_end();
+        let message = match ran {
+            Ok(()) => None,
+            Err(why) => {
+                log::error!("the game could not start: {why}");
+                Some(format!("The game could not start: {why}"))
+            }
+        };
+        app.show_launcher(message);
     }
+    drop(app);
+    log::info!("event loop ended");
     // android-activity then finishes the activity and ends this thread.
 }
 
@@ -414,13 +417,126 @@ enum Next {
     Dirs(Option<PathBuf>, Option<PathBuf>, Option<PathBuf>),
 }
 
-/// The first game's front end, without a game.
+/// The first game's front end (and the game library's screen), without a
+/// game.
 fn front_end() -> App {
     let session = Session::new(data_dir(), false, false, false, Start::Boot);
-    let mut app = App::new(Sys::new(Mixer::new()), None).with_session(session);
-    // (no game library's screen on Android yet)
-    app.menu.set_library(false);
-    app
+    App::new(Sys::new(Mixer::new()), None).with_session(session)
+}
+
+/// The library entry the folder picker's answer is for (`None`: a game
+/// to add).
+static PICK_FOR: std::sync::Mutex<Option<usize>> = std::sync::Mutex::new(None);
+
+/// Quit chosen in the game library: the app ends.
+static QUIT: AtomicBool = AtomicBool::new(false);
+
+/// Whether a library entry is a folder chosen in the picker (its tree
+/// URI) rather than a path.
+pub(crate) fn is_tree(path: &Path) -> bool {
+    path.to_string_lossy().starts_with("content://")
+}
+
+/// A chosen folder as the library shows it: its storage and the folders
+/// in it ("Phone/AtlantisNative/Atlantis3"), from its tree URI.
+pub(crate) fn shown_tree(path: &Path) -> String {
+    let uri = path.to_string_lossy();
+    let id = uri.rsplit("/tree/").next().unwrap_or(&uri);
+    let id = percent_decode(id);
+    match id.split_once(':') {
+        Some(("primary", rest)) => format!("Phone/{rest}"),
+        Some((volume, rest)) => format!("{volume}/{rest}"),
+        None => id,
+    }
+}
+
+/// `%XX` escapes decoded (as UTF-8).
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            let hex = std::str::from_utf8(&b[i + 1..i + 3]).ok();
+            if let Some(v) = hex.and_then(|h| u8::from_str_radix(h, 16).ok()) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// The library's entry for a chosen folder: the game and its edition, or
+/// why it does not open.
+pub(crate) fn describe(path: &Path) -> crate::launcher::LauncherEntry {
+    use crate::setup::GameKind;
+    let tree = path.to_string_lossy().to_string();
+    let entry =
+        |label: String, found: bool, kind: Option<GameKind>| crate::launcher::LauncherEntry {
+            path: path.to_path_buf(),
+            label,
+            found,
+            kind,
+        };
+    if !crate::android_saf::can_read(&tree) {
+        return entry(
+            "Not found: Android no longer lets the app read this folder".to_string(),
+            false,
+            None,
+        );
+    }
+    match find_game_in_tree(&tree) {
+        FoundInTree::Game(game) => entry(
+            crate::desktop::edition_label(&game, false),
+            true,
+            Some(GameKind::LostTales),
+        ),
+        FoundInTree::Other(game) => entry(other_label(&game), true, Some(game.kind)),
+        FoundInTree::Unsupported(name) => entry(
+            format!("Not found: {name} is played from the app's own folder for now"),
+            false,
+            None,
+        ),
+        FoundInTree::Nothing(_) => entry(
+            "Not found: this folder no longer holds the game".to_string(),
+            false,
+            None,
+        ),
+    }
+}
+
+/// The edition of Atlantis II, III or Evolution in a chosen folder, as
+/// the desktop's library names it.
+fn other_label(game: &OtherGame) -> String {
+    use crate::setup::GameKind;
+    let named = match game.kind {
+        GameKind::Atlantis2 => {
+            atlantis2_data::files::find_exe(&*game.install)
+                .ok()
+                .map(|(name, build, _)| {
+                    let mut files =
+                        atlantis2_data::A2Files::new(game.install.clone(), game.discs.clone());
+                    files.set_exe(name, build);
+                    files.label()
+                })
+        }
+        GameKind::Atlantis3 => atlantis3_data::A3Files::new(game.install.clone())
+            .edition_label()
+            .ok(),
+        GameKind::Atlantis4 => {
+            let files = atlantis4_data::A4Files::new(game.install.clone());
+            files
+                .build()
+                .ok()
+                .map(|b| crate::a4::files_label(&files, b))
+        }
+        GameKind::LostTales => None,
+    };
+    named.unwrap_or_else(|| game_name(game.kind).to_string())
 }
 
 /// The app's own game folder (`<external files>/game`).
@@ -593,113 +709,197 @@ fn run_tree_game(el: &mut EventLoop<()>, game: OtherGame) -> Result<(), String> 
 const TAP_TO_CHOOSE: &str = "Tap the screen to choose the game's folder.";
 
 impl App {
-    /// The game at start-up: in the folder chosen before (while the app
-    /// may still read it), else in the app's own folder `game_dir`, else
-    /// the screen saying where to put it (a tap opens the picker).
+    /// The game library at start-up (as on the desktop,
+    /// [`crate::session::startup`]): its one game at once, its screen
+    /// when it holds two or more, else the screen saying where to put a
+    /// game (a tap opens the picker). The folder an earlier version kept
+    /// and the game in the app's own folder `game_dir` are added to it.
     fn android_start(&mut self, game_dir: Option<PathBuf>) {
-        if let Ok(tree) = std::fs::read_to_string(chosen_folder_file()) {
-            let tree = tree.trim().to_string();
-            if !tree.is_empty() {
-                if crate::android_saf::can_read(&tree) {
-                    log::info!("the folder chosen before: {tree}");
-                    if self.open_tree(&tree, false) {
-                        return;
-                    }
-                } else {
-                    log::info!("the folder chosen before can no longer be read: {tree}");
+        let mut own_found = None;
+        if let Some(session) = self.session_mut() {
+            if let Ok(tree) = std::fs::read_to_string(chosen_folder_file()) {
+                let tree = tree.trim();
+                if !tree.is_empty() && session.library_mut().add(Path::new(tree)) {
+                    log::info!("the folder chosen before, into the library: {tree}");
                 }
+                session.save_library();
+                let _ = std::fs::remove_file(chosen_folder_file());
             }
         }
-        let Some(dir) = game_dir else {
-            self.show_notice(&["No storage for the game's files.".to_string()]);
-            return;
+        if let Some(dir) = &game_dir {
+            match find_game(dir) {
+                Found::Game(_, found) => {
+                    if let Some(session) = self.session_mut() {
+                        if session.library_mut().add(&found) {
+                            log::info!("the app's folder's game, into the library");
+                            session.save_library();
+                        }
+                    }
+                }
+                Found::Broken(name, found, why) => {
+                    log::info!(
+                        "{name} found in {} but it does not open: {why}",
+                        found.display()
+                    );
+                    own_found = Some((name, found, why));
+                }
+                Found::Nothing => {}
+            }
+        }
+        let folders = self
+            .session()
+            .map(|s| s.library().folders().to_vec())
+            .unwrap_or_default();
+        let first_opens = || {
+            folders.first().is_some_and(|f| {
+                if is_tree(f) {
+                    describe(f).found
+                } else {
+                    open_any(f).is_ok()
+                }
+            })
         };
-        match find_game(&dir) {
-            // (Atlantis II, III and Evolution: their own modes, after this
-            // front end's event loop, `android_main`)
-            Found::Game(opened, dir) => self.play_opened(opened, &dir),
-            Found::Broken(name, dir, why) => {
-                log::info!(
-                    "{name} found in {} but it does not open: {why}",
-                    dir.display()
-                );
-                self.show_notice(&[
+        match crate::session::startup(folders.len(), false, first_opens) {
+            crate::session::Startup::PlayFirst => {
+                self.run_launcher_action(crate::launcher::LauncherAction::Play(0));
+            }
+            crate::session::Startup::Launcher => self.show_launcher(None),
+            crate::session::Startup::FirstStart => match own_found {
+                Some((name, dir, why)) => self.show_notice(&[
                     format!("{name} found in"),
                     dir.display().to_string(),
                     "but it does not open:".to_string(),
                     why,
-                ]);
-            }
-            Found::Nothing(dir) => {
-                log::info!("No game found: copy it to {}", dir.display());
-                self.show_notice(&[
-                    "No game found.".to_string(),
-                    String::new(),
-                    "Choose the folder of Atlantis: The Lost Tales (the CD's files, or the images of the CDs),".to_string(),
-                    "or copy the game to".to_string(),
-                    dir.display().to_string(),
-                    "and start the app again.".to_string(),
-                ]);
-            }
-        }
-    }
-
-    /// Plays the game in the chosen folder `tree` (kept for the next
-    /// starts); else, when `explain`, the screen says what was found.
-    /// Whether a game started.
-    fn open_tree(&mut self, tree: &str, explain: bool) -> bool {
-        match find_game_in_tree(tree) {
-            FoundInTree::Game(game) => {
-                if let Err(e) = std::fs::create_dir_all(data_dir())
-                    .and_then(|()| std::fs::write(chosen_folder_file(), tree))
-                {
-                    log::warn!("the chosen folder not kept: {e}");
-                }
-                self.touch.picker = false;
-                self.play_game(*game, None);
-                true
-            }
-            FoundInTree::Other(game) => {
-                if let Err(e) = std::fs::create_dir_all(data_dir())
-                    .and_then(|()| std::fs::write(chosen_folder_file(), tree))
-                {
-                    log::warn!("the chosen folder not kept: {e}");
-                }
-                self.touch.picker = false;
-                // (played in its own mode once this front end's event
-                // loop ends, android_main)
-                self.android_other = Some(game);
-                true
-            }
-            FoundInTree::Unsupported(name) => {
-                if explain {
-                    let dir = GAME_DIR
-                        .lock()
-                        .unwrap()
-                        .as_ref()
-                        .map_or_else(String::new, |d| d.display().to_string());
+                ]),
+                None => {
+                    let dir = game_dir.map_or_else(String::new, |d| d.display().to_string());
+                    log::info!("No game found: copy it to {dir}");
                     self.show_notice(&[
-                        format!("{name} found in the chosen folder."),
+                        "No game found.".to_string(),
                         String::new(),
-                        format!("{name} is played from the app's own folder for now: copy it to"),
+                        "Choose the folder of one of the four Atlantis games (its files, or the images of its CDs),".to_string(),
+                        "or copy the game to".to_string(),
                         dir,
                         "and start the app again.".to_string(),
                     ]);
                 }
-                false
+            },
+        }
+    }
+
+    /// Plays the game in the chosen folder `path` (a tree URI): the first
+    /// game at once, Atlantis II, III or Evolution once this front end's
+    /// event loop ends; it moves to the top of the library. Why not.
+    fn play_tree(&mut self, path: &Path) -> Result<(), String> {
+        let tree = path.to_string_lossy().to_string();
+        if !crate::android_saf::can_read(&tree) {
+            return Err(
+                "Android no longer lets the app read this folder: choose it again".to_string(),
+            );
+        }
+        match find_game_in_tree(&tree) {
+            FoundInTree::Game(game) => {
+                self.touch.picker = false;
+                self.play_game(*game, Some(path));
+                Ok(())
             }
-            FoundInTree::Nothing(why) => {
-                if explain {
-                    self.show_notice(&[
-                        "No game found in the chosen folder.".to_string(),
-                        why,
-                        String::new(),
-                        "Choose the folder of one of the four games (its CD's files or an installed copy),".to_string(),
-                        "or the images of its CDs.".to_string(),
-                    ]);
+            FoundInTree::Other(game) => {
+                log::info!("chosen folder {tree}: {}", game_name(game.kind));
+                self.stop_game();
+                self.touch.picker = false;
+                if let Some(session) = self.session_mut() {
+                    session.hide_launcher();
+                    session.mark_played(path);
                 }
-                false
+                // (played in its own mode once this front end's event
+                // loop ends, android_main)
+                self.android_other = Some(game);
+                Ok(())
             }
+            FoundInTree::Unsupported(name) => Err(format!(
+                "{name} is played from the app's own folder for now"
+            )),
+            FoundInTree::Nothing(why) => Err(if why.is_empty() {
+                "No game found in this folder".to_string()
+            } else {
+                format!("No game found in this folder: {why}")
+            }),
+        }
+    }
+
+    /// The game library's actions that differ on Android (the picker, the
+    /// chosen folders, the app's own folder); false for the desktop's.
+    pub(crate) fn android_launcher_action(
+        &mut self,
+        action: crate::launcher::LauncherAction,
+    ) -> bool {
+        use crate::launcher::LauncherAction as A;
+        match action {
+            A::Play(i) => {
+                let Some(path) = self
+                    .session()
+                    .and_then(|s| s.library().folders().get(i).cloned())
+                else {
+                    return true;
+                };
+                if !is_tree(&path) {
+                    return false;
+                }
+                if let Err(why) = self.play_tree(&path) {
+                    log::warn!("{}: {why}", path.display());
+                    if let Some(s) = self.session_mut() {
+                        s.show_entries(i, why);
+                    }
+                }
+                true
+            }
+            A::Add | A::Locate(_) => {
+                *PICK_FOR.lock().unwrap() = match action {
+                    A::Locate(i) => Some(i),
+                    _ => None,
+                };
+                if !crate::android_saf::pick_folder() {
+                    if let Some(s) = self.session_mut() {
+                        s.set_message("The folder picker could not open");
+                    }
+                }
+                true
+            }
+            A::Find => {
+                // The app's own folder.
+                let dir = GAME_DIR.lock().unwrap().clone();
+                let text = match dir.as_deref().map(find_game) {
+                    Some(Found::Game(opened, found)) => {
+                        let label = opened.label();
+                        let Some(s) = self.session_mut() else {
+                            return true;
+                        };
+                        if s.library_mut().add(&found) {
+                            s.save_library();
+                            let at = s.library().position(&found).unwrap_or(0);
+                            s.show_entries(at, format!("Added: {label}"));
+                            return true;
+                        }
+                        "The game in the app's folder is in the list already".to_string()
+                    }
+                    _ => "No game in the app's own folder: use Add a game folder".to_string(),
+                };
+                if let Some(s) = self.session_mut() {
+                    s.set_message(text);
+                }
+                true
+            }
+            A::Support => {
+                if let Some(s) = self.session_mut() {
+                    s.set_message(crate::guide::SUPPORT_URL);
+                }
+                true
+            }
+            A::Quit => {
+                QUIT.store(true, Ordering::SeqCst);
+                true
+            }
+            A::Remove(_) | A::None => false,
         }
     }
 
@@ -718,17 +918,57 @@ impl App {
 
     /// The picker's answer, once it came (the activity resumed).
     pub(crate) fn poll_picked(&mut self, el: &winit::event_loop::ActiveEventLoop) {
-        let Some(tree) = crate::android_saf::take_picked() else {
-            return;
-        };
-        if tree.is_empty() || self.runner.is_some() {
+        if let Some(tree) = crate::android_saf::take_picked() {
+            let locate = PICK_FOR.lock().unwrap().take();
+            if !tree.is_empty() && self.runner.is_none() {
+                self.picked(&tree, locate);
+            }
+        }
+        // Atlantis II, III or Evolution chosen: its own mode, after this
+        // event loop; Quit in the library: the app ends.
+        if self.android_other.is_some() || QUIT.swap(false, Ordering::SeqCst) {
+            el.exit();
+        }
+    }
+
+    /// The folder `tree` chosen in the picker: on the library's screen,
+    /// added to it (or the place of entry `locate`, not found any more);
+    /// else (the "no game" screen) played, and so added.
+    fn picked(&mut self, tree: &str, locate: Option<usize>) {
+        let path = PathBuf::from(tree);
+        if !self.session().is_some_and(|s| s.launcher().is_some()) {
+            if let Err(why) = self.play_tree(&path) {
+                self.show_notice(&[why]);
+            }
             return;
         }
-        self.open_tree(&tree, true);
-        if self.android_other.is_some() {
-            // Atlantis II, III or Evolution: its own mode, after this
-            // event loop.
-            el.exit();
+        let entry = describe(&path);
+        let Some(s) = self.session_mut() else {
+            return;
+        };
+        if !entry.found {
+            s.set_message(entry.label);
+            return;
+        }
+        match locate {
+            Some(i) => {
+                let at = s.library_mut().relocate(i, &path);
+                s.save_library();
+                s.show_entries(at, format!("Found again: {}", entry.label));
+            }
+            None => {
+                let added = s.library_mut().add(&path);
+                s.save_library();
+                let at = s.library().position(&path).unwrap_or(0);
+                s.show_entries(
+                    at,
+                    if added {
+                        format!("Added: {}", entry.label)
+                    } else {
+                        "This game is in the list already".to_string()
+                    },
+                );
+            }
         }
     }
 }
@@ -739,7 +979,7 @@ enum Found {
     Game(Opened, PathBuf),
     /// A game's files that do not open: its name, folder, and why.
     Broken(&'static str, PathBuf, String),
-    Nothing(PathBuf),
+    Nothing,
 }
 
 /// A game's name.
@@ -784,7 +1024,7 @@ fn find_game(dir: &Path) -> Found {
     }
     match broken {
         Some((name, c, e)) => Found::Broken(name, c, e),
-        None => Found::Nothing(dir.to_path_buf()),
+        None => Found::Nothing,
     }
 }
 
@@ -879,6 +1119,10 @@ pub(crate) struct TouchState {
     down_at: (i32, i32),
     /// The finger that went down on a button, and which.
     button: Option<(u64, Button)>,
+    /// The game library's screen: where the finger went down, and the
+    /// height the list was last scrolled at (window pixels).
+    list_from: f64,
+    list_at: f64,
 }
 
 impl TouchState {
@@ -1029,6 +1273,12 @@ impl App {
         // keyboard again (closed by the player).
         if t.phase == TouchPhase::Ended && self.touch.keyboard {
             crate::android_saf::show_keyboard(true);
+        }
+        // The game library's screen: a tap is a click (on the selected
+        // row: Play), a drag scrolls the list.
+        if self.session().is_some_and(|s| s.launcher().is_some()) {
+            self.library_touch(&t, (x, y), (sx, sy));
+            return;
         }
         // The "no game" screen: a tap opens the folder picker.
         if self.runner.is_none() && self.touch.picker {
@@ -1194,6 +1444,56 @@ impl App {
             }
         }
         self.last_cursor = Some((x, y));
+    }
+
+    /// A finger on the game library's screen (window point `at`, screen
+    /// point `screen`).
+    fn library_touch(&mut self, t: &Touch, at: (f64, f64), screen: (i32, i32)) {
+        let row_px = f64::from(crate::launcher::Launcher::row_height()) * self.viewport.scale;
+        let ms = self.start.elapsed().as_millis() as u64;
+        let st = &mut self.touch;
+        let mut action = crate::launcher::LauncherAction::None;
+        match t.phase {
+            TouchPhase::Started => {
+                if st.primary.is_none() {
+                    st.primary = Some(t.id);
+                    st.dragged = false;
+                    st.list_from = at.1;
+                    st.list_at = at.1;
+                }
+            }
+            TouchPhase::Moved if st.primary == Some(t.id) => {
+                if (at.1 - st.list_from).abs() > TAP_SLOP {
+                    st.dragged = true;
+                }
+                if st.dragged && row_px > 0.0 {
+                    // The list follows the finger: up shows the rows below.
+                    let rows = ((st.list_at - at.1) / row_px).trunc();
+                    if rows != 0.0 {
+                        st.list_at -= rows * row_px;
+                        if let Some(l) = self.session.as_mut().and_then(|s| s.launcher_mut()) {
+                            l.wheel(rows as i32);
+                        }
+                    }
+                }
+            }
+            TouchPhase::Ended | TouchPhase::Cancelled if st.primary == Some(t.id) => {
+                st.primary = None;
+                if !st.dragged && t.phase == TouchPhase::Ended {
+                    if let Some(l) = self.session.as_mut().and_then(|s| s.launcher_mut()) {
+                        l.pointer(screen.0, screen.1);
+                        action = l.tap(screen.0, screen.1, ms);
+                    }
+                }
+            }
+            _ => {}
+        }
+        if action != crate::launcher::LauncherAction::None {
+            self.run_launcher_action(action);
+        }
+        if let Some(w) = &self.window {
+            w.request_redraw();
+        }
     }
 
     /// Where a tap presses `button` (window pixels), as last drawn.

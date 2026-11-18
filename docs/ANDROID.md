@@ -23,10 +23,10 @@ but nobody has played them on a device yet.
 
 Either of these:
 
-- **A folder you choose.** Tap the "no game" screen. In the picker, open
-  the folder that holds the game and press "Use this folder", then
-  "Allow". The app remembers the folder (Android keeps the permission)
-  and opens it at every start. The folder can hold:
+- **A folder you choose.** Tap the "no game" screen, or "Add a game
+  folder" in the game library. In the picker, open the folder that holds
+  the game and press "Use this folder", then "Allow". The game goes into
+  the library (Android keeps the permission). The folder can hold:
   - Atlantis: The Lost Tales: the files of its CD (`atlantis.exe` and its
     `BIGCD` archives), a copy of an installed game, or the images of its
     four CDs (`.iso`, `.bin`, `.img`, `.mdf`, `.nrg`);
@@ -40,9 +40,7 @@ Either of these:
 
   The files are read where they are, by parts, through the Storage Access
   Framework. Nothing is copied. Evolution's 2004 CD program is played
-  from the app's own folder only, for now. When Android ends the app
-  while Atlantis II, III or Evolution runs, the next start opens the
-  game again at its menu: the game's own saves are kept.
+  from the app's own folder only, for now.
 - **The app's own folder**, used when no chosen folder holds a game:
 
       /sdcard/Android/data/io.github.ripleyxlr8.atlantisnative/files/game
@@ -54,6 +52,30 @@ Either of these:
   folders as on the desktop. Android 11 and later hide `Android/data`
   from most file managers, so `adb push` or a computer is usually the
   easiest way. Uninstalling the app deletes this folder.
+
+## The game library
+
+As on the desktop, the app keeps a list of the games added: each folder
+chosen in the picker, and the game in the app's own folder. At start-up
+it plays the list's one game at once, or shows the list when it holds two
+games or more. The games are shown as on the desktop, the last played
+first:
+
+- a tap on a game selects it, a tap on the selected game plays it (as
+  "Play");
+- a drag up or down scrolls the list;
+- "Add a game folder" opens the picker; "Find installations" looks in the
+  app's own folder; "Remove" takes the selected game off the list (no file
+  is deleted); a game whose folder can no longer be read is shown as not
+  found, and "Play" asks for its folder again;
+- Back, or "Quit", closes the app.
+
+From the first game, the options menu's "Game library..." entry goes back
+to the list. Atlantis II has the same entry; Atlantis III and Evolution go
+back to it when they are quit from their own menus. When Android ends the
+app while Atlantis II, III or Evolution runs, the next start opens the
+library's last played game again at its menu: the game's own saves are
+kept.
 
 The players, the checkpoints and the settings are kept in the app's
 internal storage (`/data/data/io.github.ripleyxlr8.atlantisnative/files/atlantis-native`).

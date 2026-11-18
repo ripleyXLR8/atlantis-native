@@ -213,6 +213,50 @@ impl Session {
         self.shift_until = Some(Instant::now() + SHIFT_GRACE);
     }
 
+    /// The library, to change (saved with [`Session::save_library`]).
+    #[cfg(target_os = "android")]
+    pub(crate) fn library_mut(&mut self) -> &mut Library {
+        &mut self.library
+    }
+
+    /// Saves the library.
+    #[cfg(target_os = "android")]
+    pub(crate) fn save_library(&self) {
+        self.library.save_logged(&self.data_dir);
+    }
+
+    /// The screen's entries again (after a change of the library), `i`
+    /// selected, with `message` under them.
+    #[cfg(target_os = "android")]
+    pub(crate) fn show_entries(&mut self, i: usize, message: impl Into<String>) {
+        self.refresh(i, &describe);
+        self.message(message);
+    }
+
+    /// The screen's message.
+    #[cfg(target_os = "android")]
+    pub(crate) fn set_message(&mut self, message: impl Into<String>) {
+        self.message(message);
+    }
+
+    /// `dir` was played: first in the library, saved.
+    #[cfg(target_os = "android")]
+    pub(crate) fn mark_played(&mut self, dir: &Path) {
+        self.played(dir);
+    }
+
+    /// The game library's screen, to change.
+    #[cfg(target_os = "android")]
+    pub(crate) fn launcher_mut(&mut self) -> Option<&mut Launcher> {
+        self.launcher.as_mut()
+    }
+
+    /// Hides the game library's screen.
+    #[cfg(target_os = "android")]
+    pub(crate) fn hide_launcher(&mut self) {
+        self.launcher = None;
+    }
+
     /// `dir` was played: first in the library, saved.
     fn played(&mut self, dir: &Path) {
         self.library.played(dir);
@@ -288,6 +332,17 @@ fn launcher_key(key: &Key) -> Option<LauncherKey> {
         Key::Character(s) => LauncherKey::Char(s.chars().next()?),
         _ => return None,
     })
+}
+
+/// The library's entry for `dir`: on Android a folder chosen in the
+/// picker (its tree URI) is looked at through the Storage Access
+/// Framework ([`crate::android::describe`]).
+fn describe(dir: &Path) -> LauncherEntry {
+    #[cfg(target_os = "android")]
+    if crate::android::is_tree(dir) {
+        return crate::android::describe(dir);
+    }
+    desktop::describe(dir)
 }
 
 /// "1 installation", "3 installations".
@@ -395,7 +450,7 @@ impl App {
         };
         session.shift_until = None;
         session.launcher = None;
-        session.refresh(0, &desktop::describe);
+        session.refresh(0, &describe);
         // (the screen's own line already says to choose a game)
         session.message(message.unwrap_or_default());
         log::info!("game library: {} games", session.library.len());
@@ -482,7 +537,12 @@ impl App {
     }
 
     /// [`App::launcher_action`] but Quit (no event loop needed).
-    fn run_launcher_action(&mut self, action: LauncherAction) {
+    pub(crate) fn run_launcher_action(&mut self, action: LauncherAction) {
+        // Android: the picker and the chosen folders.
+        #[cfg(target_os = "android")]
+        if self.android_launcher_action(action) {
+            return;
+        }
         let Some(session) = &mut self.session else {
             return;
         };
@@ -504,7 +564,7 @@ impl App {
                         if let Some(l) = &mut session.launcher {
                             let mut entries = l.entries().to_vec();
                             if let Some(entry) = entries.get_mut(i) {
-                                *entry = desktop::describe(&dir);
+                                *entry = describe(&dir);
                             }
                             l.set_entries(entries, i);
                         }
@@ -538,7 +598,7 @@ impl App {
                     let (opened, dir) = found.swap_remove(k);
                     let at = session.library.relocate(i, &dir);
                     session.library.save_logged(&session.data_dir);
-                    session.refresh(at, &desktop::describe);
+                    session.refresh(at, &describe);
                     session.message(format!("Found again: {}", opened.label()));
                 }
             }
@@ -551,7 +611,7 @@ impl App {
                     session.library.save_logged(&session.data_dir);
                     let first = added.first().map_or(&found[0], |a| *a);
                     let at = session.library.position(&first.1).unwrap_or(0);
-                    session.refresh(at, &desktop::describe);
+                    session.refresh(at, &describe);
                     session.message(match added.len() {
                         0 if found.len() > 1 => "These games are in the list already".to_string(),
                         0 => "This game is in the list already".to_string(),
@@ -572,7 +632,7 @@ impl App {
                     .first()
                     .and_then(|d| session.library.position(d))
                     .unwrap_or_else(|| session.launcher.as_ref().map_or(0, |l| l.selected()));
-                session.refresh(selected, &desktop::describe);
+                session.refresh(selected, &describe);
                 let text = match (found.len(), new.len()) {
                     (0, _) => {
                         "No installation found: use Add a game folder to choose yours".to_string()
@@ -587,7 +647,7 @@ impl App {
                 if let Some(dir) = session.library.remove(i) {
                     log::info!("{}: taken off the library", dir.display());
                     session.library.save_logged(&session.data_dir);
-                    session.refresh(i, &desktop::describe);
+                    session.refresh(i, &describe);
                     session.message("Removed from the list (no file was deleted)");
                 }
             }

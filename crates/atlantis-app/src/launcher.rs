@@ -28,6 +28,17 @@ pub struct LauncherEntry {
     pub kind: Option<GameKind>,
 }
 
+/// How an entry's folder is shown: its path; on Android a folder chosen
+/// in the picker as the storage and the folders in it
+/// ([`crate::android::shown_tree`]).
+fn shown_path(path: &std::path::Path) -> String {
+    #[cfg(target_os = "android")]
+    if crate::android::is_tree(path) {
+        return crate::android::shown_tree(path);
+    }
+    path.display().to_string()
+}
+
 /// The keys the screen reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LauncherKey {
@@ -354,6 +365,26 @@ impl Launcher {
     /// A left click at a 640x480 screen point at `now_ms`: a row is
     /// selected (a second click on it soon after plays it), a button
     /// pressed.
+    /// A tap on the touch screen at a screen point: on a row, selects it,
+    /// or plays it when it is selected already; elsewhere as a click.
+    #[cfg(target_os = "android")]
+    pub fn tap(&mut self, x: i32, y: i32, now_ms: u64) -> LauncherAction {
+        if let Some(i) = self.row_at(x, y) {
+            if self.selected() == i {
+                self.focus = None;
+                self.last_click = None;
+                return self.play(i);
+            }
+        }
+        self.click(x, y, now_ms)
+    }
+
+    /// The touch screen's drag: the list moved by `rows` (negative: up).
+    #[cfg(target_os = "android")]
+    pub fn row_height() -> i32 {
+        ROW_H
+    }
+
     pub fn click(&mut self, x: i32, y: i32, now_ms: u64) -> LauncherAction {
         if let Some(i) = self.row_at(x, y) {
             let double = self
@@ -510,11 +541,7 @@ impl Launcher {
                 let r = art::fit_right(&rest_style, rest, w);
                 items.push(Item::text(rest_style, &r, x, line));
             }
-            let path = art::fit_left(
-                &PATH,
-                &e.path.display().to_string(),
-                (right - text_x) as f32,
-            );
+            let path = art::fit_left(&PATH, &shown_path(&e.path), (right - text_x) as f32);
             items.push(Item::text(PATH, &path, text_x as f32, (y + 34) as f32));
         }
         // A scroll bar when the list is longer than the tablet.
