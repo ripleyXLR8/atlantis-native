@@ -211,8 +211,11 @@ the workspace's version.
   Android only (`[patch.crates-io]` in the workspace's `Cargo.toml`), and
   with `platform::android::key_event`: the key events the app makes for
   Back and the on-screen keyboard's text in Atlantis II, III and
-  Evolution, which reach it outside winit. The other platforms build the
-  same code as the published crate.
+  Evolution, which reach it outside winit; and a later run of the event
+  loop (the next game's, or the game library's after a game) gets
+  `Resumed` while the window is there, as the first run got it when
+  Android made the window. The other platforms build the same code as
+  the published crate.
 - **What is Android-only.** Everything specific to Android is behind
   `cfg(target_os = "android")`. On Android cpal is 0.16, whose AAudio
   output is pure Rust (desktop and web stay on 0.15), and the rfd dialogs

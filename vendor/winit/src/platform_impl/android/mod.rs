@@ -143,6 +143,9 @@ pub struct EventLoop<T: 'static> {
     cause: StartCause,
     ignore_volume_keys: bool,
     combining_accent: Option<char>,
+    /// Atlantis Native's patch: the loop ran before (`run_app_on_demand`
+    /// again on this event loop).
+    ran_before: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -192,6 +195,7 @@ impl<T: 'static> EventLoop<T> {
             cause: StartCause::Init,
             ignore_volume_keys: attributes.ignore_volume_keys,
             combining_accent: None,
+            ran_before: false,
         })
     }
 
@@ -522,6 +526,17 @@ impl<T: 'static> EventLoop<T> {
 
             // run the initial loop iteration
             self.single_iteration(None, &mut callback);
+
+            // Atlantis Native's patch: a later run of the loop (another
+            // application handler, `run_app_on_demand`) while the window is
+            // there gets `Resumed` too, as the first got it when Android
+            // made the window (no `InitWindow` comes for the window already
+            // made).
+            let again = std::mem::replace(&mut self.ran_before, true);
+            if again && self.running && self.android_app.native_window().is_some() && !self.exiting()
+            {
+                callback(event::Event::Resumed, self.window_target());
+            }
         }
 
         // Consider the possibility that the `StartCause::Init` iteration could
