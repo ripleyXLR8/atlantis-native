@@ -352,6 +352,10 @@ pub struct Game {
     objects_hand: Option<Bank>,
     /// `Objects.txt` of the subtitle language (the hover label's names).
     object_names: Option<atlantis3_data::objects::ObjectNames>,
+    /// Tests: the place frame hook's runs (0x004c27d0) since the last reset.
+    hook_calls: u32,
+    /// Tests: the text the inventory's hover label drew this frame.
+    label_text: Option<Vec<u8>>,
     subjects_bank: Option<Bank>,
     arrows: Option<Bank>,
     banks_world: i32,
@@ -614,6 +618,8 @@ impl Game {
             objects: None,
             objects_hand: None,
             object_names: None,
+            hook_calls: 0,
+            label_text: None,
             subjects_bank: None,
             arrows: None,
             banks_world: 0,
@@ -1335,6 +1341,39 @@ impl Game {
         }
     }
 
+    /// Tests: the inventory harness's reset between cases: alpha 0, the
+    /// first slot 0 (the bag emptied by 0x0042a020 and the scroll stored).
+    #[doc(hidden)]
+    pub fn test_inventory_reset(&mut self) {
+        self.inventory.alpha = 0.0;
+        self.inventory.scroll = 0;
+    }
+
+    /// Tests: the place frame hook's runs (0x004c27d0) since
+    /// [`Game::test_hook_calls_reset`].
+    #[doc(hidden)]
+    pub fn test_hook_calls(&self) -> u32 {
+        self.hook_calls
+    }
+
+    #[doc(hidden)]
+    pub fn test_hook_calls_reset(&mut self) {
+        self.hook_calls = 0;
+    }
+
+    /// Tests: the inventory's first shown slot (@ 0x0075859c).
+    #[doc(hidden)]
+    pub fn test_inventory_scroll(&self) -> usize {
+        self.inventory.scroll
+    }
+
+    /// Tests: the `Objects.txt` text of the hover label drawn by the last
+    /// inventory frame.
+    #[doc(hidden)]
+    pub fn test_inventory_label(&self) -> Option<&[u8]> {
+        self.label_text.as_deref()
+    }
+
     /// Whether the inventory is open.
     pub fn inventory_open(&self) -> bool {
         self.inventory.open
@@ -1573,6 +1612,7 @@ impl Game {
     /// The hover label of the object under the pointer (@ 0x00429b80 →
     /// @ 0x0042a530), every frame, no delay.
     fn draw_inventory_label(&mut self) {
+        self.label_text = None;
         let items = self.inventory_items();
         let Some(e) = self
             .inventory
@@ -1612,6 +1652,7 @@ impl Game {
         else {
             return;
         };
+        self.label_text = Some(text.clone());
         let (w, h) = (self.width, self.height);
         self.texts();
         let Some(font) = self
@@ -1700,14 +1741,22 @@ impl Game {
             // the inventory and goes in the hand; the fade's step.
             self.draw_inventory_items();
             self.draw_pointer();
+            // The pick (@ 0x00429b80): the edge scrolling first, then the
+            // hover label with the new scroll, then the click.
+            let items = self.inventory_items();
+            self.inventory
+                .scroll_step(self.width, items.len(), self.pointer.0, self.now);
             self.draw_inventory_label();
             // The flip (@ 0x00427cc6): the subtitle line or the voice
             // slots over the inventory.
             self.flip_texts();
-            let items = self.inventory_items();
-            self.inventory
-                .scroll_step(self.width, items.len(), self.pointer.0, self.now);
-            let picked = if std::mem::take(&mut self.click) {
+            // The click is tested and cleared only with the pointer in the
+            // bar's row (@ 0x00429cfd..0x00429cff `jle` past the hover and
+            // the click; @ 0x00429db7 / 0x00429dc0): a click above the bar
+            // stays pending until the pointer enters the row (and takes the
+            // object there) or the close clears it.
+            let in_row = self.pointer.1 > self.height as i32 - crate::inventory::BAR_H;
+            let picked = if in_row && std::mem::take(&mut self.click) {
                 self.inventory
                     .pick(self.width, self.height, self.pointer, &items)
             } else {
@@ -1720,8 +1769,11 @@ impl Game {
                 if let Some(s) = self.script.as_mut() {
                     s.hold(e.id);
                 }
-                self.frame_hook();
             }
+            // The place hook on every open-bag frame (@ 0x00427ce6: the `jle`
+            // @ 0x00427cd6 skips only the close and the hold): the puzzles'
+            // timers go on behind the bag.
+            self.frame_hook();
             self.inventory.fade_step(self.now);
         } else {
             self.draw_subjects();
@@ -1931,9 +1983,22 @@ impl Game {
         true
     }
 
-    /// CryoMovie's volume (@ 0x006b9100 with `GlobalVolume`, 0..99).
+    /// CryoMovie's volume (@ 0x006b9100 with `GlobalVolume`, 0..99, called
+    /// @ 0x0042125c): below 100, without the Cryo Sound Library,
+    /// `waveOutSetVolume(v × 0x028f028f)` @ 0x006b9135..0x006b9143, so each
+    /// side gets v × 655 of 65535. The 2004 program's films keep v / 99.
     fn cinema_gain(&self) -> f32 {
-        self.startup.config.global_volume as f32 / 99.0
+        let v = self.startup.config.global_volume;
+        if self.files.is_evolution_2004() {
+            return v as f32 / 99.0;
+        }
+        (v * 655) as f32 / 65535.0
+    }
+
+    /// Tests: [`Game::cinema_gain`].
+    #[doc(hidden)]
+    pub fn test_cinema_gain(&self) -> f32 {
+        self.cinema_gain()
     }
 
     fn video_step(&mut self) {
@@ -3086,11 +3151,15 @@ impl Game {
         (g * f64::from(level)) as i32
     }
 
-    fn play_music(&mut self, path: &str) {
-        if let Some((rate, ch, pcm)) = self.sound(path) {
-            let g = csm_gain(self.level(self.startup.config.music_volume));
-            self.audio.play(CHANNEL_MUSIC, rate, ch, pcm, true, [g, g]);
-        }
+    /// The music track `path` played looped on its channel; false when the
+    /// file is missing.
+    fn play_music(&mut self, path: &str) -> bool {
+        let Some((rate, ch, pcm)) = self.sound(path) else {
+            return false;
+        };
+        let g = csm_gain(self.level(self.startup.config.music_volume));
+        self.audio.play(CHANNEL_MUSIC, rate, ch, pcm, true, [g, g]);
+        true
     }
 
     /// `AtlBruitages_InitWarp` (@ 0x00401f30): the listener at the view's
@@ -4877,11 +4946,10 @@ impl Host for Game {
         self.tr(|| "scan".into());
     }
 
-    /// `PLAYVOICE=d,l,r,g` (@ 0x0040da70): the port's parse keeps four
-    /// numbers; the fifth (blue) is 0.
-    fn play_voice(&mut self, values: [i32; 4]) {
-        let [d, l, r, g] = values;
-        self.play_voice_c(d, l, r, g, 0);
+    /// `PLAYVOICE=d,l,r,g,b` (@ 0x0040da70).
+    fn play_voice(&mut self, values: [i32; 5]) {
+        let [d, l, r, g, b] = values;
+        self.play_voice_c(d, l, r, g, b);
     }
 
     fn wam_commands(&mut self, wam: &str, flags: &[i32]) -> Vec<String> {
@@ -4954,14 +5022,19 @@ impl Host for Game {
         if self.music.as_deref() == Some(path.as_str()) && self.audio.is_playing(CHANNEL_MUSIC) {
             return false;
         }
-        self.music = Some(path.clone());
-        self.play_music(&path);
+        // The last track that started (0x00759328, written only on
+        // 0x00433930's success path @ 0x00433ca0..0x00433ca5): a missing
+        // file leaves it, and the film's end (0x00433d00) restarts it.
+        if self.play_music(&path) {
+            self.music = Some(path);
+        }
         false
     }
 
-    /// `STOPMUSIK` (@ 0x004491eb): the music faded out (here stopped).
+    /// `STOPMUSIK` (@ 0x004491eb): the music faded out (here stopped); the
+    /// last track's name is kept (0x0044c610 → 0x00433d30(1) only sets the
+    /// slots' fade flags).
     fn stop_music(&mut self) {
-        self.music = None;
         self.audio.stop(CHANNEL_MUSIC);
     }
 

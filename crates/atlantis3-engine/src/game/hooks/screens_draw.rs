@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use atlantis3_data::spr::Bank;
+use atlantis3_data::spr::{Bank, Depth};
 
 use crate::inventory::aff_at;
 use crate::maps;
@@ -298,10 +298,20 @@ impl Game {
     }
 
     /// `AtlEcrin_ReloadSprBank` (@ 0x00413370), run by the `jardin.wam`
-    /// load (@ 0x004c367e): `Ecrin%d.spr`, %d the display's depth (the
-    /// port draws in 16 bits). `Interface.spr` is the game's.
+    /// load (@ 0x004c367e): `Ecrin%d.spr`, %d the display's bit count
+    /// (0x0040efc0: 32 for x8r8g8b8, 16 for r5g6b5, @ 0x004134e5..0x004134f8).
+    /// `Ecrin16.spr` has blitters only at 16 bits and `Ecrin32.spr` only at
+    /// 32. `Interface.spr` is the game's.
     pub(crate) fn ecrin_reload_banks(&mut self) {
-        self.puzzles.screens.ecrin_bank = self.screen_bank("Ecrin16.spr");
+        self.puzzles.screens.ecrin_bank = self.screen_bank(self.ecrin_name());
+    }
+
+    /// The case bank's name for the display depth (see `ecrin_reload_banks`).
+    pub(crate) fn ecrin_name(&self) -> &'static str {
+        match self.depth() {
+            Depth::Xrgb8888 => "Ecrin32.spr",
+            Depth::Rgb565 => "Ecrin16.spr",
+        }
     }
 
     /// `ECRIN`'s drawing (@ 0x00412fc0): the warp, the case (#0) and each
@@ -314,7 +324,8 @@ impl Game {
         let st = &self.puzzles.screens;
         let (fade, taken, cursor) = (st.ecrin_fade, st.ecrin_taken, st.ecrin_cursor);
         if let Some(bank) = st.ecrin_bank.clone() {
-            let path = "spr\\Ecrin16.spr";
+            let path = format!("spr\\{}", self.ecrin_name());
+            let path = path.as_str();
             self.draw_spr(path, &bank, 0, Some(cx), cy, fade);
             for (k, t) in taken.iter().enumerate() {
                 if !t {

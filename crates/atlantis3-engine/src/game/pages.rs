@@ -210,7 +210,9 @@ impl Game {
             Mode::Video if self.video.as_ref().is_some_and(|v| v.travel) => self.escape_travel(),
             Mode::Warp if self.menus.demo => {
                 self.menus.demo = false;
-                self.place_sounds_stop();
+                // Every sound object stopped (@ 0x0042ace0 → 0x00433580),
+                // the place sounds' channels with them (sfx_stop_all).
+                self.sfx_stop_all();
                 self.subtitle = None;
                 self.voices_clear();
                 if self.enter_menu(PAGE_START) {
@@ -218,8 +220,12 @@ impl Game {
                 }
             }
             Mode::Warp => {
-                // The voice slots stopped and freed (@ 0x0042ad09), not
-                // from the inventory (@ 0x0042af2b).
+                // Every sound object stopped (@ 0x0042acff → 0x00433580:
+                // the sound map 0x00759340 walked, `PLAYSOUND`'s and the
+                // puzzles' sounds with the rest), then the voice slots
+                // stopped and freed (@ 0x0042ad09), not from the inventory
+                // (@ 0x0042af2b).
+                self.sfx_stop_all();
                 self.voices_clear();
                 self.open_menu();
             }
@@ -296,6 +302,12 @@ impl Game {
             now: self.now,
             pointer: self.pointer,
         };
+        // The start page's handler stops both music slots at once in every
+        // frame (0x00452000 @ 0x0045204d..0x00452050: 0x00433d30(0)); the
+        // last track's name (0x00759328) is kept.
+        if !self.files.is_evolution_2004() && self.menus.page == crate::menu::PAGE_START {
+            self.audio.stop(CHANNEL_MUSIC);
+        }
         let events = self.menus.frame(&mut env, &mut self.screen);
         // The original has one click byte (0x007592b8) for the menus and
         // the warp: the press sets it in every mode (@ 0x004315a5), and

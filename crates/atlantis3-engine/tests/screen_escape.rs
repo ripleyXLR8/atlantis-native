@@ -250,3 +250,38 @@ fn escape_in_the_screens_as_the_original() {
         ]
     );
 }
+
+/// Each screen's stop zeroes the view's turn speeds (0x00431760, called by
+/// every stop: the skull @ 0x00409b1b, the case @ 0x00412f6c, the tower map
+/// @ 0x00406755, the unicorn @ 0x0042eb21, the game boy @ 0x0041f7b2, ...):
+/// the speeds the screen opened with are not applied again in the warp.
+#[test]
+fn a_screen_stop_zeroes_the_turn_speeds() {
+    let Some(files) = files() else {
+        return;
+    };
+    for (kind, mode) in [
+        ("tour", 10),
+        ("crane", 15),
+        ("licorne", 11),
+        ("gboy", 12),
+        ("ecrin", 14),
+    ] {
+        let mut g = Game::new(files()).unwrap();
+        g.flat_warp = true;
+        g.stub_cinemas = true;
+        g.story_sound_model = true;
+        let clock = setup(&mut g, kind, mode);
+        assert_eq!(g.board_mode_number(), mode, "{kind}");
+        g.board_set_turn_speeds(0.5, -0.25);
+        g.board_screen_frame(clock.at(0), (400, 300), false, false);
+        assert_eq!(
+            g.board_turn_speeds(),
+            (0.5, -0.25),
+            "{kind}: during the screen"
+        );
+        g.escape();
+        assert_eq!(g.board_mode_number(), 3, "{kind}: the stop ran");
+        assert_eq!(g.board_turn_speeds(), (0.0, 0.0), "{kind}");
+    }
+}

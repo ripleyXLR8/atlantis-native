@@ -319,8 +319,7 @@ pub trait Host {
     /// The 2004 `PLAYVOICE=d,l,r,g,b` (atlantis4-cd-en-3022848 @ 0x0044ec99:
     /// five numbers, FUN_004109f0(d, l, r, g, b, 1)).
     fn play_voice_2004(&mut self, values: [i32; 5]) {
-        let [d, l, r, g, _] = values;
-        self.play_voice([d, l, r, g]);
+        self.play_voice(values);
     }
 
     /// The world's part of `Interp_SetMonde` (@ 0x00484df0): its object
@@ -453,8 +452,8 @@ pub trait Host {
     /// `DISPLAY` (@ 0x00449262): one whole frame drawn and shown now.
     fn display(&mut self) {}
 
-    /// `PLAYVOICE=a,b,c,d` (@ 0x0040da70).
-    fn play_voice(&mut self, values: [i32; 4]) {}
+    /// `PLAYVOICE=d,l,r,g,b` (@ 0x0040da70: dialog, line, colour).
+    fn play_voice(&mut self, values: [i32; 5]) {}
 
     /// `SAVE=n` (@ 0x0044c6d0): the quick save `n` of the script's state.
     fn quick_save(&mut self, n: i32, script: &Script) {}

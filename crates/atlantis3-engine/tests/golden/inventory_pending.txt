@@ -1,0 +1,71 @@
+# Inventory pick of atlantis3-gog-fr-3473408 (Game.exe MD5 eb06eaa718877dfcabee6e8f89d85b31) with spr_p6.dll (MD5 94cfb7cfaf577a3aeb94914e7769d552),
+# run under Unicorn by tools/emu/a3_inventory.py pending (functions and stubs: its docstring; the place hook
+# 0x004c27d0 stays a stub, counted). 800 x 600, world 1 banks (MONDE=1), loop mode 3, clock 100.0 s, frames 1/64 s
+# apart (scroll runs: 1/16 s), each a whole 0x00427c40.
+# case NAME: a fresh bag (bag i id sprite name), open = 0x00427a60 (case scroll: the clock 10 s later first).
+# press X Y: pointer at X, Y and the click byte 0x007592b8 := 1 (the mouse callback's press).
+# frame F X Y click=C open=O mode=M hand=H hooks=K scroll=S label=NAME: frame F with the pointer at X, Y; after it
+#   the click byte, the open flag, the loop mode, OBJETENMAIN, the calls of 0x004c27d0 in the frame, the first
+#   visible slot, the Objects.txt names given to the hover label 0x0042a530 (hex, Windows-1252), or -.
+case take
+bag 0 33 0 HOG_OBJ_TOUPIE
+bag 1 34 1 HOG_OBJ_BATON
+bag 2 35 2 HOG_OBJ_DISQUE
+frame 0 120 300 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+press 120 300
+frame 1 120 300 click=1 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 2 120 300 click=1 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 3 120 300 click=1 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 4 120 560 click=0 open=0 mode=3 hand=34 hooks=1 scroll=0 label=50657469742062e2746f6e
+case empty
+bag 0 33 0 HOG_OBJ_TOUPIE
+bag 1 34 1 HOG_OBJ_BATON
+bag 2 35 2 HOG_OBJ_DISQUE
+press 120 300
+frame 0 120 300 click=1 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 1 520 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 2 40 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=546f75706965
+case band
+bag 0 33 0 HOG_OBJ_TOUPIE
+bag 1 34 1 HOG_OBJ_BATON
+bag 2 35 2 HOG_OBJ_DISQUE
+press 120 522
+frame 0 120 522 click=1 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 1 120 523 click=0 open=0 mode=3 hand=34 hooks=1 scroll=0 label=50657469742062e2746f6e
+case scroll
+bag 0 33 0 HOG_OBJ_TOUPIE
+bag 1 34 1 HOG_OBJ_BATON
+bag 2 35 2 HOG_OBJ_DISQUE
+bag 3 36 3 HOG_OBJ_CRANE
+bag 4 37 4 CMP_TELECOMMANDE
+bag 5 38 5 CMP_OMEGA
+bag 6 39 6 CMP_CLEF1
+bag 7 40 7 CMP_CLEF2
+bag 8 41 8 CMP_TORCHE_ELECTRIQUE
+bag 9 42 9 CMP_COUTEAU
+bag 10 47 0 CHF_OISEAUBOIS
+bag 11 48 1 CHF_ECRIN_SCARABEE
+frame 0 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 1 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 2 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 3 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 4 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 5 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=-
+frame 6 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=436f7574656175
+frame 7 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=436f7574656175
+frame 8 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=436f7574656175
+frame 9 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=0 label=436f7574656175
+frame 10 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=1 label=4f697365617520656e20626f6973
+frame 11 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=1 label=4f697365617520656e20626f6973
+frame 12 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=1 label=4f697365617520656e20626f6973
+frame 13 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=1 label=4f697365617520656e20626f6973
+frame 14 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=1 label=4f697365617520656e20626f6973
+frame 15 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=2 label=456372696e
+frame 16 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=2 label=456372696e
+frame 17 799 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=2 label=456372696e
+frame 18 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=2 label=-
+frame 19 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=2 label=-
+frame 20 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=1 label=-
+frame 21 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=1 label=-
+frame 22 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=1 label=-
+frame 23 0 560 click=0 open=1 mode=7 hand=0 hooks=1 scroll=1 label=-
