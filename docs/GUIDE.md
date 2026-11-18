@@ -1075,6 +1075,9 @@ until its menus write the player's own, the installation's
 
 ## Command line
 
+`atlantis-native --help` (or `-h`) prints every option, one line each,
+the development ones apart, and the rules of the data folder.
+
 The game folder can be left out of each of these: the game library
 decides (except with `--headless`).
 
@@ -1140,9 +1143,11 @@ screen (F, F11 or Alt+Enter switches it back): for a launcher such as the
 Ports of Batocera on a Raspberry Pi. The options menu's **Start in full
 screen** does the same for every start (see [Full screen](#full-screen)).
 
-The environment variable `ATLANTIS_NATIVE_DATA` names another folder for
-the per-user data (saves, settings, log): trial runs that must not touch
-your own saves.
+`atlantis-native --data-dir <folder>` keeps the saves, settings, game
+library and log of this run in `<folder>` (made if missing; also
+`--data-dir=<folder>`). The environment variable `ATLANTIS_NATIVE_DATA`
+does the same: trial runs that must not touch your own saves. See
+[where they live](#where-the-files-live).
 
 `atlantis-native --headless /path/to/game [frames]` runs a new game without
 a window, with no input and the sound mixed and dropped, and prints what it
@@ -1161,21 +1166,49 @@ every chapter change, in the original's own files: `players.atl` (the
 player list) and `p<letter><chapter>.gam` (one checkpoint per chapter and
 player, the original's 2639-byte format). The load picker of the in-game
 menu lists the current player's checkpoints by their chapter names. The
-files are kept in a per-user folder, one per game build:
+files are kept in the data folder, in one folder per game build
+(`<data folder>/<build>`).
+
+### Where the files live
+
+The data folder is the first of these that applies:
+
+1. `--data-dir <folder>` on the command line;
+2. the folder the environment variable `ATLANTIS_NATIVE_DATA` names;
+3. the **portable mode**: when a file named `portable.txt` (its content
+   does not matter) or a folder named `data` is next to the program, the
+   `data` folder there (made if missing). On macOS "next to the program"
+   is the folder holding `Atlantis Native.app` (a `portable.txt` inside
+   `Atlantis Native.app/Contents/MacOS/` works too). Everything then
+   stays in the program's folder: copy it to a USB stick, or delete it to
+   remove the game and its saves. (The folder must be writable: not in
+   `C:\Program Files` or `/Applications` unless you run as their owner.
+   On Windows, check the file is not `portable.txt.txt`.) The desktop
+   builds only: not the web version or the PortMaster port;
+4. the per-user folder, as before:
 
 | System | Folder |
 |---|---|
-| Linux and other Unix systems | `$XDG_DATA_HOME/atlantis-native/<build>` (by default `~/.local/share/atlantis-native/<build>`) |
-| macOS | `~/Library/Application Support/atlantis-native/<build>` |
-| Windows | `%APPDATA%\atlantis-native\<build>` |
+| Linux and other Unix systems | `$XDG_DATA_HOME/atlantis-native` (by default `~/.local/share/atlantis-native`) |
+| macOS | `~/Library/Application Support/atlantis-native` |
+| Windows | `%APPDATA%\atlantis-native` |
+
+Without `portable.txt` or `data` next to the program nothing changes:
+the saves stay in the per-user folder. To move to the portable mode,
+make the `data` folder next to the program and copy the per-user
+folder's contents into it. The log names the folder used and why
+(`data folder ... (Portable)`).
 
 (`games.txt`, the game library, `support.ini`, the counts of the
-[support screen](#the-support-screen), and `atlantis-native.log` are in
-the `atlantis-native` folder itself.)
-Atlantis II's saves and settings are in its `atlantis2` folder there,
-Atlantis III's in `atlantis3` (see [Atlantis III](#atlantis-iii)),
-Atlantis Evolution's in `atlantis4` (see
-[Atlantis Evolution](#atlantis-evolution)).
+[support screen](#the-support-screen), `atlantis-native.log` and
+`game-files/`, the copies made from the discs, are in the data folder
+itself.) Atlantis II's saves and settings are in its `atlantis2` folder
+there, Atlantis III's in `atlantis3` (with its F12 screenshots in
+`atlantis3/screenshots`; see [Atlantis III](#atlantis-iii)), Atlantis
+Evolution's in `atlantis4` (see [Atlantis Evolution](#atlantis-evolution))
+and the 2004 program's in `atlantis-evolution-2004`.
+
+### Players and checkpoints
 
 On its first start with a game whose folder holds an original
 `players.atl` (an installation the original game played), the port copies

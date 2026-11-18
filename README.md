@@ -213,6 +213,14 @@ version](docs/GUIDE.md#the-web-version)).
 > Or, in the Terminal:
 > `xattr -dr com.apple.quarantine "/Applications/Atlantis Native.app"`
 
+> **Portable mode:** put an empty file named `portable.txt` (or a folder
+> named `data`) next to the program (on macOS, next to `Atlantis
+> Native.app`) and the saves, settings, game library and log go in that
+> `data` folder instead of your user folder: deleting the program's
+> folder then removes everything. `--data-dir <folder>` chooses another
+> folder for one run, and `--help` lists every option (see [where the
+> saves live](docs/GUIDE.md#players-checkpoints-and-settings)).
+
 > **PortMaster:** unzip `atlantis-native-portmaster.zip` into the
 > device's `ports` folder (it holds `Atlantis Native.sh` and the
 > `atlantisnative` folder), then copy your game's files (the folder with
@@ -447,7 +455,8 @@ from its own sources is signed; every release is approved by hand.
 
 Privacy: this program does not transfer any information to other
 networked systems. It only reads the game files you point it at and
-writes its saves, settings and log to your own user folder (in the web
+writes its saves, settings and log to your own user folder, or to the
+folder you choose (portable mode, `--data-dir`) (in the web
 version, to your browser's storage: the page is downloaded from GitHub
 Pages, the game files and saves never leave your computer).
 
