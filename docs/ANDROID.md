@@ -60,6 +60,7 @@ Uninstalling the app deletes them too.
 | Two-finger tap | A right click. |
 | Bag button | The first game's bag (a right click). It is drawn in the black bar right of the picture; a tap anywhere in that bar's lower half presses it. A screen too narrow for the bar shows no button; the two-finger tap still opens the bag. |
 | Three fingers | The first game's options menu (F10 on the desktop). A tap in it is a click. |
+| Menu button | The first game's options menu, like three fingers. It is drawn in the black bar left of the picture; a tap anywhere in that bar's lower half presses it. A screen too narrow for the bar shows no button. |
 | Back button | Escape: the game's menu. On the "no game" screen it closes the app. |
 
 The on-screen keyboard opens while the first game's player screen takes

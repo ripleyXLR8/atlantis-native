@@ -292,6 +292,10 @@ pub struct App {
     /// (window pixels, as last drawn), when shown.
     #[cfg(target_os = "android")]
     bag_button: Option<android::Rect>,
+    /// Android: the options menu's button in the black bar left of the
+    /// picture, when shown.
+    #[cfg(target_os = "android")]
+    menu_button: Option<android::Rect>,
 }
 
 impl App {
@@ -432,6 +436,8 @@ impl App {
             suspended_at: None,
             #[cfg(target_os = "android")]
             bag_button: None,
+            #[cfg(target_os = "android")]
+            menu_button: None,
         }
     }
 
@@ -1156,7 +1162,7 @@ impl App {
             &self.pattern
         };
         let hd_mode = tile.is_some();
-        // Android: the bag button while a game is played (not over the
+        // Android: the bag and menu buttons while a game is played (not over the
         // library, the options menu, or the on-screen keyboard).
         #[cfg(target_os = "android")]
         let bag_shown =
@@ -1257,7 +1263,22 @@ impl App {
             let _ = card;
             #[cfg(target_os = "android")]
             {
-                self.bag_button = android::draw_bag(&mut buf[..], sw, ox + dw, fit_h, bag_shown);
+                self.bag_button = android::draw_button(
+                    &mut buf[..],
+                    sw,
+                    (ox + dw, sw - ox - dw),
+                    fit_h,
+                    bag_shown,
+                    android::Button::Bag,
+                );
+                self.menu_button = android::draw_button(
+                    &mut buf[..],
+                    sw,
+                    (0, ox),
+                    fit_h,
+                    bag_shown,
+                    android::Button::Menu,
+                );
             }
             #[cfg(target_arch = "wasm32")]
             if let Some(gl) = &mut self.gl {
@@ -1359,7 +1380,22 @@ impl App {
         }
         #[cfg(target_os = "android")]
         {
-            self.bag_button = android::draw_bag(&mut buf[..], sw, ox + dw, fit_h, bag_shown);
+            self.bag_button = android::draw_button(
+                &mut buf[..],
+                sw,
+                (ox + dw, sw - ox - dw),
+                fit_h,
+                bag_shown,
+                android::Button::Bag,
+            );
+            self.menu_button = android::draw_button(
+                &mut buf[..],
+                sw,
+                (0, ox),
+                fit_h,
+                bag_shown,
+                android::Button::Menu,
+            );
         }
         if let Some(b) = soft_buf {
             b.present().unwrap();
