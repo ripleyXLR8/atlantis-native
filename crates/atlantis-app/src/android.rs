@@ -15,7 +15,8 @@
 //! Touch: a tap is a left click where the finger is (the panoramic view:
 //! a click at the centre), a drag moves the pointer with the button held
 //! (the panoramic view: turns it), a tap with two fingers is a right
-//! click. The Back button is Escape.
+//! click, three fingers open the port's options menu. The Back button
+//! is Escape.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -33,6 +34,9 @@ use winit::platform::android::EventLoopBuilderExtAndroid;
 use crate::desktop::{data_dir, open_any, Opened};
 use crate::session::Session;
 use crate::App;
+
+/// The activity, for the on-screen keyboard.
+static ACTIVITY: std::sync::OnceLock<AndroidApp> = std::sync::OnceLock::new();
 
 /// A finger moving less than this (window pixels) from where it went
 /// down makes a tap, not a drag (the panoramic view).
@@ -53,6 +57,7 @@ fn android_main(activity: AndroidApp) {
         default_hook(info);
     }));
     log::info!("{}", crate::version_string());
+    let _ = ACTIVITY.set(activity.clone());
     if let Some(dir) = activity.internal_data_path() {
         atlantis_engine::persist::set_android_data_dir(dir);
     }
@@ -93,6 +98,7 @@ fn android_main(activity: AndroidApp) {
             ]);
         }
         Some(Found::Nothing(dir)) => {
+            log::info!("No game found: copy it to {}", dir.display());
             app.pattern = notice(&[
                 "No game found.".to_string(),
                 String::new(),
@@ -236,6 +242,8 @@ pub(crate) struct TouchState {
     dragged: bool,
     /// The left button is down in the engine (or queued down).
     left_down: bool,
+    /// The on-screen keyboard is shown (the player screen's name entry).
+    keyboard: bool,
     /// The engine's inputs, one per engine step (a press is seen after
     /// the pointer's move, a release after its press).
     queue: VecDeque<Input>,
@@ -264,6 +272,17 @@ impl App {
             TouchPhase::Started => {
                 st.fingers.retain(|f| f.0 != t.id);
                 st.fingers.push((t.id, (x, y), (x, y)));
+                if st.fingers.len() >= 3 {
+                    // Three fingers: the port's options menu (F10).
+                    cancel_left(st, self.sys.mouse());
+                    let queue = std::mem::take(&mut st.queue);
+                    for i in queue {
+                        self.sys.push_input(i);
+                    }
+                    self.touch = TouchState::default();
+                    self.open_menu();
+                    return;
+                }
                 if st.primary.is_none() {
                     st.primary = Some(t.id);
                     st.two = false;
@@ -365,10 +384,25 @@ impl App {
         self.last_cursor = Some((x, y));
     }
 
-    /// Gives the engine the next queued touch input (before each step).
+    /// Gives the engine the next queued touch input (before each step),
+    /// and shows the on-screen keyboard while the player screen takes
+    /// the letters (hidden after).
     pub(crate) fn feed_touch(&mut self) {
         if let Some(i) = self.touch.queue.pop_front() {
             self.sys.push_input(i);
+        }
+        let entry = self
+            .sys
+            .takes_key_repeat(atlantis_engine::sys::Key::Char('a'));
+        if entry != self.touch.keyboard {
+            self.touch.keyboard = entry;
+            if let Some(a) = ACTIVITY.get() {
+                if entry {
+                    a.show_soft_input(true);
+                } else {
+                    a.hide_soft_input(true);
+                }
+            }
         }
     }
 

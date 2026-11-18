@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Atlantis Native on Android (docs/ANDROID.md): a NativeActivity, no
+     Java code. The SDK levels, the version and the debug flag are given
+     to aapt2 by build-apk.sh. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.ripleyxlr8.atlantisnative">
+
+    <application
+        android:label="Atlantis Native"
+        android:icon="@mipmap/ic_launcher"
+        android:hasCode="false"
+        android:extractNativeLibs="false"
+        android:appCategory="game"
+        android:isGame="true"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+        <activity
+            android:name="android.app.NativeActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:resizeableActivity="true">
+            <!-- The cdylib android-activity starts: libatlantis_app.so. -->
+            <meta-data android:name="android.app.lib_name" android:value="atlantis_app" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
