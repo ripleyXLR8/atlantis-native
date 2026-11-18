@@ -73,9 +73,10 @@
 //! the main menu and the game as the original's, its saves and
 //! `options.xml` in `atlantis4/Documents/Atlantis Evolution/` of the
 //! per-user data folder, the port's `settings.ini` (the language, the
-//! renderer, the full screen) in `atlantis4/`. The game library finds and
-//! opens it too. The other games' options but `--fullscreen` are refused
-//! in this mode. `--atlantis4-view <folder> [--node <node> | --save
+//! renderer, the full screen, the bug fixes) in `atlantis4/`. The game
+//! library finds and opens it too. The other games' options but
+//! `--fullscreen` and `--original` (every bug fix off) are refused in this
+//! mode. `--atlantis4-view <folder> [--node <node> | --save
 //! <file>] [--lang <l>] [--cpu] [--gpu-check] [--fullscreen]` is its
 //! development viewer (the shortcuts past the menus).
 //!
@@ -93,7 +94,7 @@
 //! (every game: what the library's "Find installations" adds) and ends.
 //!
 //! `--original` (before the game directory) turns every enhancement off,
-//! in every game (Atlantis III's bug fixes too): the original game, bug for bug. `--new-game` skips the start-up videos
+//! in every game (Atlantis III's and Atlantis Evolution's bug fixes too): the original game, bug for bug. `--new-game` skips the start-up videos
 //! and the player screen.
 //!
 //! `--puzzle <n> [--object <id>]` (a testing aid) plays StartPuzzle `n` at
@@ -492,14 +493,22 @@ fn main() {
         } else if force_hd {
             not_a4.push("--hd");
         }
-        if original {
+        // The 2004 program (Atlantis III's engine) has no switch of its
+        // fixes from the command line.
+        if original && atlantis_app::a3::holds_evolution_2004(Path::new(&dir)) {
             not_a4.push("--original");
         }
         refuse(&not_a4, "Atlantis Evolution's mode");
         let run = EventLoop::new()
             .map_err(|e| format!("No window can be opened: {e}"))
             .and_then(|mut el| {
-                atlantis_app::a4::run_window_on(&mut el, Path::new(&dir), fullscreen, false)
+                atlantis_app::a4::run_window_on(
+                    &mut el,
+                    Path::new(&dir),
+                    fullscreen,
+                    false,
+                    original,
+                )
             });
         if let Err(e) = run {
             error_box(&e);
@@ -819,7 +828,13 @@ fn main() {
             })
         } else if let Some(dir) = atlantis4 {
             atlantis_app::watchdog::leave();
-            atlantis_app::a4::run_window_on(&mut el, &dir, fullscreen, a2_grace.replace(false))
+            atlantis_app::a4::run_window_on(
+                &mut el,
+                &dir,
+                fullscreen,
+                a2_grace.replace(false),
+                original,
+            )
         } else if let Some(dir) = atlantis3 {
             atlantis_app::watchdog::leave();
             atlantis_app::a3::open(&dir, &[], original).and_then(|(game, _)| {

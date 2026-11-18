@@ -985,12 +985,24 @@ library's screen.
 | Drag with the left button | turns the view |
 | Left click | goes, takes, uses (with the object selected in the inventory), talks; a topic of a conversation; the next line of a dialog; turns a document's page |
 | The bag (bottom right) | opens the inventory: a click selects an object, a second click (or the quit button) closes it; an object can be dragged to an empty slot; its menu button saves and goes back to the main menu |
+| Escape or Space | during a film, skips it (a bug fix, below) |
 | F11 or Alt+Enter | full screen on and off (kept in `settings.ini`; the port's own keys) |
 
 The original has no Escape key: the way out of the game is the
 inventory's menu button (which saves, as the original's), then *Quit*
 in the main menu, or closing the window. Videos show a skip button at
-their top right after a click.
+their top right after a click; a click on it skips the film.
+
+**Bug fix.** The original reads no key at all, so a film can be skipped
+only by clicking once to show its skip button, then clicking that
+button. Atlantis Native also skips a film with Escape or Space
+(`fix_skip_films`, on): the key does exactly what the button does, and
+the game goes on as after the film's last frame (its end runs the same
+way: the music back, then the scripts' own follow-up, the next place or
+the tutorial). The click and the button work as in the original either
+way. `--original` turns the fix off for that run, and so does
+`fix_skip_films = 0` in `settings.ini` (below); in the browser the fix
+is kept in the page's storage, on.
 
 ### Settings and saves
 
@@ -1013,6 +1025,7 @@ there, written with the defaults at the first start:
 | `language` | `auto` (the installation's `lang.ini`, as the original), or `de`, `en`, `es`, `fr`, `it` |
 | `renderer` | `gpu` (the graphics card) or `cpu` (the processor: slower, used when no OpenGL 3.3 or ES 3.0 context can be made) |
 | `fullscreen` | `on` (the original's start) or `off`; F11 and Alt+Enter change it |
+| `fix_skip_films` | `1` (Escape or Space skips a film, the bug fix above) or `0` (the original: the skip button only); `--original` gives `0` for one run |
 
 ### The 2004 CD (in progress)
 
@@ -1093,8 +1106,9 @@ bug (see [Enhancements](TECHNICAL.md#enhancements)), and starts with the
 original's options (SUBTITLES off, OMNI 3D MODE 1, the volumes 127, 110,
 110 and 110) whatever `settings.ini` keeps; with Atlantis II too
 (its music tracks then lose their last ~5.8 s when another follows, as
-in the original) and Atlantis III (GOG.com's Spanish edition then starts
-with the texture size its `Atlantis3.cfg` asks for, 1024).
+in the original), Atlantis III (GOG.com's Spanish edition then starts
+with the texture size its `Atlantis3.cfg` asks for, 1024) and GOG.com's
+Atlantis Evolution (Escape and Space then do not skip its films).
 
 `atlantis-native --hd /path/to/game` starts in the [HD mode](TECHNICAL.md#hd-mode),
 whatever `settings.ini` says.

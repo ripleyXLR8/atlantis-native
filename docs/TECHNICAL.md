@@ -4529,9 +4529,25 @@ presses its buttons there (`atlantis4-engine/tests/menus.rs`).
 (`a4::A4Settings`): `language` (`auto`: `lang.ini`'s), `renderer`
 (`gpu` or `cpu`; the processor's renderer is also the fallback when no
 context can be made) and `fullscreen` (`on` by default, as the
-original). The original's own options (volumes, inverse look, compass,
+original), and the bug fixes' keys below. The original's own options (volumes, inverse look, compass,
 permanent help) stay in its `options.xml`, beside the saves in
-`atlantis4/Documents/Atlantis Evolution/`.
+`atlantis4/Documents/Atlantis Evolution/`. A file of an earlier version
+without the fixes' keys is written again with them, its values kept.
+
+### Atlantis Evolution's bug fixes
+
+`atlantis4_engine::Fixes` (`crates/atlantis4-engine/src/fixes.rs`), each
+fix its own switch, all on by default and off with `--original` (for
+the run; the file is not written); kept in `atlantis4/settings.ini`
+beside the port's other settings (`a4::A4Settings` parses them through
+`Fixes::set`), written with the defaults when there is none; the web
+build keeps a `settings.ini` of the fixes alone in the browser's
+storage, as Atlantis III's page. The 2004 CD program, played by
+Atlantis III's engine, has its own (`fix_smooth_turn`, above).
+
+| Fix (`settings.ini` key) | Where in the code | What it changes |
+|---|---|---|
+| `fix_skip_films` | `Game::skip_movie`, `Movie::skip`; the viewer's `skip_film` (`a4.rs`, Escape and Space on the desktop and in `a4_web.rs`) | The original has no key to skip a `PlayMovie` film: a click on the black `videoBackgroundButton` toggles `skipVideoButton` (@ 0x00522180), a click on that button stops the video sprite (@ 0x005220b0 → `TeFrameAnim` stop @ 0x004f5ab0), and no class instantiates the key callback (atlantis4-re, `functions/Game-playMovie-FUN_005232b0.md`; live: Esc does nothing). With the fix, Escape or Space does what that validated click does, when the game is shown (no menu or planks over it): the sprite's stop, whose "stopped" signal is the one end a film also reaches at its last frame (@ 0x00524740: the layouts hidden, the `video` channel stopped, the music from its start, then `OnMovieFinished(<path>)`), `Game::end_movie` in both cases. A video that is not playing (a file that could not be loaded) is not ended, as the button does not end it; a press held since the film is dropped. Off: the keys do nothing during a film (`atlantis4-engine/tests/flow.rs`: the intro and `generique.ogv` skipped and played through leave the same node, Lua globals, inventory, documents and sound channels; off, the key leaves the intro playing) |
 
 **PortMaster.** The SDL2 front end plays the first game only: Atlantis
 Evolution needs OpenGL 3.3 or ES 3.0 for its speed (the processor's

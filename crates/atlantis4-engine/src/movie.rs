@@ -50,6 +50,9 @@
 //! click on the background (@ 0x00522180) **toggles** the skip button's
 //! visibility; one on the skip button (@ 0x005220b0) stops the video. No
 //! key skips: the skip function's only reference is that connection.
+//! The port's `fix_skip_films` ([`crate::fixes`], on unless
+//! `--original`) adds Escape and Space, which do what that click does
+//! ([`Movie::skip`], [`crate::Game::skip_movie`]).
 //!
 //! **The end** (@ 0x00524740, on the sprite's "stopped" signal: at the
 //! last frame's end or on a skip): the background, the skip button and the
@@ -595,6 +598,15 @@ impl Movie {
             .map_or_else(|| self.path.clone(), |s| s.path.clone())
     }
 
+    /// The skip button's validated click (@ 0x005220b0): the video
+    /// sprite's stop; `true` when it was playing (its "stopped" signal:
+    /// the movie ends). A press held on the movie's buttons is dropped.
+    pub fn skip(&mut self) -> bool {
+        self.press = None;
+        self.skip_pressed = false;
+        self.sprite.as_mut().is_some_and(VideoSprite::stop)
+    }
+
     /// A press at window point (`x`, `y`): the topmost visible button hit
     /// takes it (the skip button above the background).
     pub fn press(&mut self, layout: &MovieLayout, x: f64, y: f64) {
@@ -623,8 +635,7 @@ impl Movie {
         self.skip_pressed = false;
         match press {
             Some(Press::Skip) if self.skip_shown && layout.skip.contains(x, y) => {
-                let stopped = self.sprite.as_mut().is_some_and(VideoSprite::stop);
-                if stopped {
+                if self.skip() {
                     Click::Skipped
                 } else {
                     Click::None

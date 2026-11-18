@@ -94,6 +94,9 @@ pub struct Game {
     resolved: HashMap<&'static str, String>,
     /// The `PlayMovie` in progress (`game+0x4038` clear while it is).
     pub movie: Option<Movie>,
+    /// The port's bug fixes ([`crate::fixes`]; every one on unless the
+    /// program sets them).
+    pub fixes: crate::Fixes,
     /// The movies' sound events, for the sound side to take.
     pub movie_cues: Vec<MovieCue>,
     /// The engine clock read at a binding call, in µs (`play()` reads the
@@ -258,6 +261,7 @@ impl Game {
             sprites: HashMap::new(),
             resolved: HashMap::new(),
             movie: None,
+            fixes: crate::Fixes::default(),
             movie_cues: Vec::new(),
             clock_us: None,
             dialogs: Dialogs::default(),
@@ -308,6 +312,26 @@ impl Game {
         let name = m.finished_name();
         log::info!("movie {name} finished");
         name
+    }
+
+    /// `fix_skip_films` ([`crate::fixes`]): a key (the viewer's Escape or
+    /// Space) does what a validated click on the skip button does
+    /// (@ 0x005220b0): the video sprite's stop, whose "stopped" signal
+    /// runs the movie's end (@ 0x00524740, [`Game::end_movie`]), the one
+    /// end a film that plays to its last frame runs too. The name for
+    /// `OnMovieFinished` when it skipped the movie; `None` with the fix
+    /// off, without a movie, or when the video was not playing (a file
+    /// that could not be loaded: the button does nothing then either).
+    pub fn skip_movie(&mut self) -> Option<String> {
+        if !self.fixes.skip_films {
+            return None;
+        }
+        let stopped = self.movie.as_mut()?.skip();
+        if !stopped {
+            return None;
+        }
+        log::info!("fix_skip_films: the film skipped by a key");
+        Some(self.end_movie())
     }
 
     /// The skip button's picture size (75 × 75 in the data).

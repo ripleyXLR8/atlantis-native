@@ -29,6 +29,10 @@
 //!   under `atlantis-native/atlantis4/`, one key per file: written as the
 //!   game writes them (`options.xml` as the settings change: a page has no
 //!   exit).
+//! - **The bug fixes**: `settings.ini` in the same storage
+//!   ([`atlantis4_engine::fixes`], written with every fix on when there is
+//!   none, as Atlantis III's page): `fix_skip_films`'s Escape and Space
+//!   skip a film as on the desktop.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -118,6 +122,21 @@ pub fn start(
         .map_err(|e| JsValue::from(format!("Atlantis Evolution: {e}")))?;
     let clock = GameClock::new();
     let mut g = Game::new(files, HEIGHT);
+    // The bug fixes (`settings.ini` in the same storage, written with the
+    // defaults when there is none, as Atlantis III's page; the page has
+    // no `--original`).
+    g.fixes = match store.read(atlantis4_engine::fixes::SETTINGS_FILE) {
+        Some(d) => atlantis4_engine::Fixes::parse(&String::from_utf8_lossy(&d)),
+        None => {
+            let f = atlantis4_engine::Fixes::default();
+            store.write(
+                atlantis4_engine::fixes::SETTINGS_FILE,
+                f.to_text().as_bytes(),
+            );
+            f
+        }
+    };
+    log::info!("{:?}", g.fixes);
     if g.table.is_none() {
         log::warn!("no movie colour table: the movies stay black");
     }
@@ -333,6 +352,8 @@ impl Viewer {
                             Key::Character(c) if c.eq_ignore_ascii_case("f") => {
                                 a2_web::toggle_fullscreen()
                             }
+                            // `fix_skip_films`, as on the desktop.
+                            Key::Named(NamedKey::Escape | NamedKey::Space) => self.skip_film(),
                             _ => {}
                         }
                     }
