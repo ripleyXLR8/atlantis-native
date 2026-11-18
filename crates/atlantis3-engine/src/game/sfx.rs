@@ -39,6 +39,9 @@ struct SfxObject {
     started: Option<f64>,
     /// The mix channel it last played on.
     channel: Option<usize>,
+    /// The position of its last `PlaySfx3d` (@ 0x00433280); `None` after
+    /// a `Play`.
+    pos: Option<[f32; 3]>,
 }
 
 /// A `PLAYVOICE` slot (@ 0x0074f248 + 0x38 k): its line's text (+0x00,
@@ -107,6 +110,7 @@ impl Game {
                 seconds,
                 started: None,
                 channel: None,
+                pos: None,
             }),
         }
         true
@@ -138,6 +142,7 @@ impl Game {
         let o = &mut self.csounds.objects[i];
         o.started = Some(now);
         o.channel = Some(channel);
+        o.pos = None;
         let class = o.class;
         let path = o.name.replace('\\', "/");
         if let Some((rate, ch, pcm)) = self.sound(&path) {
@@ -149,6 +154,43 @@ impl Game {
             let g = csm_gain(self.level(level));
             self.audio.play(channel, rate, ch, pcm, false, [g, g]);
         }
+    }
+
+    /// `AtlSound_PlaySfx3d(name, pos)` (@ 0x00433280): played as `Play`,
+    /// its gains those of a place sound at `pos` ([`Game::place_gains`]),
+    /// following the listener while it plays.
+    pub(crate) fn sfx_play_3d(&mut self, name: &str, pos: [f32; 3]) {
+        self.sfx_play(name);
+        let gains = self.place_gains(pos);
+        if let Some(i) = self.sfx_index(name) {
+            let o = &mut self.csounds.objects[i];
+            o.pos = Some(pos);
+            if let Some(c) = o.channel {
+                self.audio.set_gain(c, gains);
+            }
+        }
+    }
+
+    /// The gains of the 3D sound objects that play, for the listener of
+    /// this frame.
+    pub(crate) fn sfx_3d_gains(&mut self) {
+        for i in 0..self.csounds.objects.len() {
+            let o = &self.csounds.objects[i];
+            if let (Some(pos), Some(c)) = (o.pos, o.channel) {
+                if self.sfx_playing_at(i) {
+                    let gains = self.place_gains(pos);
+                    self.audio.set_gain(c, gains);
+                }
+            }
+        }
+    }
+
+    /// Tests: the 3D position of the sound object `name` (its last
+    /// `PlaySfx3d`) and whether it plays.
+    #[doc(hidden)]
+    pub fn test_sfx_state(&self, name: &str) -> Option<(Option<[f32; 3]>, bool)> {
+        let i = self.sfx_index(name)?;
+        Some((self.csounds.objects[i].pos, self.sfx_playing_at(i)))
     }
 
     fn sfx_playing_at(&self, i: usize) -> bool {
@@ -198,9 +240,9 @@ impl Game {
     }
 
     /// Every sound object stopped (@ 0x00433580: a walk of the sound
-    /// library's map stopping each); the place's ambient sounds with them
-    /// [INFERRED: the ambient objects belong to the same map]. Logged `snd
-    /// stopall`.
+    /// library's map stopping each); every place sound with them (the
+    /// place sounds are in that map: `AtlSound_LoadSfx` @ 0x004329e0
+    /// inserts there). Logged `snd stopall`.
     pub(crate) fn sfx_stop_all(&mut self) {
         self.tr(|| "snd stopall".into());
         for i in 0..self.csounds.objects.len() {
@@ -211,7 +253,7 @@ impl Game {
                 }
             }
         }
-        self.audio.stop(crate::audio::CHANNEL_PLACE);
+        self.place_sounds_stop();
     }
 
     /// The voice file of a dialog's line (`GetApcNameFromDial`

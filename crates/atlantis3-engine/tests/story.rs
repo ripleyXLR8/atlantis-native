@@ -350,7 +350,7 @@ impl Run {
                     self.g.aim_at_zone(|z| z.kind == 1 && z.value == v),
                     "{line}: no zone to {v} under the centre"
                 );
-                self.g.click();
+                self.g.harness_click();
                 self.act_frame();
             }
             "PERSO" | "OBJET" => {
@@ -403,7 +403,7 @@ impl Run {
                     .find(|c| c.value == value)
                     .unwrap_or_else(|| panic!("{line}: not offered"));
                 self.g.set_pointer(cell.x, cell.y);
-                self.g.click();
+                self.g.harness_click();
                 self.act_frame();
             }
             "ZONE" => {
@@ -433,7 +433,7 @@ impl Run {
                 } else {
                     assert!(here || self.g.aim_at_zone(is), "{line}");
                 }
-                self.g.click();
+                self.g.harness_click();
                 self.act_frame();
             }
             "HAND" => {
@@ -466,7 +466,7 @@ impl Run {
                 assert!((j as i32) < n, "{line}: scrolling not handled");
                 self.g
                     .set_pointer(margin + 80 * j as i32 + 40, self.g.height() as i32 - 40);
-                self.g.click();
+                self.g.harness_click();
                 self.frame();
                 assert!(!self.g.inventory_open());
                 self.settle();
@@ -528,7 +528,7 @@ impl Run {
                     }
                 }
                 if left {
-                    self.g.click();
+                    self.g.harness_click();
                 } else {
                     self.g.right_click();
                 }

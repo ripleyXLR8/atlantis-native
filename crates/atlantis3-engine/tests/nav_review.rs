@@ -1,0 +1,398 @@
+//! The warp's navigation against the static reading of the original
+//! (atlantis3-gog-fr-3473408; atlantis3-cd-fr-3379200 has the same
+//! functions, `evidence/compare/cdfr_gog_pairs.tsv` of atlantis3-re): the
+//! fixes of the 2026-11-17 fidelity review, area a3-navigation
+//! (`audit/native-a3-review-2026-11-17/a3-navigation.md`).
+//!
+//! Needs the game: `ATLANTIS3_DATA`.
+
+use std::sync::Arc;
+
+use atlantis3_data::A3Files;
+use atlantis3_engine::audio::{CHANNEL_PLACE, CHANNEL_VOICE};
+use atlantis3_engine::{cross_colour, Game, Mode};
+
+/// Hoggar view 4 at `yaw` degrees, pitch 0, after one warp frame.
+fn hoggar_view_4(yaw: f32) -> Option<(Game, f64)> {
+    let dir = atlantis3_data::testing::install_dir()?;
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    assert!(g.board_begin("hoggar.wam", 1));
+    g.board_wam_setup();
+    let t = 100.0;
+    g.board_enter_at(4, yaw.to_radians(), 0.0, t);
+    let t = t + 0.04;
+    g.step(t);
+    assert_eq!(g.mode(), Mode::Warp);
+    Some((g, t))
+}
+
+/// An ARGB colour as an RGB565 surface stores it (truncated).
+fn rgb565(argb: u32) -> u16 {
+    let (r, g, b) = ((argb >> 16) & 0xff, (argb >> 8) & 0xff, argb & 0xff);
+    (((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3)) as u16
+}
+
+/// The nine pixels of the cross (@ 0x00440a6a..0x00440b6c).
+fn cross_pixels(g: &Game) -> Vec<u16> {
+    let (w, h) = (g.width(), g.height());
+    let (cx, cy) = (w / 2, h / 2);
+    let s = g.screen();
+    let mut out = Vec::new();
+    for k in 0..5 {
+        out.push(s[(cy + k - 2) * w + cx]);
+        out.push(s[cy * w + cx + k - 2]);
+    }
+    out
+}
+
+/// F6: 0x00440a30 draws the object in the hand (0x00428500 @ 0x00440a44)
+/// first, then the cross (0x004e9a00 @ 0x00440b1c / 0x00440b7b), then the
+/// zone's cursor: the cross shows over the object.
+#[test]
+fn the_cross_is_drawn_over_the_object_in_the_hand() {
+    // A yaw with no zone and no sprite under the centre: no zone cursor
+    // over the cross.
+    let mut found = None;
+    for yaw in (0..360).step_by(15) {
+        let Some((g, t)) = hoggar_view_4(yaw as f32) else {
+            return;
+        };
+        if g.centre_zone().is_none() {
+            found = Some((g, t));
+            break;
+        }
+    }
+    let (mut g, t) = found.expect("a yaw with no zone under the centre");
+    let empty = g.screen().to_vec();
+    let s = g.script_mut().unwrap();
+    let k = s.keys.objetenmain;
+    s.vars[k] = 1;
+    s.cursor_objects = true;
+    s.cursor_sprite = 0;
+    g.step(t + 0.04);
+    let held = g.screen().to_vec();
+    // The object is drawn around the centre.
+    let (w, h) = (g.width(), g.height());
+    let changed = (h / 2 - 8..h / 2 + 8)
+        .flat_map(|y| (w / 2 - 8..w / 2 + 8).map(move |x| y * w + x))
+        .filter(|&i| empty[i] != held[i])
+        .count();
+    assert!(changed > 20, "the object in the hand is drawn ({changed})");
+    let want = rgb565(cross_colour(None, false));
+    assert!(
+        cross_pixels(&g).iter().all(|&p| p == want),
+        "the cross over the object: {:04x?}",
+        cross_pixels(&g)
+    );
+}
+
+/// Runs warp frames of 0.04 s from `t` until view 5 is entered and the
+/// warp is back (at most 1000 frames); whether a travel video played.
+fn walk_to_view_5(g: &mut Game, mut t: f64) -> bool {
+    let mut travel = false;
+    for _ in 0..1000 {
+        t += 0.04;
+        g.step(t);
+        travel |= g.video_is_travel();
+        if g.place().1 == Some(5) && g.mode() == Mode::Warp {
+            return travel;
+        }
+    }
+    panic!("view 5 not reached");
+}
+
+/// F4: the double-click byte 0x007592bb is written only by a press
+/// (@ 0x004315b1 / 0x004315ec), the click that ends a travel video
+/// (@ 0x00422073) and `CINEMA` (@ 0x00448322). The second press of a
+/// double click on the move zone to view 5 comes during the turn; the byte
+/// is still set when the turn ends, and the completion starts no travel
+/// video (@ 0x00440242).
+#[test]
+fn a_double_click_on_a_move_skips_the_travel_video() {
+    let Some((mut g, t)) = hoggar_view_4(108.0) else {
+        return;
+    };
+    // The control: one press, the travel video plays.
+    g.click();
+    assert!(walk_to_view_5(&mut g, t), "a single click plays the video");
+
+    let (mut g, t) = hoggar_view_4(108.0).unwrap();
+    g.click();
+    let t = t + 0.04;
+    g.step(t);
+    assert!(g.turning());
+    g.click();
+    assert!(!walk_to_view_5(&mut g, t), "a double click skips it");
+
+    // Two presses 0.2 s or more apart are no double click.
+    let (mut g, t) = hoggar_view_4(108.0).unwrap();
+    g.click();
+    let mut t = t;
+    for _ in 0..6 {
+        t += 0.04;
+        g.step(t);
+    }
+    assert!(g.turning());
+    g.click();
+    assert!(walk_to_view_5(&mut g, t), "presses 0.24 s apart");
+}
+
+/// F7: the mouse callback moves and clamps the free pointer
+/// (0x007592b0 / 0x007592b4) in every mode except the warp while a move
+/// turns (@ 0x004313b7..0x00431444); the warp's Escape does not centre it
+/// and the menu draws its pointer from it.
+#[test]
+fn the_free_pointer_follows_the_mouse_in_the_warp() {
+    let Some((mut g, t)) = hoggar_view_4(108.0) else {
+        return;
+    };
+    g.set_pointer(400, 300);
+    g.mouse_motion(100, -50);
+    assert_eq!(g.pointer(), (500, 250));
+    g.mouse_motion(1000, 1000);
+    assert_eq!(g.pointer(), (799, 599));
+    g.mouse_motion(-30, -40);
+    assert_eq!(g.pointer(), (769, 559));
+    g.step(t + 0.04);
+    g.escape();
+    assert_eq!(g.mode(), Mode::Menu);
+    assert_eq!(
+        g.pointer(),
+        (769, 559),
+        "the menu's pointer where the warp left it"
+    );
+
+    // While a move turns the pointer stays.
+    let (mut g, t) = hoggar_view_4(108.0).unwrap();
+    g.set_pointer(400, 300);
+    g.click();
+    g.step(t + 0.04);
+    assert!(g.turning());
+    g.mouse_motion(100, 100);
+    assert_eq!(g.pointer(), (400, 300));
+}
+
+/// A looping sound on `ch` (as a place sound).
+fn play_on(g: &Game, ch: usize) {
+    g.audio
+        .play(ch, 22050, 1, Arc::new(vec![0; 2205]), true, [1.0, 1.0]);
+}
+
+/// F5: the warp's Escape stops every sound of the sound map (0x00433580
+/// @ 0x0042acff / 0x0042ad5c), every place sound with them, not only the
+/// first place channel.
+#[test]
+fn escape_stops_every_place_sound() {
+    let Some((mut g, _)) = hoggar_view_4(108.0) else {
+        return;
+    };
+    for ch in [CHANNEL_PLACE, CHANNEL_PLACE + 1, CHANNEL_VOICE - 1] {
+        play_on(&g, ch);
+    }
+    g.escape();
+    assert_eq!(g.mode(), Mode::Menu);
+    for ch in CHANNEL_PLACE..CHANNEL_VOICE {
+        assert!(!g.audio.is_playing(ch), "place channel {ch}");
+    }
+}
+
+/// A new game run to its first cinematic.
+fn first_cinematic() -> Option<(Game, f64)> {
+    let dir = atlantis3_data::testing::install_dir()?;
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    assert!(g.new_game());
+    let mut t = 0.0;
+    for _ in 0..20_000 {
+        t += 1.0 / 30.0;
+        g.step(t);
+        if g.mode() == Mode::Video && !g.video_is_travel() {
+            return Some((g, t));
+        }
+    }
+    panic!("no cinematic");
+}
+
+/// F8: Space or Escape in CryoMovie's loop of `AtlHnm_continue`
+/// (@ 0x00421e83..0x00421ebe) stops the film, then every sound object and
+/// place sound (0x00433580). The film's normal end does not.
+#[test]
+fn skipping_a_cinematic_stops_the_other_sounds() {
+    let Some((mut g, _)) = first_cinematic() else {
+        return;
+    };
+    play_on(&g, CHANNEL_PLACE);
+    play_on(&g, CHANNEL_PLACE + 1);
+    let film = g.video().map(|v| v.0.to_string());
+    g.skip();
+    // The film ended (the next one of the chain may start at once).
+    assert!(g.mode() != Mode::Video || g.video().map(|v| v.0.to_string()) != film);
+    assert!(!g.audio.is_playing(CHANNEL_PLACE));
+    assert!(!g.audio.is_playing(CHANNEL_PLACE + 1));
+
+    // The control: the film's end leaves them.
+    let (mut g, _) = first_cinematic().unwrap();
+    play_on(&g, CHANNEL_PLACE);
+    g.finish_video();
+    assert!(g.audio.is_playing(CHANNEL_PLACE));
+}
+
+/// Place `wam` of world `world` entered at `view` (no cube drawn), one
+/// warp frame run.
+fn place_at(wam: &str, world: i32, view: u32) -> Option<(Game, f64)> {
+    let dir = atlantis3_data::testing::install_dir()?;
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    g.flat_warp = true;
+    assert!(g.board_begin(wam, world));
+    let t = 100.0;
+    g.board_enter_at(view, 0.0, 0.0, t);
+    let t = t + 0.04;
+    g.step(t);
+    assert_eq!(g.mode(), Mode::Warp);
+    Some((g, t))
+}
+
+/// The files of the voices playing, sorted, lower case.
+fn voice_files(g: &Game) -> Vec<String> {
+    let mut v: Vec<String> = g
+        .test_place_voices()
+        .into_iter()
+        .map(|(_, f, _)| f.to_ascii_lowercase())
+        .collect();
+    v.sort();
+    v
+}
+
+/// F3: 0x00402590 starts an active source's first file only when none of
+/// its files plays, tested by name on the sound map that holds one sound
+/// per file (0x00433780; 0x00433280 plays that entry). CFuner's three
+/// torches name `2ta1_a.apc`: one voice, at `TorcheDroite` (the first in
+/// map order), as `place-sounds.md` of atlantis3-re works out for view 4.
+#[test]
+fn place_sounds_sharing_a_file_play_once() {
+    let Some((mut g, mut t)) = place_at("CFuner.wam", 1, 4) else {
+        return;
+    };
+    let v = g.test_place_voices();
+    assert_eq!(v.len(), 1, "{v:?}");
+    assert!(v[0].1.eq_ignore_ascii_case("2ta1_a.apc"), "{v:?}");
+    assert_eq!(v[0].2, [-16.0, -169.761, 164.0]);
+    // Frames later, still one voice; another CFuner view keeps it where it
+    // started (the map is rebuilt, the file is playing).
+    for _ in 0..10 {
+        t += 0.04;
+        g.step(t);
+    }
+    assert_eq!(g.test_place_voices().len(), 1);
+    g.board_enter_at(1, 0.0, 0.0, t);
+    t += 0.04;
+    g.step(t);
+    let v = g.test_place_voices();
+    assert_eq!(v.len(), 1, "{v:?}");
+    assert_eq!(v[0].2, [-16.0, -169.761, 164.0]);
+}
+
+/// F3: a new view's source whose file is not playing starts at once,
+/// while the previous view's voices end at their old positions (the view
+/// entry 0x00401f30 clears the map without stopping anything). LDMorts
+/// view 13 → 14: `waa_a` and `palmiers` play on, the torches' `2ta1_a`
+/// starts.
+#[test]
+fn a_new_views_place_sound_starts_at_once() {
+    let Some((mut g, mut t)) = place_at("LDMorts.wam", 2, 13) else {
+        return;
+    };
+    let before = voice_files(&g);
+    assert!(before.iter().any(|f| f.starts_with("waa_a")), "{before:?}");
+    let old = g.test_place_voices();
+    g.board_enter_at(14, 0.0, 0.0, t);
+    t += 0.04;
+    g.step(t);
+    let after = voice_files(&g);
+    assert!(after.iter().any(|f| f == "2ta1_a.apc"), "{after:?}");
+    for f in &before {
+        assert!(after.contains(f), "{f} still plays: {after:?}");
+    }
+    // One voice per file, the old ones where they started.
+    let mut dedup = after.clone();
+    dedup.dedup();
+    assert_eq!(dedup, after);
+    for (ch, f, p) in g.test_place_voices() {
+        if let Some(o) = old.iter().find(|o| o.0 == ch) {
+            assert_eq!((&o.1, o.2), (&f, p));
+        }
+    }
+}
+
+/// Place `wam` of world `world` with the view, among its views, whose
+/// place animations include a slot named `prefix...`, entered (a drawn
+/// warp frame); the slot forced shown, in mode 1, on frame 0.
+fn with_slot(wam: &str, world: i32, prefix: &str) -> Option<(Game, f64, String)> {
+    let dir = atlantis3_data::testing::install_dir()?;
+    let mut g = Game::new(A3Files::open_dir(&dir).unwrap().0).unwrap();
+    assert!(g.board_begin(wam, world));
+    let ids: Vec<u32> = g
+        .wam()
+        .places
+        .iter()
+        .flat_map(|p| p.views.iter().map(|v| v.id))
+        .collect();
+    let t = 100.0;
+    for id in ids {
+        g.board_enter_at(id, 0.0, 0.0, t);
+        let Some(k) = g
+            .test_slots_mut()
+            .slots
+            .iter()
+            .position(|s| s.name.starts_with(prefix))
+        else {
+            continue;
+        };
+        let s = &mut g.test_slots_mut().slots[k];
+        s.shown = true;
+        s.mode = 1;
+        s.frame = 0;
+        let name = s.name.clone();
+        return Some((g, t, name));
+    }
+    panic!("no {prefix} slot in {wam}");
+}
+
+/// F2: the sprite pass 0x00440bf0 calls 0x00439130 for every shown slot;
+/// a slot in mode 1 on frame 0 with no dialog loads and plays
+/// `sfx\<first 4 characters>.apc` when it exists, in 3D at the Coord
+/// `Perso` position of `Mid(0, 2) + Mid(7, 3)` in upper case (the Hoggar
+/// guard `g1A2005007` → `G1007`; the WAM's state letter is upper case, as
+/// the original's slots name it, `tests/golden/spwz_pick.txt`).
+#[test]
+fn a_place_animation_plays_its_sound_at_frame_0() {
+    let Some((mut g, t, name)) = with_slot("hoggar.wam", 1, "g1A2") else {
+        return;
+    };
+    assert!(name.ends_with("007"), "{name}");
+    assert_eq!(g.test_sfx_state("sfx\\g1A2.apc"), None);
+    g.step(t + 0.04);
+    let (pos, playing) = g.test_sfx_state("sfx\\g1A2.apc").expect("loaded");
+    assert!(playing);
+    assert_eq!(pos, Some([4227.7, -118.329, 945.123]));
+}
+
+/// F2: a `pd` name (the tower's demon pawns, named in lower case by the
+/// tower's C code @ 0x004d46e0) is placed at the view's Coord `Warp`
+/// position shifted by (300 k, 0, 100 k), k = 1 for the letter `a`
+/// (@ 0x00439427..0x004394e0); `pda2` draws no `rand()`.
+#[test]
+fn a_pd_animation_plays_beside_the_view() {
+    let Some((mut g, t, name)) = with_slot("TourMagi.wam", 3, "pda2") else {
+        return;
+    };
+    g.step(t + 0.04);
+    let view = g.place().1.unwrap();
+    let w = g.test_coord_warp(view).unwrap_or([0.0; 3]);
+    let (pos, playing) = g.test_sfx_state("sfx\\pda2.apc").expect("loaded");
+    assert!(playing, "{name}");
+    let pos = pos.expect("in 3D");
+    let want = [w[0] + 300.0, w[1], w[2] + 100.0];
+    for k in 0..3 {
+        assert!((pos[k] - want[k]).abs() < 0.01, "{pos:?} {want:?}");
+    }
+}

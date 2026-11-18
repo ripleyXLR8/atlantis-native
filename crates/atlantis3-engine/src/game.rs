@@ -36,6 +36,7 @@ use atlantis2_engine::place_sound::{sources, Source};
 use atlantis3_data::coord::Coord;
 use std::collections::{BTreeMap, HashMap};
 
+mod anim_sounds;
 mod board;
 mod carte2004;
 mod credits;
@@ -330,6 +331,12 @@ pub struct Game {
     coord: Coord,
     listener: [f32; 3],
     place_sounds: BTreeMap<String, Source>,
+    /// The place sounds playing, one per sound file (the sound map
+    /// 0x00759340 holds one CSM sound per name), on the channels
+    /// `CHANNEL_PLACE + k`: the file and the position it was started at.
+    place_voices: Vec<Option<(String, [f32; 3])>>,
+    /// The interdimension's swaying camera: its amplitude and phase.
+    sway: crate::sway::Sway,
     /// A dialog the port does not play: the waiting section goes on at the
     /// next warp frame, as after the dialog's end.
     resume_next: bool,
@@ -457,8 +464,9 @@ pub struct Game {
     #[doc(hidden)]
     pub story_sound_model: bool,
     /// Tests: the parts the whole-story harness stubs (the dialogs' set-up
-    /// and start, the place sounds' restarts) draw from a generator of
-    /// their own, leaving `rand` alone as the stubs do.
+    /// and start, the place sounds' restarts, the warp draw's sprite pass
+    /// with the place animations' sounds) draw from a generator of their
+    /// own or none, leaving `rand` alone as the stubs do.
     #[doc(hidden)]
     pub stub_rand: bool,
 }
@@ -598,6 +606,8 @@ impl Game {
             coord: Coord::default(),
             listener: [0.0; 3],
             place_sounds: BTreeMap::new(),
+            place_voices: vec![None; CHANNEL_VOICE - CHANNEL_PLACE],
+            sway: crate::sway::Sway::default(),
             pointer: (0, 0),
             prev_mode: Mode::Warp,
             inventory: Default::default(),
@@ -1171,7 +1181,8 @@ impl Game {
     }
 
     /// Space or Escape (`WM_KEYDOWN` in the cinematic's wait loop
-    /// @ 0x00421c5b): the cinematic stops. Travel videos ignore keys.
+    /// @ 0x00421c5b): the cinematic stops, every other sound with it.
+    /// Travel videos ignore keys.
     pub fn skip(&mut self) {
         // The 2004 program's keyboard callback: Escape (scan code 1) or
         // Space (0x39) in loop mode 5 sets 0x006e9e70 (@ 0x0042c504..
@@ -1181,6 +1192,11 @@ impl Game {
             return;
         }
         if self.video.as_ref().is_some_and(|v| !v.travel) {
+            // CryoMovie's loop of `AtlHnm_continue` on Space or Escape
+            // (@ 0x00421e83..0x00421ebe): the film stopped (0x006b8e30),
+            // then every sound object and place sound (0x00433580); the
+            // film's normal end does not.
+            self.sfx_stop_all();
             self.end_video();
         }
     }
@@ -1202,8 +1218,21 @@ impl Game {
             self.pointer.1 = (self.pointer.1 + dy).clamp(0, self.height as i32 - 1);
             return;
         }
+        // The sway amplitude in loop mode 3, turning or not
+        // (@ 0x004314a7..0x004314f1, [`crate::sway`]).
+        if self.mode == Mode::Warp && !self.files.is_evolution_2004() {
+            self.sway.mouse(self.camera.fpu, dx);
+        }
         if self.mode != Mode::Warp || self.moving.turn.is_some() {
             return;
+        }
+        // The free pointer follows the mouse in the warp too: the callback
+        // skips it only while a move turns or the demo runs (0x007812d4)
+        // (@ 0x004313b7..0x00431444); the in-game menu starts with it
+        // there (the warp's Escape does not centre it).
+        if !self.menus.demo {
+            self.pointer.0 = (self.pointer.0 + dx).clamp(0, self.width as i32 - 1);
+            self.pointer.1 = (self.pointer.1 + dy).clamp(0, self.height as i32 - 1);
         }
         self.look.mouse(self.camera.fpu, dx, dy);
         self.centre = self.pick_centre();
@@ -1222,8 +1251,18 @@ impl Game {
             self.menus.press();
         }
         self.click = true;
-        if self.last_press.is_some_and(|t| self.now - t < 0.2) {
-            self.double_click = true;
+        let quick = self.last_press.is_some_and(|t| self.now - t < 0.2);
+        if self.files.is_evolution_2004() {
+            if quick {
+                self.double_click = true;
+            }
+        } else {
+            // The press writes the double-click byte 0x007592bb: 0, then 1
+            // within 0.2 s of the previous press (@ 0x004315b1 /
+            // 0x004315ec). It keeps its value until the next press, the
+            // click that ends a travel video (@ 0x00422073) or `CINEMA`
+            // (@ 0x00448322): the only writers.
+            self.double_click = quick;
         }
         // The script reads the same flags (`Script::click`).
         if let Some(s) = self.script.as_mut() {
@@ -1231,6 +1270,17 @@ impl Game {
             s.double_click |= self.double_click;
         }
         self.last_press = Some(self.now);
+    }
+
+    /// Tests: a left press as the emulation harnesses make it (the click
+    /// byte 0x007592b8 set, not the press callback): never a double click,
+    /// however close to the previous press.
+    #[doc(hidden)]
+    pub fn harness_click(&mut self) {
+        self.click();
+        if !self.files.is_evolution_2004() {
+            self.double_click = false;
+        }
     }
 
     /// The free pointer (inventory, subject menu).
@@ -1447,7 +1497,7 @@ impl Game {
             s.click = false;
         }
         self.click = false;
-        self.double_click = false;
+        self.clear_double_click_2004();
         self.look_last = None;
     }
 
@@ -1474,7 +1524,7 @@ impl Game {
             s.click = false;
         }
         self.click = false;
-        self.double_click = false;
+        self.clear_double_click_2004();
         self.look_last = None;
     }
 
@@ -2061,6 +2111,17 @@ impl Game {
 
     // ---- the warp ------------------------------------------------------
 
+    /// The 2004 program's double-click flag cleared at the warp frame's
+    /// end and when a menu closes, as before. *Atlantis III* keeps its byte
+    /// 0x007592bb until the next press (see [`Game::click`]): a double
+    /// click during a move's turn still skips the travel video at the
+    /// completion (@ 0x00440242).
+    fn clear_double_click_2004(&mut self) {
+        if self.files.is_evolution_2004() {
+            self.double_click = false;
+        }
+    }
+
     /// `AtlWarp_continue` (@ 0x0043ff20).
     fn warp_frame(&mut self) {
         if std::mem::take(&mut self.resume_next) {
@@ -2130,7 +2191,7 @@ impl Game {
         // to enter waits for the warp.
         if !matches!(self.mode, Mode::Warp | Mode::Subjects) {
             self.click = false;
-            self.double_click = false;
+            self.clear_double_click_2004();
             self.right_clicked = false;
             if self.moving.pending && self.moving.next.is_none() {
                 self.complete_move();
@@ -2154,7 +2215,7 @@ impl Game {
         if self.moving.pending {
             self.complete_move();
         }
-        self.double_click = false;
+        self.clear_double_click_2004();
         // 8. `CLICZONE` = 0.
         if let Some(s) = self.script.as_mut() {
             let k = s.keys.cliczone;
@@ -2216,7 +2277,8 @@ impl Game {
 
     /// @ 0x004317a0: `dt` since the last step (at most 0.5 s) × 25 into the
     /// accumulator; per whole tick, a turn step or the look's inertia and
-    /// limits, and the 76° field of view; then the centre pick.
+    /// limits, and the 76° field of view (the sway in the interdimension);
+    /// then the centre pick.
     fn warp_step(&mut self) {
         let dt = match self.look_last {
             Some(t) => (self.now - t).min(0.5),
@@ -2245,11 +2307,16 @@ impl Game {
         // The 2004 program's turns inside the ship's node (FUN_00444920
         // and the camera node's own frame), while it is the camera's.
         let ship = self.files.is_evolution_2004() && self.ship.engaged();
+        // The interdimension's byte 0x007592ac.
+        let sway = self.puzzles.interdim.here && !self.files.is_evolution_2004();
         while self.look_acc >= 1.0 {
             self.look_acc -= 1.0;
             if let Some(turn) = self.moving.turn.as_mut() {
-                self.camera_fov = warp_fov(self.camera.fpu);
-                self.camera.set_fov(self.camera_fov, w, h);
+                // Not in the sway mode (@ 0x00431845).
+                if !sway {
+                    self.camera_fov = warp_fov(self.camera.fpu);
+                    self.camera.set_fov(self.camera_fov, w, h);
+                }
                 let step = if ship {
                     let mut c = crate::tangage::ShipCamera {
                         cam: &mut self.camera,
@@ -2271,8 +2338,7 @@ impl Game {
                 // under the camera lock; the speeds still decay and the
                 // limits are tested on the camera as it is.
                 self.look.frame_locked(&self.camera);
-                self.camera_fov = warp_fov(self.camera.fpu);
-                self.camera.set_fov(self.camera_fov, w, h);
+                self.warp_tick_fov(sway, false);
             } else if ship {
                 self.look.frame(&mut crate::tangage::ShipCamera {
                     cam: &mut self.camera,
@@ -2282,11 +2348,31 @@ impl Game {
                 self.camera.set_fov(self.camera_fov, w, h);
             } else {
                 self.look.frame(&mut self.camera);
-                self.camera_fov = warp_fov(self.camera.fpu);
-                self.camera.set_fov(self.camera_fov, w, h);
+                self.warp_tick_fov(sway, true);
             }
         }
         self.centre = self.pick_centre();
+    }
+
+    /// The end of a tick that does not turn: the 76° field of view, or in
+    /// the interdimension the sway branch (@ 0x004319b7..0x00431a8e,
+    /// [`crate::sway`]): its field of view and, unless the camera is
+    /// locked (`turn` false), its wobble.
+    fn warp_tick_fov(&mut self, sway: bool, turn: bool) {
+        let (w, h) = (self.width as u32, self.height as u32);
+        if sway {
+            let deg = self.sway.tick(&mut self.camera, turn);
+            self.camera_fov = dialog_fov(self.camera.fpu, deg);
+        } else {
+            self.camera_fov = warp_fov(self.camera.fpu);
+        }
+        self.camera.set_fov(self.camera_fov, w, h);
+    }
+
+    /// Tests: the sway's amplitude and phase.
+    #[doc(hidden)]
+    pub fn test_sway(&self) -> crate::sway::Sway {
+        self.sway
     }
 
     /// The zone under the screen centre (@ 0x00463310 = *Atlantis II*'s
@@ -2364,6 +2450,9 @@ impl Game {
         if self.slots.evolution {
             // FUN_00444e70 → FUN_00439fc0: the sounds before the sprites.
             self.anim_sounds_2004();
+        } else {
+            // The sprite pass @ 0x00440bf0 → 0x00439130 per shown slot.
+            self.anim_sounds_a3();
         }
         let sprites = self.slots.slots.iter().any(|s| s.shown);
         self.render_cube(&m, proj, sprites);
@@ -2446,6 +2535,26 @@ impl Game {
         }
     }
 
+    /// The cross (`Cursor`, @ 0x00440a6a..0x00440b6c): five pixels up and
+    /// across through the centre, coloured by the zone or green over a
+    /// place sprite.
+    fn draw_cross(&mut self, zone_kind: Option<i32>, sprite: bool) {
+        if !self.startup.config.cursor {
+            return;
+        }
+        let argb = cross_colour(zone_kind, sprite);
+        // Two lines of 0x004e9a00: the colour as the surface stores it
+        // (RGB565 truncated; x8r8g8b8 the ARGB value, alpha included).
+        let (cx, cy, w) = (self.width / 2, self.height / 2, self.width);
+        with_px!(&mut self.screen, s => {
+            let px = PagePixel::from_argb(argb);
+            for k in 0..5 {
+                s[(cy + k - 2) * w + cx] = px;
+                s[cy * w + cx + k - 2] = px;
+            }
+        });
+    }
+
     /// @ 0x00440a30 → @ 0x00428060: the cursor of the zone under the
     /// centre, centred on the screen's centre, animated at 15 frames a
     /// second of real time; none without a zone.
@@ -2455,25 +2564,14 @@ impl Game {
             .and_then(|i| self.place.wam.view(self.place.view?)?.zones.get(i))
             .map(|z| z.kind);
         let hit = self.cursor_hit;
-        if self.startup.config.cursor {
-            // The cross (`Cursor`, @ 0x00440a6a..0x00440b6c): five pixels
-            // up and across through the centre.
-            let argb = cross_colour(zone_kind, hit.is_some());
-            // Two lines of 0x004e9a00: the colour as the surface stores it
-            // (RGB565 truncated; x8r8g8b8 the ARGB value, alpha included).
-            let (cx, cy, w) = (self.width / 2, self.height / 2, self.width);
-            with_px!(&mut self.screen, s => {
-                let px = PagePixel::from_argb(argb);
-                for k in 0..5 {
-                    s[(cy + k - 2) * w + cx] = px;
-                    s[cy * w + cx + k - 2] = px;
-                }
-            });
-        }
-        // The object in the hand, centred on the screen (@ 0x00428500,
-        // `<World>ObjetsEnMain.SPR`), the zone's cursor over it; the 2004
-        // program's from its bag (FUN_00429780).
+        // The object in the hand first, centred on the screen (@ 0x00428500
+        // called @ 0x00440a44, `<World>ObjetsEnMain.SPR`), then the cross
+        // (@ 0x00440b1c / 0x00440b7b) and the zone's cursor over it; the
+        // 2004 program's from its bag (FUN_00429780).
         if self.files.is_evolution_2004() {
+            // The 2004 program's order as before: the cross, then its bag's
+            // object.
+            self.draw_cross(zone_kind, hit.is_some());
             self.draw_hand_2004();
         } else if let Some(sprite) = self
             .script
@@ -2495,6 +2593,9 @@ impl Game {
                     1.0,
                 );
             }
+        }
+        if !self.files.is_evolution_2004() {
+            self.draw_cross(zone_kind, hit.is_some());
         }
         // @ 0x00440b9f: the place sprite under the centre first (its
         // state's click kind, the cursor kind), else the zone (mode 0);
@@ -3028,15 +3129,97 @@ impl Game {
         }
     }
 
-    /// The place sounds of a warp frame (@ 0x004024b0): each active source
-    /// whose sound is silent starts its first file again (one `rand()`
-    /// drawn and dropped); the gains follow the listener. The original
-    /// hands the positions to DirectSound3D (minimum distance 100,
-    /// rolloff 1, the listener facing the camera's −Z, heights dropped);
-    /// here the gain is 100 / distance beyond 100 and the side's share of
-    /// the direction in the listener's frame pans it, DirectSound3D's own
-    /// panning law being Windows'.
+    /// Every place-sound channel stopped: the place sounds' part of the
+    /// stop of every sound (@ 0x00433580 walks the whole sound map
+    /// 0x00759340, where `AtlSound_LoadSfx` put the place sounds).
+    pub(crate) fn place_sounds_stop(&mut self) {
+        for ch in CHANNEL_PLACE..CHANNEL_VOICE {
+            self.audio.stop(ch);
+        }
+    }
+
+    /// The place sounds of a warp frame (@ 0x004024b0): in map order, each
+    /// active source none of whose files plays (0x00402590: 0x00433780 on
+    /// each file's name, the sound map holding one sound per name) draws
+    /// one `rand()` and starts its first file at its position
+    /// (0x00433280). So the objects of a view naming the same file share
+    /// one voice, started by the first of them (CFuner's three torches,
+    /// `2ta1_a.apc`, at `TorcheDroite`); a voice of the previous view goes
+    /// on at its old position until it ends, and the new view's other
+    /// files start at once on free channels. The gains follow the
+    /// listener. The original hands the positions to DirectSound3D
+    /// (minimum distance 100, rolloff 1, the listener facing the camera's
+    /// −Z, heights dropped); here the gain is 100 / distance beyond 100
+    /// and the side's share of the direction in the listener's frame pans
+    /// it, DirectSound3D's own panning law being Windows'.
     fn place_sounds_frame(&mut self) {
+        if self.files.is_evolution_2004() {
+            self.place_sounds_frame_2004();
+            return;
+        }
+        // The voices that ended free their channels.
+        for (k, v) in self.place_voices.iter_mut().enumerate() {
+            if v.is_some() && !self.audio.is_playing(CHANNEL_PLACE + k) {
+                *v = None;
+            }
+        }
+        let entries: Vec<Source> = self.place_sounds.values().cloned().collect();
+        for src in &entries {
+            let busy = src.files.iter().any(|f| {
+                self.place_voices
+                    .iter()
+                    .flatten()
+                    .any(|(v, _)| v.eq_ignore_ascii_case(f))
+            });
+            if busy {
+                continue;
+            }
+            if !self.stub_rand {
+                self.rand.rand();
+            }
+            let Some(first) = src.files.first() else {
+                continue;
+            };
+            let Some(k) = self.place_voices.iter().position(Option::is_none) else {
+                log::debug!("no free place channel for {first}");
+                continue;
+            };
+            if let Some((rate, chans, pcm)) = self.sound(&format!("sfx/{first}")) {
+                let gains = self.place_gains(src.pos);
+                self.audio
+                    .play(CHANNEL_PLACE + k, rate, chans, pcm, false, gains);
+                self.place_voices[k] = Some((first.clone(), src.pos));
+            }
+        }
+        for k in 0..self.place_voices.len() {
+            if let Some((_, pos)) = self.place_voices[k] {
+                let gains = self.place_gains(pos);
+                self.audio.set_gain(CHANNEL_PLACE + k, gains);
+            }
+        }
+        // The listener moved for the other 3D sounds too.
+        self.sfx_3d_gains();
+    }
+
+    /// Tests: the place sounds playing, by channel: the file and the
+    /// position it was started at.
+    #[doc(hidden)]
+    pub fn test_place_voices(&self) -> Vec<(usize, String, [f32; 3])> {
+        self.place_voices
+            .iter()
+            .enumerate()
+            .filter_map(|(k, v)| {
+                let (f, p) = v.as_ref()?;
+                self.audio
+                    .is_playing(CHANNEL_PLACE + k)
+                    .then(|| (CHANNEL_PLACE + k, f.clone(), *p))
+            })
+            .collect()
+    }
+
+    /// The left and right gains of a place sound at `pos` for the
+    /// listener as the camera turns it.
+    fn place_gains(&self, pos: [f32; 3]) -> [f32; 2] {
         let (yaw, pitch) = self.camera.angles();
         let (ps, pc) = (f64::from(pitch).sin(), f64::from(pitch).cos());
         let (ys, yc) = (f64::from(yaw).sin(), f64::from(yaw).cos());
@@ -3054,29 +3237,32 @@ impl Game {
             0.0,
             f64::from(self.listener[1]),
         ];
+        let d = [f64::from(pos[0]) - l[0], 0.0, f64::from(pos[1]) - l[2]];
+        let dist = (d[0] * d[0] + d[2] * d[2]).sqrt();
+        let att = if dist > 100.0 { 100.0 / dist } else { 1.0 };
+        let pan = if dist > 0.0 {
+            (d[0] * right[0] + d[2] * right[2]) / dist
+        } else {
+            0.0
+        };
+        let g = base * att as f32;
+        [
+            g * (1.0 - pan).min(1.0) as f32,
+            g * (1.0 + pan).min(1.0) as f32,
+        ]
+    }
+
+    /// The 2004 program's place sounds as before: the k-th active source
+    /// on the channel `CHANNEL_PLACE + k`, restarted when that channel is
+    /// silent, its gain set to the source's.
+    fn place_sounds_frame_2004(&mut self) {
         let entries: Vec<Source> = self.place_sounds.values().cloned().collect();
         for (k, src) in entries.iter().enumerate() {
             let ch = CHANNEL_PLACE + k;
             if ch >= CHANNEL_VOICE {
                 break;
             }
-            let d = [
-                f64::from(src.pos[0]) - l[0],
-                0.0,
-                f64::from(src.pos[1]) - l[2],
-            ];
-            let dist = (d[0] * d[0] + d[2] * d[2]).sqrt();
-            let att = if dist > 100.0 { 100.0 / dist } else { 1.0 };
-            let pan = if dist > 0.0 {
-                (d[0] * right[0] + d[2] * right[2]) / dist
-            } else {
-                0.0
-            };
-            let g = base * att as f32;
-            let gains = [
-                g * (1.0 - pan).min(1.0) as f32,
-                g * (1.0 + pan).min(1.0) as f32,
-            ];
+            let gains = self.place_gains(src.pos);
             if !self.audio.is_playing(ch) {
                 if !self.stub_rand {
                     self.rand.rand();
@@ -4707,6 +4893,8 @@ impl Host for Game {
     }
 
     fn play_cinema(&mut self, n: i32, fps: i32) -> bool {
+        // `CINEMA` clears the double-click byte (@ 0x00448322).
+        self.double_click = false;
         let world = self.world;
         let folder = WORLDS.get(world as usize).copied().unwrap_or("");
         let (video, subtitles) = atlantis3_data::cine_txt::cinema_names(n as u32);
