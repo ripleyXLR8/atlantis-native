@@ -19,6 +19,9 @@ app_log() {
 }
 
 adb wait-for-device
+# (root: the thread dump of a hang)
+adb root >/dev/null 2>&1 && sleep 3
+adb wait-for-device
 adb install -r "$apk" || exit 1
 adb logcat -c
 adb shell am start -W -n "$pkg/android.app.NativeActivity"
@@ -32,6 +35,16 @@ sleep 3
 adb shell am start -W -n "$pkg/android.app.NativeActivity"
 sleep 5
 adb exec-out screencap -p > "$out/screen-resumed.png"
+# Quick round trips, the first while the app is still starting (a hang
+# was once seen when its first window went away at once).
+for i in 1 2 3; do
+    adb shell input keyevent KEYCODE_HOME
+    sleep 1
+    adb shell am start -n "$pkg/android.app.NativeActivity" >/dev/null
+    sleep 1
+done
+sleep 4
+adb exec-out screencap -p > "$out/screen-round-trips.png"
 # A tap on the screen.
 adb shell input tap 500 300
 sleep 5
@@ -55,5 +68,5 @@ grep -q "ANR in $pkg\|timeout for ActivityRecord.*$pkg\|hang: " "$out/logcat-app
     fail "the app stopped answering"
 grep -q "No game found" "$out/logcat-app.txt" || fail "no 'No game found' line in the log"
 made=$(grep -c "resumed: window made" "$out/logcat-app.txt")
-[ "$made" -ge 2 ] || fail "the window was made $made times (2 expected: at the start, after the background)"
+[ "$made" -ge 5 ] || fail "the window was made $made times (5 expected: at the start, after each return)"
 echo "smoke test passed (pid $pid, then $pid2)"
