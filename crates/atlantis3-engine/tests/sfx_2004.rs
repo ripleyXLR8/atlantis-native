@@ -93,6 +93,78 @@ fn the_porthole_opening_sounds_at_its_first_frame() {
     assert!(!g.audio.is_playing(CHANNEL_SFX3D_2004 + 1));
 }
 
+/// The music update's sweep (FUN_00430380 @ 0x00430853): a sample that
+/// no longer plays is freed at the next 15 Hz update, and an ended place
+/// animation's sound gives its 3D channel back although its animation is
+/// not drawn again.
+#[test]
+fn ended_sounds_are_swept_and_their_3d_channels_freed() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    let a2 = g
+        .slots()
+        .slots
+        .iter()
+        .position(|s| s.name.eq_ignore_ascii_case("hua2001002"))
+        .expect("the opening");
+    let hua2 = format!("sfx\\{}.ogg", &g.slots().slots[a2].name[..4]);
+    let (id, kind) = (g.slots().slots[a2].id, g.slots().slots[a2].kind);
+    g.test_slots_mut().hide(id, kind, t);
+    g.test_slots_mut().show(id, kind, 2, t);
+    t += 0.01;
+    g.step(t);
+    assert_eq!(g.sfx_2004_state(&hua2), (true, true));
+    assert_eq!(g.sfx_2004_free_3d(), 3);
+    // Hidden at once: never drawn at frame 0 again, no film.
+    g.test_slots_mut().hide(id, kind, t);
+    let door = "sfx\\PORTE_FERME.wav";
+    g.run_command("(playsound=SON_PORTE_FERME)");
+    assert_eq!(g.sfx_2004_state(door), (true, true));
+    // Both end within 3 s (hua2.ogg about 1.3 s).
+    for _ in 0..75 {
+        t += 0.04;
+        g.step(t);
+    }
+    assert_eq!(g.sfx_2004_free_3d(), 4);
+    assert_eq!(g.sfx_2004_state(&hua2), (false, false));
+    assert_eq!(g.sfx_2004_state(door), (false, false));
+}
+
+/// Escape from the panorama (FUN_0042c560, mode 3) runs FUN_0042fb20: the
+/// `PLAYSOUND` channel and the four 3D channels stopped and freed as the
+/// in-game menu opens; the samples stay loaded.
+#[test]
+fn escape_to_the_menu_stops_the_effects() {
+    let Some((mut g, mut t)) = cabin() else {
+        return;
+    };
+    let a2 = g
+        .slots()
+        .slots
+        .iter()
+        .position(|s| s.name.eq_ignore_ascii_case("hua2001002"))
+        .expect("the opening");
+    let hua2 = format!("sfx\\{}.ogg", &g.slots().slots[a2].name[..4]);
+    let (id, kind) = (g.slots().slots[a2].id, g.slots().slots[a2].kind);
+    g.test_slots_mut().hide(id, kind, t);
+    g.test_slots_mut().show(id, kind, 2, t);
+    t += 0.01;
+    g.step(t);
+    let door = "sfx\\PORTE_FERME.wav";
+    g.run_command("(playsound=SON_PORTE_FERME)");
+    assert_eq!(g.sfx_2004_state(&hua2), (true, true));
+    assert_eq!(g.sfx_2004_state(door), (true, true));
+    assert!(g.audio.is_playing(CHANNEL_SOUND) && g.audio.is_playing(CHANNEL_SFX3D_2004));
+    g.escape();
+    assert_eq!(g.mode(), Mode::Menu);
+    assert!(!g.audio.is_playing(CHANNEL_SOUND));
+    assert!(!g.audio.is_playing(CHANNEL_SFX3D_2004));
+    assert_eq!(g.sfx_2004_free_3d(), 4);
+    assert_eq!(g.sfx_2004_state(&hua2), (true, false));
+    assert_eq!(g.sfx_2004_state(door), (true, false));
+}
+
 #[test]
 fn changecd_loads_the_disc_banks() {
     let Some((mut g, _)) = cabin() else { return };

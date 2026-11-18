@@ -968,6 +968,11 @@ pub enum Event {
     Quit,
     /// A volume setter ran (@ 0x004341c0.. @ 0x00434220).
     Volumes,
+    /// The 2004 options page's `SL_MUSIC` (`master` false) or `SL_MASTER`
+    /// dragged to `frame` (@ 0x0045a447, 0x0045a4ec): the float volume
+    /// `frame × 6.6666665` stored under the x87's rounding of the moment
+    /// ([`crate::menu::evolution::slider_volume_2004`]).
+    Volume2004 { master: bool, frame: i32 },
     /// An option changed at once (smoothing, crosshair, mouse Y, subtitles,
     /// texture size).
     Options,

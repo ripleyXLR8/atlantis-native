@@ -49,6 +49,23 @@ pub const LOAD_SLOTS: i32 = 4;
 const SLIDER_OF_VOLUME: f32 = 0.15;
 const VOLUME_OF_SLIDER: f32 = 6.666_666_5;
 
+/// The music or master volume of a slider frame (@ 0x0045a447..0x0045a454,
+/// 0x0045a4ec..0x0045a4f9: `fild frame; fmul [6.6666665f]; fstp float`):
+/// the exact product rounded to a float by the x87's rounding of the
+/// moment (to nearest under the process's 0x027f, toward zero under the
+/// 0x0e7f the first warp frame leaves).
+pub fn slider_volume_2004(frame: i32, fpu: atlantis2_engine::Fpu) -> f32 {
+    fpu.f32(f64::from(frame) * f64::from(VOLUME_OF_SLIDER))
+}
+
+/// The voices or effects volume of a slider frame (@ 0x0045a301..0x0045a30d,
+/// 0x0045a3a4..0x0045a3b0: `fild; fmul [6.6666665f]; _ftol`): the exact
+/// product truncated (frames 3, 6, 9, 12 give 19, 39, 59, 79), the setter
+/// clamping it to 0..99 (FUN_00430bc0, FUN_00430b90).
+pub fn slider_level_2004(frame: i32) -> i32 {
+    ftol(f64::from(frame) * f64::from(VOLUME_OF_SLIDER)).clamp(0, 99)
+}
+
 impl Menus {
     /// Page 0 (FUN_00457850): hover, click, element pass, FUN_00431d10(0);
     /// nothing more while the sub-state is not 0. A click on `BT_LOAD<n>`:
@@ -325,8 +342,8 @@ impl Menus {
     /// effects: integers; music, master: floats), sub-state 1 and the
     /// tooltips on, then on in the same frame. Sub-state 1: hover, drag,
     /// click, element pass; a dragged slider sets its volume to `frame ×
-    /// 6.6666665` (`ftol` for voices and effects; the setters clamp to
-    /// 0..99) and returns; `BT_BACK` → page 1 (its tooltip element
+    /// 6.6666665` (voices and effects: [`slider_level_2004`]; music and
+    /// master: floats, [`Event::Volume2004`]) and returns; `BT_BACK` → page 1 (its tooltip element
     /// cleared); then the pressed bytes and click flags cleared.
     pub(super) fn page_volumes_2004(&mut self, env: &mut Env<'_>, ev: &mut Vec<Event>) {
         const SLIDERS: [&[u8]; 4] = [b"SL_VOICE", b"SL_SFX", b"SL_MUSIC", b"SL_MASTER"];
@@ -353,13 +370,18 @@ impl Menus {
                 let it = &self.get(PAGE_VOLUMES).unwrap().items[d];
                 (it.el.nomref.clone(), it.frame)
             };
-            let v = ftol(f64::from(f as f32 * VOLUME_OF_SLIDER)).clamp(0, 99);
             let cfg = &mut *env.config;
             match name.as_slice() {
-                b"SL_VOICE" => cfg.voices_volume = v,
-                b"SL_SFX" => cfg.sfx_volume = v,
-                b"SL_MUSIC" => cfg.music_volume = v,
-                b"SL_MASTER" => cfg.global_volume = v,
+                b"SL_VOICE" => cfg.voices_volume = slider_level_2004(f),
+                b"SL_SFX" => cfg.sfx_volume = slider_level_2004(f),
+                b"SL_MUSIC" => ev.push(Event::Volume2004 {
+                    master: false,
+                    frame: f,
+                }),
+                b"SL_MASTER" => ev.push(Event::Volume2004 {
+                    master: true,
+                    frame: f,
+                }),
                 _ => return,
             }
             ev.push(Event::Volumes);
@@ -556,5 +578,23 @@ mod tests {
         assert_eq!(ftol(f64::from(99.0f32 * SLIDER_OF_VOLUME)), 14);
         assert_eq!(ftol(f64::from(14.0f32 * VOLUME_OF_SLIDER)), 93);
         assert_eq!(ftol(f64::from(0.0f32 * VOLUME_OF_SLIDER)), 0);
+    }
+
+    /// The x87 keeps `frame × 6.6666665` exact: voices and effects truncate
+    /// it, music and master store it as a float under the rounding of the
+    /// moment.
+    #[test]
+    fn the_slider_volumes_are_the_x87_products() {
+        use atlantis2_engine::Fpu;
+        let levels: Vec<i32> = (0..16).map(slider_level_2004).collect();
+        assert_eq!(
+            levels,
+            [0, 6, 13, 19, 26, 33, 39, 46, 53, 59, 66, 73, 79, 86, 93, 99]
+        );
+        assert_eq!(slider_volume_2004(1, Fpu::Double), 6.666_666_5);
+        assert_eq!(slider_volume_2004(3, Fpu::Double), 20.0);
+        assert_eq!(slider_volume_2004(3, Fpu::Chop), 19.999_998);
+        assert_eq!(slider_volume_2004(5, Fpu::Chop), 33.333_332);
+        assert_eq!(slider_volume_2004(15, Fpu::Double), 100.0);
     }
 }

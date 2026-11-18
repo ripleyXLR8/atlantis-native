@@ -63,6 +63,8 @@ pub struct Game {
     pub table: Option<RgbTable>,
     pub warp: Option<Warp>,
     pub view: View,
+    /// The view's inertia after a drag (`GameWarp+0x3610..+0x3618`).
+    pub inertia: crate::view::Inertia,
     /// The camera's field of view (`camera+0xb8`), radians.
     pub fov: f32,
     /// The window's height (the `HD` definition, hence the FOV).
@@ -71,6 +73,9 @@ pub struct Game {
     pub now_ms: f64,
     /// The global marker flag (`App+0x86b0`, the options' `PermanentHelp`).
     pub markers_shown: bool,
+    /// `helpButton` shown in this game (`PermanentHelp` off at
+    /// `Game::enter`).
+    pub help_button: bool,
     /// The options' `InverseLook` (`App+0x86b1`): the mouse look inverted.
     pub inverse_look: bool,
     /// The bilinear weights' precision of the drawing.
@@ -239,10 +244,12 @@ impl Game {
             table,
             warp: None,
             view: View::default(),
+            inertia: crate::view::Inertia::default(),
             fov: fov_for_height(height),
             height,
             now_ms: 0.0,
             markers_shown: true,
+            help_button: false,
             inverse_look: false,
             weights: Weights::Exact,
             trace: None,
@@ -618,6 +625,9 @@ impl Game {
             .as_mut()
             .map(|w| w.update(now_ms))
             .unwrap_or_default();
+        // The view's velocity curves are animations of the same update
+        // (`0x004f5950`), before the view's (`0x0052ab40`).
+        self.inertia.update_curves(now_ms);
         let mut c = Ctx {
             files: &self.files,
             sounds: &mut self.sounds,
@@ -632,6 +642,20 @@ impl Game {
             }
         }
         finished
+    }
+
+    /// The view update at `now_us` (`0x0052ab40`), not while `game+0x4038`
+    /// is clear (a movie, `FinishGame`): with the button up, a drag in
+    /// progress ends at the pointer's `speed` (@ 0x0052ac0e); then the
+    /// inertia's step (`0x0052ae0a..0x0052ae62`).
+    pub fn view_update(&mut self, now_us: u64, held: bool, speed: (i32, i32)) {
+        if self.movie.is_some() || self.planks.is_some() {
+            return;
+        }
+        if !held {
+            self.inertia.release(speed, self.inverse_look, now_us);
+        }
+        self.inertia.coast(&mut self.view, now_us);
     }
 
     /// The Lua callbacks the dialogs raised in the last update

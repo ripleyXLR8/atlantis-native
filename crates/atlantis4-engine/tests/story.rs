@@ -595,6 +595,11 @@ impl Player {
             if g.gui().notify_hit(W, H, fx, fy) {
                 return false;
             }
+            // The HUD's buttons (the edge strips, `helpButton`) take a
+            // click there before the warp, as in the original.
+            if g.hud_takes_release(W, H, fx, fy) {
+                return false;
+            }
             g.click(W, H, x, y).as_deref() == Some(target)
         };
         for p in points {

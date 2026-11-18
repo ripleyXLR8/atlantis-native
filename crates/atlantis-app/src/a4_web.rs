@@ -225,6 +225,7 @@ pub fn start(
         down: None,
         gui_down: false,
         last: (0.0, 0.0),
+        moves: atlantis4_engine::view::MoveHistory::default(),
         size: (WIDTH, HEIGHT),
         next_frame: Instant::now(),
         shown: None,

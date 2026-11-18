@@ -84,6 +84,13 @@ pub const NOTIFY_LUA: &str = "GUI/Notify.lua";
 pub const DIARY_LUA: &str = "Diary/DiaryGUI.lua";
 /// The HUD button's sound (0x00524cc0).
 pub const HUD_SOUND: &str = "Sounds/SFX/ChoixMenu.wav";
+
+/// `helpButton`'s click sound (@ 0x005b87d8, played at 1.0 @ 0x00523bd7).
+pub const HELP_SOUND: &str = "Sounds/SFX/Clic_prec-suiv.wav";
+
+/// `InGame.lua`'s edge strips (`Percent` 1.0 × 0.005 or 0.005 × 1.0, just
+/// outside each edge).
+pub const EDGE_BUTTONS: [&str; 4] = ["upButton", "downButton", "leftButton", "rightButton"];
 /// The notification's text before the name (0x005284e0).
 pub const NOTIFY_FORMAT: &str = "<section style=\"center\" /><color r=\"0\" g=\"0\" b=\"0\"/><font file=\"Common/Fonts/Arial_r_16.tef\" />";
 /// An object's picture (0x004107f0: `Inventory/Objects/` + id + `.png`).
@@ -113,6 +120,14 @@ pub enum Target {
     /// The inventory's background, an empty slot: swallowed.
     Inventory,
     Hud,
+    /// `InGame.lua`'s `upButton`, `downButton`, `leftButton`,
+    /// `rightButton`: strips along the window's edges with no handler,
+    /// which still take the presses and releases on them.
+    Edge,
+    /// `InGame.lua`'s `helpButton` (every attribute commented out: 1 × 1
+    /// at the window's centre), shown when `PermanentHelp` was off at
+    /// `Game::enter`.
+    Help,
 }
 
 /// What a validated click asks the game to do.
@@ -120,6 +135,9 @@ pub enum Target {
 pub enum Action {
     /// Play this sound once at 1.0 (a validation sound, a handler's).
     Sound(String),
+    /// `helpButton`'s handler (`0x00523b30`): the current node's markers
+    /// shown (`0x004f4ba0(warp, 1)`) until the next `ChangeWarp`.
+    ShowMarkers,
     OpenMenu,
     CloseMenu,
     HideInventory,
@@ -176,6 +194,9 @@ pub struct Screens {
     pub inventory_shown: bool,
     /// `App+0x7a10`: the warp takes input.
     pub warp_input: bool,
+    /// `helpButton` is shown: `Game::enter` hides it when `PermanentHelp`
+    /// is on (`App+0x86b0 == 1` @ 0x00528fb7..0x00529021).
+    pub help_button: bool,
     /// The flag saved by the inventory's opening (`+0x814`).
     saved_input: bool,
     /// `dragThreshold` (`InventoryObject.lua`).
@@ -233,6 +254,7 @@ impl Screens {
             menu_shown: false,
             inventory_shown: false,
             warp_input: true,
+            help_button: false,
             saved_input: true,
             drag_threshold: 25.0,
             text_format: String::new(),
@@ -489,7 +511,44 @@ impl Screens {
         {
             return Some(Target::Hud);
         }
+        if self.help_button
+            && Self::rect_of(&self.in_game, "helpButton", width, height)
+                .is_some_and(|r| r.contains(x, y))
+        {
+            return Some(Target::Help);
+        }
+        // Visible buttons without a handler (nothing looks them up by
+        // name): the press handler `0x004e5030` and the validation
+        // `0x004e52c0` still consume what hits them, before the warp's
+        // handlers (priority -1000.0 @ 0x005296a0, 0x0052963f).
+        if EDGE_BUTTONS.iter().any(|name| {
+            Self::rect_of(&self.in_game, name, width, height).is_some_and(|r| r.contains(x, y))
+        }) {
+            return Some(Target::Edge);
+        }
         None
+    }
+
+    /// Whether a release at (`x`, `y`) falls on one of the HUD's buttons
+    /// (the inventory button, an edge strip): their validation
+    /// (`0x004e52c0`) consumes any release on them, pressed there or not,
+    /// so the warp's mouse-up does not see it.
+    #[allow(clippy::too_many_arguments)]
+    pub fn hud_takes_release(
+        &mut self,
+        inv: &Inventory,
+        doc_shown: bool,
+        in_movie: bool,
+        width: u32,
+        height: u32,
+        x: f64,
+        y: f64,
+    ) -> bool {
+        self.layout(width, height);
+        matches!(
+            self.target(inv, doc_shown, in_movie, width, height, x, y),
+            Some(Target::Hud | Target::Edge | Target::Help)
+        )
     }
 
     /// A press: whether a screen took it.
@@ -607,7 +666,13 @@ impl Screens {
                 out.extend(sound(&self.documents, "zoomed"));
                 out.push(Action::ZoomedClicked);
             }
-            Target::Notify | Target::Inventory => {}
+            Target::Help => {
+                // `0x00523b30`: the sound (in no install: silent), then
+                // the markers.
+                out.push(Action::Sound(HELP_SOUND.to_string()));
+                out.push(Action::ShowMarkers);
+            }
+            Target::Notify | Target::Inventory | Target::Edge => {}
         }
         (out, took)
     }

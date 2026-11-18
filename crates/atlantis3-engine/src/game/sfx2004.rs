@@ -18,7 +18,11 @@
 //!   at `ftol(ftol(G · 0.01 · SFXVolume) · k)` — **no 2.55**;
 //! - `IsPlaying` (FUN_0042ffd0): a 3D sound that stopped frees its channel
 //!   there; `Stop` (FUN_0042fc70), `RemoveSfx` (FUN_0042fdd0: stop, then
-//!   the sample freed).
+//!   the sample freed);
+//! - the music update's sweep (FUN_00430380 @ 0x00430853..): at each
+//!   15 Hz update every sample loaded with loop 0 is polled with
+//!   `IsPlaying` (freeing an ended 3D sound's channel) and, when it does
+//!   not play, freed and taken out of the map.
 //!
 //! Port: the samples are the CD's Ogg files decoded whole by the
 //! workspace's Vorbis decoder; FMOD's volume 0..255 is the gain `v / 255`
@@ -358,6 +362,57 @@ impl Game {
                 self.stop_sfx_2004(&p);
             }
         }
+    }
+
+    /// FUN_0042fb20, the Escape from the panorama's (FUN_0042c560's mode-3
+    /// case, @ 0x0042c5ba before the menu's set-up and @ 0x0042c618
+    /// after it), with the sound on: `FSOUND_StopSound(6)` and `(7)`
+    /// (@ 0x0042fb4b..0x0042fb54), then for each busy 3D channel its
+    /// sample's channel index := −1, the FMOD channel stopped, the channel
+    /// freed (busy 0, name cleared, channel −1). The samples stay loaded.
+    pub(crate) fn stop_all_sfx_2004(&mut self) {
+        if !self.music2004.enabled {
+            return;
+        }
+        self.audio.stop(CHANNEL_SOUND);
+        self.audio.stop(CHANNEL_VOICE);
+        self.sfx2004.ends = [None; 2];
+        for k in 0..SFX3D_SLOTS {
+            if self.sfx2004.slots[k].take().is_none() {
+                continue;
+            }
+            for s in self.sfx2004.samples.values_mut() {
+                if s.slot == Some(k) {
+                    s.slot = None;
+                }
+            }
+            self.audio.stop(CHANNEL_SFX3D_2004 + k);
+        }
+    }
+
+    /// The end of the music update (FUN_00430380 @ 0x00430853..0x00430b7b,
+    /// after the couches, at each 15 Hz update with the sound on): for
+    /// each sample of the map whose loop byte (+0x3c) is 0, `IsPlaying`
+    /// (FUN_0042ffd0, which frees an ended 3D sound's channel), and when
+    /// it does not play `FSOUND_Sample_Free` and the node erased
+    /// (FUN_00434b40). Every sample Native loads has loop 0 (`PLAYSOUND`
+    /// and the place animations; the looping `AtlBruitages` files have no
+    /// data on the CD and are not ported).
+    pub(crate) fn sweep_sfx_2004(&mut self) {
+        // The map's order (keys compared as strings).
+        let mut paths: Vec<String> = self.sfx2004.samples.keys().cloned().collect();
+        paths.sort();
+        for p in paths {
+            if !self.sfx_playing_2004(&p) {
+                self.sfx2004.samples.remove(&p);
+            }
+        }
+    }
+
+    /// Tests: the free 3D channels.
+    #[doc(hidden)]
+    pub fn sfx_2004_free_3d(&self) -> usize {
+        self.sfx2004.slots.iter().filter(|s| s.is_none()).count()
     }
 
     /// Tests: whether an `AtlSound` path's sample is loaded and plays.

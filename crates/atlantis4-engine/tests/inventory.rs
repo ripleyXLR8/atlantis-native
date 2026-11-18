@@ -142,6 +142,87 @@ fn the_screens_are_laid_out_from_the_files() {
     assert!(b.width > 10.0 && b.height > 10.0);
 }
 
+/// `InGame.lua`'s edge strips (`upButton`, `downButton`, `leftButton`,
+/// `rightButton`): visible buttons with no handler that take the presses
+/// and releases within a few pixels of each edge, so the view neither
+/// turns nor clicks there.
+#[test]
+fn the_hud_edge_strips_take_the_presses_at_the_edges() {
+    let Some(dir) = install() else { return };
+    let (files, _) = A4Files::open_dir(&dir).unwrap();
+    let lang = files.language();
+    let mut s = Screens::load(&files, &lang);
+    let inv = atlantis4_engine::inventory::Inventory::new(&Screens::slots(&s.inventory));
+    let mut taken = |x: f64, y: f64| {
+        let t = s.press(&inv, false, false, W, H, x, y);
+        let (actions, took) = s.release(&inv, false, false, W, H, x, y);
+        assert!(actions.is_empty(), "{x},{y}: {actions:?}");
+        assert_eq!(t, took);
+        t
+    };
+    // 0.005 of the window: rows 0..2 and 765..767, columns 0..5 and
+    // 1360..1364 (the right strip starts at 1365 × 1.001 − 6.825).
+    for (x, y) in [
+        (683.0, 0.0),
+        (683.0, 2.5),
+        (683.0, 767.0),
+        (683.0, 765.0),
+        (0.0, 384.0),
+        (5.0, 384.0),
+        (1364.0, 384.0),
+        (1360.0, 384.0),
+    ] {
+        assert!(taken(x, y), "{x},{y}");
+    }
+    for (x, y) in [
+        (683.0, 3.5),
+        (683.0, 764.0),
+        (7.0, 384.0),
+        (1357.0, 384.0),
+        (683.0, 384.0),
+    ] {
+        assert!(!taken(x, y), "{x},{y}");
+    }
+    assert!(s.hud_takes_release(&inv, false, false, W, H, 683.0, 0.0));
+    assert!(!s.hud_takes_release(&inv, false, false, W, H, 683.0, 100.0));
+}
+
+/// `helpButton` (1 × 1 at the window's centre, every attribute commented
+/// out) is there only when `PermanentHelp` was off at `Game::enter`: a
+/// click on it plays its (missing) sound and shows the node's markers.
+#[test]
+fn the_help_button_shows_the_markers_when_permanent_help_is_off() {
+    let Some(dir) = install() else { return };
+    let (files, _) = A4Files::open_dir(&dir).unwrap();
+    let lang = files.language();
+    let mut s = Screens::load(&files, &lang);
+    let inv = atlantis4_engine::inventory::Inventory::new(&Screens::slots(&s.inventory));
+    let mut hits = Vec::new();
+    for on in [false, true] {
+        s.help_button = on;
+        for y in 380..388 {
+            for x in 678..688 {
+                let (x, y) = (f64::from(x) + 0.5, f64::from(y) + 0.5);
+                if s.press(&inv, false, false, W, H, x, y) {
+                    let (actions, _) = s.release(&inv, false, false, W, H, x, y);
+                    hits.push((on, x, y, actions));
+                } else {
+                    s.release(&inv, false, false, W, H, x, y);
+                }
+            }
+        }
+    }
+    use atlantis4_engine::screens::{Action as GuiAction, HELP_SOUND};
+    let want = vec![
+        GuiAction::Sound(HELP_SOUND.to_string()),
+        GuiAction::ShowMarkers,
+    ];
+    assert_eq!(hits.len(), 1, "{hits:?}");
+    assert!(hits[0].0);
+    assert_eq!(hits[0].3, want);
+    println!("helpButton pixel: {:?}", (hits[0].1, hits[0].2));
+}
+
 #[test]
 fn every_object_and_document_of_the_scripts_is_known() {
     let Some(dir) = install() else { return };

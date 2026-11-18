@@ -35,7 +35,10 @@ impl Game {
             self.documents = documents::Documents::new(&Screens::slots(&s.documents));
             self.screens = Some(s);
         }
-        self.screens.as_mut().expect("screens")
+        let help = self.help_button;
+        let s = self.screens.as_mut().expect("screens");
+        s.help_button = help;
+        s
     }
 
     /// The engine clock now, µs.
@@ -151,6 +154,23 @@ impl Game {
             .press(inventory, doc, movie, width, height, x, y)
     }
 
+    /// Whether a release at (`x`, `y`) falls on a HUD button, which
+    /// consumes it before the warp's mouse-up ([`Screens::hud_takes_release`]).
+    pub fn hud_takes_release(&mut self, width: u32, height: u32, x: f64, y: f64) -> bool {
+        if !self.warp_takes_input() {
+            return false;
+        }
+        let (doc, movie) = (self.documents.shown.is_some(), self.movie.is_some());
+        self.gui();
+        let Game {
+            screens, inventory, ..
+        } = self;
+        screens
+            .as_mut()
+            .expect("screens")
+            .hud_takes_release(inventory, doc, movie, width, height, x, y)
+    }
+
     /// The pointer moved to (`x`, `y`) with the button held.
     pub fn gui_drag(&mut self, x: f64, y: f64) {
         if let Some(s) = self.screens.as_mut() {
@@ -182,6 +202,11 @@ impl Game {
         log::info!("GUI: {a:?}");
         match a {
             Action::Sound(p) => self.sounds.play_free_sound(&self.files, &p, 1.0),
+            Action::ShowMarkers => {
+                if let Some(w) = self.warp.as_mut() {
+                    w.markers_shown = true;
+                }
+            }
             Action::OpenMenu => {
                 let Game {
                     screens, inventory, ..
