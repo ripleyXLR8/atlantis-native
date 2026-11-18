@@ -65,7 +65,11 @@ It does:
   If Android destroys the activity while it is in the background (low
   memory, or "Don't keep activities" in the developer options), the app
   closes. The game then starts again from its last checkpoint, as after a
-  restart of the desktop build.
+  restart of the desktop build. The same happens when Android relaunches the
+  activity for a change that no manifest flag can declare. The emulator
+  in CI does this sometimes on the first start after an install (a
+  relaunch for the package's new resource paths): the app closes and has
+  to be started again.
 
 It does not yet:
 - pick a game folder elsewhere (the Storage Access Framework);
