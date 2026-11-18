@@ -335,6 +335,8 @@ pub struct Game {
     /// 0x00759340 holds one CSM sound per name), on the channels
     /// `CHANNEL_PLACE + k`: the file and the position it was started at.
     place_voices: Vec<Option<(String, [f32; 3])>>,
+    /// The interdimension's swaying camera: its amplitude and phase.
+    sway: crate::sway::Sway,
     /// A dialog the port does not play: the waiting section goes on at the
     /// next warp frame, as after the dialog's end.
     resume_next: bool,
@@ -605,6 +607,7 @@ impl Game {
             listener: [0.0; 3],
             place_sounds: BTreeMap::new(),
             place_voices: vec![None; CHANNEL_VOICE - CHANNEL_PLACE],
+            sway: crate::sway::Sway::default(),
             pointer: (0, 0),
             prev_mode: Mode::Warp,
             inventory: Default::default(),
@@ -1214,6 +1217,11 @@ impl Game {
             self.pointer.0 = (self.pointer.0 + dx).clamp(0, self.width as i32 - 1);
             self.pointer.1 = (self.pointer.1 + dy).clamp(0, self.height as i32 - 1);
             return;
+        }
+        // The sway amplitude in loop mode 3, turning or not
+        // (@ 0x004314a7..0x004314f1, [`crate::sway`]).
+        if self.mode == Mode::Warp && !self.files.is_evolution_2004() {
+            self.sway.mouse(self.camera.fpu, dx);
         }
         if self.mode != Mode::Warp || self.moving.turn.is_some() {
             return;
@@ -2269,7 +2277,8 @@ impl Game {
 
     /// @ 0x004317a0: `dt` since the last step (at most 0.5 s) × 25 into the
     /// accumulator; per whole tick, a turn step or the look's inertia and
-    /// limits, and the 76° field of view; then the centre pick.
+    /// limits, and the 76° field of view (the sway in the interdimension);
+    /// then the centre pick.
     fn warp_step(&mut self) {
         let dt = match self.look_last {
             Some(t) => (self.now - t).min(0.5),
@@ -2298,11 +2307,16 @@ impl Game {
         // The 2004 program's turns inside the ship's node (FUN_00444920
         // and the camera node's own frame), while it is the camera's.
         let ship = self.files.is_evolution_2004() && self.ship.engaged();
+        // The interdimension's byte 0x007592ac.
+        let sway = self.puzzles.interdim.here && !self.files.is_evolution_2004();
         while self.look_acc >= 1.0 {
             self.look_acc -= 1.0;
             if let Some(turn) = self.moving.turn.as_mut() {
-                self.camera_fov = warp_fov(self.camera.fpu);
-                self.camera.set_fov(self.camera_fov, w, h);
+                // Not in the sway mode (@ 0x00431845).
+                if !sway {
+                    self.camera_fov = warp_fov(self.camera.fpu);
+                    self.camera.set_fov(self.camera_fov, w, h);
+                }
                 let step = if ship {
                     let mut c = crate::tangage::ShipCamera {
                         cam: &mut self.camera,
@@ -2324,8 +2338,7 @@ impl Game {
                 // under the camera lock; the speeds still decay and the
                 // limits are tested on the camera as it is.
                 self.look.frame_locked(&self.camera);
-                self.camera_fov = warp_fov(self.camera.fpu);
-                self.camera.set_fov(self.camera_fov, w, h);
+                self.warp_tick_fov(sway, false);
             } else if ship {
                 self.look.frame(&mut crate::tangage::ShipCamera {
                     cam: &mut self.camera,
@@ -2335,11 +2348,31 @@ impl Game {
                 self.camera.set_fov(self.camera_fov, w, h);
             } else {
                 self.look.frame(&mut self.camera);
-                self.camera_fov = warp_fov(self.camera.fpu);
-                self.camera.set_fov(self.camera_fov, w, h);
+                self.warp_tick_fov(sway, true);
             }
         }
         self.centre = self.pick_centre();
+    }
+
+    /// The end of a tick that does not turn: the 76° field of view, or in
+    /// the interdimension the sway branch (@ 0x004319b7..0x00431a8e,
+    /// [`crate::sway`]): its field of view and, unless the camera is
+    /// locked (`turn` false), its wobble.
+    fn warp_tick_fov(&mut self, sway: bool, turn: bool) {
+        let (w, h) = (self.width as u32, self.height as u32);
+        if sway {
+            let deg = self.sway.tick(&mut self.camera, turn);
+            self.camera_fov = dialog_fov(self.camera.fpu, deg);
+        } else {
+            self.camera_fov = warp_fov(self.camera.fpu);
+        }
+        self.camera.set_fov(self.camera_fov, w, h);
+    }
+
+    /// Tests: the sway's amplitude and phase.
+    #[doc(hidden)]
+    pub fn test_sway(&self) -> crate::sway::Sway {
+        self.sway
     }
 
     /// The zone under the screen centre (@ 0x00463310 = *Atlantis II*'s

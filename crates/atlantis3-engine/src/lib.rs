@@ -34,6 +34,7 @@ pub mod puzzles2004;
 pub mod px;
 pub mod startup;
 pub mod subjects;
+pub mod sway;
 pub mod tangage;
 pub mod text;
 pub mod travel;
