@@ -20,6 +20,7 @@
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use atlantis_engine::audio::Mixer;
 use atlantis_engine::subtitles::SubtitleFont;
@@ -41,6 +42,59 @@ static ACTIVITY: std::sync::OnceLock<AndroidApp> = std::sync::OnceLock::new();
 /// A finger moving less than this (window pixels) from where it went
 /// down makes a tap, not a drag (the panoramic view).
 const TAP_SLOP: f64 = 24.0;
+
+/// The activity is being destroyed: its `onDestroy` waits for
+/// `android_main` to return, which winit 0.30 does not ask for (it logs
+/// the event and goes on): [`App`] ends its event loop when this is set.
+static DESTROYED: AtomicBool = AtomicBool::new(false);
+
+/// android-activity's `onDestroy`, which [`on_destroy`] calls.
+static ANDROID_ACTIVITY_ON_DESTROY: std::sync::OnceLock<
+    unsafe extern "C" fn(*mut ndk_sys::ANativeActivity),
+> = std::sync::OnceLock::new();
+
+extern "C" {
+    /// android-activity's entry point (glue.rs).
+    fn ANativeActivity_onCreate(
+        activity: *mut ndk_sys::ANativeActivity,
+        saved_state: *const std::ffi::c_void,
+        saved_state_size: usize,
+    );
+}
+
+/// The activity's entry point (the manifest's `android.app.func_name`):
+/// android-activity's, then its `onDestroy` replaced by [`on_destroy`].
+///
+/// # Safety
+/// Called by NativeActivity with its `ANativeActivity`.
+#[no_mangle]
+pub unsafe extern "C" fn atlantis_native_on_create(
+    activity: *mut ndk_sys::ANativeActivity,
+    saved_state: *const std::ffi::c_void,
+    saved_state_size: usize,
+) {
+    ANativeActivity_onCreate(activity, saved_state, saved_state_size);
+    let callbacks = (*activity).callbacks;
+    if let Some(f) = (*callbacks).onDestroy {
+        let _ = ANDROID_ACTIVITY_ON_DESTROY.set(f);
+        (*callbacks).onDestroy = Some(on_destroy);
+    }
+}
+
+/// The activity's `onDestroy`: [`DESTROYED`] set before android-activity's
+/// own wakes the event loop (and waits for `android_main` to return).
+unsafe extern "C" fn on_destroy(activity: *mut ndk_sys::ANativeActivity) {
+    log::info!("activity destroyed");
+    DESTROYED.store(true, Ordering::SeqCst);
+    if let Some(f) = ANDROID_ACTIVITY_ON_DESTROY.get() {
+        f(activity);
+    }
+}
+
+/// Whether the activity is being destroyed (the event loop must end).
+pub(crate) fn destroyed() -> bool {
+    DESTROYED.load(Ordering::SeqCst)
+}
 
 /// The entry point android-activity calls on its own thread, once the
 /// activity is created.
@@ -123,7 +177,12 @@ fn android_main(activity: AndroidApp) {
     if let Err(e) = event_loop.run_app(&mut app) {
         log::error!("event loop: {e}");
     }
+    drop(app);
+    // The process ends with the activity: winit makes one event loop per
+    // process, and the activity Android may create again in it would have
+    // none.
     log::info!("event loop ended");
+    std::process::exit(0);
 }
 
 /// What the game folder holds.

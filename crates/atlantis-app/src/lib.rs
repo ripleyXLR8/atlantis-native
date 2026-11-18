@@ -1493,6 +1493,13 @@ impl ApplicationHandler for App {
         watchdog::enter(watchdog::Phase::AboutToWait);
         #[cfg(not(target_arch = "wasm32"))]
         let _guard = WatchdogLeave;
+        // Android: the activity is being destroyed, and waits for the
+        // event loop to end.
+        #[cfg(target_os = "android")]
+        if android::destroyed() {
+            el.exit();
+            return;
+        }
         // In the browser the redraw loop keeps itself going (see
         // RedrawRequested).
         #[cfg(target_arch = "wasm32")]

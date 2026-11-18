@@ -56,6 +56,8 @@ rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 winit = { version = "0.30", features = ["android-native-activity"] }
 cpal = "0.16"
 android_logger = "0.15"
+# The activity's onDestroy, which winit 0.30 does not pass on (android.rs).
+ndk-sys = "0.6"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 env_logger = "0.11"

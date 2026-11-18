@@ -19,10 +19,13 @@
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="sensorLandscape"
-            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|uiMode|density"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|density|screenSize|smallestScreenSize|layoutDirection|colorMode|fontWeightAdjustment|grammaticalGender"
             android:resizeableActivity="true">
             <!-- The cdylib android-activity starts: libatlantis_app.so. -->
             <meta-data android:name="android.app.lib_name" android:value="atlantis_app" />
+            <!-- Its entry point: android-activity's, with onDestroy
+                 watched (src/android.rs). -->
+            <meta-data android:name="android.app.func_name" android:value="atlantis_native_on_create" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

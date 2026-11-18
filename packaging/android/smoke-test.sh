@@ -50,9 +50,19 @@ adb shell input tap 500 300
 sleep 5
 adb exec-out screencap -p > "$out/screen-after-tap.png"
 pid2=$(adb shell pidof "$pkg" | tr -d '\r')
+# The activity destroyed in the background (Developer options' "Don't
+# keep activities"), then started again.
+adb shell settings put global always_finish_activities 1
+adb shell input keyevent KEYCODE_HOME
+sleep 3
+adb shell settings put global always_finish_activities 0
+adb shell am start -W -n "$pkg/android.app.NativeActivity"
+sleep 5
+adb exec-out screencap -p > "$out/screen-recreated.png"
+pid3=$(adb shell pidof "$pkg" | tr -d '\r')
 # The threads of the app (a hang shows where it waits).
-if [ -n "$pid2" ]; then
-    adb shell debuggerd -b "$pid2" > "$out/threads.txt" 2>&1
+if [ -n "$pid3" ]; then
+    adb shell debuggerd -b "$pid3" > "$out/threads.txt" 2>&1
 fi
 app_log
 cat "$out/logcat-app.txt"
@@ -63,10 +73,12 @@ fail() {
 }
 [ -n "$pid" ] || fail "the app was not running after its start"
 [ -n "$pid2" ] || fail "the app was not running after suspend and resume"
+[ -n "$pid3" ] || fail "the app was not running again after its activity was destroyed"
+grep -q "activity destroyed" "$out/logcat-app.txt" || fail "the activity was not destroyed"
 grep -q "panicked\|Fatal signal" "$out/logcat-app.txt" && fail "the app crashed"
 grep -q "ANR in $pkg\|timeout for ActivityRecord.*$pkg\|hang: " "$out/logcat-app.txt" &&
     fail "the app stopped answering"
 grep -q "No game found" "$out/logcat-app.txt" || fail "no 'No game found' line in the log"
 made=$(grep -c "resumed: window made" "$out/logcat-app.txt")
-[ "$made" -ge 5 ] || fail "the window was made $made times (5 expected: at the start, after each return)"
-echo "smoke test passed (pid $pid, then $pid2)"
+[ "$made" -ge 6 ] || fail "the window was made $made times (6 expected: at the start, after each return)"
+echo "smoke test passed (pid $pid, then $pid2, then $pid3)"
