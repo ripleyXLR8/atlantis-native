@@ -288,6 +288,10 @@ pub struct App {
     touch: android::TouchState,
     #[cfg(target_os = "android")]
     suspended_at: Option<Instant>,
+    /// Android: the bag button in the black bar right of the picture
+    /// (window pixels, as last drawn), when shown.
+    #[cfg(target_os = "android")]
+    bag_button: Option<android::Rect>,
 }
 
 impl App {
@@ -426,6 +430,8 @@ impl App {
             touch: android::TouchState::default(),
             #[cfg(target_os = "android")]
             suspended_at: None,
+            #[cfg(target_os = "android")]
+            bag_button: None,
         }
     }
 
@@ -1150,6 +1156,11 @@ impl App {
             &self.pattern
         };
         let hd_mode = tile.is_some();
+        // Android: the bag button while a game is played (not over the
+        // library, the options menu, or the on-screen keyboard).
+        #[cfg(target_os = "android")]
+        let bag_shown =
+            !launcher && self.runner.is_some() && !self.menu.is_open() && !self.touch.typing();
         if self.menu.is_open() {
             self.menu_frame.clear();
             self.menu_frame.extend_from_slice(frame);
@@ -1244,6 +1255,10 @@ impl App {
             drop((layer, text, video));
             #[cfg(not(target_arch = "wasm32"))]
             let _ = card;
+            #[cfg(target_os = "android")]
+            {
+                self.bag_button = android::draw_bag(&mut buf[..], sw, ox + dw, fit_h, bag_shown);
+            }
             #[cfg(target_arch = "wasm32")]
             if let Some(gl) = &mut self.gl {
                 // The whole frame enlarged to the canvas, over the card's
@@ -1341,6 +1356,10 @@ impl App {
                 launcher_art::draw(&mut win, item);
             }
             self.launcher_shown = (self.launcher_text.clone(), sw, sh, buf.to_vec());
+        }
+        #[cfg(target_os = "android")]
+        {
+            self.bag_button = android::draw_bag(&mut buf[..], sw, ox + dw, fit_h, bag_shown);
         }
         if let Some(b) = soft_buf {
             b.present().unwrap();

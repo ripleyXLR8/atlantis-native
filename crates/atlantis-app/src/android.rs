@@ -15,8 +15,9 @@
 //! Touch: a tap is a left click where the finger is (the panoramic view:
 //! a click at the centre), a drag moves the pointer with the button held
 //! (the panoramic view: turns it), a tap with two fingers is a right
-//! click, three fingers open the port's options menu. The Back button
-//! is Escape.
+//! click, three fingers open the port's options menu. The bag button in
+//! the black bar right of the picture is the right click too (the bag,
+//! README's "Inventory"). The Back button is Escape.
 
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
@@ -712,6 +713,105 @@ pub(crate) struct TouchState {
     /// Where the finger went down (the game's screen): a tap clicks
     /// there, whatever small motion the finger made (see [`TAP_SLOP`]).
     down_at: (i32, i32),
+    /// The finger that went down on the bag button.
+    bag: Option<u64>,
+}
+
+impl TouchState {
+    /// The on-screen keyboard is up for the player screen's name entry.
+    pub(crate) fn typing(&self) -> bool {
+        self.keyboard
+    }
+}
+
+/// A rectangle in window pixels: x, y, width, height.
+pub(crate) type Rect = (usize, usize, usize, usize);
+
+/// The bar right of the picture narrower than this (window pixels): no
+/// bag button (a 4:3 screen; two fingers still open the bag).
+const BAG_MIN_BAR: usize = 48;
+
+/// Draws the bag button in the black bar right of the picture (from
+/// window column `right` to the window's edge, `fit_h` rows high) when
+/// `shown`; returns where a tap presses it (the bar's lower half).
+pub(crate) fn draw_bag(
+    buf: &mut [u32],
+    stride: usize,
+    right: usize,
+    fit_h: usize,
+    shown: bool,
+) -> Option<Rect> {
+    let bar = stride.checked_sub(right)?;
+    if !shown || bar < BAG_MIN_BAR || fit_h < 4 {
+        return None;
+    }
+    let size = ((bar as f64 * 0.62).min(fit_h as f64 * 0.16)) as usize;
+    if size < 16 {
+        return None;
+    }
+    let x0 = right + (bar - size) / 2;
+    let margin = (bar - size) / 2;
+    let y0 = fit_h.saturating_sub(size + margin.max(size / 3));
+    let s = size as f64;
+    // The shapes in units of the icon's side: the body a rounded
+    // rectangle, the handle half a ring above it, a clasp in the middle.
+    const OUTLINE: (f64, f64, f64) = (200.0, 180.0, 138.0);
+    const FILL: (f64, f64, f64) = (70.0, 52.0, 34.0);
+    let line = 0.06;
+    for py in 0..size {
+        let row = (y0 + py) * stride;
+        let v = (py as f64 + 0.5) / s;
+        for px in 0..size {
+            let u = (px as f64 + 0.5) / s;
+            // The body's signed distance (negative inside).
+            let (cx, cy, hw, hh, r) = (0.5, 0.64, 0.36, 0.27, 0.12);
+            let qx = (u - cx).abs() - (hw - r);
+            let qy = (v - cy).abs() - (hh - r);
+            let body = qx.max(0.0).hypot(qy.max(0.0)) + qx.max(qy).min(0.0) - r;
+            // The handle: half a ring above the body.
+            let ring = if v <= 0.40 {
+                ((u - 0.5).hypot(v - 0.40) - 0.19).abs() - line / 2.0
+            } else {
+                f64::INFINITY
+            };
+            // The clasp: a small square on the body's top edge.
+            let clasp = ((u - 0.5).abs() - 0.07).max((v - 0.48).abs() - 0.07);
+            let aa = |d: f64| (0.5 - d * s).clamp(0.0, 1.0);
+            let fill_a = aa(body);
+            let out_a = aa(body.abs() - line / 2.0).max(aa(ring)).max(aa(clasp));
+            if fill_a <= 0.0 && out_a <= 0.0 {
+                continue;
+            }
+            let p = &mut buf[row + x0 + px];
+            let bg = (
+                (*p >> 16 & 255) as f64,
+                (*p >> 8 & 255) as f64,
+                (*p & 255) as f64,
+            );
+            let mix = |a: f64, b: f64, t: f64| a + (b - a) * t;
+            let mut c = (
+                mix(bg.0, FILL.0, fill_a),
+                mix(bg.1, FILL.1, fill_a),
+                mix(bg.2, FILL.2, fill_a),
+            );
+            c = (
+                mix(c.0, OUTLINE.0, out_a),
+                mix(c.1, OUTLINE.1, out_a),
+                mix(c.2, OUTLINE.2, out_a),
+            );
+            *p = (c.0 as u32) << 16 | (c.1 as u32) << 8 | c.2 as u32;
+        }
+    }
+    // A tap anywhere in the bar's lower half presses it.
+    let top = fit_h / 2;
+    Some((right, top, bar, fit_h - top))
+}
+
+/// Whether window point (x, y) is in `r`.
+fn inside(r: Option<Rect>, x: f64, y: f64) -> bool {
+    r.is_some_and(|(rx, ry, rw, rh)| {
+        x >= rx as f64 && y >= ry as f64 && x < (rx + rw) as f64 && y < (ry + rh) as f64
+    })
 }
 
 impl App {
@@ -746,6 +846,44 @@ impl App {
                 log::info!("folder picker opened");
             }
             return;
+        }
+        // The bag button: a right click (the bag) when the finger lifts
+        // on it, the only finger down.
+        if self.runner.is_some() {
+            let st = &mut self.touch;
+            if st.bag == Some(t.id) {
+                if t.phase == TouchPhase::Ended && inside(self.bag_button, x, y) {
+                    log::info!("bag button");
+                    let (mx, my) = self.sys.mouse();
+                    let button = MouseButton::Right;
+                    st.queue.push_back(Some(Input::MouseDown {
+                        button,
+                        x: mx,
+                        y: my,
+                    }));
+                    st.queue.push_back(Some(Input::MouseUp {
+                        button,
+                        x: mx,
+                        y: my,
+                    }));
+                }
+                if matches!(t.phase, TouchPhase::Ended | TouchPhase::Cancelled) {
+                    st.bag = None;
+                }
+                return;
+            }
+            if t.phase == TouchPhase::Started
+                && st.fingers.is_empty()
+                && st.bag.is_none()
+                && inside(self.bag_button, x, y)
+            {
+                st.bag = Some(t.id);
+                return;
+            }
+            if st.bag.is_some() {
+                // Other fingers while the bag button is held: ignored.
+                return;
+            }
         }
         let st = &mut self.touch;
         match t.phase {
