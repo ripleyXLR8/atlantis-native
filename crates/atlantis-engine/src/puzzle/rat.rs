@@ -1711,6 +1711,7 @@ impl RatIo for Host<'_> {
             .host
             .input
             .read_with(&self.host.e.sys, |msg| queue.push_back(msg));
+        self.host.note_pump();
         super::assets::poll_flags(self.host.e, &m);
         if !m.click {
             // WM_LBUTTONDOWN sets the held flag (@ 0x00419c47), WM_LBUTTONUP

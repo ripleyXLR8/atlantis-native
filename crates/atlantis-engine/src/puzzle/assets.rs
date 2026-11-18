@@ -260,6 +260,10 @@ pub struct PuzzleInput {
     /// place then: the pointer stays there until the mouse leaves that
     /// place (the first WM_MOUSEMOVE, 0x00419c10..0x00419c29).
     held: Option<((i32, i32), (i32, i32))>,
+    /// The system mouse at the last read that pumped the messages (no
+    /// left press edge: `FUN_0041a298` returns before its pump on one,
+    /// 0x0041a2b5); the entry mark until one did.
+    pub pump_mark: Option<(i32, i32)>,
 }
 
 impl PuzzleInput {
@@ -276,6 +280,7 @@ impl PuzzleInput {
     pub fn with_pointer(sys: &Sys, pointer: (i32, i32), mark: (i32, i32)) -> PuzzleInput {
         let mut input = PuzzleInput::new(sys);
         input.held = Some((pointer, mark));
+        input.pump_mark = Some(mark);
         input
     }
 
@@ -351,6 +356,9 @@ impl PuzzleInput {
         // button held since a read that saw it is none, and so is a new
         // press made before any read found the button up.
         let click = pressed;
+        if !click {
+            self.pump_mark = Some(sys.mouse());
+        }
         PuzzleMouse {
             x,
             y,
@@ -481,6 +489,7 @@ impl<'a> PuzzleHost<'a> {
         e.sys.set_mouse_locked(false);
         let pointer = e.pointer.pos;
         let input = PuzzleInput::with_pointer(&e.sys, pointer, e.pointer_mouse_mark);
+        e.puzzle_pump_mark = input.pump_mark;
         PuzzleHost {
             e,
             hooks,
@@ -496,8 +505,15 @@ impl<'a> PuzzleHost<'a> {
     /// [`poll_flags`]).
     pub fn read_input(&mut self) -> PuzzleMouse {
         let m = self.input.read(&self.e.sys);
+        self.note_pump();
         poll_flags(self.e, &m);
         m
+    }
+
+    /// The engine keeps the mouse of the puzzle's last pumping read for
+    /// the reload after it ([`Engine::reload_view_after_puzzle`]).
+    pub(crate) fn note_pump(&mut self) {
+        self.e.puzzle_pump_mark = self.input.pump_mark;
     }
 
     /// The port's read at a puzzle's entry, for the pointer and a click
@@ -507,7 +523,10 @@ impl<'a> PuzzleHost<'a> {
     /// 0x00442230, each after the present; meta and taquin 14 poll twice a
     /// pass, [`PuzzleHost::second_poll`]): no F5..F8 step.
     pub fn read_entry(&mut self) -> PuzzleMouse {
+        // No poll of the original: nothing pumped.
+        let pump_mark = self.input.pump_mark;
         let m = self.input.read(&self.e.sys);
+        self.input.pump_mark = pump_mark;
         poll_flags_with(self.e, &m, false);
         m
     }
@@ -552,6 +571,8 @@ impl<'a> PuzzleHost<'a> {
             return None;
         }
         self.pointer = self.input.pointer(sys);
+        self.input.pump_mark = Some(sys.mouse());
+        self.note_pump();
         Some(self.pointer)
     }
 

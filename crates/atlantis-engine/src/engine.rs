@@ -435,6 +435,12 @@ pub struct Engine {
     pub(crate) momentum: WarpMomentum,
     pub(crate) pointer: WarpPointer,
     pub(crate) pointer_mouse_mark: (i32, i32),
+    /// The system mouse at the last poll of the puzzle that ran which
+    /// pumped the messages (no left press edge, `FUN_0041a298` @
+    /// 0x0041a2b5); the reload after the puzzle takes it as the mark, so a
+    /// motion no puzzle poll retrieved reaches the pointer at the next
+    /// pump ([`Engine::reload_view_after_puzzle`]).
+    pub(crate) puzzle_pump_mark: Option<(i32, i32)>,
     /// A move's panorama load has set the pointer already, after the turn
     /// and before the film ([`Engine::execute_transition`]): the place
     /// entry that loads the picture leaves it alone.
@@ -602,6 +608,7 @@ impl Engine {
             momentum: WarpMomentum::default(),
             pointer: WarpPointer::default(),
             pointer_mouse_mark: (0, 0),
+            puzzle_pump_mark: None,
             move_pointer_loaded: false,
             cursor_sprites: Vec::new(),
             cursor_state: WarpCursorState::default(),

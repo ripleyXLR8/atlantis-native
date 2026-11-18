@@ -334,3 +334,87 @@ pub async fn play(e: &mut Engine, hooks: &mut dyn ScriptHooks) -> i32 {
         r
     }
 }
+
+#[cfg(test)]
+mod pointer_tests {
+    use crate::hooks::NoScripts;
+    use crate::sys::{Input, MouseButton};
+    use crate::test_support::with_engine;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    /// The passes of a won eclipse (as `engine_plays_eclipse`): the mouse
+    /// place and whether the left button goes down there.
+    fn winning_passes() -> Vec<(i32, i32, bool)> {
+        let mut v = vec![(320, 300, false); 5];
+        for (x, n) in [(180, 34), (490, 34)] {
+            for _ in 0..n {
+                v.extend([(x, 400, false), (x, 400, true), (x, 400, false)]);
+            }
+        }
+        v.extend([(490, 400, false), (490, 400, true)]);
+        v
+    }
+
+    /// The eclipse won, the mouse moved during the 80 win passes
+    /// (`FUN_00441724`, no `FUN_0041a298`) and not after: the motion is
+    /// still queued at the reload (`FUN_0044a424` sets the pointer to
+    /// (0x140, 0x140) only), and the next poll that pumps (CINEM030's)
+    /// puts the pointer at the cursor; at the warp loop's entry the
+    /// pointer is the mouse, not (320, 320) (round 9, puzzles-1).
+    #[test]
+    fn a_motion_during_the_eclipse_win_reaches_the_pointer() {
+        let got = Rc::new(Cell::new(None));
+        let g2 = got.clone();
+        let passes = winning_passes();
+        let n = passes.len();
+        let mut left = false;
+        let ran = with_engine(
+            "a_motion_during_the_eclipse_win_reaches_the_pointer",
+            move |mut e| async move {
+                assert!(e.load_wam("ATLAN1.WAM").await);
+                e.next_place_id = Some(1);
+                e.do_place_change().await;
+                let r = super::super::play_puzzle(&mut e, &mut NoScripts, 0).await;
+                e.reload_view_after_puzzle().await;
+                // The warp loop's entry (Engine::handle_warp).
+                e.sync_pointer_mouse();
+                g2.set(Some((r, e.pointer.pos, e.sys.mouse())));
+            },
+            move |sys, f| {
+                let f = f as usize;
+                if let Some(&(x, y, click)) = passes.get(f) {
+                    sys.push_input(Input::MouseMove { x, y });
+                    if left {
+                        sys.push_input(Input::MouseUp {
+                            button: MouseButton::Left,
+                            x,
+                            y,
+                        });
+                        left = false;
+                    }
+                    if click {
+                        sys.push_input(Input::MouseDown {
+                            button: MouseButton::Left,
+                            x,
+                            y,
+                        });
+                        left = true;
+                    }
+                } else if f == n + 20 {
+                    // In the win passes.
+                    sys.push_input(Input::MouseMove { x: 100, y: 100 });
+                } else if f > n + 400 {
+                    sys.push_input(Input::Quit);
+                }
+            },
+        );
+        if !ran {
+            return;
+        }
+        let (r, pointer, mouse) = got.get().expect("the puzzle did not end");
+        assert_eq!(r, 255);
+        assert_eq!(mouse, (100, 100));
+        assert_eq!(pointer, (100, 100));
+    }
+}
