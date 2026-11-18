@@ -512,6 +512,11 @@ impl Engine {
             if self.bow_mode {
                 clicked = false;
             }
+            // Bow mode as the poll saw it: FUN_0041a298 sets the menu
+            // request on Escape only with no bow (0x00496164 == 0, dc:11436),
+            // so lowering the bow below does not let an Escape of the same
+            // poll open the menu.
+            let bow_at_poll = self.bow_mode;
             // The bow step right after the poll that ends the original's
             // frame (0x0041c61d..0x0041c678), before the next frame's look
             // step, timer scan (FUN_0042be3c @ 0x0041c369) and drawing: a
@@ -709,7 +714,7 @@ impl Engine {
                     // is seen at once.
                     self.update_con_clocks();
                 }
-            } else if !exit && fi.escape && !self.bow_mode && self.vars.get("objetenmain") == 0 {
+            } else if !exit && fi.escape && !bow_at_poll && self.vars.get("objetenmain") == 0 {
                 self.sys.set_mouse_locked(false);
                 self.sys
                     .set_mouse_pos(self.pointer.cursor.0, self.pointer.cursor.1);
@@ -2497,5 +2502,25 @@ mod tests {
             seen.iter().all(|&(tir, frame, _)| tir == 0 && frame == 0),
             "{seen:?}"
         );
+    }
+
+    /// A right press and an Escape in one poll in bow mode: FUN_0041a298
+    /// sets no menu request with the bow up (0x00496164 == 0, dc:11436),
+    /// and the loop only lowers the bow (FUN_0042d368 @ 0x0041c6c8): the
+    /// warp loop goes on, no in-game menu (round 9, navigation).
+    #[test]
+    fn right_press_and_escape_in_bow_mode_only_lower_the_bow() {
+        let Some(seen) = bow_run(
+            "right_press_and_escape_in_bow_mode_only_lower_the_bow",
+            10.5,
+            usize::MAX,
+            None,
+            2,
+        ) else {
+            return;
+        };
+        assert!(seen.len() >= 12, "the warp loop stopped: {seen:?}");
+        assert!(seen[2].2);
+        assert!(!seen[seen.len() - 1].2, "{seen:?}");
     }
 }
