@@ -127,7 +127,7 @@ the app on the "no game" screen.
 - It writes into the window's buffers itself (`ANativeWindow`,
   `android_frame.rs`) rather than through softbuffer, whose Android path
   makes a new screen-sized buffer each frame and copies it byte by byte.
-  The first game and the library draw at the screen's size, into a
+  The first game, Atlantis II and the library draw at the screen's size, into a
   buffer kept between frames, copied into the window once. Atlantis III and
   Evolution's 2004 program write their picture at its own size into the
   window's buffers, sized to its proportions with the black bars

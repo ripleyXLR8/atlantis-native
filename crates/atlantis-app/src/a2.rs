@@ -1016,6 +1016,10 @@ impl A2App {
             size,
             window: None,
             surface: None,
+            #[cfg(target_os = "android")]
+            native: None,
+            #[cfg(target_os = "android")]
+            frame_px: Vec::new(),
             picture: Picture::new(),
             screen: vec![0u16; w * h],
             shown: Vec::new(),
@@ -1076,6 +1080,14 @@ pub struct A2App {
     size: Option<(u32, u32)>,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// Android: the window's buffers written directly (in place of
+    /// softbuffer's surface, which makes a new screen-sized buffer each
+    /// frame and copies it byte by byte), from `frame_px`, the frame
+    /// composed at the window's size and kept between frames.
+    #[cfg(target_os = "android")]
+    native: Option<crate::android_frame::Frame>,
+    #[cfg(target_os = "android")]
+    frame_px: Vec<u32>,
     /// The engine's screen (640 x 480 or 800 x 600).
     screen: Vec<u16>,
     /// The screen with the options menu drawn over it, the menu's text.
@@ -1479,6 +1491,12 @@ impl A2App {
         if self.present_web() {
             return;
         }
+        #[cfg(target_os = "android")]
+        {
+            self.present_native();
+            return;
+        }
+        #[allow(unreachable_code)]
         let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
             return;
         };
@@ -1509,6 +1527,51 @@ impl A2App {
         self.picture
             .compose_with_text(&self.engine, screen, &self.menu_text, &mut buf, ww, wh);
         let _ = buf.present();
+    }
+}
+
+#[cfg(target_os = "android")]
+impl A2App {
+    /// Android: the frame composed into `frame_px` at the window's size,
+    /// then written once into the window's buffers.
+    fn present_native(&mut self) {
+        let Some(window) = &self.window else {
+            return;
+        };
+        if self.native.is_none() {
+            self.native = crate::android_frame::Frame::new(window);
+        }
+        let size = window.inner_size();
+        let (ww, wh) = (size.width as usize, size.height as usize);
+        if ww == 0 || wh == 0 {
+            return;
+        }
+        self.frame_px.resize(ww * wh, 0);
+        let screen = if draw_menu(
+            &self.menu,
+            &self.engine,
+            &self.screen,
+            &mut self.shown,
+            &self.font,
+            &mut self.menu_text,
+        ) {
+            &self.shown
+        } else {
+            &self.screen
+        };
+        self.picture.compose_with_text(
+            &self.engine,
+            screen,
+            &self.menu_text,
+            &mut self.frame_px,
+            ww,
+            wh,
+        );
+        if let Some(n) = &mut self.native {
+            if !n.post((ww, wh), &self.frame_px) {
+                log::debug!("window took no frame");
+            }
+        }
     }
 }
 
@@ -1708,6 +1771,7 @@ impl ApplicationHandler for A2App {
     #[cfg(target_os = "android")]
     fn suspended(&mut self, _el: &ActiveEventLoop) {
         self.surface = None;
+        self.native = None;
         self.window = None;
         crate::android::pause_audio(&self._audio, true);
     }
@@ -1744,8 +1808,11 @@ impl ApplicationHandler for A2App {
         self.web.attach(&window, &mut self.engine);
         #[cfg(target_arch = "wasm32")]
         let soft = self.web.gl.is_none();
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
         let soft = true;
+        // (Android: the window's buffers directly, `native`)
+        #[cfg(target_os = "android")]
+        let soft = false;
         if soft {
             let context = softbuffer::Context::new(window.clone()).unwrap();
             self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
