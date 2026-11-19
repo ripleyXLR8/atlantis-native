@@ -93,6 +93,12 @@ Uninstalling the app deletes them too.
 | Menu button | The first game's options menu, like three fingers. It is drawn in the black bar left of the picture; a tap anywhere in that bar's lower half presses it. A screen too narrow for the bar shows no button. |
 | Back button | Escape: the game's menu. On the "no game" screen it closes the app. |
 
+In Atlantis III, whose original reads only the mouse's moves, a finger
+puts the pointer where it is on the menus, the inventory, the subject
+menu, the dialogs and the puzzles (a tap is a click there); on the
+panorama a drag turns the view and a tap clicks where it points. Two
+fingers are a right click.
+
 The on-screen keyboard opens while the first game's player screen takes
 a name. The game's picture is then drawn smaller, above the keyboard. If
 the keyboard is closed, a tap on the screen opens it again. Letters,

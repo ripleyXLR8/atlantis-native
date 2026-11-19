@@ -325,6 +325,12 @@ pub struct A3App {
     /// The game was started (its intro, logos or start page), at the
     /// first window.
     started: bool,
+    /// Where the game's picture was last drawn in the window: x, y,
+    /// width, height (window pixels).
+    view: (usize, usize, usize, usize),
+    /// Android: the fingers on the screen (see [`A3App::touch`]).
+    #[cfg(target_os = "android")]
+    touch: TouchA3,
     /// The 2004 program ([`run_evolution_2004`]): its start-up logos and
     /// start page in place of the intro.
     evolution_2004: bool,
@@ -368,6 +374,9 @@ impl A3App {
             shift_until: None,
             to_library: false,
             started: false,
+            view: (0, 0, 1, 1),
+            #[cfg(target_os = "android")]
+            touch: TouchA3::default(),
             evolution_2004: false,
         }
     }
@@ -405,6 +414,7 @@ impl A3App {
         };
         let (dw, dh) = (dw.max(1), dh.max(1));
         let (ox, oy) = ((ww - dw) / 2, (wh - dh) / 2);
+        self.view = (ox, oy, dw, dh);
         let xs: Vec<usize> = (0..dw).map(|x| x * gw / dw).collect();
         buf.fill(0);
         match self.game.surface() {
@@ -591,7 +601,14 @@ impl ApplicationHandler for A3App {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
-        // Android: the touch screen as the mouse, Back as Escape.
+        // Android: the touch screen (the game reads the mouse's moves
+        // only, as DirectInput gave them).
+        #[cfg(target_os = "android")]
+        if let WindowEvent::Touch(t) = &event {
+            self.touch(t);
+            return;
+        }
+        // Android: Back as Escape.
         #[cfg(target_os = "android")]
         if let Some(events) = crate::android::mode_events(&event) {
             for e in events {
@@ -667,6 +684,14 @@ impl ApplicationHandler for A3App {
                     self.shift_until = None;
                 }
                 let now = self.start.elapsed().as_secs_f64();
+                // Android: the touch screen's next button action.
+                #[cfg(target_os = "android")]
+                match self.touch.queue.pop_front() {
+                    Some(Press::Down) => self.game.click(),
+                    Some(Press::Up) => self.game.release(),
+                    Some(Press::Right) => self.game.right_click(),
+                    None => {}
+                }
                 self.game.step(now);
                 if !self.intro_done && self.game.mode() == Mode::Idle {
                     self.intro_done = true;
@@ -683,6 +708,144 @@ impl ApplicationHandler for A3App {
                 self.next_frame = (self.next_frame + FRAME).max(t);
             }
             _ => {}
+        }
+    }
+}
+
+/// Android: a finger moving less than this (window pixels) from where it
+/// went down is still a tap.
+#[cfg(target_os = "android")]
+const TAP_SLOP: f64 = 24.0;
+
+/// Android: the fingers on the screen in Atlantis III.
+#[cfg(target_os = "android")]
+#[derive(Default)]
+struct TouchA3 {
+    fingers: Vec<u64>,
+    /// The first finger, where it went down and where it was last.
+    primary: Option<u64>,
+    from: (f64, f64),
+    last: (f64, f64),
+    /// It moved past [`TAP_SLOP`].
+    moved: bool,
+    /// A second finger came: a right click when they lift.
+    two: bool,
+    /// The left button is held in the game (a free pointer's press).
+    pressed: bool,
+    /// The game's button actions, one per frame (a press is seen after the
+    /// pointer's move, as the menus hit-test the pointer of the frame
+    /// before; a release after its press).
+    queue: std::collections::VecDeque<Press>,
+}
+
+/// Android: a button action queued for the game.
+#[cfg(target_os = "android")]
+#[derive(Clone, Copy)]
+enum Press {
+    Down,
+    Up,
+    Right,
+}
+
+#[cfg(target_os = "android")]
+impl A3App {
+    /// Whether the game's pointer is free on the screen (the menus, the
+    /// inventory, the subject menu, a dialog, a full-screen puzzle): a
+    /// finger puts it where it is. Elsewhere (the panorama) a drag turns
+    /// the view and a tap clicks where the view points.
+    fn free_pointer(&self) -> bool {
+        matches!(
+            self.game.mode(),
+            Mode::Menu | Mode::Inventory | Mode::Subjects | Mode::Dialog | Mode::Screen
+        )
+    }
+
+    /// Window point (x, y) as the game's screen point.
+    fn to_game(&self, (x, y): (f64, f64)) -> (i32, i32) {
+        let (ox, oy, dw, dh) = self.view;
+        let (gw, gh) = (self.game.width() as f64, self.game.height() as f64);
+        let gx = ((x - ox as f64) * gw / dw.max(1) as f64).floor();
+        let gy = ((y - oy as f64) * gh / dh.max(1) as f64).floor();
+        (
+            (gx as i32).clamp(0, gw as i32 - 1),
+            (gy as i32).clamp(0, gh as i32 - 1),
+        )
+    }
+
+    /// The pointer moved to window point `at` (the free pointer).
+    fn point_at(&mut self, at: (f64, f64)) {
+        let (gx, gy) = self.to_game(at);
+        let (px, py) = self.game.pointer();
+        self.game.mouse_motion(gx - px, gy - py);
+    }
+
+    /// A finger on the screen: on a free pointer a press there (moving it
+    /// while down); on the panorama a drag turns the view, a tap clicks;
+    /// two fingers a right click.
+    fn touch(&mut self, t: &winit::event::Touch) {
+        use winit::event::TouchPhase;
+        let at = (t.location.x, t.location.y);
+        match t.phase {
+            TouchPhase::Started => {
+                self.touch.fingers.retain(|f| *f != t.id);
+                self.touch.fingers.push(t.id);
+                if self.touch.fingers.len() == 1 {
+                    self.touch.primary = Some(t.id);
+                    self.touch.from = at;
+                    self.touch.last = at;
+                    self.touch.moved = false;
+                    self.touch.two = false;
+                    if self.free_pointer() {
+                        self.point_at(at);
+                        self.touch.queue.push_back(Press::Down);
+                        self.touch.pressed = true;
+                    }
+                } else if !self.touch.two {
+                    self.touch.two = true;
+                    if std::mem::take(&mut self.touch.pressed) {
+                        self.touch.queue.push_back(Press::Up);
+                    }
+                }
+            }
+            TouchPhase::Moved => {
+                if self.touch.primary != Some(t.id) || self.touch.two {
+                    return;
+                }
+                let (lx, ly) = self.touch.last;
+                self.touch.last = at;
+                let (fx, fy) = self.touch.from;
+                if (at.0 - fx).hypot(at.1 - fy) > TAP_SLOP {
+                    self.touch.moved = true;
+                }
+                if self.touch.pressed {
+                    self.point_at(at);
+                } else if self.touch.moved {
+                    // The view turns with the finger, as with the mouse
+                    // (the game's pixels as mickeys).
+                    let k = self.game.width() as f64 / self.view.2.max(1) as f64;
+                    let (dx, dy) = ((at.0 - lx) * k, (at.1 - ly) * k);
+                    self.game.mouse_motion(dx.round() as i32, dy.round() as i32);
+                }
+            }
+            TouchPhase::Ended | TouchPhase::Cancelled => {
+                self.touch.fingers.retain(|f| *f != t.id);
+                if self.touch.primary == Some(t.id) && !self.touch.two {
+                    if std::mem::take(&mut self.touch.pressed) {
+                        self.touch.queue.push_back(Press::Up);
+                    } else if !self.touch.moved && t.phase == TouchPhase::Ended {
+                        // A tap on the panorama: a click where it points.
+                        self.touch.queue.push_back(Press::Down);
+                        self.touch.queue.push_back(Press::Up);
+                    }
+                }
+                if self.touch.fingers.is_empty() {
+                    if self.touch.two && t.phase == TouchPhase::Ended {
+                        self.touch.queue.push_back(Press::Right);
+                    }
+                    self.touch.primary = None;
+                    self.touch.two = false;
+                }
+            }
         }
     }
 }
