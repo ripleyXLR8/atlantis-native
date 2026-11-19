@@ -38,6 +38,17 @@ pub(crate) fn rgb565_lut() -> &'static [u32] {
     })
 }
 
+/// The locked buffer after the picture was written, for what is drawn
+/// in its black bars (pixels made with [`from_xrgb`]).
+pub(crate) struct Bars<'a> {
+    pub px: &'a mut [u32],
+    pub stride: usize,
+    /// The buffer's width and height.
+    pub size: (usize, usize),
+    /// The picture's rectangle in the buffer (x, y, width, height).
+    pub picture: (usize, usize, usize, usize),
+}
+
 impl Frame {
     /// The window's `ANativeWindow`, or None (not an Android window).
     pub(crate) fn new(window: &Window) -> Option<Frame> {
@@ -54,6 +65,14 @@ impl Frame {
         })
     }
 
+    /// The buffers' size last given (width, height).
+    pub(crate) fn buffer_size(&self) -> (usize, usize) {
+        (
+            self.geometry.0.max(0) as usize,
+            self.geometry.1.max(0) as usize,
+        )
+    }
+
     /// Shows a `gw` x `gh` picture in the middle of a window of
     /// `ww` x `wh` pixels, at the largest size keeping its proportions:
     /// `row(y, out)` writes the picture's row `y` into `out` (`gw`
@@ -65,6 +84,7 @@ impl Frame {
         (ww, wh): (usize, usize),
         (gw, gh): (usize, usize),
         mut row: impl FnMut(usize, &mut [u32]),
+        bars: impl FnOnce(Bars<'_>),
     ) -> Option<(usize, usize, usize, usize)> {
         let (ww, wh, gw, gh) = (ww.max(1), wh.max(1), gw.max(1), gh.max(1));
         // The buffers: the picture's own pixels on the side where it
@@ -107,6 +127,12 @@ impl Frame {
             row(y - oy, &mut line[ox..ox + gw]);
             line[ox + gw..].fill(0);
         }
+        bars(Bars {
+            px: &mut pixels[..],
+            stride,
+            size: (lw, lh),
+            picture: (ox, oy, gw, gh),
+        });
         drop(lock);
         // The same rectangle on the screen, for the touches.
         let (dw, dh) = if wider {
@@ -116,5 +142,45 @@ impl Frame {
         };
         let (dw, dh) = (dw.max(1), dh.max(1));
         Some(((ww - dw.min(ww)) / 2, (wh - dh.min(wh)) / 2, dw, dh))
+    }
+
+    /// Shows `px`, a picture of `w` x `h` pixels (0x00RRGGBB) made at
+    /// the window's own size: the buffers take that size, and each row is
+    /// copied once with its bytes put in the window's order. Returns
+    /// false when the window took no frame.
+    pub(crate) fn post(&mut self, (w, h): (usize, usize), px: &[u32]) -> bool {
+        if w == 0 || h == 0 || px.len() < w * h {
+            return false;
+        }
+        let geometry = (w as i32, h as i32);
+        if geometry != self.geometry {
+            if self
+                .window
+                .set_buffers_geometry(
+                    geometry.0,
+                    geometry.1,
+                    Some(HardwareBufferFormat::R8G8B8X8_UNORM),
+                )
+                .is_err()
+            {
+                return false;
+            }
+            self.geometry = geometry;
+        }
+        let Ok(mut lock) = self.window.lock(None) else {
+            return false;
+        };
+        let (lw, lh, stride) = (lock.width(), lock.height(), lock.stride());
+        if lw < w || lh < h || stride < lw {
+            return false;
+        }
+        // SAFETY: as in `present`.
+        let out = unsafe { std::slice::from_raw_parts_mut(lock.bits().cast::<u32>(), stride * lh) };
+        for (line, src) in out.chunks_exact_mut(stride).zip(px.chunks_exact(w)) {
+            for (d, &p) in line[..w].iter_mut().zip(src) {
+                *d = from_xrgb(p);
+            }
+        }
+        true
     }
 }

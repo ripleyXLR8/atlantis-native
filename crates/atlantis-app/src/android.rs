@@ -228,6 +228,27 @@ pub(crate) fn mode_events(
     }
 }
 
+/// Escape pressed and released, as the window's key events (Atlantis
+/// III's menu button).
+pub(crate) fn escape_press() -> Vec<winit::event::WindowEvent> {
+    use winit::event::{DeviceId, ElementState, WindowEvent};
+    use winit::keyboard::{Key, KeyCode, NamedKey, PhysicalKey};
+    use winit::platform::android::key_event;
+    [ElementState::Pressed, ElementState::Released]
+        .into_iter()
+        .map(|state| WindowEvent::KeyboardInput {
+            device_id: DeviceId::dummy(),
+            event: key_event(
+                PhysicalKey::Code(KeyCode::Escape),
+                Key::Named(NamedKey::Escape),
+                None,
+                state,
+            ),
+            is_synthetic: false,
+        })
+        .collect()
+}
+
 /// Atlantis II, III and Evolution's windows on Android: the Back button
 /// (Escape) and the on-screen keyboard's text and keys, which reach the
 /// app outside winit (`AtlantisActivity`), as the window's key events.
@@ -1635,6 +1656,7 @@ impl App {
     pub(crate) fn android_suspend(&mut self) {
         log::info!("suspended");
         self.surface = None;
+        self.native = None;
         self.window = None;
         self.audio = None;
         self.audio_pending = true;

@@ -404,23 +404,85 @@ impl A3App {
         let (gw, gh) = (self.game.width(), self.game.height());
         self.shown = (gw, gh);
         let window_size = (size.width as usize, size.height as usize);
+        // The bag and menu buttons in the bars, as in Atlantis I (not
+        // during a cinematic or the credits); where a tap presses them,
+        // in the buffer's pixels.
+        let shown = !self.game.skippable() && self.game.credits().is_none();
+        let mut pressed: [Option<crate::android::Rect>; 2] = [None; 2];
+        let bars = |b: crate::android_frame::Bars<'_>| {
+            let (lw, lh) = b.size;
+            let (ox, _, pw, _) = b.picture;
+            let right = ox + pw;
+            for (i, (bar, button)) in [
+                ((right, lw - right), crate::android::Button::Bag),
+                ((0, ox), crate::android::Button::Menu),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let r = crate::android::draw_button(b.px, b.stride, bar, lh, shown, button);
+                // (drawn as 0x00RRGGBB: put in the buffer's byte order)
+                if let Some((x, y, w, h)) = r {
+                    for row in b.px.chunks_exact_mut(b.stride).skip(y).take(h) {
+                        for p in &mut row[x..x + w] {
+                            *p = crate::android_frame::from_xrgb(*p);
+                        }
+                    }
+                }
+                pressed[i] = r;
+            }
+        };
         let view = match self.game.surface() {
             Surface::Rgb565(screen) => {
                 let lut = crate::android_frame::rgb565_lut();
-                frame.present(window_size, (gw, gh), |y, out| {
-                    for (o, &p) in out.iter_mut().zip(&screen[y * gw..][..gw]) {
-                        *o = lut[usize::from(p)];
-                    }
-                })
+                frame.present(
+                    window_size,
+                    (gw, gh),
+                    |y, out| {
+                        for (o, &p) in out.iter_mut().zip(&screen[y * gw..][..gw]) {
+                            *o = lut[usize::from(p)];
+                        }
+                    },
+                    bars,
+                )
             }
-            Surface::Xrgb8888(screen) => frame.present(window_size, (gw, gh), |y, out| {
-                for (o, &p) in out.iter_mut().zip(&screen[y * gw..][..gw]) {
-                    *o = crate::android_frame::from_xrgb(p);
-                }
-            }),
+            Surface::Xrgb8888(screen) => frame.present(
+                window_size,
+                (gw, gh),
+                |y, out| {
+                    for (o, &p) in out.iter_mut().zip(&screen[y * gw..][..gw]) {
+                        *o = crate::android_frame::from_xrgb(p);
+                    }
+                },
+                bars,
+            ),
         };
         if let Some(view) = view {
             self.view = view;
+            // The buttons' rectangles in window pixels: the buffer's
+            // pixel is the picture's (gw across `view.2` window pixels),
+            // its picture at the view's place.
+            let (vx, vy, vw, vh) = view;
+            let (bw, bh) = frame.buffer_size();
+            let (box_, boy) = ((bw - gw) / 2, (bh - gh) / 2);
+            let to_window = |r: Option<crate::android::Rect>| {
+                r.map(|(x, y, w, h)| {
+                    let sx = |v: usize| {
+                        (vx as f64 + (v as f64 - box_ as f64) * vw as f64 / gw as f64).max(0.0)
+                    };
+                    let sy = |v: usize| {
+                        (vy as f64 + (v as f64 - boy as f64) * vh as f64 / gh as f64).max(0.0)
+                    };
+                    let (x0, y0, x1, y1) = (sx(x), sy(y), sx(x + w), sy(y + h));
+                    (
+                        x0 as usize,
+                        y0 as usize,
+                        (x1 - x0) as usize,
+                        (y1 - y0) as usize,
+                    )
+                })
+            };
+            self.touch.buttons = [to_window(pressed[0]), to_window(pressed[1])];
         }
     }
 
@@ -629,7 +691,11 @@ impl ApplicationHandler for A3App {
         // Android: Back and the on-screen keyboard's text.
         #[cfg(target_os = "android")]
         if let Some(id) = self.window.as_ref().map(|w| w.id()) {
-            for e in crate::android::mode_typed() {
+            let mut typed = crate::android::mode_typed();
+            if std::mem::take(&mut self.touch.escape) {
+                typed.extend(crate::android::escape_press());
+            }
+            for e in typed {
                 self.window_event(el, id, e);
             }
         }
@@ -776,6 +842,13 @@ struct TouchA3 {
     moved: bool,
     /// A second finger came: a right click when they lift.
     two: bool,
+    /// Where a tap presses the bag and the menu buttons (window pixels),
+    /// as last drawn.
+    buttons: [Option<crate::android::Rect>; 2],
+    /// The first finger went down on the bag (0) or menu (1) button.
+    on_button: Option<usize>,
+    /// The menu button was tapped: Escape for the game, as Back.
+    escape: bool,
     /// The left button is held in the game (a free pointer's press).
     pressed: bool,
     /// The game's button actions, one per frame (a press is seen after the
@@ -843,7 +916,17 @@ impl A3App {
                     self.touch.last = at;
                     self.touch.moved = false;
                     self.touch.two = false;
-                    if self.free_pointer() {
+                    self.touch.on_button = self.touch.buttons.iter().position(|r| {
+                        r.is_some_and(|(x, y, w, h)| {
+                            at.0 >= x as f64
+                                && at.1 >= y as f64
+                                && at.0 < (x + w) as f64
+                                && at.1 < (y + h) as f64
+                        })
+                    });
+                    if self.touch.on_button.is_some() {
+                        // (a button: nothing for the game until it lifts)
+                    } else if self.free_pointer() {
                         self.point_at(at);
                         self.touch.queue.push_back(Press::Down);
                         self.touch.pressed = true;
@@ -856,7 +939,10 @@ impl A3App {
                 }
             }
             TouchPhase::Moved => {
-                if self.touch.primary != Some(t.id) || self.touch.two {
+                if self.touch.primary != Some(t.id)
+                    || self.touch.two
+                    || self.touch.on_button.is_some()
+                {
                     return;
                 }
                 let (lx, ly) = self.touch.last;
@@ -877,7 +963,17 @@ impl A3App {
             }
             TouchPhase::Ended | TouchPhase::Cancelled => {
                 self.touch.fingers.retain(|f| *f != t.id);
-                if self.touch.primary == Some(t.id) && !self.touch.two {
+                let button = self.touch.on_button.take();
+                if self.touch.primary == Some(t.id) && !self.touch.two && button.is_some() {
+                    // A button lifted where it went down: the bag (the
+                    // right button, as two fingers) or the menu (Escape).
+                    if t.phase == TouchPhase::Ended {
+                        match button {
+                            Some(0) => self.touch.queue.push_back(Press::Right),
+                            _ => self.touch.escape = true,
+                        }
+                    }
+                } else if self.touch.primary == Some(t.id) && !self.touch.two {
                     if std::mem::take(&mut self.touch.pressed) {
                         self.touch.queue.push_back(Press::Up);
                     } else if !self.touch.moved

@@ -178,6 +178,14 @@ pub fn version_string() -> String {
 pub struct App {
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// Android: the window's buffers written directly (in place of
+    /// softbuffer's surface, which makes a new screen-sized buffer each
+    /// frame and copies it byte by byte), from `frame_px`, the frame
+    /// drawn at the window's size and kept between frames.
+    #[cfg(target_os = "android")]
+    native: Option<android_frame::Frame>,
+    #[cfg(target_os = "android")]
+    frame_px: Vec<u32>,
     /// The browser: WebGL presents the frames (the 2D canvas, `surface`,
     /// without it), drawn first into `gl_frame` (an HD frame at most
     /// `WEB_MAX_PIXELS`) or `gl_small` (the original's 640x480).
@@ -376,6 +384,10 @@ impl App {
         App {
             window: None,
             surface: None,
+            #[cfg(target_os = "android")]
+            native: None,
+            #[cfg(target_os = "android")]
+            frame_px: Vec::new(),
             #[cfg(target_arch = "wasm32")]
             gl: None,
             #[cfg(target_arch = "wasm32")]
@@ -1091,7 +1103,11 @@ impl App {
         let gl_on = self.gl.is_some();
         #[cfg(not(target_arch = "wasm32"))]
         let gl_on = false;
+        #[cfg(not(target_os = "android"))]
         let mut soft_buf = None;
+        // (Android: no softbuffer surface; see `native`)
+        #[cfg(target_os = "android")]
+        let soft_buf: Option<softbuffer::Buffer<'_, Rc<Window>, Rc<Window>>> = None;
         #[cfg(target_arch = "wasm32")]
         let buf: &mut [u32] = if gl_on {
             self.gl_frame
@@ -1104,7 +1120,17 @@ impl App {
             surface.resize(nw, nh).unwrap();
             soft_buf.insert(surface.buffer_mut().unwrap())
         };
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(target_os = "android")]
+        let buf: &mut [u32] = {
+            let _ = (nw, nh);
+            if self.native.is_none() {
+                return;
+            }
+            self.frame_px
+                .resize(size.width as usize * size.height as usize, 0);
+            &mut self.frame_px
+        };
+        #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
         let buf: &mut [u32] = {
             let Some(surface) = &mut self.surface else {
                 return;
@@ -1349,6 +1375,8 @@ impl App {
             if let Some(b) = soft_buf {
                 b.present().unwrap();
             }
+            #[cfg(target_os = "android")]
+            post_native(&mut self.native, &self.frame_px, sw, sh);
             return;
         }
         // WebGL: the original's 640x480 pixels go to the graphics card as
@@ -1379,6 +1407,8 @@ impl App {
                 if let Some(b) = soft_buf {
                     b.present().unwrap();
                 }
+                #[cfg(target_os = "android")]
+                post_native(&mut self.native, &self.frame_px, sw, sh);
                 return;
             }
         }
@@ -1438,6 +1468,18 @@ impl App {
         }
         if let Some(b) = soft_buf {
             b.present().unwrap();
+        }
+        #[cfg(target_os = "android")]
+        post_native(&mut self.native, &self.frame_px, sw, sh);
+    }
+}
+
+/// Android: the frame drawn in `px` (the app's `frame_px`) to the window.
+#[cfg(target_os = "android")]
+fn post_native(native: &mut Option<android_frame::Frame>, px: &[u32], sw: usize, sh: usize) {
+    if let Some(n) = native {
+        if !n.post((sw, sh), px) {
+            log::debug!("window took no frame");
         }
     }
 }
@@ -1563,8 +1605,13 @@ impl ApplicationHandler for App {
         }
         #[cfg(target_arch = "wasm32")]
         let soft = self.gl.is_none();
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
         let soft = true;
+        #[cfg(target_os = "android")]
+        let soft = {
+            self.native = android_frame::Frame::new(&window);
+            false
+        };
         if soft {
             let context = softbuffer::Context::new(window.clone()).unwrap();
             self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());

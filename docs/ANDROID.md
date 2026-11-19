@@ -105,6 +105,9 @@ panorama a drag turns the view and a tap clicks where it points. Two
 fingers are a right click. A tap during a cinematic or the start-up's
 videos stops it, as Space does (a click does not in the original);
 Back does too, as Escape. A tap ends a travel video, as a click does.
+The bag and menu buttons are drawn in Atlantis III's black bars too,
+except during cinematics and the credits: the bag is a right click (the
+inventory), the menu is Escape (the game's menu, like Back).
 
 The on-screen keyboard opens while the first game's player screen takes
 a name. The game's picture is then drawn smaller, above the keyboard. If
@@ -121,7 +124,11 @@ the app on the "no game" screen.
 - It runs the game full screen in landscape. Android's status and
   navigation bars are hidden; a swipe from the edge shows them for a
   moment. The display cutout is used.
-- It draws through softbuffer (`ANativeWindow`). Atlantis III and
+- It writes into the window's buffers itself (`ANativeWindow`,
+  `android_frame.rs`) rather than through softbuffer, whose Android path
+  makes a new screen-sized buffer each frame and copies it byte by byte.
+  The first game and the library draw at the screen's size, into a
+  buffer kept between frames, copied into the window once. Atlantis III and
   Evolution's 2004 program write their picture at its own size into the
   window's buffers, sized to its proportions with the black bars
   (`android_frame.rs`, `ANativeWindow_setBuffersGeometry`); Android's
