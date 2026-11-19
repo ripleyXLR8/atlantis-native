@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 
 use atlantis_data::Game;
 use atlantis_engine::persist::{Graphics, Settings};
-use atlantis_engine::warp::{SCREEN_H, SCREEN_W};
+use atlantis_engine::warp::SCREEN_H;
 use atlantis_engine::Start;
 use web_time::{Duration, Instant};
 use winit::event::{ElementState, MouseButton, MouseScrollDelta, WindowEvent};
@@ -307,7 +307,7 @@ pub fn draw_launcher(
     let Some(launcher) = session.and_then(|s| s.launcher.as_ref()) else {
         return false;
     };
-    frame.resize(SCREEN_W * SCREEN_H, 0);
+    frame.resize(launcher.width() * SCREEN_H, 0);
     match items {
         Some(items) => *items = launcher.draw_scene(frame),
         None => launcher.draw(frame),
@@ -778,7 +778,8 @@ mod tests {
             };
             let mut frame = Vec::new();
             assert!(draw_launcher(app.session(), &mut frame, None));
-            let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
+            let png =
+                atlantis2_engine::png::encode_rgb565(&frame, frame.len() / SCREEN_H, SCREEN_H);
             std::fs::write(PathBuf::from(dir).join(name), png).unwrap();
         };
         shot(&app, "library-both.png");
@@ -1080,14 +1081,16 @@ mod tests {
         if let Some(dir) = std::env::var_os("ATLANTIS_DVD_SHOTS") {
             let mut frame = Vec::new();
             assert!(draw_launcher(app.session(), &mut frame, None));
-            let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
+            let png =
+                atlantis2_engine::png::encode_rgb565(&frame, frame.len() / SCREEN_H, SCREEN_H);
             std::fs::write(PathBuf::from(&dir).join("library-dvd.png"), png).unwrap();
             // The end of the list: the Japanese version, the Perfect
             // Edition.
             let l = app.session_mut().unwrap().launcher.as_mut().unwrap();
             l.key(LauncherKey::End);
             assert!(draw_launcher(app.session(), &mut frame, None));
-            let png = atlantis2_engine::png::encode_rgb565(&frame, SCREEN_W, SCREEN_H);
+            let png =
+                atlantis2_engine::png::encode_rgb565(&frame, frame.len() / SCREEN_H, SCREEN_H);
             std::fs::write(PathBuf::from(dir).join("library-dvd-end.png"), png).unwrap();
             let l = app.session_mut().unwrap().launcher.as_mut().unwrap();
             l.key(LauncherKey::Home);

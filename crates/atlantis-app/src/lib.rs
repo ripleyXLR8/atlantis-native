@@ -91,12 +91,15 @@ const FRAME: Duration = Duration::from_micros(16_667);
 /// An engine step longer than this is logged.
 const SLOW_STEP: Duration = Duration::from_millis(100);
 
-/// Where the 640x480 picture sits in the window.
+/// Where the 640x480 picture sits in the window (the game library's
+/// screen: `w` x 480, wider in a wide window).
 #[derive(Clone, Copy, Default)]
 struct Viewport {
     ox: f64,
     oy: f64,
     scale: f64,
+    /// The screen's width in units (0: 640).
+    w: usize,
 }
 
 impl Viewport {
@@ -106,7 +109,8 @@ impl Viewport {
         }
         let sx = ((x - self.ox) / self.scale).floor() as i32;
         let sy = ((y - self.oy) / self.scale).floor() as i32;
-        (sx.clamp(0, W as i32 - 1), sy.clamp(0, H as i32 - 1))
+        let w = if self.w == 0 { W } else { self.w };
+        (sx.clamp(0, w as i32 - 1), sy.clamp(0, H as i32 - 1))
     }
 
     fn to_window(self, x: i32, y: i32) -> (f64, f64) {
@@ -203,6 +207,8 @@ pub struct App {
     viewport: Viewport,
     /// Source column of each window column, for the current width.
     col_map: Vec<usize>,
+    /// The frame's width `col_map` was made for.
+    col_map_w: usize,
     /// The pointer lock as applied to the window.
     locked: bool,
     /// Alt is held (Alt+Enter: full screen).
@@ -391,6 +397,7 @@ impl App {
             next_frame: now,
             viewport: Viewport::default(),
             col_map: Vec::new(),
+            col_map_w: 0,
             locked: false,
             alt: false,
             title: "Atlantis Native".to_string(),
@@ -1112,6 +1119,19 @@ impl App {
         // menu is open over it).
         #[cfg(not(target_arch = "wasm32"))]
         self.launcher_text.clear();
+        // Android: the game library's screen as wide as the window (640
+        // under the options menu, which is drawn on a 640x480 frame).
+        #[cfg(target_os = "android")]
+        {
+            let wide = if self.menu.is_open() {
+                W
+            } else {
+                (size.width as usize * H / (size.height as usize).max(1)).max(W)
+            };
+            if let Some(l) = self.session.as_mut().and_then(|s| s.launcher_mut()) {
+                l.set_width(wide);
+            }
+        }
         #[cfg(not(target_arch = "wasm32"))]
         let launcher = support::draw_support(self.support.as_ref(), &mut self.launcher_frame)
             || session::draw_launcher(
@@ -1128,14 +1148,22 @@ impl App {
         let fit_h = sh;
         #[cfg(target_os = "android")]
         let fit_h = sh.saturating_sub(android_saf::ime_height()).max(sh / 4);
-        // Nearest scaling keeping the 4:3 aspect, black bars.
-        let scale = (sw as f64 / W as f64).min(fit_h as f64 / H as f64);
-        let (dw, dh) = ((W as f64 * scale) as usize, (H as f64 * scale) as usize);
+        // The frame's width: 640, the game library's screen's own (wider
+        // in a wide window on Android).
+        let fw = if launcher {
+            (self.launcher_frame.len() / H).max(W)
+        } else {
+            W
+        };
+        // Nearest scaling keeping the aspect, black bars.
+        let scale = (sw as f64 / fw as f64).min(fit_h as f64 / H as f64);
+        let (dw, dh) = ((fw as f64 * scale) as usize, (H as f64 * scale) as usize);
         let (ox, oy) = ((sw - dw) / 2, (fit_h - dh) / 2);
         self.viewport = Viewport {
             ox: ox as f64,
             oy: oy as f64,
             scale,
+            w: fw,
         };
         // The pointer is in window pixels.
         #[cfg(target_arch = "wasm32")]
@@ -1144,6 +1172,7 @@ impl App {
                 ox: ox as f64 * k,
                 oy: oy as f64 * k,
                 scale: scale * k,
+                w: fw,
             };
         }
         // The HD tile the engine draws its next frames at.
@@ -1356,8 +1385,9 @@ impl App {
         // RGB565 -> XRGB8888 table and source column per window column,
         // built once (the per-pixel arithmetic was the cost in the browser).
         let lut = hd::rgb565_to_888();
-        if self.col_map.len() != dw {
-            self.col_map = (0..dw).map(|x| x * W / dw).collect();
+        if self.col_map.len() != dw || self.col_map_w != fw {
+            self.col_map = (0..dw).map(|x| x * fw / dw).collect();
+            self.col_map_w = fw;
         }
         let mut prev_src = usize::MAX;
         for y in 0..dh {
@@ -1369,7 +1399,7 @@ impl App {
                 continue;
             }
             prev_src = src_y;
-            let src_row = &frame[src_y * W..][..W];
+            let src_row = &frame[src_y * fw..][..fw];
             for (d, &x) in buf[start..start + dw].iter_mut().zip(&self.col_map) {
                 *d = lut[usize::from(src_row[x])];
             }
@@ -1380,6 +1410,7 @@ impl App {
                 px: &mut buf[..],
                 stride: sw,
                 rect: (ox, oy, dw, dh),
+                width: fw,
             };
             for item in &self.launcher_text {
                 launcher_art::draw(&mut win, item);

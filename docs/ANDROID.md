@@ -56,6 +56,10 @@ Either of these:
 
 ## The game library
 
+The library's screen fills the screen: its background, its list and its
+lines are laid out across the window's width (1040 by 480 units on a
+19.5:9 phone), not in the 640x480 of the desktop's window.
+
 As on the desktop, the app keeps a list of the games added: each folder
 chosen in the picker, and the game in the app's own folder. At start-up
 it plays the list's one game at once, or shows the list when it holds two

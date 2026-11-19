@@ -292,7 +292,8 @@ fn from565(p: u16) -> Rgb {
     )
 }
 
-/// The 640x480 RGB565 frame.
+/// The RGB565 frame: 480 rows of the screen's width (640, or wider for
+/// a wide window, [`background_for`]).
 pub struct Frame565<'a>(pub &'a mut [u16]);
 
 impl Canvas for Frame565<'_> {
@@ -303,26 +304,29 @@ impl Canvas for Frame565<'_> {
         (0.0, 0.0)
     }
     fn blend(&mut self, x: i32, y: i32, c: Rgb, a: f32) {
-        if x < 0 || y < 0 || x >= SCREEN_W as i32 || y >= SCREEN_H as i32 || a <= 0.0 {
+        let w = self.0.len() / SCREEN_H;
+        if x < 0 || y < 0 || x >= w as i32 || y >= SCREEN_H as i32 || a <= 0.0 {
             return;
         }
-        let p = &mut self.0[y as usize * SCREEN_W + x as usize];
+        let p = &mut self.0[y as usize * w + x as usize];
         *p = rgb565(mix(from565(*p), c, a.min(1.0)));
     }
 }
 
-/// The window's XRGB8888 pixels (`stride` a row), the screen mapped to
-/// the `dw` x `dh` pixels at (`ox`, `oy`).
+/// The window's XRGB8888 pixels (`stride` a row), the screen (`width`
+/// x 480 units: 640, or wider for a wide window) mapped to the `dw` x
+/// `dh` pixels at (`ox`, `oy`).
 pub struct Window<'a> {
     pub px: &'a mut [u32],
     pub stride: usize,
     pub rect: (usize, usize, usize, usize),
+    pub width: usize,
 }
 
 impl Canvas for Window<'_> {
     fn scale(&self) -> (f32, f32) {
         (
-            self.rect.2 as f32 / SCREEN_W as f32,
+            self.rect.2 as f32 / self.width.max(1) as f32,
             self.rect.3 as f32 / SCREEN_H as f32,
         )
     }
@@ -620,8 +624,37 @@ pub fn shade(frame: &mut [u16], (x, y, w, h): (i32, i32, i32, i32), c: Rgb, a: f
 /// grain, warm age stains and the worn, darker edges; dithered to RGB565.
 pub fn background() -> &'static [u16] {
     static BG: OnceLock<Vec<u16>> = OnceLock::new();
-    BG.get_or_init(|| {
-        let (w, h) = (SCREEN_W, SCREEN_H);
+    BG.get_or_init(|| paint_background(SCREEN_W))
+}
+
+/// [`background`] for a screen `width` units wide (480 high): the same
+/// painting widened, its night, moonlight and worn edges spread to the
+/// sides, the parchment's grain at the same size; 640 gives
+/// [`background`]. The last width asked is kept.
+pub fn background_for(width: usize) -> std::sync::Arc<[u16]> {
+    static WIDE: std::sync::Mutex<Option<(usize, std::sync::Arc<[u16]>)>> =
+        std::sync::Mutex::new(None);
+    if width == SCREEN_W {
+        return background().into();
+    }
+    let mut kept = WIDE.lock().unwrap();
+    if let Some((w, bg)) = kept.as_ref() {
+        if *w == width {
+            return bg.clone();
+        }
+    }
+    let bg: std::sync::Arc<[u16]> = paint_background(width).into();
+    *kept = Some((width, bg.clone()));
+    bg
+}
+
+fn paint_background(w: usize) -> Vec<u16> {
+    {
+        let h = SCREEN_H;
+        // The width in 640-unit screens: the painting's places (the moon,
+        // the sea's light) keep their share of the width, its grain its
+        // size.
+        let a = w as f32 / SCREEN_W as f32;
         let mut out = vec![0u16; w * h];
         const BAYER: [[f32; 4]; 4] = [
             [0.0, 8.0, 2.0, 10.0],
@@ -641,16 +674,16 @@ pub fn background() -> &'static [u16] {
         let sea = [16.0, 64.0, 106.0];
         for y in 0..h {
             for x in 0..w {
-                let (u, v) = (x as f32 / w as f32, y as f32 / h as f32);
+                let (u, v) = (x as f32 / SCREEN_W as f32, y as f32 / h as f32);
                 let mut c = if v < 0.55 {
                     lerp3(night, blue, v / 0.55)
                 } else {
                     lerp3(blue, sea, (v - 0.55) / 0.45)
                 };
                 // the moonlight and the sea's light
-                let d1 = ((u - 0.7) * 1.0).hypot((v - 0.18) * 0.75) / 0.5;
+                let d1 = ((u - 0.7 * a) * 1.0).hypot((v - 0.18) * 0.75) / 0.5;
                 c = lerp3(c, [120.0, 160.0, 255.0], 0.22 * (1.0 - d1).max(0.0));
-                let d2 = (u - 0.5).hypot((v - 1.2) * 0.9) / 0.8;
+                let d2 = (u - 0.5 * a).hypot((v - 1.2) * 0.9) / 0.8;
                 c = lerp3(c, [40.0, 120.0, 190.0], 0.55 * (1.0 - d2).max(0.0));
                 // the parchment: a mottled skin and fine fibres
                 let m = fbm(u * 3.2, v * 2.4, 5);
@@ -662,7 +695,7 @@ pub fn background() -> &'static [u16] {
                 let stain = ((s - 0.55) * 4.0).clamp(0.0, 1.0) * 0.35;
                 c = lerp3(c, [c[0] * 1.25 + 8.0, c[1] * 1.05 + 4.0, c[2] * 0.7], stain);
                 // the worn edges
-                let e = (u - 0.5).hypot(v - 0.45) / 0.72;
+                let e = (u / a - 0.5).hypot(v - 0.45) / 0.72;
                 let t = ((e - 0.45) / 0.55).clamp(0.0, 1.0);
                 let t = t * t * (3.0 - 2.0 * t) * 0.78;
                 c = lerp3(
@@ -676,7 +709,7 @@ pub fn background() -> &'static [u16] {
             }
         }
         out
-    })
+    }
 }
 
 fn hash(x: i32, y: i32) -> f32 {
@@ -756,6 +789,7 @@ mod tests {
             px: &mut px,
             stride: w,
             rect: (0, 0, w, h),
+            width: SCREEN_W,
         };
         for i in &items {
             draw(&mut win, i);
