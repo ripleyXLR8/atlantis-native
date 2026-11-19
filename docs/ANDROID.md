@@ -35,12 +35,13 @@ Either of these:
     also need their discs: a copy of each disc, or its image, in the
     installed game's folder, in a folder inside it, or in a folder
     beside it in the chosen folder. Atlantis II needs its four discs
-    there, as the game cannot be given another one while it runs;
+    there, as the game cannot be given another one while it runs.
+    Evolution's 2004 CD program is its installation: `Atlantis
+    Evolution.exe` beside the `cd0` .. `cd4` folders the installer made;
   - any of the above in a folder directly inside it.
 
   The files are read where they are, by parts, through the Storage Access
-  Framework. Nothing is copied. Evolution's 2004 CD program is played
-  from the app's own folder only, for now.
+  Framework. Nothing is copied.
 - **The app's own folder**, used when no chosen folder holds a game:
 
       /sdcard/Android/data/io.github.ripleyxlr8.atlantisnative/files/game
@@ -114,7 +115,14 @@ the app on the "no game" screen.
 - It runs the game full screen in landscape. Android's status and
   navigation bars are hidden; a swipe from the edge shows them for a
   moment. The display cutout is used.
-- It draws through softbuffer (`ANativeWindow`). Atlantis Evolution uses
+- It draws through softbuffer (`ANativeWindow`). Atlantis III and
+  Evolution's 2004 program write their picture at its own size into the
+  window's buffers, sized to its proportions with the black bars
+  (`android_frame.rs`, `ANativeWindow_setBuffersGeometry`); Android's
+  composer scales it to the screen on the graphics chip, so the picture
+  is smoothed rather than drawn in blocks. Through softbuffer, a frame
+  of Atlantis III took about 13 ms, most of it scaling 800x600 to the
+  screen's 2340x1080 and copying it twice. Atlantis Evolution uses
   OpenGL ES 3.0 through EGL, and the processor when that fails.
 - It plays the sound through cpal's AAudio output.
 - It keeps the screen on.
@@ -128,7 +136,6 @@ the app on the "no game" screen.
   the desktop.
 
 It does not yet:
-- play Atlantis II, III or Evolution from a chosen folder;
 - offer touch controls beyond the mouse and the gestures above (no
   on-screen buttons, no gamepad);
 - have a store listing.

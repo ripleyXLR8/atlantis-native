@@ -58,6 +58,8 @@ cpal = "0.16"
 android_logger = "0.15"
 # The activity's onDestroy, which winit 0.30 does not pass on (android.rs).
 ndk-sys = "0.6"
+# The window's buffers at the game's size (android_frame.rs).
+ndk = { version = "0.9", default-features = false }
 # The activity's Java helpers (the folder picker, android_saf.rs).
 jni-sys = "0.3"
 

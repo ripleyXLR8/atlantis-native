@@ -33,6 +33,7 @@
 //! back to the library's screen ([`crate::a2::Ended::Library`]), as for
 //! the other games.
 
+#[cfg(not(target_os = "android"))]
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -315,6 +316,9 @@ pub struct A3App {
     alt: bool,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// Android: the window's buffers at the game's size (android_frame.rs).
+    #[cfg(target_os = "android")]
+    frame: Option<crate::android_frame::Frame>,
     _audio: Option<cpal::Stream>,
     /// The game's screen size the window was last given.
     shown: (usize, usize),
@@ -369,6 +373,8 @@ impl A3App {
             alt: false,
             window: None,
             surface: None,
+            #[cfg(target_os = "android")]
+            frame: None,
             _audio: stream,
             shown,
             shift_until: None,
@@ -381,6 +387,44 @@ impl A3App {
         }
     }
 
+    /// Android: the picture through [`crate::android_frame`], scaled by
+    /// the system's composer.
+    #[cfg(target_os = "android")]
+    fn present(&mut self) {
+        let Some(window) = &self.window else {
+            return;
+        };
+        if self.frame.is_none() {
+            self.frame = crate::android_frame::Frame::new(window);
+        }
+        let Some(frame) = self.frame.as_mut() else {
+            return;
+        };
+        let size = window.inner_size();
+        let (gw, gh) = (self.game.width(), self.game.height());
+        self.shown = (gw, gh);
+        let window_size = (size.width as usize, size.height as usize);
+        let view = match self.game.surface() {
+            Surface::Rgb565(screen) => {
+                let lut = crate::android_frame::rgb565_lut();
+                frame.present(window_size, (gw, gh), |y, out| {
+                    for (o, &p) in out.iter_mut().zip(&screen[y * gw..][..gw]) {
+                        *o = lut[usize::from(p)];
+                    }
+                })
+            }
+            Surface::Xrgb8888(screen) => frame.present(window_size, (gw, gh), |y, out| {
+                for (o, &p) in out.iter_mut().zip(&screen[y * gw..][..gw]) {
+                    *o = crate::android_frame::from_xrgb(p);
+                }
+            }),
+        };
+        if let Some(view) = view {
+            self.view = view;
+        }
+    }
+
+    #[cfg(not(target_os = "android"))]
     fn present(&mut self) {
         let (Some(window), Some(surface)) = (&self.window, self.surface.as_mut()) else {
             return;
@@ -502,6 +546,7 @@ impl ApplicationHandler for A3App {
     #[cfg(target_os = "android")]
     fn suspended(&mut self, _el: &ActiveEventLoop) {
         self.surface = None;
+        self.frame = None;
         self.window = None;
         crate::android::pause_audio(&self._audio, true);
     }
@@ -878,8 +923,19 @@ pub fn run_evolution_2004_on(
     fullscreen: bool,
     shift_grace: bool,
 ) -> Result<Ended, String> {
-    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     let game = open_evolution_2004(dir, &evolution_2004_data_dir())?;
+    run_evolution_2004_game_on(el, game, fullscreen, shift_grace)
+}
+
+/// [`run_evolution_2004_on`] for a game already opened (Android: from a
+/// chosen folder, [`open_evolution_2004_in`]).
+pub fn run_evolution_2004_game_on(
+    el: &mut EventLoop<()>,
+    game: Game,
+    fullscreen: bool,
+    shift_grace: bool,
+) -> Result<Ended, String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     let mut app = A3App::new(game, fullscreen, true);
     app.evolution_2004 = true;
     app.started_from_library(shift_grace.then(|| Instant::now() + SHIFT_GRACE));
@@ -959,16 +1015,26 @@ pub fn evolution_2004_data_dir() -> PathBuf {
 /// `base` (the install's `datas\Atlantis4.cfg` until the menus write the
 /// player's own).
 pub fn open_evolution_2004(dir: &Path, base: &Path) -> Result<Game, String> {
+    open_evolution_2004_in(Arc::new(StdDir::new(dir)), dir, base)
+}
+
+/// [`open_evolution_2004`] for the installation read through `install`
+/// (Android: a chosen folder), named `shown` in the messages.
+pub fn open_evolution_2004_in(
+    install: Arc<dyn FileSource>,
+    shown: &Path,
+    base: &Path,
+) -> Result<Game, String> {
     use atlantis3_data::evolution2004::Evolution2004Source;
     let _ = std::fs::create_dir_all(base);
     let cfg_path = base.join("Atlantis4.cfg");
     let src = Evolution2004Source::new(Arc::new(WithCfg {
-        install: Arc::new(StdDir::new(dir)),
+        install,
         cfg: cfg_path.clone(),
         name: "datas/Atlantis4.cfg",
     }));
     let files = A3Files::evolution_2004(Arc::new(src));
-    let mut game = Game::new(files).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let mut game = Game::new(files).map_err(|e| format!("{}: {e}", shown.display()))?;
     game.save_dir = Some(base.join("save"));
     game.menus_mut().cfg_path = Some(cfg_path);
     log::info!(

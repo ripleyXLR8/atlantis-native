@@ -496,11 +496,7 @@ pub(crate) fn describe(path: &Path) -> crate::launcher::LauncherEntry {
             Some(GameKind::LostTales),
         ),
         FoundInTree::Other(game) => entry(other_label(&game), true, Some(game.kind)),
-        FoundInTree::Unsupported(name) => entry(
-            format!("Not found: {name} is played from the app's own folder for now"),
-            false,
-            None,
-        ),
+        FoundInTree::Unsupported(why) => entry(format!("Not found: {why}"), false, None),
         FoundInTree::Nothing(_) => entry(
             "Not found: this folder no longer holds the game".to_string(),
             false,
@@ -527,6 +523,9 @@ fn other_label(game: &OtherGame) -> String {
         GameKind::Atlantis3 => atlantis3_data::A3Files::new(game.install.clone())
             .edition_label()
             .ok(),
+        GameKind::Atlantis4 if game.evolution_2004 => evolution_2004_build(&*game.install)
+            .and_then(Result::ok)
+            .map(atlantis3_data::evolution2004::edition_label),
         GameKind::Atlantis4 => {
             let files = atlantis4_data::A4Files::new(game.install.clone());
             files
@@ -578,8 +577,8 @@ enum FoundInTree {
     /// Atlantis II, III or Evolution, played in its own mode after the
     /// first game's front end ([`android_main`]).
     Other(OtherGame),
-    /// A game not played from a chosen folder yet (its name).
-    Unsupported(&'static str),
+    /// A game's program without what it needs to be played (why).
+    Unsupported(String),
     Nothing(String),
 }
 
@@ -590,6 +589,24 @@ pub(crate) struct OtherGame {
     kind: crate::setup::GameKind,
     install: Arc<dyn atlantis_data::FileSource>,
     discs: Vec<(String, Arc<dyn atlantis_data::FileSource>)>,
+    /// Atlantis Evolution's 2004 program (the CD's installation, played
+    /// by Atlantis III's engine), not GOG.com's.
+    evolution_2004: bool,
+}
+
+/// The 2004 program's installation in `src` (its program beside
+/// `cd0\datas\scenar`, as [`crate::a3::holds_evolution_2004`]): which
+/// known build its program is.
+fn evolution_2004_build(
+    src: &dyn atlantis_data::FileSource,
+) -> Option<
+    Result<&'static atlantis3_data::evolution2004::Build, atlantis3_data::evolution2004::ExeError>,
+> {
+    use atlantis3_data::evolution2004::{identify, EXE_NAME};
+    if !src.has_dir("cd0/datas/scenar") {
+        return None;
+    }
+    Some(identify(&src.read(EXE_NAME)?))
 }
 
 /// The game in the chosen folder `tree` or in a folder directly inside it
@@ -605,7 +622,7 @@ fn find_game_in_tree(tree: &str) -> FoundInTree {
     let candidates: Vec<Arc<crate::android_saf::SafDir>> =
         std::iter::once(top).chain(subs).map(Arc::new).collect();
     let mut first_error = None;
-    let mut other: Option<(GameKind, usize)> = None;
+    let mut other: Option<(GameKind, usize, bool)> = None;
     let mut unsupported = None;
     for (i, c) in candidates.iter().enumerate() {
         // The other games, by their program files, then checked.
@@ -616,17 +633,28 @@ fn find_game_in_tree(tree: &str) -> FoundInTree {
             if (has("atlantis2.exe") || (has("game.exe") && !has("datas")))
                 && atlantis2_data::files::find_exe(&*src).is_ok()
             {
-                other = Some((GameKind::Atlantis2, i));
+                other = Some((GameKind::Atlantis2, i, false));
             } else if has("datas")
                 && (has("game.exe") || has("atlantis3.exe"))
                 && atlantis3_data::A3Files::new(src.clone()).build().is_ok()
             {
-                other = Some((GameKind::Atlantis3, i));
+                other = Some((GameKind::Atlantis3, i, false));
             } else if has("atlantis evolution.exe") {
-                if atlantis4_data::A4Files::new(src).build().is_ok() {
-                    other = Some((GameKind::Atlantis4, i));
+                if atlantis4_data::A4Files::new(src.clone()).build().is_ok() {
+                    other = Some((GameKind::Atlantis4, i, false));
                 } else {
-                    unsupported.get_or_insert("Atlantis Evolution (2004)");
+                    match evolution_2004_build(&*src) {
+                        Some(Ok(_)) => other = Some((GameKind::Atlantis4, i, true)),
+                        Some(Err(e)) => {
+                            unsupported.get_or_insert(format!("Atlantis Evolution (2004): {e}"));
+                        }
+                        None => {
+                            unsupported.get_or_insert(
+                                "Atlantis Evolution's program is here, but not its data"
+                                    .to_string(),
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -648,7 +676,7 @@ fn find_game_in_tree(tree: &str) -> FoundInTree {
             }
         }
     }
-    if let Some((kind, i)) = other {
+    if let Some((kind, i, evolution_2004)) = other {
         log::info!("chosen folder: {}", game_name(kind));
         let install = candidates[i].clone();
         let mut dirs: Vec<Arc<crate::android_saf::SafDir>> = candidates
@@ -670,6 +698,7 @@ fn find_game_in_tree(tree: &str) -> FoundInTree {
             kind,
             install,
             discs,
+            evolution_2004,
         });
     }
     match unsupported {
@@ -693,6 +722,14 @@ fn run_tree_game(el: &mut EventLoop<()>, game: OtherGame) -> Result<(), String> 
             let (g, _) =
                 crate::a3::open_source_in(game.install, game.discs, shown, &crate::a3::data_dir())?;
             crate::a3::run_window_on(el, g, true, false).map(|_| ())
+        }
+        GameKind::Atlantis4 if game.evolution_2004 => {
+            let g = crate::a3::open_evolution_2004_in(
+                game.install,
+                shown,
+                &crate::a3::evolution_2004_data_dir(),
+            )?;
+            crate::a3::run_evolution_2004_game_on(el, g, true, false).map(|_| ())
         }
         GameKind::Atlantis4 => {
             let files = atlantis4_data::A4Files::new(game.install);
@@ -816,9 +853,7 @@ impl App {
                 self.android_other = Some(game);
                 Ok(())
             }
-            FoundInTree::Unsupported(name) => Err(format!(
-                "{name} is played from the app's own folder for now"
-            )),
+            FoundInTree::Unsupported(why) => Err(why),
             FoundInTree::Nothing(why) => Err(if why.is_empty() {
                 "No game found in this folder".to_string()
             } else {

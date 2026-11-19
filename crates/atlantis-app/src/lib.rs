@@ -49,6 +49,8 @@ mod a4_wasm_tests;
 #[cfg(target_os = "android")]
 mod android;
 #[cfg(target_os = "android")]
+mod android_frame;
+#[cfg(target_os = "android")]
 mod android_saf;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
