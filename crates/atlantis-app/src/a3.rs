@@ -660,6 +660,8 @@ impl ApplicationHandler for A3App {
                     _ => {}
                 }
             }
+            // (none before the game's window: the game starts with it)
+            WindowEvent::RedrawRequested if self.window.is_none() => {}
             WindowEvent::RedrawRequested => {
                 if self.shift_until.is_some_and(|t| Instant::now() >= t) {
                     self.shift_until = None;

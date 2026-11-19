@@ -146,6 +146,9 @@ pub struct EventLoop<T: 'static> {
     /// Atlantis Native's patch: the loop ran before (`run_app_on_demand`
     /// again on this event loop).
     ran_before: bool,
+    /// Atlantis Native's patch: `Resumed` to send at the next iteration's
+    /// start (a later run of the loop while the window is there).
+    resume_first: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -196,6 +199,7 @@ impl<T: 'static> EventLoop<T> {
             ignore_volume_keys: attributes.ignore_volume_keys,
             combining_accent: None,
             ran_before: false,
+            resume_first: false,
         })
     }
 
@@ -210,6 +214,11 @@ impl<T: 'static> EventLoop<T> {
         let mut resized = false;
 
         callback(event::Event::NewEvents(cause), self.window_target());
+
+        // Atlantis Native's patch (see `pump_events`).
+        if std::mem::take(&mut self.resume_first) {
+            callback(event::Event::Resumed, self.window_target());
+        }
 
         if let Some(event) = main_event {
             trace!("Handling main event {:?}", event);
@@ -524,19 +533,21 @@ impl<T: 'static> EventLoop<T> {
             self.pending_redraw = false;
             self.cause = StartCause::Init;
 
-            // run the initial loop iteration
-            self.single_iteration(None, &mut callback);
-
             // Atlantis Native's patch: a later run of the loop (another
             // application handler, `run_app_on_demand`) while the window is
             // there gets `Resumed` too, as the first got it when Android
             // made the window (no `InitWindow` comes for the window already
-            // made).
+            // made), first thing after `NewEvents(Init)`; a redraw the
+            // previous handler asked for is not handed to this one.
             let again = std::mem::replace(&mut self.ran_before, true);
-            if again && self.running && self.android_app.native_window().is_some() && !self.exiting()
-            {
-                callback(event::Event::Resumed, self.window_target());
+            self.resume_first =
+                again && self.running && self.android_app.native_window().is_some();
+            if again {
+                self.redraw_flag.get_and_reset();
             }
+
+            // run the initial loop iteration
+            self.single_iteration(None, &mut callback);
         }
 
         // Consider the possibility that the `StartCause::Init` iteration could
