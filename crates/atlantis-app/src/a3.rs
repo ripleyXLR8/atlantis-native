@@ -322,6 +322,9 @@ pub struct A3App {
     shift_until: Option<Instant>,
     /// The window ended for the game library's screen.
     to_library: bool,
+    /// The game was started (its intro, logos or start page), at the
+    /// first window.
+    started: bool,
     /// The 2004 program ([`run_evolution_2004`]): its start-up logos and
     /// start page in place of the intro.
     evolution_2004: bool,
@@ -364,6 +367,7 @@ impl A3App {
             shown,
             shift_until: None,
             to_library: false,
+            started: false,
             evolution_2004: false,
         }
     }
@@ -529,6 +533,13 @@ impl ApplicationHandler for A3App {
         self.window = Some(window);
         self.focused = true;
         self.grab();
+        // Android: a window made again (the app back from the background)
+        // goes on where the game was; only the first starts it.
+        if self.started {
+            self.next_frame = Instant::now();
+            return;
+        }
+        self.started = true;
         self.start = Instant::now();
         self.next_frame = self.start;
         if self.evolution_2004 {
