@@ -98,7 +98,9 @@ In Atlantis III, whose original reads only the mouse's moves, a finger
 puts the pointer where it is on the menus, the inventory, the subject
 menu, the dialogs and the puzzles (a tap is a click there); on the
 panorama a drag turns the view and a tap clicks where it points. Two
-fingers are a right click.
+fingers are a right click. A tap during a cinematic or the start-up's
+videos stops it, as Space does (a click does not in the original);
+Back does too, as Escape. A tap ends a travel video, as a click does.
 
 The on-screen keyboard opens while the first game's player screen takes
 a name. The game's picture is then drawn smaller, above the keyboard. If

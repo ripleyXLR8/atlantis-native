@@ -735,6 +735,7 @@ impl ApplicationHandler for A3App {
                     Some(Press::Down) => self.game.click(),
                     Some(Press::Up) => self.game.release(),
                     Some(Press::Right) => self.game.right_click(),
+                    Some(Press::Skip) => self.game.skip(),
                     None => {}
                 }
                 self.game.step(now);
@@ -790,6 +791,8 @@ enum Press {
     Down,
     Up,
     Right,
+    /// Space: the cinematic stops ([`Game::skip`]).
+    Skip,
 }
 
 #[cfg(target_os = "android")]
@@ -877,6 +880,14 @@ impl A3App {
                 if self.touch.primary == Some(t.id) && !self.touch.two {
                     if std::mem::take(&mut self.touch.pressed) {
                         self.touch.queue.push_back(Press::Up);
+                    } else if !self.touch.moved
+                        && t.phase == TouchPhase::Ended
+                        && self.game.skippable()
+                    {
+                        // A tap during a cinematic: Space, the key that
+                        // stops it (the phone has no keyboard; the
+                        // original's click does not stop it).
+                        self.touch.queue.push_back(Press::Skip);
                     } else if !self.touch.moved && t.phase == TouchPhase::Ended {
                         // A tap on the panorama: a click where it points.
                         self.touch.queue.push_back(Press::Down);
