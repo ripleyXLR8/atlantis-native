@@ -1,0 +1,616 @@
+//! The game manager (`CGameManager`): its states and request queue, the
+//! script runs and the calls that wait, the named timers and the view
+//! transition of `Atl_Address_Go`.
+//!
+//! Addresses are atlantis5-dvd-int-3891200's.
+//!
+//! - `Process` (@ 0x0042f000) switches on the manager's state (+0x30):
+//!   1 runs the C string `return InitChapter` with the scripts' folder and
+//!   the chapter (+0x50, nil when 0) under `lua_pcall`; 4 is play (camera,
+//!   events, timers, sound); 2 load, 3 a menu (game over), 7 the end of a
+//!   game; 0 takes the next request. A request is an int in a queue
+//!   (+0x04..+0x2c); `Atl_InitChapter(n)` stores n and queues 1 then 4,
+//!   `Atl_GameOver` queues 3 (unless in 3), `Atl_Load` 2,
+//!   `Atl_TerminateGame` 7. The next request is taken (@ 0x0042ef30,
+//!   set @ 0x0042fb90) when state 1 ends, in state 0, and in state 4 at
+//!   the start of a frame when the queue is not empty.
+//! - A new game (@ 0x0042fc50): the autosave `autoslot` is deleted, the
+//!   `atl` database made (@ 0x00401010), then `atlantis.lua` and
+//!   `on_new_game.lua` run.
+//! - The handlers that run over frames do it in a loop of their own
+//!   (`Atl_Address_Go` @ 0x00405390, `Atl_Video_Play` @ 0x0040c990): the
+//!   script that called waits. Here the script is a coroutine that
+//!   yields at the call and is resumed when it is over.
+
+use std::collections::{BTreeMap, VecDeque};
+
+use crate::engine::{Call, Event, Fx, Request, Value};
+use crate::script::{EngineRef, Outcome, Pending, Script, Task, SCRIPTS_DIR};
+
+/// What a script run waits for.
+#[derive(Clone, Debug, PartialEq)]
+enum Block {
+    /// A call the engine runs over frames.
+    Engine,
+    /// The transition at this depth of the transition stack.
+    Transition(usize),
+}
+
+/// A script run on the stack of runs.
+struct Run {
+    task: Task,
+    /// Arguments of the first resume.
+    args: Option<Vec<Value>>,
+    block: Option<Block>,
+    /// The `on_enter_view` run of a transition (the transition goes on
+    /// when it ends).
+    enter_view: bool,
+    /// The chapter run of state 1 (the next request is taken when it ends).
+    chapter: bool,
+}
+
+/// `Atl_Address_Go`'s transition (the step @ 0x0042d900 on the object
+/// set up @ 0x0042d580 / 0x0042d610).
+#[derive(Clone, Debug)]
+struct Transition {
+    scene: Vec<u8>,
+    view: i32,
+    fx: Fx,
+    /// +0x94: 0 before the view change, 1 the change, 2 after.
+    phase: u32,
+    /// +0x08: the time in the phase (seconds, single float).
+    t: f32,
+    /// +0x10: the camera's field of view when the transition started
+    /// (radians; the camera's +0xc0).
+    fov0: f32,
+    /// The view change happened and its `on_enter_view` run is going.
+    entering: bool,
+}
+
+/// A named timer (`Atl_Timer_Create`, the timer list @ 0x00435770: a map
+/// by name, so the timers of a frame end in name order).
+#[derive(Clone, Debug, PartialEq)]
+struct Timer {
+    /// +0x30: the duration (seconds).
+    duration: f64,
+    /// The clock when it (re)started.
+    start: f64,
+    /// +0x44: the repeats left; -1 for ever.
+    repeat: i32,
+}
+
+/// The game.
+pub struct Game {
+    script: Script,
+    engine: EngineRef,
+    /// +0x30 and +0x34.
+    state: u32,
+    previous: u32,
+    queue: VecDeque<u32>,
+    /// +0x50: the chapter `Atl_InitChapter` gave.
+    chapter: u32,
+    runs: Vec<Run>,
+    transitions: Vec<Transition>,
+    timers: BTreeMap<Vec<u8>, Timer>,
+    /// The game clock (seconds).
+    clock: f64,
+    /// The camera's field of view as the engine last set it (radians),
+    /// which `zoom_and_fade` starts from.
+    fov: f32,
+}
+
+impl Game {
+    /// A game with its Lua state (no game started).
+    pub fn new(engine: EngineRef) -> rilua::LuaResult<Self> {
+        Ok(Self {
+            script: Script::new(engine.clone())?,
+            engine,
+            state: 0,
+            previous: 0,
+            queue: VecDeque::new(),
+            chapter: 0,
+            runs: Vec::new(),
+            transitions: Vec::new(),
+            timers: BTreeMap::new(),
+            clock: 0.0,
+            fov: 0.0,
+        })
+    }
+
+    pub fn script(&mut self) -> &mut Script {
+        &mut self.script
+    }
+
+    /// The manager's state (+0x30).
+    pub fn state(&self) -> u32 {
+        self.state
+    }
+
+    /// Whether a script is running or waiting (the original is inside a
+    /// handler's loop or a script; no event is taken then).
+    pub fn busy(&self) -> bool {
+        !self.runs.is_empty() || !self.transitions.is_empty()
+    }
+
+    /// Whether the engine is running a call the scripts wait for.
+    pub fn waiting_for_engine(&self) -> bool {
+        self.runs.iter().any(|r| r.block == Some(Block::Engine))
+    }
+
+    /// The names of the timers, in their order.
+    pub fn timer_names(&self) -> Vec<Vec<u8>> {
+        self.timers.keys().cloned().collect()
+    }
+
+    /// The field of view the engine shows (radians), kept for
+    /// `zoom_and_fade`.
+    pub fn set_fov(&mut self, radians: f32) {
+        self.fov = radians;
+    }
+
+    fn event(&self, e: &Event<'_>) {
+        self.engine.borrow_mut().event(e);
+    }
+
+    fn note(&self, s: String) {
+        self.event(&Event::Note(s));
+    }
+
+    fn request(&self, r: &Request) {
+        self.engine.borrow_mut().request(r);
+    }
+
+    fn scripts_path(name: &[u8]) -> Vec<u8> {
+        let mut p = SCRIPTS_DIR.to_vec();
+        p.extend_from_slice(name);
+        p
+    }
+
+    fn push_file(&mut self, path: &[u8], enter_view: bool) -> bool {
+        match self.script.file_task(path) {
+            Some(task) => {
+                self.runs.push(Run {
+                    task,
+                    args: None,
+                    block: None,
+                    enter_view,
+                    chapter: false,
+                });
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// A new game (@ 0x0042fc50): the autosave deleted, the database made,
+    /// `atlantis.lua` then `on_new_game.lua`. The manager then takes the
+    /// queued requests (the chapter, then play).
+    pub fn new_game(&mut self) {
+        self.request(&Request::DeleteAutosave);
+        if let Err(e) = self.script.create_database() {
+            self.note(format!("CreateAtlantisDatabase: {e}"));
+        }
+        // Each file runs to its end before the next (EvaluateScriptFile).
+        for name in [&b"atlantis.lua"[..], b"on_new_game.lua"] {
+            let path = Self::scripts_path(name);
+            if self.push_file(&path, false) {
+                self.run();
+            }
+        }
+        self.state = 0;
+    }
+
+    /// The `on_click_<scene>.lua` of the current view (@ 0x0042f890).
+    fn run_on_click(&mut self) {
+        let (scene, _) = self.script.address();
+        let mut name = b"on_click_".to_vec();
+        name.extend_from_slice(&scene);
+        name.extend_from_slice(b".lua");
+        let path = Self::scripts_path(&name);
+        if self.push_file(&path, false) {
+            self.run();
+        }
+    }
+
+    /// A click on a zone of the view (@ 0x004300d0 → 0x004017c0,
+    /// 0x0042f890): `atl.event` filled, then the scene's `on_click`
+    /// script. Ignored while a script runs.
+    pub fn click_zone(&mut self, id: i32, name: &[u8]) -> bool {
+        if self.busy() || self.state != 4 {
+            return false;
+        }
+        self.script.set_click_zone(id, name);
+        self.run_on_click();
+        true
+    }
+
+    /// A click on a sprite: `click_sprite` and the scene's `on_click`.
+    pub fn click_sprite(&mut self, name: &[u8], animation: &[u8]) -> bool {
+        if self.busy() || self.state != 4 {
+            return false;
+        }
+        self.script.set_click_sprite(name, animation);
+        self.run_on_click();
+        true
+    }
+
+    /// A timer's end as @ 0x00405ae0 handles it: the `timer` event and
+    /// the scene's `on_click` (the timers call it when their time is up).
+    pub fn timer_event(&mut self, name: &[u8]) -> bool {
+        if self.busy() || self.state != 4 {
+            return false;
+        }
+        self.script.set_timer_event(name);
+        self.run_on_click();
+        true
+    }
+
+    /// `atl.zones[name]` (type, active).
+    pub fn zone(&mut self, name: &[u8]) -> Option<(i32, bool)> {
+        self.script.zone(name)
+    }
+
+    /// The engine has ended a call the scripts wait for (a film, an
+    /// animated look).
+    pub fn finish_wait(&mut self) {
+        if let Some(r) = self
+            .runs
+            .iter_mut()
+            .rev()
+            .find(|r| r.block == Some(Block::Engine))
+        {
+            r.block = None;
+        }
+        self.run();
+    }
+
+    /// The calls of the last resume that belong to the manager.
+    fn manager_calls(&mut self) {
+        for call in self.script.take_manager_calls() {
+            match call {
+                Call::TimerCreate {
+                    name,
+                    duration,
+                    repeat,
+                } => {
+                    if self.timers.contains_key(&name) {
+                        // 0x0066b010
+                        self.note(format!(
+                            "Atl_Timer_Create: a timer named {} exists already",
+                            String::from_utf8_lossy(&name)
+                        ));
+                    } else {
+                        self.timers.insert(
+                            name,
+                            Timer {
+                                duration,
+                                start: self.clock,
+                                repeat,
+                            },
+                        );
+                    }
+                }
+                Call::TimerDestroy { name } => {
+                    self.timers.remove(&name);
+                }
+                Call::TimerClearAll => self.timers.clear(),
+                // @ 0x0040c5b0 → 0x004356b0, 0x004680a0: the duration only;
+                // the time already run stays.
+                Call::TimerSetDuration { name, duration } => match self.timers.get_mut(&name) {
+                    Some(t) => t.duration = duration,
+                    None => self.note(format!(
+                        "Atl_Timer_SetDuration: no timer {}",
+                        String::from_utf8_lossy(&name)
+                    )),
+                },
+                Call::InitChapter(n) => {
+                    self.chapter = n;
+                    self.queue.push_back(1);
+                    self.queue.push_back(4);
+                }
+                Call::GameOver(_) => {
+                    if self.state != 3 {
+                        self.queue.push_back(3);
+                    }
+                }
+                Call::Load => self.queue.push_back(2),
+                Call::TerminateGame => self.queue.push_back(7),
+                _ => {}
+            }
+        }
+    }
+
+    /// Runs the script runs until each one waits or none is left.
+    fn run(&mut self) {
+        loop {
+            let Some(top) = self.runs.last_mut() else {
+                return;
+            };
+            if top.block.is_some() {
+                return;
+            }
+            let task = top.task.clone();
+            let args = top.args.take().unwrap_or_default();
+            let what = task.what.clone();
+            self.event(&Event::Run(&what));
+            let outcome = self.script.resume(&task, &args);
+            self.manager_calls();
+            match outcome {
+                Outcome::Finished => {
+                    self.event(&Event::End(&what));
+                    self.end_run();
+                }
+                Outcome::Error(m) => {
+                    // The original throws (EvaluateScriptFile @ 0x00454410,
+                    // Process @ 0x0042f000 for the chapter) and the game
+                    // stops; Native reports it and ends that run.
+                    let site = if what.starts_with(b"./") {
+                        crate::engine::ErrorSite::File(what.clone())
+                    } else {
+                        crate::engine::ErrorSite::String(what.clone())
+                    };
+                    self.event(&Event::Error(site, &m));
+                    self.end_run();
+                }
+                Outcome::Waiting(Pending::Engine(_)) => {
+                    if let Some(r) = self.runs.last_mut() {
+                        r.block = Some(Block::Engine);
+                    }
+                    return;
+                }
+                Outcome::Waiting(Pending::Transition { scene, view, fx }) => {
+                    let depth = self.transitions.len();
+                    if let Some(r) = self.runs.last_mut() {
+                        r.block = Some(Block::Transition(depth));
+                    }
+                    self.start_transition(scene, view, fx);
+                    return;
+                }
+            }
+        }
+    }
+
+    fn end_run(&mut self) {
+        let Some(run) = self.runs.pop() else {
+            return;
+        };
+        if run.enter_view {
+            if let Some(t) = self.transitions.last_mut() {
+                t.entering = false;
+            }
+            // no_fx and centring end with the view change.
+            self.continue_transition(0.0);
+        }
+        if run.chapter {
+            self.next_request();
+        }
+    }
+
+    /// The transition's set-up (@ 0x0042d580, 0x0042d8d0 → 0x0042d610):
+    /// the camera's field of view kept, time and phase 0.
+    fn start_transition(&mut self, scene: Vec<u8>, view: i32, fx: Fx) {
+        if fx == Fx::Centring {
+            // @ 0x0042d610 → 0x0042cac0: the camera turns toward the
+            // clicked zone first [not ported: the view changes at once].
+            self.note("centring: the turn toward the zone is not ported".into());
+        }
+        self.transitions.push(Transition {
+            scene,
+            view,
+            fx,
+            phase: 0,
+            t: 0.0,
+            fov0: self.fov,
+            entering: false,
+        });
+        if fx != Fx::ZoomAndFade {
+            self.change_view();
+        }
+    }
+
+    /// The view change of the step (@ 0x0042d900): the view loaded
+    /// (@ 0x0044b590), `atl.address` set (@ 0x00401f20), then
+    /// `on_enter_view_<scene>.lua` (missing: logged, nothing runs).
+    fn change_view(&mut self) {
+        let Some(t) = self.transitions.last_mut() else {
+            return;
+        };
+        let (scene, view) = (t.scene.clone(), t.view);
+        t.entering = true;
+        self.request(&Request::LoadView {
+            scene: scene.clone(),
+            view,
+        });
+        self.script.set_entered_view(&scene, view);
+        let mut name = b"on_enter_view_".to_vec();
+        name.extend_from_slice(&scene);
+        name.extend_from_slice(b".lua");
+        let path = Self::scripts_path(&name);
+        if self.push_file(&path, true) {
+            self.run();
+        } else if let Some(t) = self.transitions.last_mut() {
+            t.entering = false;
+            self.continue_transition(0.0);
+        }
+    }
+
+    /// One step of the transition on top, `dt` seconds on.
+    #[allow(clippy::cast_possible_truncation)]
+    fn continue_transition(&mut self, dt: f32) {
+        let Some(t) = self.transitions.last_mut() else {
+            return;
+        };
+        if t.entering {
+            return;
+        }
+        let pi = f32::from_bits(0x4049_0fdb);
+        // 0x00655748: 1/9 (20° of π).
+        let ninth = f32::from_bits(0x3de3_8e39);
+        let done = match t.fx {
+            // no_fx (fx 0) and centring (fx 1) end with the view change.
+            Fx::NoFx | Fx::Centring => true,
+            Fx::ZoomAndFade => match t.phase {
+                0 => {
+                    // t += dt; k = min(t · 4, 1) (0x00655740);
+                    // fov = fov0 − k · π · (1/9); phase 1 after 0.25 s.
+                    t.t += dt;
+                    let k = (t.t * 4.0).min(1.0);
+                    let fov = t.fov0 - k * pi * ninth;
+                    self.engine.borrow_mut().request(&Request::TransitionFov {
+                        radians: fov,
+                        fade: k,
+                    });
+                    if t.t > 0.25 {
+                        t.phase = 1;
+                    }
+                    false
+                }
+                1 => {
+                    t.phase = 2;
+                    t.t = 0.0;
+                    self.change_view();
+                    false
+                }
+                _ => {
+                    // k = max(1 − t · 2.857143 (0x0065574c), 0);
+                    // fov = (π/9 + fov0) − (1 − k) · π/9; ends after 0.35 s
+                    // (0x00655744) with fov0.
+                    t.t += dt;
+                    let k = (1.0 - t.t * f32::from_bits(0x4036_db6e)).max(0.0);
+                    let fov = (pi * ninth + t.fov0) - (1.0 - k) * pi * ninth;
+                    if t.t <= f32::from_bits(0x3eb3_3333) {
+                        self.engine.borrow_mut().request(&Request::TransitionFov {
+                            radians: fov,
+                            fade: k,
+                        });
+                        false
+                    } else {
+                        self.engine.borrow_mut().request(&Request::TransitionFov {
+                            radians: t.fov0,
+                            fade: 0.0,
+                        });
+                        true
+                    }
+                }
+            },
+        };
+        if done {
+            let depth = self.transitions.len() - 1;
+            self.transitions.pop();
+            self.request(&Request::TransitionEnd);
+            if let Some(r) = self
+                .runs
+                .iter_mut()
+                .rev()
+                .find(|r| r.block == Some(Block::Transition(depth)))
+            {
+                r.block = None;
+            }
+            self.run();
+        }
+    }
+
+    /// The next request (@ 0x0042ef30 + 0x0042fb90).
+    fn next_request(&mut self) {
+        let next = self.queue.pop_front().unwrap_or(self.previous);
+        if next != self.state {
+            self.note(format!("game manager: state {} -> {next}", self.state));
+            self.previous = self.state;
+            self.state = next;
+        }
+    }
+
+    /// State 1: `return InitChapter` called with the scripts' folder and
+    /// the chapter (nil for 0), then the next request.
+    fn init_chapter(&mut self) {
+        let chapter = if self.chapter == 0 {
+            Value::Nil
+        } else {
+            Value::Num(f64::from(self.chapter))
+        };
+        self.chapter = 0;
+        let path = Value::Str(SCRIPTS_DIR.to_vec());
+        match self
+            .script
+            .string_task("return InitChapter", vec![path, chapter])
+        {
+            Some((task, args)) => {
+                self.runs.push(Run {
+                    task,
+                    args: Some(args),
+                    block: None,
+                    enter_view: false,
+                    chapter: true,
+                });
+                self.run();
+            }
+            None => self.next_request(),
+        }
+    }
+
+    /// The timers (@ 0x00435a70 → 0x004353d0), in name order: one whose
+    /// time is up (remaining ≤ 0, 0x00655468) sets the `timer` event and
+    /// runs the scene's `on_click` (@ 0x00405ae0); then its repeats go
+    /// down (−1: for ever) and it starts again unless none is left.
+    fn timers(&mut self) {
+        let names: Vec<Vec<u8>> = self.timers.keys().cloned().collect();
+        for name in names {
+            if self.busy() {
+                return;
+            }
+            let Some(t) = self.timers.get(&name) else {
+                continue;
+            };
+            let remaining = t.duration - (self.clock - t.start);
+            if remaining > 0.0 {
+                continue;
+            }
+            self.timer_event(&name);
+            if let Some(t) = self.timers.get_mut(&name) {
+                if t.repeat > 0 {
+                    t.repeat -= 1;
+                }
+                if t.repeat != 0 {
+                    // Restarted from now [INFERRED: the restart's argument
+                    // is the timer's own remaining time, not checked].
+                    t.start = self.clock;
+                } else {
+                    self.timers.remove(&name);
+                }
+            }
+        }
+    }
+
+    /// One frame of `dt` seconds.
+    pub fn update(&mut self, dt: f64) {
+        self.clock += dt;
+        self.run();
+        if self.waiting_for_engine() {
+            return;
+        }
+        if !self.transitions.is_empty() {
+            #[allow(clippy::cast_possible_truncation)]
+            self.continue_transition(dt as f32);
+            return;
+        }
+        if !self.runs.is_empty() {
+            return;
+        }
+        match self.state {
+            0 => self.next_request(),
+            1 => self.init_chapter(),
+            4 => {
+                if !self.queue.is_empty() {
+                    self.next_request();
+                    return;
+                }
+                self.timers();
+            }
+            s => {
+                // 2 (load), 3 (menus, game over), 7 (end of a game):
+                // the next milestones.
+                let _ = s;
+            }
+        }
+    }
+}
