@@ -30,7 +30,7 @@ pub mod script;
 
 pub use engine::{
     number_text, Binding, Call, CameraFx, Engine, ErrorSite, Event, Fx, Limit, PlayType, Reply,
-    Request, Value, BINDINGS,
+    Request, Semantic, Value, BINDINGS,
 };
 pub use game::Game;
 pub use rilua;

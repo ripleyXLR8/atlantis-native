@@ -4,10 +4,11 @@
 //! ([`atlantis3_data::atlantis5::Atlantis5Source`]), then the new game's
 //! game played from a new game: the player's own scripts run
 //! ([`atlantis5_script`] through [`atlantis3_engine::atlantis5_play`]).
-//! A click on the view clicks its zone; a drag with the left button looks
-//! around; Escape or Space ends a film; Escape out of a film, or closing
-//! the window, ends the game. Dialogs, inventory, menus and saves are the
-//! next milestones.
+//! As in the original, the mouse turns the view (its relative moves, the
+//! system cursor hidden and kept in the window) and a left click acts on
+//! what is under the screen centre; Escape or Space ends a film; Escape out
+//! of a film, or closing the window, ends the game. Dialogs, inventory,
+//! menus, the game's own cursors and saves are the next milestones.
 
 use std::num::NonZeroU32;
 use std::path::Path;
@@ -21,10 +22,10 @@ use atlantis3_engine::atlantis5_play::Play;
 use atlantis3_engine::audio::Audio;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::{ElementState, MouseButton, WindowEvent};
+use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
-use winit::window::{Fullscreen, Window, WindowId};
+use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 
 /// The data at `path` and what they are, for people: the build of the
 /// program beside them (when there is one), the form, the languages.
@@ -113,11 +114,9 @@ struct A5App {
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
     last: Instant,
-    /// The cursor in view pixels; the left button's press point and
-    /// whether it was dragged.
-    cursor: (f32, f32),
-    pressed: Option<(f32, f32)>,
-    dragged: bool,
+    /// Whether the window has the focus (the mouse's moves turn the view
+    /// only then).
+    focused: bool,
     _audio: Option<cpal::Stream>,
 }
 
@@ -206,8 +205,24 @@ impl ApplicationHandler for A5App {
                 return;
             }
         }
+        // The original hides the system cursor (ShowCursor(0) at start,
+        // @ 0x0043c200) and reads the mouse's relative moves (DirectInput).
+        window.set_cursor_visible(false);
+        if window.set_cursor_grab(CursorGrabMode::Locked).is_err() {
+            let _ = window.set_cursor_grab(CursorGrabMode::Confined);
+        }
         self.window = Some(window);
+        self.focused = true;
         self.last = Instant::now();
+    }
+
+    fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
+        if let DeviceEvent::MouseMotion { delta } = event {
+            if self.focused {
+                #[allow(clippy::cast_possible_truncation)]
+                self.play.look(delta.0 as f32, delta.1 as f32);
+            }
+        }
     }
 
     fn about_to_wait(&mut self, _el: &ActiveEventLoop) {
@@ -232,41 +247,14 @@ impl ApplicationHandler for A5App {
                     _ => {}
                 }
             }
-            WindowEvent::CursorMoved { position, .. } => {
-                let (ox, oy, dw, dh) = self.place();
-                let x = (position.x as f32 - ox as f32) * VIEW_WIDTH as f32 / dw as f32;
-                let y = (position.y as f32 - oy as f32) * VIEW_HEIGHT as f32 / dh as f32;
-                let (dx, dy) = (x - self.cursor.0, y - self.cursor.1);
-                self.cursor = (x, y);
-                if let Some(p) = self.pressed {
-                    if (x - p.0).abs() + (y - p.1).abs() > 4.0 {
-                        self.dragged = true;
-                    }
-                    if self.dragged {
-                        self.play.look(dx, dy, 1.0 / 60.0);
-                    }
-                }
-            }
+            WindowEvent::Focused(f) => self.focused = f,
+            // A press of the left button: the original's mouse event of
+            // kind 0 with the buttons 1 (@ 0x0043bbc0).
             WindowEvent::MouseInput {
-                state,
+                state: ElementState::Pressed,
                 button: MouseButton::Left,
                 ..
-            } => match state {
-                ElementState::Pressed => {
-                    self.pressed = Some(self.cursor);
-                    self.dragged = false;
-                }
-                ElementState::Released => {
-                    if self.pressed.take().is_some() && !self.dragged {
-                        if self.play.stage().film_playing() {
-                            self.play.skip();
-                        } else {
-                            let (x, y) = self.cursor;
-                            self.play.click(x, y);
-                        }
-                    }
-                }
-            },
+            } => self.play.click(),
             WindowEvent::RedrawRequested => self.frame(),
             _ => {}
         }
@@ -296,9 +284,7 @@ pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
         window: None,
         surface: None,
         last: Instant::now(),
-        cursor: (0.0, 0.0),
-        pressed: None,
-        dragged: false,
+        focused: false,
         _audio: out,
     };
     el.run_app(&mut app)

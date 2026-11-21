@@ -221,6 +221,15 @@ impl Value {
     }
 }
 
+/// What an object is (`atl.objects.<name>.semantic`, @ 0x00402db0).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Semantic {
+    /// `item` (0).
+    Item,
+    /// `character` (1).
+    Character,
+}
+
 /// `Atl_Address_Go`'s transition (@ 0x00405390: the third argument
 /// compared with these names; two arguments give `centring`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -417,6 +426,10 @@ pub enum Request {
     TransitionEnd,
     /// Delete the autosave (`autoslot`, @ 0x0042fc50) before a new game.
     DeleteAutosave,
+    /// A click on a character with subjects and an empty hand: the
+    /// original opens its subject menu (@ 0x004300d0: mode 9,
+    /// @ 0x00410f80(name), state 3). The menu is the dialogs' milestone.
+    SubjectMenu { character: Vec<u8> },
 }
 
 /// Where a Lua error happened.
@@ -466,4 +479,22 @@ pub trait Engine {
 
     /// Something to log or trace.
     fn event(&mut self, _event: &Event<'_>) {}
+
+    /// `centring`'s set-up (@ 0x0042d610, fx 1): the camera's mode kept
+    /// (returned; the transition's +0x98); with a zone under the centre
+    /// (the manager's +0x38) a turn toward it when it is 3° or more away,
+    /// with none the free mode (@ 0x0042caa0: speeds 0).
+    fn centring_start(&mut self) -> u32 {
+        0
+    }
+
+    /// One step of the camera (@ 0x0042cf80): true unless a turn goes on.
+    fn camera_step(&mut self, _dt: f32) -> bool {
+        true
+    }
+
+    /// The camera's mode a transition kept, back (@ 0x0042d900's phase 1:
+    /// 0 → @ 0x0042caa0, the free mode with its speeds 0; 1 →
+    /// @ 0x0042cab0).
+    fn camera_restore(&mut self, _mode: u32) {}
 }

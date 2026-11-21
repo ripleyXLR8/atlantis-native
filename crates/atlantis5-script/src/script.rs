@@ -17,7 +17,8 @@ use rilua::vm::value::{Userdata, Val};
 use rilua::{Lua, LuaApiMut, LuaError, LuaResult, RuntimeError};
 
 use crate::engine::{
-    Binding, Call, CameraFx, Engine, ErrorSite, Event, Fx, Limit, PlayType, Reply, Value, BINDINGS,
+    Binding, Call, CameraFx, Engine, ErrorSite, Event, Fx, Limit, PlayType, Reply, Semantic, Value,
+    BINDINGS,
 };
 
 /// The engine as the bindings reach it.
@@ -1417,14 +1418,168 @@ impl Script {
         self.set_field(z, b"name", &v);
     }
 
-    /// A sprite click: type `click_sprite`, `click.sprite.name` and
-    /// `.anim_name` [the setter's code is not read; the fields are the
-    /// ones @ 0x00401550 clears].
+    /// A sprite click (@ 0x00401a30): type `click_sprite`, the clear,
+    /// then `atl.event.click.sprite.name` = the object (part 3 of the
+    /// sprite's file name, @ 0x00449f50) and `.anim_name` = the animation
+    /// (part 4, @ 0x00449ff0).
     pub fn set_click_sprite(&mut self, name: &[u8], animation: &[u8]) {
         self.begin_event(b"click_sprite");
         let s: &[&[u8]] = &[b"atl", b"event", b"click", b"sprite"];
         self.set_field(s, b"name", &Value::Str(name.to_vec()));
         self.set_field(s, b"anim_name", &Value::Str(animation.to_vec()));
+    }
+
+    /// A subject picked in a character's subject menu (@ 0x00401c40):
+    /// type `click_subject`, the clear, then
+    /// `atl.event.click.subject.character` and `.name`.
+    pub fn set_click_subject(&mut self, character: &[u8], subject: &[u8]) {
+        self.begin_event(b"click_subject");
+        let s: &[&[u8]] = &[b"atl", b"event", b"click", b"subject"];
+        self.set_field(s, b"character", &Value::Str(character.to_vec()));
+        self.set_field(s, b"name", &Value::Str(subject.to_vec()));
+    }
+
+    /// `atl.objects.<name>` (the path walk of @ 0x00405910).
+    fn object_field(&mut self, name: &[u8], key: &[u8]) -> Option<Val> {
+        let objects = self.global_table(&[b"atl", b"objects"])?;
+        let state = self.lua.state_mut();
+        let k = str_val(state, name);
+        let Val::Table(o) = raw_get(state, objects, k) else {
+            return None;
+        };
+        let k = str_val(state, key);
+        match raw_get(state, o, k) {
+            Val::Nil => None,
+            v => Some(v),
+        }
+    }
+
+    /// `GetSemantic` (@ 0x00402db0): `atl.objects.<name>.semantic`,
+    /// `item` (0x00668900) or `character` (0x0066814c). A missing field, a
+    /// value that is not a string or another word throws in the original
+    /// (`GetSemantic -> ...`, 0x00668930, 0x00668908, 0x006688dc): the
+    /// error's text here.
+    pub fn object_semantic(&mut self, name: &[u8]) -> Result<Semantic, String> {
+        let lossy = String::from_utf8_lossy(name).into_owned();
+        let Some(v) = self.object_field(name, b"semantic") else {
+            return Err(format!("GetSemantic: no atl.objects.{lossy}.semantic"));
+        };
+        let state = self.lua.state_mut();
+        let text = match v {
+            Val::Str(_) => bytes_of(state, v).unwrap_or_default(),
+            Val::Num(x) => crate::engine::number_text(x).into_bytes(),
+            _ => return Err(format!("GetSemantic: {lossy} has no string semantic")),
+        };
+        match text.as_slice() {
+            b"item" => Ok(Semantic::Item),
+            b"character" => Ok(Semantic::Character),
+            _ => Err(format!("GetSemantic: unknown semantic of {lossy}")),
+        }
+    }
+
+    /// `IsReachable` (@ 0x004030f0): whether `atl.objects.<name>.
+    /// warp_reachable` (a table, else the original throws) holds the view
+    /// number, its entries walked from 1 to the first nil (one that is not
+    /// a number throws).
+    pub fn warp_reachable(&mut self, name: &[u8], view: i32) -> Result<bool, String> {
+        let lossy = String::from_utf8_lossy(name).into_owned();
+        let Some(Val::Table(t)) = self.object_field(name, b"warp_reachable") else {
+            return Err(format!(
+                "IsReachable: atl.objects.{lossy}.warp_reachable is not a table"
+            ));
+        };
+        let state = self.lua.state_mut();
+        let mut found = false;
+        let mut i = 1.0;
+        loop {
+            match raw_get(state, t, Val::Num(i)) {
+                Val::Nil => return Ok(found),
+                #[allow(clippy::cast_possible_truncation)]
+                Val::Num(x) => {
+                    if x as i32 == view {
+                        found = true;
+                    }
+                }
+                Val::Str(_) => {
+                    // lua_isnumber accepts a numeric string.
+                    let n = bytes_of(state, raw_get(state, t, Val::Num(i)))
+                        .and_then(|b| String::from_utf8(b).ok())
+                        .and_then(|s| s.trim().parse::<f64>().ok());
+                    match n {
+                        #[allow(clippy::cast_possible_truncation)]
+                        Some(x) => found |= x as i32 == view,
+                        None => return Err(format!("IsReachable: entry {i} of {lossy}")),
+                    }
+                }
+                _ => return Err(format!("IsReachable: entry {i} of {lossy}")),
+            }
+            i += 1.0;
+        }
+    }
+
+    /// `GetHandledItem` (@ 0x00403ee0): `atl.hero.handled_item`, empty
+    /// when nil; a value that is not a string throws in the original.
+    pub fn handled_item(&mut self) -> Result<Vec<u8>, String> {
+        match self.get_field(&[b"atl", b"hero"], b"handled_item") {
+            Value::Nil => Ok(Vec::new()),
+            Value::Str(s) => Ok(s),
+            Value::Num(x) => Ok(crate::engine::number_text(x).into_bytes()),
+            _ => Err("GetHandledItem: atl.hero.handled_item is not a string".into()),
+        }
+    }
+
+    /// `GetSubjects` (@ 0x00402540): the scripts' global
+    /// `Atl_Character_GetSubjects(name)` under `lua_pcall` (an error, or a
+    /// result that is not a table, throws in the original); its entries
+    /// from 1 to the first nil, each `{name, state, priority}`: a string,
+    /// a boolean and a number, else logged and skipped (0x00668520,
+    /// 0x006684ac, 0x00668458). The kept ones' count.
+    pub fn character_subjects(&mut self, name: &[u8]) -> Result<usize, String> {
+        let state = self.lua.state_mut();
+        let g = state.global;
+        let k = str_val(state, b"Atl_Character_GetSubjects");
+        let f = raw_get(state, g, k);
+        let arg = str_val(state, name);
+        let func_pos = state.top;
+        state.ensure_stack(2);
+        state.stack_set(func_pos, f);
+        state.stack_set(func_pos + 1, arg);
+        state.top = func_pos + 2;
+        let r = state.call_function(func_pos, 1);
+        let v = state.stack_get(func_pos);
+        state.top = func_pos;
+        if let Err(e) = r {
+            return Err(format!("GetSubjects: {e}"));
+        }
+        let Val::Table(t) = v else {
+            return Err("GetSubjects: the result is not a table".into());
+        };
+        let mut n = 0;
+        let mut i = 1.0;
+        loop {
+            let e = raw_get(state, t, Val::Num(i));
+            let t_e = match e {
+                Val::Nil => return Ok(n),
+                Val::Table(e) => e,
+                // lua_rawgeti on it is outside Lua 5.0's API contract.
+                _ => return Err(format!("GetSubjects: entry {i} is not a table")),
+            };
+            let s = raw_get(state, t_e, Val::Num(1.0));
+            let b = raw_get(state, t_e, Val::Num(2.0));
+            let p = raw_get(state, t_e, Val::Num(3.0));
+            // lua_isnumber: a number or a string that reads as one.
+            let numeric = match p {
+                Val::Num(_) => true,
+                Val::Str(_) => bytes_of(state, p)
+                    .and_then(|b| String::from_utf8(b).ok())
+                    .is_some_and(|s| s.trim().parse::<f64>().is_ok()),
+                _ => false,
+            };
+            if matches!(s, Val::Str(_) | Val::Num(_)) && matches!(b, Val::Bool(_)) && numeric {
+                n += 1;
+            }
+            i += 1.0;
+        }
     }
 
     /// A timer's end (@ 0x004023d0): type `timer`, `atl.event.timer.name`.

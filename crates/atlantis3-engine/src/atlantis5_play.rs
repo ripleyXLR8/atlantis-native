@@ -14,16 +14,19 @@
 //! - Camera: pitch (@ 0x004447a0) and yaw (@ 0x004448c0), each clamped to
 //!   its limits when `Atl_Camera_Limit*` set them, else `fmod(angle, 360)`;
 //!   the field of view of `Atl_Camera_SetFOV`; the mouse look's inertia
-//!   (@ 0x0042cdc0, 0x0042cf80 mode 0).
+//!   (@ 0x0042cdc0, 0x0042cf80 mode 0); the turns of mode 2 (the animated
+//!   `Atl_Camera_LookAt`, `centring`; [`crate::atlantis5_camera`]).
 //! - Sprites: `Atl_Sprite_Play` (@ 0x0040a0d0): the file of the current
 //!   view, an earlier sprite of the object removed, inserted by priority
 //!   (@ 0x00441830), its player (@ 0x00448c30, 0x00442920: frames 0..n−1
 //!   at the bank's rate, 15 for SPW files @ 0x00440e50) stepped each frame
 //!   (@ 0x00441c30 → 0x00448d20).
-//! - Zones: a click on the view takes the first zone of the WAM view
-//!   containing the direction whose name is empty or active in
-//!   `atl.zones` (@ 0x00430740), and gives its number and name to
-//!   `Game::click_zone` (@ 0x004017c0).
+//! - Picks and clicks: each play frame picks what is under the screen
+//!   centre, the first zone of the WAM view (type below 1000) holding the
+//!   centre's direction whose name is empty or active in `atl.zones`
+//!   (@ 0x00430740) or, with none, the sprite there (@ 0x00430b70,
+//!   0x0044af90); a left click acts on the last pick (@ 0x004300d0):
+//!   `Game::click_zone` or `Game::click_sprite`.
 //! - Sounds: `fx/<name>.ogg` played on FMOD channel 6 (@ 0x00459630).
 //! - Music: five channels of playlists (`music/<name>.mls`), the
 //!   2004 program's `AtlSound` as A5 has it (@ 0x0045a730, 0x0045acf0,
@@ -49,6 +52,7 @@ use atlantis5_script::{
 use atlantis_data::FileSource;
 
 use crate::atlantis5::{panorama_name, sprite_path, ViewError, FACE, VIEW_HEIGHT, VIEW_WIDTH};
+use crate::atlantis5_camera::{forward, look_at_direction, Turn};
 use crate::audio::{Audio, CHANNEL_CINEMA, CHANNEL_MUSIC_2004, CHANNEL_SOUND};
 use crate::film2004::{Film, FilmSound};
 use crate::px::Faces;
@@ -88,9 +92,8 @@ impl Sprite {
     /// @ 0x00448d20: the frame for the time played, and whether a `stop`
     /// sprite is over. `stay`: ftol(t · fps), held at the last frame;
     /// `stop`: the same, over once t > frames / fps; `loop`:
-    /// floor(t · fps) mod frames. (The operand of the first two `__ftol`
-    /// is t · fps [INFERRED: Ghidra hides the x87 operand; the loop mode
-    /// multiplies t by fps explicitly].)
+    /// floor(t · fps) mod frames. (The `__ftol` of modes 0–2 takes t · fps:
+    /// `fmul [esi+8]` before `call 0x0062abdc`.)
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     fn step(&mut self, dt: f64) -> bool {
         self.time += dt;
@@ -169,9 +172,24 @@ pub struct Stage {
     pub fov: f32,
     yaw_limit: Option<(f32, f32)>,
     pitch_limit: Option<(f32, f32)>,
-    /// The mouse look's speeds (+0x08, +0x0c) and damping clock (+0x10).
+    /// The mouse look's speeds (+0x0c yaw, +0x08 pitch, degrees per second
+    /// before the × 180/π) and damping clock (+0x10).
     speed: [f32; 2],
     damping: f32,
+    /// The camera controller's mode (+0x00): 0 free (the mouse look), 1,
+    /// 2 turning.
+    mode: u32,
+    /// The turn of mode 2.
+    turn: Option<Turn>,
+    /// `Atl_Camera_LookAt(..., true)` waits for its turn: the mode it
+    /// kept.
+    look_turn: Option<u32>,
+    /// The points of the zone under the centre at the last pick (the
+    /// manager's +0x38), which `centring` turns toward.
+    hover_zone: Option<Vec<[f32; 3]>>,
+    /// The cursor the last pick set (@ 0x0042bfd0's argument), `None` for
+    /// the default one.
+    pub cursor: Option<i32>,
     sprites: Vec<Sprite>,
     /// Persistent sprites: object, priority, seconds played.
     persistent: Vec<(Vec<u8>, i32, f64)>,
@@ -184,7 +202,8 @@ pub struct Stage {
     /// The sound on FMOD channel 6.
     sound: Option<Vec<u8>>,
     film: Option<(Film, Option<FilmSound>)>,
-    film_ended: bool,
+    /// A call the scripts wait for has ended (a film, an animated look).
+    wait_ended: bool,
     clock: f64,
     /// Every call and request, for tests and logs.
     pub trace: Vec<String>,
@@ -208,6 +227,11 @@ impl Stage {
             pitch_limit: None,
             speed: [0.0; 2],
             damping: 0.0,
+            mode: 0,
+            turn: None,
+            look_turn: None,
+            hover_zone: None,
+            cursor: None,
             sprites: Vec::new(),
             persistent: Vec::new(),
             music: Default::default(),
@@ -215,7 +239,7 @@ impl Stage {
             music_rand: 1,
             sound: None,
             film: None,
-            film_ended: false,
+            wait_ended: false,
             clock: 0.0,
             trace: Vec::new(),
         }
@@ -658,7 +682,6 @@ impl Stage {
             _ => None,
         };
         self.film = Some((film, sound));
-        self.film_ended = false;
         true
     }
 
@@ -688,39 +711,86 @@ impl Stage {
             if let (Some(s), Some(a)) = (sound, &self.audio) {
                 s.stop(a);
             }
-            self.film_ended = true;
+            self.wait_ended = true;
         }
     }
 
     // -- frame ---------------------------------------------------------------
 
-    /// The camera's step in free mode (@ 0x0042cf80 mode 0): the angles
-    /// turned by the speeds (rad/s · 180/π), the speeds × 0.55 20 times a
-    /// second.
-    fn camera_step(&mut self, dt: f32) {
-        let pi = f32::from_bits(0x4049_0fdb);
-        if self.speed != [0.0, 0.0] {
-            let yaw = self.yaw + dt * self.speed[0] * 180.0 / pi;
-            let pitch = self.pitch + dt * self.speed[1] * 180.0 / pi;
-            self.set_yaw(yaw);
-            self.set_pitch(pitch);
-        }
-        self.damping += dt * 20.0;
-        while self.damping >= 1.0 {
-            self.speed[0] *= 0.55;
-            self.speed[1] *= 0.55;
-            self.damping -= 1.0;
+    /// The camera's step (@ 0x0042cf80). Mode 0 (free): pitch and yaw
+    /// turned by their speeds (@ 0x004444c0, 0x00444600: dt · speed ·
+    /// 180/π, set through the limits every step), the damping clock +=
+    /// dt · 20 (0x00655708) and, while it is above 1 (0x0042d25b /
+    /// 0x0042d28c: `fcomp` 1.0, `test ah, 0x41`, so not at 1), both speeds
+    /// × 0.55 (0x00655704) and the clock − 1. Mode 2: the turn's step
+    /// ([`Turn::step`]), false until it ends. Other modes: nothing. True
+    /// unless a turn goes on. (`BoatFx`, the sine at the step's top, is
+    /// not ported.)
+    fn camera_step(&mut self, dt: f32) -> bool {
+        match self.mode {
+            0 => {
+                let pi = f32::from_bits(0x4049_0fdb);
+                let pitch = self.pitch + dt * self.speed[1] * 180.0 / pi;
+                self.set_pitch(pitch);
+                let yaw = self.yaw + dt * self.speed[0] * 180.0 / pi;
+                self.set_yaw(yaw);
+                self.damping += dt * 20.0;
+                while self.damping > 1.0 {
+                    self.speed[0] *= 0.55;
+                    self.speed[1] *= 0.55;
+                    self.damping -= 1.0;
+                }
+                true
+            }
+            2 => {
+                let Some(turn) = self.turn.as_mut() else {
+                    return true;
+                };
+                let ((pitch, yaw), end) = turn.step(dt);
+                self.set_pitch(pitch);
+                self.set_yaw(yaw);
+                end
+            }
+            _ => true,
         }
     }
 
-    /// The mouse look's input (@ 0x0042cdc0): a move of (dx, dy) pixels
-    /// with the button down adds dx · dt · −0.3 and dy · dt · −0.3 to the
-    /// speeds (a speed against the move is first cut by a third), each kept
-    /// within ±6. (The button is the left one [INFERRED: the event's
-    /// subtype 2 is not decoded].)
+    /// A turn toward `to` (@ 0x0042cac0): mode 2 from the direction now.
+    fn start_turn(&mut self, to: [f32; 3]) {
+        self.mode = 2;
+        self.turn = Some(Turn::new(forward(self.pitch, self.yaw), to));
+    }
+
+    /// The controller's mode set back (0: @ 0x0042caa0, the free mode with
+    /// the speeds and the damping clock 0; 1: @ 0x0042cab0).
+    fn restore_mode(&mut self, mode: u32) {
+        match mode {
+            0 => {
+                self.mode = 0;
+                self.speed = [0.0; 2];
+                self.damping = 0.0;
+            }
+            1 => self.mode = 1,
+            _ => {}
+        }
+        self.turn = None;
+    }
+
+    /// The mouse look's input (@ 0x0042cdc0), for each mouse event of
+    /// kind 2 (a move, @ 0x0043bde0 → 0x004546a0(2, ...); whatever the
+    /// buttons) while the mode is 0: the damping clock 0; the move's
+    /// DirectInput lX, lY (the event's +0x1c, +0x20) times dt and −0.3
+    /// (0x006556fc; lY by +0.3 with the invert flag +0x80, 0x00655700)
+    /// added to the yaw and pitch speeds (a speed against the move first
+    /// loses a third of itself, 0x006556f8), each kept within ±6
+    /// (0x006556f4).
     pub fn look(&mut self, dx: f32, dy: f32, dt: f32) {
+        if self.mode != 0 {
+            return;
+        }
         self.damping = 0.0;
-        // The sign is −1 without the camera's invert flag (+0x80).
+        // Yaw from lX × −0.3; pitch from lY × 0.3 × (−1 without the
+        // invert flag +0x80, which Native does not set).
         let mut ax = -(dx * dt) * 0.3;
         let mut ay = dy * dt * -0.3;
         let third = f32::from_bits(0x3eaa_aaab);
@@ -747,6 +817,17 @@ impl Stage {
         if play {
             self.camera_step(dt as f32);
         }
+        // `Atl_Camera_LookAt(..., true)`'s loop (@ 0x00406f00): the turn's
+        // step each frame; at its end the kept mode back, and the call
+        // returns.
+        if let Some(saved) = self.look_turn {
+            #[allow(clippy::cast_possible_truncation)]
+            if self.camera_step(dt as f32) {
+                self.restore_mode(saved);
+                self.look_turn = None;
+                self.wait_ended = true;
+            }
+        }
         for p in &mut self.persistent {
             p.2 += dt;
         }
@@ -767,8 +848,8 @@ impl Stage {
     }
 
     /// The picture: the film while one plays, else the view with its
-    /// sprites (drawn from the list's head [UNKNOWN: the drawing loop is
-    /// not read]) by the cube renderer.
+    /// sprites (drawn from the list's head to its tail, @ 0x0044bd30's
+    /// second pass: @ 0x00456a90 then @ 0x00456ad0) by the cube renderer.
     pub fn render(&self, out: &mut [u32]) {
         out.fill(0);
         if let Some((film, _)) = &self.film {
@@ -809,21 +890,64 @@ impl Stage {
     }
 
     /// The zone under screen point (sx, sy): the first of the view's
-    /// zones containing the direction whose name is empty, or whose
-    /// `atl.zones` entry `zone` says is active (@ 0x00430740).
-    fn zone_at(&self, sx: f32, sy: f32, zone: &mut ZoneLookup<'_>) -> Option<(i32, Vec<u8>)> {
+    /// zones of a type below 1000 (@ 0x0044acd0) containing the direction
+    /// whose name is empty, or whose `atl.zones` entry `zone` says is
+    /// active (@ 0x00430740). The game asks it for the screen centre.
+    fn zone_at(
+        &self,
+        sx: f32,
+        sy: f32,
+        zone: &mut ZoneLookup<'_>,
+    ) -> Option<(i32, Vec<u8>, usize)> {
         let v = self.view.as_ref()?;
         let d = self.camera().ray(sx, sy).map(f64::from);
-        for z in &v.zones {
-            if !z.contains(d) {
+        for (k, z) in v.zones.iter().enumerate() {
+            if z.kind >= 1000 || !z.contains(d) {
                 continue;
             }
             let name = z.name.clone().unwrap_or_default().into_bytes();
             if name.is_empty() || matches!(zone(&name), Some((_, true))) {
-                return Some((z.value, name));
+                return Some((z.value, name, k));
             }
         }
         None
+    }
+
+    /// The sprites under the screen centre (@ 0x0044af90): the centre's
+    /// face pixel (the camera's direction × 10000 (0x00655830) through
+    /// the six face cameras of the cube, 768-texel faces, the first whose
+    /// projection falls in 0..767 — [`Camera::texel_face`]); then the
+    /// sprite list from its tail to its head (@ 0x00456aa0 walks to the
+    /// last node, @ 0x00456ae0 steps to the previous: the sprites drawn
+    /// last, @ 0x0044bd30 draws from the head, come first), a sprite hit
+    /// when the pixel is in its frame's `GET_SPWZ` rectangle on that face,
+    /// both bounds included (@ 0x0044b312..0x0044b33b), and
+    /// `SPW_COLLISION` says it is covered (the DLL's code is *Atlantis
+    /// III*'s, [`Bank::face_opaque_at`]). The first hit: (object,
+    /// animation).
+    pub fn sprite_at_centre(&self) -> Option<(Vec<u8>, Vec<u8>)> {
+        self.view.as_ref()?;
+        let c = self.camera();
+        let (face, u, v) = c.texel_face(c.cx, c.cy, FACE as u32)?;
+        for s in self.sprites.iter().rev() {
+            let Some(info) = s.bank.face_info(s.frame, face) else {
+                continue;
+            };
+            let (x, y) = (-i32::from(info.xoff), -i32::from(info.yoff));
+            let (w, h) = (i32::from(info.w), i32::from(info.h));
+            if !(x <= u && u <= x + w && y <= v && v <= y + h) {
+                continue;
+            }
+            if s.bank.face_opaque_at(s.frame, face, u, v) {
+                return Some((s.object.clone(), s.animation.clone()));
+            }
+        }
+        None
+    }
+
+    /// The view's number.
+    pub fn view_number(&self) -> Option<i32> {
+        self.view.as_ref().map(|v| v.view)
     }
 }
 
@@ -893,12 +1017,22 @@ impl Engine for Stage {
                 animated,
             } => {
                 if *animated {
-                    // The turn (@ 0x0042cac0, 0x0042cf80 mode 2) is not
-                    // ported: the angles are set at once.
-                    log::info!("animated look: set at once");
+                    // @ 0x00406f00: the mode kept, a turn toward the
+                    // direction of the angles (@ 0x0048bb70 × (0, 0, 1)),
+                    // then a loop on the camera's step, the first with a
+                    // time of 0; the angles are the last step's.
+                    let saved = self.mode;
+                    self.start_turn(look_at_direction(*pitch, *yaw));
+                    if self.camera_step(0.0) {
+                        self.restore_mode(saved);
+                    } else {
+                        self.look_turn = Some(saved);
+                        return Reply::Wait;
+                    }
+                } else {
+                    self.set_pitch(*pitch);
+                    self.set_yaw(*yaw);
                 }
-                self.set_pitch(*pitch);
-                self.set_yaw(*yaw);
             }
             Call::CameraSetFov { radians, .. } => self.fov = *radians,
             Call::CameraActivateFx(fx) => {
@@ -971,6 +1105,10 @@ impl Engine for Stage {
             }
             Request::TransitionFov { radians, .. } => self.fov = *radians,
             Request::TransitionEnd | Request::DeleteAutosave => {}
+            Request::SubjectMenu { character } => {
+                // The subject menu is the dialogs' milestone.
+                log::info!("subject menu of {}: not ported yet", lossy(character));
+            }
         }
     }
 
@@ -991,12 +1129,71 @@ impl Engine for Stage {
             Event::Run(_) | Event::End(_) => {}
         }
     }
+
+    /// @ 0x0042d610, fx 1: the mode kept; no zone under the centre: the
+    /// free mode (@ 0x0042caa0); else the zone's direction (the sum of its
+    /// points, @ 0x004586c0, through the scene root's and the camera
+    /// parent's frames, normalised) against the camera's direction now:
+    /// a turn when their dot product is below cos(π · 0.016667)
+    /// (0x00655738: 3°).
+    fn centring_start(&mut self) -> u32 {
+        let saved = self.mode;
+        let Some(points) = self.hover_zone.clone() else {
+            self.restore_mode(0);
+            return saved;
+        };
+        let mut sum = [0.0f32; 3];
+        for p in &points {
+            for i in 0..3 {
+                sum[i] += p[i];
+            }
+        }
+        let l2 = f64::from(sum[0]) * f64::from(sum[0])
+            + f64::from(sum[1]) * f64::from(sum[1])
+            + f64::from(sum[2]) * f64::from(sum[2]);
+        #[allow(clippy::cast_possible_truncation)]
+        let inv = (1.0 / l2.sqrt()) as f32;
+        let b = sum.map(|x| x * inv);
+        let a = forward(self.pitch, self.yaw);
+        let dot = f64::from(a[2]) * f64::from(b[2])
+            + f64::from(a[1]) * f64::from(b[1])
+            + f64::from(a[0]) * f64::from(b[0]);
+        let pi = f64::from(f32::from_bits(0x4049_0fdb));
+        let limit = (pi * f64::from(f32::from_bits(0x3c88_8889))).cos();
+        if dot < limit {
+            self.start_turn(b);
+        }
+        saved
+    }
+
+    fn camera_step(&mut self, dt: f32) -> bool {
+        Stage::camera_step(self, dt)
+    }
+
+    fn camera_restore(&mut self, mode: u32) {
+        self.restore_mode(mode);
+    }
+}
+
+/// What the last pick found under the screen centre (the manager's +0x38
+/// zone or +0x3c sprite).
+#[derive(Clone, Debug, PartialEq)]
+pub enum Hover {
+    /// A zone: its number and name.
+    Zone(i32, Vec<u8>),
+    /// A sprite: its object and animation.
+    Sprite(Vec<u8>, Vec<u8>),
 }
 
 /// A game being played.
 pub struct Play {
     pub game: Game,
     stage: Rc<RefCell<Stage>>,
+    /// The mouse's moves (DirectInput lX, lY) since the last frame.
+    moves: Vec<(f32, f32)>,
+    /// Left clicks since the last frame.
+    clicks: usize,
+    hover: Option<Hover>,
 }
 
 impl Play {
@@ -1009,7 +1206,13 @@ impl Play {
     ) -> Result<Play, String> {
         let stage = Rc::new(RefCell::new(Stage::new(src, language, audio)));
         let game = Game::new(stage.clone()).map_err(|e| e.to_string())?;
-        Ok(Play { game, stage })
+        Ok(Play {
+            game,
+            stage,
+            moves: Vec::new(),
+            clicks: 0,
+            hover: None,
+        })
     }
 
     /// The engine's side.
@@ -1021,43 +1224,219 @@ impl Play {
         self.game.new_game();
     }
 
-    /// One frame of `dt` seconds.
+    /// One frame of `dt` seconds. In play (the manager's state 4, no
+    /// script running), as `CGameManager::Process` (@ 0x0042f000): the
+    /// mouse's moves into the camera's speeds (@ 0x0042cdc0), the
+    /// camera's step (@ 0x0042cf80), the clicks on what the last frame's
+    /// pick found (@ 0x004300d0), the timers (@ 0x00435a70); then the pick
+    /// for the next frame: the zone under the centre (@ 0x00430740) or,
+    /// with none, the sprite (@ 0x00430b70). Moves and clicks outside play
+    /// are dropped.
     pub fn update(&mut self, dt: f64) {
         self.game.set_fov(self.stage.borrow().fov);
         let play = self.game.state() == 4 && !self.game.busy();
+        let moves = std::mem::take(&mut self.moves);
+        let clicks = std::mem::take(&mut self.clicks);
+        if play {
+            #[allow(clippy::cast_possible_truncation)]
+            let dtf = dt as f32;
+            let mut st = self.stage.borrow_mut();
+            for (dx, dy) in moves {
+                st.look(dx, dy, dtf);
+            }
+        }
         self.stage.borrow_mut().update(dt, play);
-        if std::mem::take(&mut self.stage.borrow_mut().film_ended) {
+        if std::mem::take(&mut self.stage.borrow_mut().wait_ended) {
             self.game.finish_wait();
         }
+        if play {
+            for _ in 0..clicks {
+                match self.hover.clone() {
+                    Some(Hover::Zone(id, name)) => {
+                        self.game.click_zone(id, &name);
+                    }
+                    Some(Hover::Sprite(object, animation)) => {
+                        self.game.click_sprite(&object, &animation);
+                    }
+                    None => {}
+                }
+            }
+        }
         self.game.update(dt);
+        if self.game.state() == 4 && !self.game.busy() {
+            self.pick();
+        }
     }
 
-    /// A click at (sx, sy) of the 1024 × 576 view: the zone there.
-    pub fn click(&mut self, sx: f32, sy: f32) -> bool {
+    /// The pick (@ 0x0042f000 state 4's end): +0x38 = +0x3c = 0; the zone
+    /// under the centre and its cursor (type 1 → 0, 2 → 2, 3 → 1); with no
+    /// zone the sprite and its cursor ([`Game::sprite_cursor`]); with
+    /// neither the default cursor.
+    fn pick(&mut self) {
+        let (cx, cy) = {
+            let st = self.stage.borrow();
+            let c = st.camera();
+            (c.cx, c.cy)
+        };
         let game = &mut self.game;
-        let hit = self
+        let zone = self
             .stage
             .borrow()
-            .zone_at(sx, sy, &mut |name| game.zone(name));
-        match hit {
-            Some((id, name)) => self.game.click_zone(id, &name),
-            None => false,
+            .zone_at(cx, cy, &mut |name| game.zone(name));
+        let mut st = self.stage.borrow_mut();
+        st.hover_zone = None;
+        if let Some((id, name, k)) = zone {
+            let kind = if name.is_empty() {
+                1
+            } else {
+                self.game.zone(&name).map_or(0, |z| z.0)
+            };
+            st.cursor = match kind {
+                1 => Some(0),
+                2 => Some(2),
+                3 => Some(1),
+                _ => st.cursor,
+            };
+            st.hover_zone = st.view.as_ref().map(|v| v.zones[k].points.clone());
+            self.hover = Some(Hover::Zone(id, name));
+            return;
         }
+        let hit = st.sprite_at_centre();
+        let view = st.view_number().unwrap_or(0);
+        drop(st);
+        self.hover = None;
+        let mut cursor = None;
+        if let Some((object, animation)) = hit {
+            if let Some(c) = self.game.sprite_cursor(&object, view) {
+                cursor = Some(c);
+                self.hover = Some(Hover::Sprite(object, animation));
+            }
+        }
+        self.stage.borrow_mut().cursor = cursor;
     }
 
-    /// The zone the cursor is over, for tests and the cursor.
-    pub fn zone_at(&mut self, sx: f32, sy: f32) -> Option<(i32, Vec<u8>)> {
-        let game = &mut self.game;
-        self.stage
-            .borrow()
-            .zone_at(sx, sy, &mut |name| game.zone(name))
+    /// What the last pick found under the centre.
+    pub fn hover(&self) -> Option<&Hover> {
+        self.hover.as_ref()
     }
 
-    /// A mouse move of (dx, dy) pixels with the button down.
-    pub fn look(&mut self, dx: f32, dy: f32, dt: f32) {
-        if self.game.state() == 4 && !self.game.busy() {
-            self.stage.borrow_mut().look(dx, dy, dt);
+    /// A mouse move of (dx, dy) (DirectInput's relative lX, lY), taken at
+    /// the next frame.
+    pub fn look(&mut self, dx: f32, dy: f32) {
+        self.moves.push((dx, dy));
+    }
+
+    /// A press of the left button (the mouse event of kind 0 with the
+    /// buttons 1, @ 0x0043bbc0), taken at the next frame: a click on what
+    /// is under the screen centre.
+    pub fn click(&mut self) {
+        self.clicks += 1;
+    }
+
+    /// Turns the camera so that the screen centre is on the direction of
+    /// zone `id` of the view (the sum of its points), at once (tests and
+    /// tools; the player turns with the mouse). False without such a zone.
+    #[doc(hidden)]
+    pub fn aim_at_zone(&mut self, id: i32) -> bool {
+        let mut st = self.stage.borrow_mut();
+        let Some(points) = st
+            .view
+            .as_ref()
+            .and_then(|v| v.zones.iter().find(|z| z.value == id && z.kind < 1000))
+            .map(|z| z.points.clone())
+        else {
+            return false;
+        };
+        let mut d = [0.0f32; 3];
+        for p in &points {
+            for i in 0..3 {
+                d[i] += p[i];
+            }
         }
+        let (pitch, yaw) = crate::atlantis5_camera::angles_of(&normalize3(d));
+        st.set_pitch(pitch);
+        st.set_yaw(yaw);
+        drop(st);
+        self.pick();
+        true
+    }
+
+    /// Sets the camera's angles at once and picks (tests and tools).
+    #[doc(hidden)]
+    pub fn look_angles(&mut self, pitch: f32, yaw: f32) {
+        {
+            let mut st = self.stage.borrow_mut();
+            st.set_pitch(pitch);
+            st.set_yaw(yaw);
+        }
+        self.pick();
+    }
+
+    /// Turns the camera, at once, so that the centre is on a covered pixel
+    /// of the sprite of `object` and the pick takes it (tests and tools):
+    /// each covered pixel of its frame's faces is tried, its direction
+    /// from the cube's face cameras (@ 0x00490ad0: the look rotations of
+    /// (0, 0, 1), (0, 0, −1), (0, −1, 0), (0, 1, 0), (−1, 0, 0),
+    /// (1, 0, 0) with the up vectors (0, −1, 0), (0, 0, −1) for face 2 and
+    /// (0, 0, 1) for face 3; field of view π · 0.5012459 (0x00656258) over
+    /// 768 texels). False when none works.
+    #[doc(hidden)]
+    pub fn aim_at_sprite(&mut self, object: &[u8]) -> bool {
+        use crate::atlantis5_camera::{angles_of, look_rotation, mat_vec, quat_matrix};
+        let pixels: Vec<(usize, i32, i32)> = {
+            let st = self.stage.borrow();
+            let Some(s) = st.sprites.iter().find(|s| s.object == object) else {
+                return false;
+            };
+            let mut out = Vec::new();
+            for face in 0..6 {
+                let Some(info) = s.bank.face_info(s.frame, face) else {
+                    continue;
+                };
+                let (x0, y0) = (-i32::from(info.xoff), -i32::from(info.yoff));
+                for v in y0..y0 + i32::from(info.h) {
+                    for u in x0..x0 + i32::from(info.w) {
+                        if s.bank.face_opaque_at(s.frame, face, u, v) {
+                            out.push((face, u, v));
+                        }
+                    }
+                }
+            }
+            out
+        };
+        let faces: [([f32; 3], [f32; 3]); 6] = [
+            ([0.0, 0.0, 1.0], [0.0, -1.0, 0.0]),
+            ([0.0, 0.0, -1.0], [0.0, -1.0, 0.0]),
+            ([0.0, -1.0, 0.0], [0.0, 0.0, -1.0]),
+            ([0.0, 1.0, 0.0], [0.0, 0.0, 1.0]),
+            ([-1.0, 0.0, 0.0], [0.0, -1.0, 0.0]),
+            ([1.0, 0.0, 0.0], [0.0, -1.0, 0.0]),
+        ];
+        #[allow(clippy::cast_precision_loss)]
+        let half = FACE as f32 * 0.5;
+        let fov = std::f32::consts::PI * f32::from_bits(0x3f00_51a6);
+        let focal = half / (fov * 0.5).tan();
+        // The middle of the sprite's pixels first.
+        let mut order: Vec<usize> = (0..pixels.len()).collect();
+        let mid = pixels.len() / 2;
+        order.sort_by_key(|&i| i.abs_diff(mid));
+        for i in order.into_iter().take(400) {
+            let (face, u, v) = pixels[i];
+            let q = look_rotation(&faces[face].0, &faces[face].1);
+            #[allow(clippy::cast_precision_loss)]
+            let local = [
+                (u as f32 + 0.5 - half) / focal,
+                (v as f32 + 0.5 - half) / focal,
+                1.0,
+            ];
+            let d = normalize3(mat_vec(&quat_matrix(&q), &local));
+            let (pitch, yaw) = angles_of(&d);
+            self.look_angles(pitch, yaw);
+            if matches!(&self.hover, Some(Hover::Sprite(o, _)) if o == object) {
+                return true;
+            }
+        }
+        false
     }
 
     /// Escape or Space: a film ends (@ 0x0042b0f0: keys 1 and 0x39).
@@ -1073,21 +1452,145 @@ impl Play {
         self.stage.borrow().render(out);
     }
 
-    /// Points of the view inside zones the player can click now (screen
-    /// coordinates, a coarse grid), with each zone's number and name.
-    pub fn clickable(&mut self) -> Vec<(f32, f32, i32, Vec<u8>)> {
-        let mut out: Vec<(f32, f32, i32, Vec<u8>)> = Vec::new();
-        for gy in 0..18 {
-            for gx in 0..32 {
-                #[allow(clippy::cast_precision_loss)]
-                let (x, y) = (gx as f32 * 32.0 + 16.0, gy as f32 * 32.0 + 16.0);
-                if let Some((id, name)) = self.zone_at(x, y) {
-                    if !out.iter().any(|o| o.2 == id && o.3 == name) {
-                        out.push((x, y, id, name));
-                    }
-                }
+    /// The zones the player can click in this view (those the pick would
+    /// take with the centre on their direction): number and name.
+    pub fn zones(&mut self) -> Vec<(i32, Vec<u8>)> {
+        let zones: Vec<(i32, Option<String>, i32)> = self
+            .stage
+            .borrow()
+            .view
+            .as_ref()
+            .map(|v| {
+                v.zones
+                    .iter()
+                    .map(|z| (z.value, z.name.clone(), z.kind))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let mut out = Vec::new();
+        for (id, name, kind) in zones {
+            if kind >= 1000 {
+                continue;
+            }
+            let name = name.unwrap_or_default().into_bytes();
+            if name.is_empty() || matches!(self.game.zone(&name), Some((_, true))) {
+                out.push((id, name));
             }
         }
         out
+    }
+}
+
+fn normalize3(v: [f32; 3]) -> [f32; 3] {
+    let l = (v[0] * v[0] + v[1] * v[1] + v[2] * v[2]).sqrt();
+    v.map(|x| x / l)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct NoFiles;
+
+    impl FileSource for NoFiles {
+        fn size(&self, _: &str) -> Option<u64> {
+            None
+        }
+        fn read_at(&self, _: &str, _: u64, _: usize) -> Option<Vec<u8>> {
+            None
+        }
+        fn has_dir(&self, _: &str) -> bool {
+            false
+        }
+    }
+
+    fn stage() -> Stage {
+        Stage::new(Arc::new(NoFiles), "french", None)
+    }
+
+    #[test]
+    fn an_animated_look_turns_over_frames() {
+        let mut s = stage();
+        s.set_yaw(270.0);
+        let r = s.call(&Call::CameraLookAt {
+            pitch: 10.0,
+            yaw: 300.0,
+            animated: true,
+        });
+        assert_eq!(r, Reply::Wait);
+        assert_eq!(s.mode, 2);
+        let mut n = 0;
+        let mut last = s.yaw;
+        while !s.wait_ended {
+            s.update(1.0 / 30.0, false);
+            n += 1;
+            // The yaw goes from 270 toward 300 (atan2 gives it in
+            // (−180, 180], fmod keeps it there: −90 .. −60).
+            assert!(s.yaw >= last - 1e-3, "{} {last}", s.yaw);
+            last = s.yaw;
+            assert!(n < 100);
+        }
+        // 0.75 s at 30 frames a second.
+        assert_eq!(n, 23);
+        assert_eq!(s.mode, 0, "the kept mode back");
+        assert!((s.yaw - -60.0).abs() < 0.05, "{}", s.yaw);
+        assert!((s.pitch - 10.0).abs() < 0.05, "{}", s.pitch);
+    }
+
+    #[test]
+    fn the_turns_direction_is_the_drawn_centre() {
+        // The renderer's camera and the turn's frame agree: the screen
+        // centre's ray is the direction the setters' rotation gives.
+        let mut s = stage();
+        for &(p, y) in &[(0.0, 270.0), (15.0, 40.0), (-25.0, 181.0)] {
+            s.set_pitch(p);
+            s.set_yaw(y);
+            let c = s.camera();
+            let r = c.ray(c.cx, c.cy);
+            let l = (r[0] * r[0] + r[1] * r[1] + r[2] * r[2]).sqrt();
+            let f = crate::atlantis5_camera::forward(p, y);
+            for i in 0..3 {
+                assert!((r[i] / l - f[i]).abs() < 1e-4, "{p} {y}: {r:?} {f:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn the_inertia_damps_only_above_one() {
+        let mut s = stage();
+        s.speed = [1.0, 0.0];
+        // dt · 20 = 1 exactly: no damping yet (@ 0x0042d25b: not at 1).
+        s.camera_step(0.05);
+        assert_eq!(s.speed[0], 1.0);
+        s.camera_step(0.05);
+        assert!((s.speed[0] - 0.55).abs() < 1e-6);
+    }
+
+    #[test]
+    fn centring_turns_only_beyond_three_degrees() {
+        let mut s = stage();
+        // No zone under the centre: free mode, speeds 0.
+        s.speed = [2.0, 1.0];
+        assert_eq!(s.centring_start(), 0);
+        assert_eq!((s.mode, s.speed), (0, [0.0, 0.0]));
+        // A zone 2° away: no turn.
+        let z = crate::atlantis5_camera::forward(0.0, 2.0);
+        s.hover_zone = Some(vec![z]);
+        s.centring_start();
+        assert_eq!(s.mode, 0);
+        assert!(s.camera_step(0.0));
+        // 5° away: a turn of 0.75 s.
+        let z = crate::atlantis5_camera::forward(0.0, 5.0);
+        s.hover_zone = Some(vec![z, z]);
+        s.centring_start();
+        assert_eq!(s.mode, 2);
+        let mut n = 0;
+        while !s.camera_step(0.25) {
+            n += 1;
+        }
+        assert_eq!(n, 2);
+        s.camera_restore(0);
+        assert_eq!(s.mode, 0);
+        assert!((s.yaw - 5.0).abs() < 0.01, "{}", s.yaw);
     }
 }

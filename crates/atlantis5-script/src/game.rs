@@ -24,7 +24,7 @@
 
 use std::collections::{BTreeMap, VecDeque};
 
-use crate::engine::{Call, Event, Fx, Request, Value};
+use crate::engine::{Call, Event, Fx, Request, Semantic, Value};
 use crate::script::{EngineRef, Outcome, Pending, Script, Task, SCRIPTS_DIR};
 
 /// What a script run waits for.
@@ -65,18 +65,38 @@ struct Transition {
     fov0: f32,
     /// The view change happened and its `on_enter_view` run is going.
     entering: bool,
+    /// +0x98: the camera's mode when a `centring` started.
+    saved_mode: u32,
 }
 
 /// A named timer (`Atl_Timer_Create`, the timer list @ 0x00435770: a map
-/// by name, so the timers of a frame end in name order).
+/// by name, so the timers of a frame end in name order). The map node
+/// holds the name at +0x10 and the timer at +0x20 (@ 0x00435ca0 gives
+/// node + 0x10, @ 0x00435ae3 adds 0x10), so the node's +0x64 that the
+/// walk @ 0x00435a70 tests is the timer's +0x44.
+///
+/// The clock (@ 0x00468170) is QueryPerformanceCounter / frequency:
+/// seconds.
 #[derive(Clone, Debug, PartialEq)]
 struct Timer {
     /// +0x30: the duration (seconds).
     duration: f64,
-    /// The clock when it (re)started.
+    /// +0x28: the start (@ 0x004680c0: now − its argument).
     start: f64,
     /// +0x44: the repeats left; -1 for ever.
     repeat: i32,
+}
+
+/// A walk of the timers (@ 0x00435a70) whose `timer` handler waits (a
+/// transition, a film): the original is inside the handler, so the walk
+/// goes on after it, from the next name.
+#[derive(Clone, Debug)]
+struct TimerWalk {
+    /// The timer whose handler runs.
+    name: Vec<u8>,
+    /// Its remaining time at the step (@ 0x00468060 with the step's
+    /// +0x10, which the handler does not change).
+    remaining: f64,
 }
 
 /// The game.
@@ -92,6 +112,8 @@ pub struct Game {
     runs: Vec<Run>,
     transitions: Vec<Transition>,
     timers: BTreeMap<Vec<u8>, Timer>,
+    /// The walk of the timers that waits for a handler.
+    timer_walk: Option<TimerWalk>,
     /// The game clock (seconds).
     clock: f64,
     /// The camera's field of view as the engine last set it (radians),
@@ -112,6 +134,7 @@ impl Game {
             runs: Vec::new(),
             transitions: Vec::new(),
             timers: BTreeMap::new(),
+            timer_walk: None,
             clock: 0.0,
             fov: 0.0,
         })
@@ -224,14 +247,108 @@ impl Game {
         true
     }
 
-    /// A click on a sprite: `click_sprite` and the scene's `on_click`.
-    pub fn click_sprite(&mut self, name: &[u8], animation: &[u8]) -> bool {
+    /// Whether the sprite of `object` under the screen centre is a target
+    /// (@ 0x00430b70 after its hit test): `GetSemantic` (@ 0x00402db0),
+    /// then the object must be reachable from view `view`
+    /// (`atl.objects.<name>.warp_reachable`, @ 0x004030f0). The cursor it
+    /// sets (@ 0x0042bfd0): 2 for an item, and for a character 2 with
+    /// something in the hand, 3 without. `None` when it is not a target.
+    /// An error the original throws on (a sprite without an object, ...)
+    /// is reported and the sprite is not a target.
+    pub fn sprite_cursor(&mut self, object: &[u8], view: i32) -> Option<i32> {
+        let semantic = match self.script.object_semantic(object) {
+            Ok(s) => s,
+            Err(e) => {
+                self.lua_error(&e);
+                return None;
+            }
+        };
+        match self.script.warp_reachable(object, view) {
+            Ok(true) => {}
+            Ok(false) => return None,
+            Err(e) => {
+                self.lua_error(&e);
+                return None;
+            }
+        }
+        match semantic {
+            Semantic::Item => Some(2),
+            Semantic::Character => match self.script.handled_item() {
+                Ok(h) if h.is_empty() => Some(3),
+                Ok(_) => Some(2),
+                Err(e) => {
+                    self.lua_error(&e);
+                    None
+                }
+            },
+        }
+    }
+
+    /// A left click with a sprite under the centre (@ 0x004300d0, the
+    /// manager's +0x3c): an item, or a character while the hand holds
+    /// something, or a character without subjects
+    /// (`Atl_Character_GetSubjects`, @ 0x00402540): the `click_sprite`
+    /// event (@ 0x00401a30) and the scene's `on_click`. A character with
+    /// subjects and an empty hand opens its subject menu instead
+    /// ([`Request::SubjectMenu`]). Ignored while a script runs.
+    pub fn click_sprite(&mut self, object: &[u8], animation: &[u8]) -> bool {
         if self.busy() || self.state != 4 {
             return false;
         }
-        self.script.set_click_sprite(name, animation);
+        let semantic = match self.script.object_semantic(object) {
+            Ok(s) => s,
+            Err(e) => {
+                self.lua_error(&e);
+                return false;
+            }
+        };
+        if semantic == Semantic::Character {
+            let hand = match self.script.handled_item() {
+                Ok(h) => h,
+                Err(e) => {
+                    self.lua_error(&e);
+                    return false;
+                }
+            };
+            if hand.is_empty() {
+                match self.script.character_subjects(object) {
+                    Ok(0) => {}
+                    Ok(_) => {
+                        self.request(&Request::SubjectMenu {
+                            character: object.to_vec(),
+                        });
+                        return true;
+                    }
+                    Err(e) => {
+                        self.lua_error(&e);
+                        return false;
+                    }
+                }
+            }
+        }
+        self.script.set_click_sprite(object, animation);
         self.run_on_click();
         true
+    }
+
+    /// A subject picked in a subject menu (@ 0x00401c40): the
+    /// `click_subject` event and the scene's `on_click`.
+    pub fn click_subject(&mut self, character: &[u8], subject: &[u8]) -> bool {
+        if self.busy() || self.state != 4 {
+            return false;
+        }
+        self.script.set_click_subject(character, subject);
+        self.run_on_click();
+        true
+    }
+
+    /// An error the original throws a `CException` on (the game ends);
+    /// here it is reported.
+    fn lua_error(&self, message: &str) {
+        self.event(&Event::Error(
+            crate::engine::ErrorSite::String(b"CLuaDatabaseManipulator".to_vec()),
+            message.as_bytes(),
+        ));
     }
 
     /// A timer's end as @ 0x00405ae0 handles it: the `timer` event and
@@ -280,6 +397,8 @@ impl Game {
                             String::from_utf8_lossy(&name)
                         ));
                     } else {
+                        // @ 0x0040c39c..0x0040c3a2: 0x004680c0(0.0),
+                        // the start is now.
                         self.timers.insert(
                             name,
                             Timer {
@@ -387,13 +506,17 @@ impl Game {
     }
 
     /// The transition's set-up (@ 0x0042d580, 0x0042d8d0 → 0x0042d610):
-    /// the camera's field of view kept, time and phase 0.
+    /// the camera's field of view kept, time and phase 0; for `centring`
+    /// the camera's mode kept and its turn toward the zone under the
+    /// centre started (the engine's [`crate::Engine::centring_start`]).
+    /// Then the handler's loop (@ 0x00405390) steps it once with a time of
+    /// 0 before its first frame.
     fn start_transition(&mut self, scene: Vec<u8>, view: i32, fx: Fx) {
-        if fx == Fx::Centring {
-            // @ 0x0042d610 → 0x0042cac0: the camera turns toward the
-            // clicked zone first [not ported: the view changes at once].
-            self.note("centring: the turn toward the zone is not ported".into());
-        }
+        let saved_mode = if fx == Fx::Centring {
+            self.engine.borrow_mut().centring_start()
+        } else {
+            0
+        };
         self.transitions.push(Transition {
             scene,
             view,
@@ -402,10 +525,9 @@ impl Game {
             t: 0.0,
             fov0: self.fov,
             entering: false,
+            saved_mode,
         });
-        if fx != Fx::ZoomAndFade {
-            self.change_view();
-        }
+        self.continue_transition(0.0);
     }
 
     /// The view change of the step (@ 0x0042d900): the view loaded
@@ -446,10 +568,37 @@ impl Game {
         let pi = f32::from_bits(0x4049_0fdb);
         // 0x00655748: 1/9 (20° of π).
         let ninth = f32::from_bits(0x3de3_8e39);
-        let done = match t.fx {
-            // no_fx (fx 0) and centring (fx 1) end with the view change.
-            Fx::NoFx | Fx::Centring => true,
-            Fx::ZoomAndFade => match t.phase {
+        let done = match (t.fx, t.phase) {
+            // no_fx (fx 0): the view change; the step ends with it.
+            (Fx::NoFx, 0) => {
+                t.phase = 1;
+                self.change_view();
+                false
+            }
+            (Fx::NoFx, _) => true,
+            // centring (fx 1), phase 0: t += dt and the camera's step
+            // (@ 0x0042cf80) until it reports its turn's end; then t = 0,
+            // phase 1.
+            (Fx::Centring, 0) => {
+                t.t += dt;
+                if self.engine.borrow_mut().camera_step(dt) {
+                    let t = self.transitions.last_mut().expect("transition");
+                    t.t = 0.0;
+                    t.phase = 1;
+                }
+                false
+            }
+            // Phase 1: the kept mode back (@ 0x0042caa0 / 0x0042cab0), then
+            // the view change as fx 0.
+            (Fx::Centring, 1) => {
+                t.phase = 2;
+                let mode = t.saved_mode;
+                self.engine.borrow_mut().camera_restore(mode);
+                self.change_view();
+                false
+            }
+            (Fx::Centring, _) => true,
+            (Fx::ZoomAndFade, _) => match t.phase {
                 0 => {
                     // t += dt; k = min(t · 4, 1) (0x00655740);
                     // fov = fov0 − k · π · (1/9); phase 1 after 0.25 s.
@@ -548,36 +697,69 @@ impl Game {
         }
     }
 
-    /// The timers (@ 0x00435a70 → 0x004353d0), in name order: one whose
-    /// time is up (remaining ≤ 0, 0x00655468) sets the `timer` event and
-    /// runs the scene's `on_click` (@ 0x00405ae0); then its repeats go
-    /// down (−1: for ever) and it starts again unless none is left.
+    /// The timers (@ 0x00435a70), in name order. Each step
+    /// (@ 0x004353d0): the timer's +0x10 = now (@ 0x00468120); remaining =
+    /// duration − (now − start) (@ 0x00468060); remaining ≤ 0 (0x00655468)
+    /// runs its `OnTimeOut` handler (@ 0x00405ae0: the `timer` event, the
+    /// scene's `on_click`), then the repeats (+0x44) go down when positive
+    /// and, when not 0, the timer starts again (0x004354bf..0x004354cc:
+    /// 0x004680c0(remaining), start = now − remaining, so the overshoot
+    /// lengthens the next period). After the step the walk erases the
+    /// timer when its +0x44 is 0 (0x00435aef → 0x00435ea0), whether it
+    /// ran or not.
     fn timers(&mut self) {
-        let names: Vec<Vec<u8>> = self.timers.keys().cloned().collect();
-        for name in names {
-            if self.busy() {
-                return;
-            }
-            let Some(t) = self.timers.get(&name) else {
-                continue;
+        let mut after: Option<Vec<u8>> = None;
+        if let Some(walk) = self.timer_walk.take() {
+            self.end_timer_step(&walk.name, Some(walk.remaining));
+            after = Some(walk.name);
+        }
+        loop {
+            let next = match &after {
+                None => self.timers.keys().next().cloned(),
+                Some(a) => self
+                    .timers
+                    .range::<Vec<u8>, _>((std::ops::Bound::Excluded(a), std::ops::Bound::Unbounded))
+                    .next()
+                    .map(|(k, _)| k.clone()),
             };
+            let Some(name) = next else {
+                return;
+            };
+            let t = &self.timers[&name];
             let remaining = t.duration - (self.clock - t.start);
-            if remaining > 0.0 {
-                continue;
-            }
-            self.timer_event(&name);
-            if let Some(t) = self.timers.get_mut(&name) {
-                if t.repeat > 0 {
-                    t.repeat -= 1;
+            if remaining <= 0.0 {
+                self.timer_event(&name);
+                if self.busy() {
+                    self.timer_walk = Some(TimerWalk { name, remaining });
+                    return;
                 }
-                if t.repeat != 0 {
-                    // Restarted from now [INFERRED: the restart's argument
-                    // is the timer's own remaining time, not checked].
-                    t.start = self.clock;
-                } else {
-                    self.timers.remove(&name);
-                }
+                self.end_timer_step(&name, Some(remaining));
+            } else {
+                self.end_timer_step(&name, None);
             }
+            after = Some(name);
+        }
+    }
+
+    /// The end of a timer's step: after its handler (`ran` = its
+    /// remaining time at the step), the repeats and the restart; then the
+    /// walk's erase when +0x44 is 0.
+    fn end_timer_step(&mut self, name: &[u8], ran: Option<f64>) {
+        let clock = self.clock;
+        let Some(t) = self.timers.get_mut(name) else {
+            // Destroyed by its handler.
+            return;
+        };
+        if let Some(remaining) = ran {
+            if t.repeat > 0 {
+                t.repeat -= 1;
+            }
+            if t.repeat != 0 {
+                t.start = clock - remaining;
+            }
+        }
+        if t.repeat == 0 {
+            self.timers.remove(name);
         }
     }
 
@@ -600,6 +782,12 @@ impl Game {
             0 => self.next_request(),
             1 => self.init_chapter(),
             4 => {
+                // A walk of the timers that waited for a handler ends in
+                // the frame the handler ended in.
+                if self.timer_walk.is_some() {
+                    self.timers();
+                    return;
+                }
                 if !self.queue.is_empty() {
                     self.next_request();
                     return;

@@ -170,7 +170,10 @@ fn zoom_and_fade_turns_the_field_of_view() {
         .position(|r| matches!(r, Request::LoadView { view: 7, .. }))
         .expect("the view change");
     let ninth = std::f32::consts::PI / 9.0;
-    assert!((fovs[0] - (1.0 - 0.08 * ninth)).abs() < 1e-5, "{fovs:?}");
+    // The handler's loop steps once with a time of 0 (@ 0x00405390), then
+    // with each frame's.
+    assert_eq!(fovs[0], 1.0, "{fovs:?}");
+    assert!((fovs[1] - (1.0 - 0.08 * ninth)).abs() < 1e-5, "{fovs:?}");
     assert!(fovs
         .iter()
         .all(|f| *f >= 1.0 - ninth - 1e-5 && *f <= 1.0 + ninth + 1e-5));
@@ -209,6 +212,38 @@ fn timers_repeat_and_end() {
     assert_eq!(g.script().global(b"N"), Value::Num(7.0));
     assert_eq!(g.timer_names(), [b"always".to_vec()]);
     // The second Create of "always" was logged, not made again: 1 s still.
+}
+
+#[test]
+fn a_repeating_timer_keeps_its_overshoot() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then N = (N or 0) + 1 \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"t\", 1) Atl_Timer_Create(\"none\", 5, 0) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"make"));
+    // 0.3 s frames, a 1 s timer: up at 1.2 s (remaining −0.2), restarted
+    // at now − remaining = 1.4 s (@ 0x004354bf..0x004354cc, 0x004680c0),
+    // up again at 2.4 s; one with 0 repeats goes at the first walk
+    // without running (@ 0x00435aef).
+    g.update(0.3);
+    assert_eq!(g.timer_names(), [b"t".to_vec()]);
+    assert_eq!(g.script().global(b"N"), Value::Nil);
+    for _ in 0..3 {
+        g.update(0.3);
+    }
+    assert_eq!(g.script().global(b"N"), Value::Num(1.0), "at 1.2 s");
+    for _ in 0..3 {
+        g.update(0.3);
+    }
+    assert_eq!(g.script().global(b"N"), Value::Num(1.0), "not at 2.1 s");
+    g.update(0.3);
+    assert_eq!(g.script().global(b"N"), Value::Num(2.0), "at 2.4 s");
 }
 
 #[test]

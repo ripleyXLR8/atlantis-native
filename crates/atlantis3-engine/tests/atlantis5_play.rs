@@ -2,15 +2,18 @@
 //! folder holding `datas/`, the French DVD's cabinets extracted; skipped
 //! when unset): the player's own scripts run, the first film runs and is
 //! skipped, the zeppelin's first view shows with its sprites and music,
-//! and clicks on the move zones walk through the views. Pictures go to
-//! `/tmp/claude-1000/a5-runs/m1-shots/` when that folder exists.
+//! clicks at the screen centre on the move zones walk through the views
+//! (the `centring` turn first when the zone is off the centre), and a
+//! click on a sprite runs the scene's `click_sprite` branch. Pictures go
+//! to the folder `ATLANTIS5_SHOT_DIR` names, when set.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use atlantis3_data::atlantis5::Atlantis5Source;
 use atlantis3_engine::atlantis5::{VIEW_HEIGHT, VIEW_WIDTH};
-use atlantis3_engine::atlantis5_play::Play;
+use atlantis3_engine::atlantis5_play::{Hover, Play};
+use atlantis5_script::Value;
 
 fn dvd() -> Option<PathBuf> {
     match std::env::var_os("ATLANTIS5_DVD_FR") {
@@ -25,10 +28,9 @@ fn dvd() -> Option<PathBuf> {
 fn shot(play: &Play, name: &str) -> Vec<u32> {
     let mut px = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
     play.render(&mut px);
-    let dir = std::path::Path::new("/tmp/claude-1000/a5-runs/m1-shots");
-    if dir.is_dir() {
+    if let Some(dir) = std::env::var_os("ATLANTIS5_SHOT_DIR") {
         let png = atlantis2_engine::png::encode_xrgb8888(&px, VIEW_WIDTH, VIEW_HEIGHT);
-        let _ = std::fs::write(dir.join(name), png);
+        let _ = std::fs::write(PathBuf::from(dir).join(name), png);
     }
     px
 }
@@ -79,30 +81,87 @@ fn a_new_game_walks_the_zeppelin() {
     let first = shot(&play, "a5-zeppelin-3.png");
     assert!(first.iter().filter(|&&p| p & 0xff_ffff != 0).count() > VIEW_WIDTH * VIEW_HEIGHT / 2);
 
-    // The move zones in sight, then a walk by clicks: wherever a zone to
-    // another view is in sight, it is clicked.
+    // A walk by clicks: the centre turned onto a move zone not visited
+    // yet, a click there.
     let mut visited = vec![3];
-    for step in 0..6 {
-        let zones = play.clickable();
-        let Some((x, y, id, _)) = zones.into_iter().find(|z| !visited.contains(&z.2)) else {
-            // Look around: turn the camera by mouse drags until a new
-            // zone shows.
-            for _ in 0..10 {
-                play.look(-40.0, 0.0, 1.0 / 30.0);
-                frames(&mut play, 1);
-            }
-            frames(&mut play, 30);
-            continue;
+    for step in 0..4 {
+        let zones: Vec<i32> = play
+            .zones()
+            .into_iter()
+            .filter(|z| z.1.is_empty() && !visited.contains(&z.0))
+            .map(|z| z.0)
+            .collect();
+        // Toward view 4 (the coin's) when it is in reach.
+        let Some(&id) = zones.iter().find(|&&z| z == 4).or(zones.first()) else {
+            break;
         };
-        assert!(play.click(x, y), "click on zone {id} at ({x}, {y})");
-        frames(&mut play, 5);
+        assert!(play.aim_at_zone(id));
+        assert_eq!(play.hover(), Some(&Hover::Zone(id, Vec::new())));
+        play.click();
+        frames(&mut play, 3);
         let addr = play.stage().address().expect("a view");
         assert_eq!(addr.0, b"zeppelin".to_vec());
         assert_eq!(addr.1, id, "the zone's view");
         visited.push(id);
         shot(&play, &format!("a5-walk-{step}-view-{id}.png"));
+        if id == 4 {
+            break;
+        }
     }
-    assert!(visited.len() >= 3, "walked through {visited:?}");
+    assert_eq!(visited.last(), Some(&4), "walked through {visited:?}");
+
+    // View 4: the coin on the table is a target (an item reachable from
+    // view 4, `chapter_01.lua`'s Init_Coin); a click takes it in the hand.
+    assert!(play.aim_at_sprite(b"coin"), "the coin under the centre");
+    assert_eq!(play.stage().cursor, Some(2));
+    play.click();
+    frames(&mut play, 2);
+    play.game
+        .script()
+        .exec("__hand = atl.hero.handled_item")
+        .expect("lua");
+    assert_eq!(
+        play.game.script().global(b"__hand"),
+        Value::Str(b"coin".to_vec())
+    );
+    // No longer reachable: not a target any more.
+    frames(&mut play, 1);
+    assert!(!matches!(play.hover(), Some(Hover::Sprite(o, _)) if o == b"coin"));
+
+    // The centring turn: the centre a few degrees off a move zone's
+    // direction (still inside it), a click; the camera turns for 0.75 s
+    // before the view changes.
+    let back = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1.is_empty())
+        .map(|z| z.0)
+        .expect("a move zone");
+    assert!(play.aim_at_zone(back));
+    let (p0, y0) = play.stage().angles();
+    let mut off = None;
+    for d in [8.0f32, 6.0, 5.0, 4.0] {
+        play.look_angles(p0, y0 + d);
+        if play.hover() == Some(&Hover::Zone(back, Vec::new())) {
+            off = Some(d);
+            break;
+        }
+    }
+    let off = off.expect("the zone is wide enough");
+    play.click();
+    frames(&mut play, 1);
+    let mut turned = 0;
+    let mut y1 = y0 + off;
+    while play.stage().address() == Some((b"zeppelin".to_vec(), 4)) {
+        y1 = play.stage().angles().1;
+        frames(&mut play, 1);
+        turned += 1;
+        assert!(turned < 60, "the view changes");
+    }
+    assert!(turned >= 20, "a turn of about 0.75 s: {turned} frames");
+    let gap = (y1 - y0).rem_euclid(360.0).min((y0 - y1).rem_euclid(360.0));
+    assert!(gap < 1.0, "turned toward the zone: {y0} {y1}");
+
     let trace = &play.stage().trace;
     assert!(!trace.iter().any(|l| l.starts_with("error")), "{trace:?}");
 }
