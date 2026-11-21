@@ -302,7 +302,7 @@ mod dir {
         fn command_line_first() {
             let d = scratch("cli");
             std::fs::write(d.join(PORTABLE_MARKER), b"").unwrap();
-            let r = resolve_data_dir(p("/cli"), p("/env"), &[d.clone()], p("/user"));
+            let r = resolve_data_dir(p("/cli"), p("/env"), std::slice::from_ref(&d), p("/user"));
             assert_eq!(r, Some((PathBuf::from("/cli"), DataDirSource::CommandLine)));
         }
 
@@ -310,10 +310,10 @@ mod dir {
         fn environment_over_portable() {
             let d = scratch("env");
             std::fs::write(d.join(PORTABLE_MARKER), b"").unwrap();
-            let r = resolve_data_dir(None, p("/env"), &[d.clone()], p("/user"));
+            let r = resolve_data_dir(None, p("/env"), std::slice::from_ref(&d), p("/user"));
             assert_eq!(r, Some((PathBuf::from("/env"), DataDirSource::Environment)));
             // Empty values count as unset.
-            let r = resolve_data_dir(p(""), p(""), &[d.clone()], p("/user"));
+            let r = resolve_data_dir(p(""), p(""), std::slice::from_ref(&d), p("/user"));
             assert_eq!(r, Some((d.join("data"), DataDirSource::Portable)));
         }
 
@@ -322,16 +322,19 @@ mod dir {
             let d = scratch("marker");
             let user = Some((PathBuf::from("/user"), DataDirSource::PerUser));
             // No marker: nothing changes for the players of before.
-            assert_eq!(resolve_data_dir(None, None, &[d.clone()], p("/user")), user);
+            assert_eq!(
+                resolve_data_dir(None, None, std::slice::from_ref(&d), p("/user")),
+                user
+            );
             std::fs::write(d.join(PORTABLE_MARKER), b"").unwrap();
             assert_eq!(
-                resolve_data_dir(None, None, &[d.clone()], p("/user")),
+                resolve_data_dir(None, None, std::slice::from_ref(&d), p("/user")),
                 Some((d.join("data"), DataDirSource::Portable))
             );
             let e = scratch("datafolder");
             std::fs::create_dir_all(e.join(PORTABLE_DATA)).unwrap();
             assert_eq!(
-                resolve_data_dir(None, None, &[e.clone()], p("/user")),
+                resolve_data_dir(None, None, std::slice::from_ref(&e), p("/user")),
                 Some((e.join("data"), DataDirSource::Portable))
             );
             // A file named `data` is no marker.

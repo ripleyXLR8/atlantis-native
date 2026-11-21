@@ -18,7 +18,9 @@
 //!   `warps/`, string 0x0066cec4); the JP6 reader is the 2004 program's
 //!   (@ 0x00478100, 0x00478250, 0x00478930 = atlantis4-cd-en-3022848
 //!   @ 0x006644b0, 0x00664600, 0x00664ce0), so the faces come in its
-//!   order ([`atlantis3_data::evolution2004_jp6`]);
+//!   order ([`atlantis3_data::evolution2004_jp6`]), and the warp loader
+//!   (@ 0x00448eb0 → `AtlLoadWarp_LoadJpeg6Panorama` @ 0x004491b0) puts
+//!   face i into cube slot i as the 2004 program's FUN_0042d8b0 does;
 //! - a sprite: `(<scene>)_(<view %.3d>)_(<object>)_(<animation>).spw` in
 //!   `datas/sprites3d/` (@ 0x00449a80: `(`, `)_(`, `%.3d`, `).spw`,
 //!   0x0066e788..0x0066e798), an `SPWCRYO` file of the shared sprite DLL
