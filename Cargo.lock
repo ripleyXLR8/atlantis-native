@@ -230,6 +230,7 @@ dependencies = [
  "encoding_rs",
  "log",
  "md-5",
+ "miniz_oxide 0.8.9",
 ]
 
 [[package]]

@@ -94,6 +94,26 @@ pub fn install_dir() -> Option<PathBuf> {
     }
 }
 
+/// The variable naming the French DVD of *Atlantis V* (the folder holding
+/// `soa-fr.iso`, the disc's files in `files/` and the extracted cabinets
+/// in `datas/`).
+pub const A5_DVD_FR_VAR: &str = "ATLANTIS5_DVD_FR";
+
+/// The French DVD's folder from `ATLANTIS5_DVD_FR`. Unlike the other
+/// games' data, its absence never fails a test: the test writes
+/// `SKIPPED <test>` and returns.
+pub fn a5_dvd_fr() -> Option<PathBuf> {
+    match std::env::var_os(A5_DVD_FR_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(std::io::stderr(), "SKIPPED {test}: {A5_DVD_FR_VAR} not set");
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
