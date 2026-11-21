@@ -2,19 +2,26 @@
 //! development entry (`--atlantis5 <disc, image or folder>`): the data
 //! opened in any form the player has them
 //! ([`atlantis3_data::atlantis5::Atlantis5Source`]), then the new game's
-//! first view drawn by the engine ([`atlantis3_engine::atlantis5`]). The
-//! scripts do not run yet: the view is entered from the calls the game's
-//! scripts make, and nothing moves. Escape or closing the window ends it.
+//! game played from a new game: the player's own scripts run
+//! ([`atlantis5_script`] through [`atlantis3_engine::atlantis5_play`]).
+//! A click on the view clicks its zone; a drag with the left button looks
+//! around; Escape or Space ends a film; Escape out of a film, or closing
+//! the window, ends the game. Dialogs, inventory, menus and saves are the
+//! next milestones.
 
 use std::num::NonZeroU32;
 use std::path::Path;
 use std::rc::Rc;
+use std::sync::Arc;
+use std::time::Instant;
 
 use atlantis3_data::atlantis5::Atlantis5Source;
 use atlantis3_engine::atlantis5::{View, FIRST_VIEW, VIEW_HEIGHT, VIEW_WIDTH};
+use atlantis3_engine::atlantis5_play::Play;
+use atlantis3_engine::audio::Audio;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
-use winit::event::{ElementState, WindowEvent};
+use winit::event::{ElementState, MouseButton, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{Fullscreen, Window, WindowId};
@@ -49,17 +56,36 @@ pub fn first_view(src: &Atlantis5Source) -> Result<Vec<u32>, String> {
     Ok(view.render(true))
 }
 
-/// Without a window: prints what the data are and, with `screenshot`,
-/// writes the first view there.
+/// Without a window: prints what the data are and plays a new game until
+/// the first view (its films ended at once); with `screenshot`, writes it
+/// there.
 pub fn headless(path: &Path, screenshot: Option<&Path>) -> Result<(), String> {
     let (src, label) = open(path)?;
     println!("{label}, {}", crate::version_string());
-    let pic = first_view(&src)?;
+    let lang = language(&src);
+    let src: Arc<dyn atlantis_data::FileSource> = Arc::new(src);
+    let mut play = Play::new(src, &lang, None)?;
+    play.new_game();
+    for _ in 0..600 {
+        play.update(1.0 / 30.0);
+        if play.stage().film_playing() {
+            play.skip();
+        }
+        if play.game.state() == 4 && !play.game.busy() {
+            break;
+        }
+    }
+    let (scene, view) = play
+        .stage()
+        .address()
+        .ok_or_else(|| "no view after the new game".to_string())?;
     println!(
-        "first view: {} view {}, {VIEW_WIDTH}x{VIEW_HEIGHT}",
-        FIRST_VIEW.scene, FIRST_VIEW.view
+        "first view: {} view {view}, {VIEW_WIDTH}x{VIEW_HEIGHT}",
+        String::from_utf8_lossy(&scene)
     );
     if let Some(p) = screenshot {
+        let mut pic = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        play.render(&mut pic);
         let png = atlantis2_engine::png::encode_xrgb8888(&pic, VIEW_WIDTH, VIEW_HEIGHT);
         std::fs::write(p, png).map_err(|e| format!("{}: {e}", p.display()))?;
         println!("screenshot: {}", p.display());
@@ -67,16 +93,54 @@ pub fn headless(path: &Path, screenshot: Option<&Path>) -> Result<(), String> {
     Ok(())
 }
 
+/// The language of the films' voices: French when the data have it, else
+/// the first.
+fn language(src: &Atlantis5Source) -> String {
+    let langs = src.languages();
+    langs
+        .iter()
+        .find(|l| l.eq_ignore_ascii_case("french"))
+        .or_else(|| langs.first())
+        .cloned()
+        .unwrap_or_else(|| "french".to_string())
+}
+
 struct A5App {
+    play: Play,
     picture: Vec<u32>,
     title: String,
     fullscreen: bool,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    last: Instant,
+    /// The cursor in view pixels; the left button's press point and
+    /// whether it was dragged.
+    cursor: (f32, f32),
+    pressed: Option<(f32, f32)>,
+    dragged: bool,
+    _audio: Option<cpal::Stream>,
 }
 
 impl A5App {
+    /// The picture's place in the window: (x, y, width, height).
+    fn place(&self) -> (usize, usize, usize, usize) {
+        let Some(window) = &self.window else {
+            return (0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+        };
+        let size = window.inner_size();
+        let (ww, wh) = (size.width.max(1) as usize, size.height.max(1) as usize);
+        let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
+        let (dw, dh) = if ww * gh > wh * gw {
+            (wh * gw / gh, wh)
+        } else {
+            (ww, ww * gh / gw)
+        };
+        let (dw, dh) = (dw.max(1), dh.max(1));
+        ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
+    }
+
     fn present(&mut self) {
+        let (ox, oy, dw, dh) = self.place();
         let (Some(window), Some(surface)) = (&self.window, self.surface.as_mut()) else {
             return;
         };
@@ -94,13 +158,6 @@ impl A5App {
         // The picture at its proportions, black bars around, nearest
         // pixel.
         let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
-        let (dw, dh) = if ww * gh > wh * gw {
-            (wh * gw / gh, wh)
-        } else {
-            (ww, ww * gh / gw)
-        };
-        let (dw, dh) = (dw.max(1), dh.max(1));
-        let (ox, oy) = ((ww - dw) / 2, (wh - dh) / 2);
         buf.fill(0);
         for y in 0..dh {
             let row = &self.picture[(y * gh / dh) * gw..][..gw];
@@ -110,6 +167,15 @@ impl A5App {
             }
         }
         let _ = buf.present();
+    }
+
+    fn frame(&mut self) {
+        let now = Instant::now();
+        let dt = now.duration_since(self.last).as_secs_f64().min(0.25);
+        self.last = now;
+        self.play.update(dt);
+        self.play.render(&mut self.picture);
+        self.present();
     }
 }
 
@@ -141,41 +207,99 @@ impl ApplicationHandler for A5App {
             }
         }
         self.window = Some(window);
+        self.last = Instant::now();
+    }
+
+    fn about_to_wait(&mut self, _el: &ActiveEventLoop) {
+        if let Some(w) = &self.window {
+            w.request_redraw();
+        }
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => el.exit(),
-            WindowEvent::KeyboardInput { event, .. }
-                if event.state == ElementState::Pressed
-                    && event.logical_key == Key::Named(NamedKey::Escape) =>
-            {
-                el.exit()
-            }
-            WindowEvent::RedrawRequested => self.present(),
-            WindowEvent::Resized(_) => {
-                if let Some(w) = &self.window {
-                    w.request_redraw();
+            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
+                match event.logical_key {
+                    Key::Named(NamedKey::Escape) => {
+                        if self.play.stage().film_playing() {
+                            self.play.skip();
+                        } else {
+                            el.exit();
+                        }
+                    }
+                    Key::Named(NamedKey::Space) => self.play.skip(),
+                    _ => {}
                 }
             }
+            WindowEvent::CursorMoved { position, .. } => {
+                let (ox, oy, dw, dh) = self.place();
+                let x = (position.x as f32 - ox as f32) * VIEW_WIDTH as f32 / dw as f32;
+                let y = (position.y as f32 - oy as f32) * VIEW_HEIGHT as f32 / dh as f32;
+                let (dx, dy) = (x - self.cursor.0, y - self.cursor.1);
+                self.cursor = (x, y);
+                if let Some(p) = self.pressed {
+                    if (x - p.0).abs() + (y - p.1).abs() > 4.0 {
+                        self.dragged = true;
+                    }
+                    if self.dragged {
+                        self.play.look(dx, dy, 1.0 / 60.0);
+                    }
+                }
+            }
+            WindowEvent::MouseInput {
+                state,
+                button: MouseButton::Left,
+                ..
+            } => match state {
+                ElementState::Pressed => {
+                    self.pressed = Some(self.cursor);
+                    self.dragged = false;
+                }
+                ElementState::Released => {
+                    if self.pressed.take().is_some() && !self.dragged {
+                        if self.play.stage().film_playing() {
+                            self.play.skip();
+                        } else {
+                            let (x, y) = self.cursor;
+                            self.play.click(x, y);
+                        }
+                    }
+                }
+            },
+            WindowEvent::RedrawRequested => self.frame(),
             _ => {}
         }
     }
 }
 
-/// Opens a window on the first view of the data at `path`; returns when it
-/// is closed.
+/// Opens a window and plays a new game from the data at `path`; returns
+/// when the window is closed.
 pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
     let (src, label) = open(path)?;
     log::info!("{label}");
-    let picture = first_view(&src)?;
+    let lang = language(&src);
+    let audio = Audio::new();
+    let out = {
+        let a = audio.clone();
+        crate::audio_out::start_with(move |buf, rate, channels| a.fill(buf, rate, channels))
+    };
+    let src: Arc<dyn atlantis_data::FileSource> = Arc::new(src);
+    let mut play = Play::new(src, &lang, Some(audio))?;
+    play.new_game();
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     let mut app = A5App {
-        picture,
+        play,
+        picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
         title: "The Secrets of Atlantis (2006) - Atlantis Native".to_string(),
         fullscreen,
         window: None,
         surface: None,
+        last: Instant::now(),
+        cursor: (0.0, 0.0),
+        pressed: None,
+        dragged: false,
+        _audio: out,
     };
     el.run_app(&mut app)
         .map_err(|e| format!("The window failed: {e}"))

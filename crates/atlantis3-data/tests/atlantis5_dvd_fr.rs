@@ -146,7 +146,8 @@ fn the_text_tables() {
     let [dialogs, strings, subtitles] = text_paths("french");
     let s = StringResources::parse(&t.read(&strings).unwrap()).unwrap();
     assert_eq!((s.language.as_str(), s.strings.len()), ("french", 238));
-    assert_eq!(s.get("new_game"), Some("Nouvelle partie"));
+    // A derived value, not the text: the menu string's length in chars.
+    assert_eq!(s.get("new_game").map(|v| v.chars().count()), Some(15));
     assert!(s
         .strings
         .iter()

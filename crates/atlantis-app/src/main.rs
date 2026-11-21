@@ -89,7 +89,7 @@
 //! plays the logos (skipped with `--no-intro`) and the start page without
 //! a window. The game library finds and opens it too, as an edition of
 //! Atlantis Evolution; `--evolution2004 <folder>` opens it directly;
-//! `--atlantis5 <disc, image or folder>` shows Atlantis V's first view.
+//! `--atlantis5 <disc, image or folder>` plays Atlantis V from a new game (in development).
 //!
 //! `atlantis-native --list-games` prints the games found on the computer
 //! (every game: what the library's "Find installations" adds) and ends.
@@ -233,7 +233,7 @@ fn main() {
         }
         return;
     }
-    // Atlantis V (2006): the development entry, its first view.
+    // Atlantis V (2006): the development entry, a new game.
     if args.first().map(String::as_str) == Some("--atlantis5") {
         let fullscreen = args.iter().any(|a| a == "--fullscreen");
         let headless = args.iter().any(|a| a == "--headless");
