@@ -133,3 +133,50 @@ fn the_playlists() {
     }
     assert_eq!((lists, looped, random), (42, 17, 4));
 }
+
+/// The three French tables read whole: 238 strings, 31 talkers and 291
+/// dialogs of 827 tirades (one voice file each in `sounds/dialog/french`),
+/// 14 films' 37 subtitles, each film a `.bik` of `videos/`.
+#[test]
+fn the_text_tables() {
+    use atlantis3_data::atlantis5::text_paths;
+    use atlantis3_data::atlantis5_texts::{Dialogs, KinematicSubtitles, StringResources};
+    let Some(d) = dvd() else { return };
+    let t = tree(&d);
+    let [dialogs, strings, subtitles] = text_paths("french");
+    let s = StringResources::parse(&t.read(&strings).unwrap()).unwrap();
+    assert_eq!((s.language.as_str(), s.strings.len()), ("french", 238));
+    assert_eq!(s.get("new_game"), Some("Nouvelle partie"));
+    assert!(s
+        .strings
+        .iter()
+        .any(|(_, v)| v.contains('\n') && !v.contains('\r')));
+    let g = Dialogs::parse(&t.read(&dialogs).unwrap()).unwrap();
+    assert_eq!((g.talkers.len(), g.dialogs.len()), (31, 291));
+    let tirades: usize = g.dialogs.iter().map(|x| x.tirades.len()).sum();
+    assert_eq!(tirades, 827);
+    let voices = t.list("datas/sounds/dialog/french");
+    assert_eq!(voices.len(), 827);
+    let k = KinematicSubtitles::parse(&t.read(&subtitles).unwrap()).unwrap();
+    let n: usize = k.films.iter().map(|f| f.subtitles.len()).sum();
+    assert_eq!((k.films.len(), n), (14, 37));
+    for f in &k.films {
+        assert!(
+            t.size(&format!("datas/videos/{}.bik", f.name)).is_some(),
+            "{}",
+            f.name
+        );
+        assert!(f.subtitles.iter().all(|s| s.start <= s.end));
+    }
+    // Every tirade's talker is a talker of the set.
+    for x in &g.dialogs {
+        for tr in &x.tirades {
+            assert!(
+                g.talkers.iter().any(|k| k.name == tr.talker),
+                "{} {}",
+                x.id,
+                tr.talker
+            );
+        }
+    }
+}

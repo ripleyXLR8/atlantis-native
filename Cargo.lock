@@ -288,6 +288,7 @@ dependencies = [
  "atlantis-codecs",
  "atlantis-data",
  "atlantis2-data",
+ "atlantis4-data",
  "log",
  "md-5",
 ]
