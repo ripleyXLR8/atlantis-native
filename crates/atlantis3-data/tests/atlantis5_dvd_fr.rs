@@ -98,3 +98,38 @@ fn the_tree_and_datas_itself() {
             .map(|m| m.len())
     );
 }
+
+/// Every playlist reads (@ 0x0045b7a0's rules) to tracks whose files are in
+/// the music folder (any case): `LOOP` lists among them. Two lists name a
+/// file the disc lacks (`death_theme.mls`: `electric_bzz.ogg`,
+/// `floor_18_typewriter.mls`: `typewriter_1.ogg`); no script plays them
+/// (the second's one call is commented out).
+#[test]
+fn the_playlists() {
+    use atlantis3_data::evolution2004_mls::Playlist;
+    let Some(d) = dvd() else { return };
+    let t = tree(&d);
+    let names: Vec<String> = t
+        .list("datas/sounds/music")
+        .iter()
+        .map(|n| n.to_ascii_lowercase())
+        .collect();
+    let (mut lists, mut looped, mut random) = (0, 0, 0);
+    for n in names.iter().filter(|n| n.ends_with(".mls")) {
+        let p = Playlist::parse_atlantis5(&t.read(&format!("datas/sounds/music/{n}")).unwrap());
+        assert!(!p.tracks.is_empty(), "{n}");
+        for tr in &p.tracks {
+            let f = String::from_utf8_lossy(&tr.file).to_ascii_lowercase();
+            let lacking = matches!(
+                (n.as_str(), f.as_str()),
+                ("death_theme.mls", "electric_bzz.ogg")
+                    | ("floor_18_typewriter.mls", "typewriter_1.ogg")
+            );
+            assert_eq!(names.contains(&f), !lacking, "{n}: {f}");
+        }
+        lists += 1;
+        looped += usize::from(p.looped);
+        random += usize::from(p.random);
+    }
+    assert_eq!((lists, looped, random), (42, 17, 4));
+}
