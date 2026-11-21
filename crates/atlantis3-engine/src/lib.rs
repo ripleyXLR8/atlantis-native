@@ -15,6 +15,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod atlantis5;
 pub mod audio;
 pub mod caption;
 pub mod cinema;
