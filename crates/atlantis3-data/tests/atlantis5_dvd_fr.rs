@@ -180,3 +180,17 @@ fn the_text_tables() {
         }
     }
 }
+
+/// The French `font.txt`: 12 fonts, the quoted faces whole.
+#[test]
+fn the_font_list() {
+    use atlantis3_data::font_txt::FontTxt;
+    let Some(d) = dvd() else { return };
+    let t = tree(&d);
+    let f = FontTxt::parse_atlantis5(&t.read("datas/fonts/french/font.txt").unwrap());
+    assert_eq!(f.fonts.len(), 12);
+    let def = f.font("AtlFont_Default").unwrap();
+    assert_eq!((def.face.as_str(), def.height), ("Courier New", 16));
+    assert_eq!(f.font("AtlFont_Dialog").unwrap().weight(), 700);
+    assert_eq!(f.fonts.iter().filter(|x| x.antialias).count(), 0);
+}
