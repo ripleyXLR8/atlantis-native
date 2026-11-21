@@ -2049,6 +2049,112 @@ pub fn execute(state: &mut LuaState) -> LuaResult<()> {
                 }
 
                 // ----- SETLIST -----
+                // ----- Lua 5.0 operations (Native patch 4), as Lua 5.0.3's lvm.c -----
+                OpCode::NewTable50 => {
+                    state.gc_check()?;
+                    // fb2int (5.0): (x & 7) << (x >> 3); luaH_new(L, b, C)
+                    // with C the log2 of the node count, 0 = no node.
+                    let b = instr.b();
+                    let narray = ((b & 7) << (b >> 3)) as usize;
+                    let c = instr.c();
+                    let nhash = if c == 0 { 0 } else { 1usize << c.min(26) };
+                    let t = state.gc.alloc_table(Table::with_sizes(narray, nhash));
+                    state.stack_set(ra, Val::Table(t));
+                }
+
+                OpCode::ForLoop50 => {
+                    let Val::Num(idx) = state.stack_get(ra) else {
+                        return Err(runtime_error(
+                            &proto,
+                            pc,
+                            "`for' initial value must be a number",
+                        ));
+                    };
+                    let limit = coerce_to_number(state.stack_get(ra + 1), &state.gc)
+                        .ok_or_else(|| runtime_error(&proto, pc, "`for' limit must be a number"))?;
+                    state.stack_set(ra + 1, Val::Num(limit));
+                    let step = coerce_to_number(state.stack_get(ra + 2), &state.gc)
+                        .ok_or_else(|| runtime_error(&proto, pc, "`for' step must be a number"))?;
+                    state.stack_set(ra + 2, Val::Num(step));
+                    let idx = idx + step;
+                    let go_on = if step > 0.0 {
+                        idx <= limit
+                    } else {
+                        idx >= limit
+                    };
+                    if go_on {
+                        let sbx = instr.sbx();
+                        pc = ((pc as i64) + i64::from(sbx)) as usize;
+                        state.stack_set(ra, Val::Num(idx));
+                    }
+                }
+
+                OpCode::TForPrep50 => {
+                    if let Val::Table(_) = state.stack_get(ra) {
+                        state.stack_set(ra + 1, state.stack_get(ra));
+                        let key = state.gc.intern_string(b"next");
+                        let next = state
+                            .gc
+                            .tables
+                            .get(state.global)
+                            .map_or(Val::Nil, |g| g.get_str(key, &state.gc.string_arena));
+                        state.stack_set(ra, next);
+                    }
+                    let sbx = instr.sbx();
+                    pc = ((pc as i64) + i64::from(sbx)) as usize;
+                }
+
+                OpCode::TForLoop50 => {
+                    let nvar = instr.c() as usize + 1;
+                    let cb = ra + nvar + 2;
+                    state.stack_set(cb, state.stack_get(ra));
+                    state.stack_set(cb + 1, state.stack_get(ra + 1));
+                    state.stack_set(cb + 2, state.stack_get(ra + 2));
+                    state.top = cb + 3;
+                    state.call_stack[state.ci].saved_pc = pc;
+                    state.call_depth += 1;
+                    let tfor_result = (|| {
+                        state.check_stack_overflow()?;
+                        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+                        match state.precall(cb, nvar as i32)? {
+                            CallResult::Lua => execute(state),
+                            CallResult::Rust => Ok(()),
+                        }
+                    })();
+                    state.call_depth -= 1;
+                    tfor_result?;
+                    state.top = state.call_stack[state.ci].top;
+                    // Results from the call base to their places (R(A+2)...).
+                    for k in 0..nvar {
+                        state.stack_set(ra + 2 + k, state.stack_get(cb + k));
+                    }
+                    if state.stack_get(ra + 2).is_nil() {
+                        pc += 1;
+                    } else {
+                        let jump_instr = Instruction::from_raw(proto.code[pc]);
+                        pc = ((pc as i64) + i64::from(jump_instr.sbx()) + 1) as usize;
+                    }
+                }
+
+                OpCode::SetList50 | OpCode::SetListO50 => {
+                    let mut bc = instr.bx() as usize;
+                    let n = if op == OpCode::SetList50 {
+                        (bc & 31) + 1
+                    } else {
+                        let n = state.top - ra - 1;
+                        state.top = state.call_stack[state.ci].top;
+                        n
+                    };
+                    bc &= !31;
+                    let Val::Table(table_ref) = state.stack_get(ra) else {
+                        return Err(type_error(state, &proto, pc, base, a, "index"));
+                    };
+                    for i in (1..=n).rev() {
+                        let val = state.stack_get(ra + i);
+                        table_set(state, table_ref, Val::Num((bc + i) as f64), val)?;
+                    }
+                }
+
                 OpCode::SetList => {
                     let mut n = instr.b() as usize;
                     let mut c = instr.c() as usize;

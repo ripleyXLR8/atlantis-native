@@ -1,0 +1,33 @@
+1,2,3,4,5,
+10 7 4 1 
+1 1.5 2 
+1 2 3 
+1;2;3;
+3 6 9 12 
+n	4
+3	3	3
+1=gold 2=silver 3=copper 
+1=gold 2=silver 3=copper 
+sum	6
+70	1	33	64	70
+5	7	9
+4	7	7	9
+d	false	2	true	false	true	true	true	false	true	false
+3	20	3.5	1	-4	4	1024
+1020	1.5	1e+15	1e+16	0.1	0.33333333333333
+42  3.14 x "a\"b"
+4	bcde	3	ababab
+nil	true	16	12	35	function
+2
+610
+8
+-1
+deep	deep
+3	4	5
+false	semantics.lua:64: attempt to index local `z' (a nil value)
+false	semantics.lua:65: attempt to call global `undefined_global_fn' (a nil value)
+false	semantics.lua:66: boom
+false	semantics.lua:67: msg
+false	semantics.lua:68: attempt to perform arithmetic on a string value
+macao ishtar etage19 etage12 etage99 mesopotamie etage18 etage28 etage-2 zeppelin etage0
+97.5 30 15 7.5 142.5 82.5 135 52.5 75 67.5 45 112.5 150 127.5 37.5 105 120 90 60 22.5

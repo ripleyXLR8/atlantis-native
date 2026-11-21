@@ -188,7 +188,7 @@ fn close_thread_upvalues(state: &mut LuaState) -> Vec<(GcRef<Upvalue>, usize)> {
 /// `resume`/`wrap` without stringification.
 ///
 /// Reference: `auxresume` in `lbaselib.c`.
-pub(crate) fn auxresume(
+pub fn auxresume(
     state: &mut LuaState,
     co_ref: GcRef<LuaThread>,
     args: &[Val],

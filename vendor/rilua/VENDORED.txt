@@ -40,3 +40,20 @@ PATCHES
    `newproxy`; `package`, `module`, `require`); `package.loaded` receives
    the libraries opened after `package` at the end. A fresh `pairs(_G)`
    then walks in Lua 5.1.4's order.
+
+4. src/vm/undump50.rs (new), src/lib.rs, src/vm/instructions.rs,
+   src/vm/execute.rs, src/vm/debug_info.rs: Lua 5.0 binary chunks
+   (Atlantis V's French DVD ships its scripts as Lua 5.0 bytecode).
+   `compile_or_undump` sends a chunk whose header is `ESC "Lua" 0x50` to
+   `undump50`, which re-encodes the 5.0 instructions in 5.1's layout
+   (5.0's RK operands, constants reordered when an RK operand names a
+   constant past 255) and gives the operations whose meaning differs
+   their own codes, run as Lua 5.0.3's lvm.c runs them: ForLoop50,
+   TForLoop50, TForPrep50 (generic `for` over a table), SetList50,
+   SetListO50, NewTable50. Reproducer: crates/atlantis5-script/tests/
+   lua50.rs (a chunk compiled by Lua 5.0.3's luac and the output of Lua
+   5.0.3's lua).
+
+5. src/stdlib/coroutine.rs: `auxresume` made public, so an embedder can
+   resume a coroutine from Rust (atlantis5-script runs each script as a
+   coroutine that waits at the calls the original runs over frames).
