@@ -8,7 +8,7 @@ use crate::engine::{Call, Engine, Event, Reply, Request, Value};
 pub type Reader = Box<dyn FnMut(&[u8]) -> Option<Vec<u8>>>;
 
 /// Records calls; every call is done at once (films and looks do not
-/// wait), `Atl_Display_GetScreenSize` answers 1024 × 768.
+/// wait), `Atl_Display_GetScreenSize` answers 1024 × 576.
 pub struct Recorder {
     read: Reader,
     /// The trace, one line per call or note.
@@ -50,7 +50,7 @@ impl Engine for Recorder {
 
     fn call(&mut self, call: &Call) -> Reply {
         match call {
-            Call::DisplayGetScreenSize => Reply::Values(vec![1024.0, 768.0]),
+            Call::DisplayGetScreenSize => Reply::Values(vec![1024.0, 576.0]),
             Call::VideoPlay { .. } | Call::CameraLookAt { animated: true, .. } if self.wait => {
                 Reply::Wait
             }

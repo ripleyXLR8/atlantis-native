@@ -304,6 +304,7 @@ dependencies = [
  "atlantis2-engine",
  "atlantis3-data",
  "atlantis4-data",
+ "atlantis5-script",
  "libm",
  "log",
  "md-5",

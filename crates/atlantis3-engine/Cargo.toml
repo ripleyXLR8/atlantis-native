@@ -15,6 +15,8 @@ atlantis2-engine = { path = "../atlantis2-engine" }
 atlantis3-data = { path = "../atlantis3-data" }
 # The JPEG decoder of the 2004 program's `jp6` panoramas.
 atlantis4-data = { path = "../atlantis4-data" }
+# Atlantis V's scripts (the game manager the engine serves).
+atlantis5-script = { path = "../atlantis5-script" }
 ab_glyph = "0.2"
 libm = "=0.2.16"
 log = "0.4"
