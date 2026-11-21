@@ -88,7 +88,8 @@
 //! `--headless <folder> [frames] [--no-intro] [--screenshot <file.png>]`
 //! plays the logos (skipped with `--no-intro`) and the start page without
 //! a window. The game library finds and opens it too, as an edition of
-//! Atlantis Evolution; `--evolution2004 <folder>` opens it directly.
+//! Atlantis Evolution; `--evolution2004 <folder>` opens it directly;
+//! `--atlantis5 <disc, image or folder>` shows Atlantis V's first view.
 //!
 //! `atlantis-native --list-games` prints the games found on the computer
 //! (every game: what the library's "Find installations" adds) and ends.
@@ -227,6 +228,31 @@ fn main() {
         };
         install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
         if let Err(e) = atlantis_app::a3::run_evolution_2004(Path::new(dir), fullscreen) {
+            error_box(&e);
+            std::process::exit(1);
+        }
+        return;
+    }
+    // Atlantis V (2006): the development entry, its first view.
+    if args.first().map(String::as_str) == Some("--atlantis5") {
+        let fullscreen = args.iter().any(|a| a == "--fullscreen");
+        let headless = args.iter().any(|a| a == "--headless");
+        let shot = args
+            .iter()
+            .position(|a| a == "--screenshot")
+            .and_then(|i| args.get(i + 1))
+            .map(std::path::PathBuf::from);
+        let Some(path) = args.get(1).filter(|a| !a.starts_with("--")) else {
+            eprintln!("--atlantis5 <disc, image or folder> [--fullscreen] [--headless] [--screenshot <file.png>]");
+            std::process::exit(2);
+        };
+        install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
+        let r = if headless || shot.is_some() {
+            atlantis_app::a5::headless(Path::new(path), shot.as_deref())
+        } else {
+            atlantis_app::a5::run(Path::new(path), fullscreen)
+        };
+        if let Err(e) = r {
             error_box(&e);
             std::process::exit(1);
         }
