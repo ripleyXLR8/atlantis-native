@@ -352,3 +352,35 @@ fn the_play_cursor_shows_the_pick_the_hand_and_the_followers() {
     assert_eq!(play.game.state(), 3);
     assert!(!play.cursor_drawn());
 }
+
+/// State 3's frame (@ 0x0041b780): the scene's update (the sprites' step
+/// @ 0x00441c30) only for modes 8, 9 and 0xc; under the in-game menu the
+/// gorilla's sprite holds its frame, and goes on once the menu is left.
+#[test]
+fn the_in_game_menu_freezes_the_sprites() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    go(&mut play, 17);
+    frames(&mut play, 10);
+    let gorilla = |play: &Play| {
+        play.stage()
+            .sprites()
+            .into_iter()
+            .find(|s| s.0 == "gorilla")
+            .expect("the gorilla")
+    };
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 3);
+    let held = gorilla(&play);
+    frames(&mut play, 60);
+    assert_eq!(gorilla(&play), held, "frozen in the in-game menu");
+    assert!(play.click_menu("resume"));
+    let mut moved = false;
+    for _ in 0..120 {
+        frames(&mut play, 1);
+        moved |= gorilla(&play) != held;
+    }
+    assert_eq!(play.game.state(), 4);
+    assert!(moved, "stepped again in play");
+}

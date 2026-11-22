@@ -1460,9 +1460,9 @@ impl Stage {
         }
     }
 
-    /// One frame: camera, sprites (@ 0x00441c30), sound and music
-    /// (@ 0x00459fd0), film.
-    fn update(&mut self, dt: f64, play: bool) {
+    /// One frame: camera, sprites (@ 0x00441c30) when `scene`, sound and
+    /// music (@ 0x00459fd0), film.
+    fn update(&mut self, dt: f64, play: bool, scene: bool) {
         self.clock += dt;
         #[allow(clippy::cast_possible_truncation)]
         if play {
@@ -1482,6 +1482,16 @@ impl Stage {
         // `Atl_Dialog_Play`'s loop: its checks, then the scene's update.
         self.dialog_update(dt);
         self.menu_close_step();
+        if scene {
+            self.sprites_step(dt);
+        }
+        self.music_update(dt);
+        self.film_update();
+    }
+
+    /// The sprites' step (@ 0x00441c30, from the scene's update
+    /// @ 0x0044c380).
+    fn sprites_step(&mut self, dt: f64) {
         for p in &mut self.persistent {
             p.2 += dt;
         }
@@ -1509,8 +1519,6 @@ impl Stage {
                 }
             }
         }
-        self.music_update(dt);
-        self.film_update();
     }
 
     /// The picture: the film while one plays, else the view with its
@@ -3217,6 +3225,12 @@ struct PokerHost<'a> {
 }
 
 impl PokerHost<'_> {
+    /// A one-shot string's error (@ 0x00454220 throws an
+    /// `ATLINT::CException`): nothing between the board and the
+    /// application's frame catches it; the original's
+    /// `CAtlantis5::MainLoop` catch (@ 0x0043d456) logs it and ends the
+    /// program (@ 0x004896d0(0)). Native logs it and goes on (a getter's
+    /// results read as Nil).
     fn report(&self, e: &str) {
         log::warn!("poker: {e}");
     }
@@ -3328,6 +3342,10 @@ impl Play {
                 .and_then(|p| p.point_of(name, &st.fonts))
         };
         let Some((x, y)) = p else { return false };
+        // A move onto the button (a button's hover is tested on moves
+        // only, and a show resets it): from beside it, then onto it.
+        self.mouse_at(x + 1, y);
+        self.update(0.0);
         self.mouse_at(x, y);
         self.update(0.0);
         self.click();
@@ -3401,7 +3419,7 @@ impl Play {
             // The logos' loop (@ 0x0043d6a0): the film's steps only.
             self.clicks = 0;
             self.moves.clear();
-            self.stage.borrow_mut().update(dt, false);
+            self.stage.borrow_mut().update(dt, false, true);
             let ended = std::mem::take(&mut self.stage.borrow_mut().wait_ended);
             if ended && !self.stage().film_playing() {
                 self.next_logo();
@@ -3420,14 +3438,7 @@ impl Play {
                 st.look(dx, dy, dtf);
             }
         }
-        // A dialog takes the frame's clicks (`Atl_Dialog_Play`'s loop).
-        if self.stage.borrow().dialog_running() {
-            self.stage.borrow_mut().clicks += clicks;
-        }
-        self.stage.borrow_mut().update(dt, play);
-        if std::mem::take(&mut self.stage.borrow_mut().wait_ended) {
-            self.game.finish_wait();
-        }
+        // The modes asked by the last frame's scripts.
         let requests = std::mem::take(&mut self.stage.borrow_mut().menu_requests);
         for (mode, arg) in requests {
             if mode == menus::DEATH {
@@ -3437,8 +3448,24 @@ impl Play {
             }
             self.menus.request(mode);
         }
+        // State 3 (the menus' frame @ 0x0041b780): the mode's process
+        // first, then the scene's update (@ 0x0044c380 → the sprites'
+        // step @ 0x00441c30) for modes 8, 9 and 0xc only (the inventory,
+        // the subject menu, poker: the 3D view stays under them), then the
+        // sound (@ 0x00459fd0); the other modes freeze the sprites.
+        let mut scene = true;
         if self.game.state() == 3 && !self.game.busy() {
+            let before = self.scene_under_menu();
             self.menu_frame(clicks, dt);
+            scene = before || self.scene_under_menu();
+        }
+        // A dialog takes the frame's clicks (`Atl_Dialog_Play`'s loop).
+        if self.stage.borrow().dialog_running() {
+            self.stage.borrow_mut().clicks += clicks;
+        }
+        self.stage.borrow_mut().update(dt, play, scene);
+        if std::mem::take(&mut self.stage.borrow_mut().wait_ended) {
+            self.game.finish_wait();
         }
         if play {
             for _ in 0..clicks {
@@ -3588,6 +3615,13 @@ impl Play {
     /// the death panel 10 of `Atl_GameOver`, the examine view 11, poker
     /// 12, the game's menus) is not, and ends at once (logged), so the
     /// manager takes its next request.
+    /// Whether the menus' mode is 8, 9 or 0xc (the inventory, the subject
+    /// menu, poker), the modes whose frame steps the scene (@ 0x0041b780).
+    fn scene_under_menu(&self) -> bool {
+        let st = self.stage.borrow();
+        st.inventory_open_now() || st.menu_open_now() || self.poker.is_some()
+    }
+
     fn menu_frame(&mut self, clicks: usize, dt: f64) {
         if self.stage.borrow().inventory_open_now() {
             self.inventory_frame(clicks);
@@ -4176,7 +4210,7 @@ mod tests {
         let mut n = 0;
         let mut last = s.yaw;
         while !s.wait_ended {
-            s.update(1.0 / 30.0, false);
+            s.update(1.0 / 30.0, false, true);
             n += 1;
             // The yaw goes from 270 toward 300 (atan2 gives it in
             // (−180, 180], fmod keeps it there: −90 .. −60).

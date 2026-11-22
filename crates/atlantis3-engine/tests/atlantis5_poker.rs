@@ -232,3 +232,38 @@ fn stopping_every_game_loses_the_last() {
     assert_eq!(play.game.state(), 3);
     shot(&play, "a5-poker-lost.png");
 }
+
+/// The buttons' hover (@ 0x004523e0, @ 0x0044eb60) is tested on mouse
+/// moves only and reset by a show (@ 0x00452530, 0x0044ec50): when the
+/// panel comes back under a still mouse, a press on `follow_bet` does
+/// nothing until the mouse moves.
+#[test]
+fn a_shown_panel_takes_a_click_only_after_a_move() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_poker(&d);
+    let wait_panel = |play: &mut Play| {
+        for _ in 0..30_000 {
+            frames(play, 1);
+            if !play.game.busy() && play.poker().is_some_and(|p| p.state == 3) {
+                return;
+            }
+        }
+        panic!("no panel");
+    };
+    wait_panel(&mut play);
+    assert!(play.click_poker("follow_bet"));
+    frames(&mut play, 1);
+    assert_ne!(play.poker().map(|p| p.state), Some(3), "the click taken");
+    wait_panel(&mut play);
+    assert!(play.poker().unwrap().shown("follow_bet"));
+    play.click();
+    frames(&mut play, 30);
+    assert_eq!(
+        play.poker().map(|p| p.state),
+        Some(3),
+        "a press without a move after the show"
+    );
+    assert!(play.click_poker("follow_bet"));
+    frames(&mut play, 1);
+    assert_ne!(play.poker().map(|p| p.state), Some(3), "after a move");
+}

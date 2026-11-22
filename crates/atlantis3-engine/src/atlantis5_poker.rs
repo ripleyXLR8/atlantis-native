@@ -129,6 +129,9 @@ pub struct Poker {
     pub cursor: bool,
     ops: VecDeque<Op>,
     winners: [Option<Bank>; 4],
+    /// The mouse at the last frame: the buttons' hover is tested only on
+    /// a move (a mouse event of kind 2, @ 0x004523e0).
+    last_mouse: Option<(i32, i32)>,
 }
 
 fn num(v: Option<&Value>) -> f64 {
@@ -181,6 +184,7 @@ impl Poker {
                 spr("fisher.spr"),
                 spr("punter.spr"),
             ],
+            last_mouse: None,
         };
         p.add(None, 0, 0, Kind::Root);
         // card_bubble_1..3 (bubble.spr) at (0, 10).
@@ -325,9 +329,15 @@ impl Poker {
         self.els[i].y = y;
     }
 
-    /// Show (@ 0x00452530): shown, and each hidden child shown.
+    /// Show (@ 0x00452530): shown, and each hidden child shown. A show
+    /// resets the hit flag (+0x40 = 0 @ 0x00452530) and a text button's
+    /// state (+0x8c = 0 @ 0x0044ec50): drawn in its normal colour, and
+    /// not clickable until the mouse moves over it again.
     fn show(&mut self, i: usize) {
         self.els[i].visible = true;
+        if let Kind::Text { over, .. } = &mut self.els[i].kind {
+            *over = false;
+        }
         for c in self.els[i].children.clone() {
             if !self.els[c].visible {
                 self.show(c);
@@ -543,9 +553,10 @@ impl Poker {
     }
 
     /// One frame (the menu manager's state 3 with mode 12): the mouse's
-    /// move over the buttons, the clicks (@ 0x0040d920 → the buttons'
-    /// handler), then the process (@ 0x004240b0). True when the board
-    /// ends (its process returned 1).
+    /// move over the buttons (only when it moved since the last frame:
+    /// the base handler @ 0x004523e0 hit-tests on a move event only), the
+    /// clicks (@ 0x0040d920 → the buttons' handler), then the process
+    /// (@ 0x004240b0). True when the board ends (its process returned 1).
     pub fn frame(
         &mut self,
         host: &mut dyn Host,
@@ -556,7 +567,10 @@ impl Poker {
         if !self.drain(host) {
             return false;
         }
-        self.hover(mouse, measure);
+        if self.last_mouse.is_some_and(|m| m != mouse) {
+            self.hover(mouse, measure);
+        }
+        self.last_mouse = Some(mouse);
         for _ in 0..clicks {
             let hit = [INCREASE, FOLLOW, STOP, NEXT_GAME].into_iter().find(|&i| {
                 self.els[i].visible && matches!(self.els[i].kind, Kind::Text { over: true, .. })
