@@ -51,12 +51,17 @@ fn a_new_game_walks_the_zeppelin() {
     frames(&mut play, 3);
     // The chapter's film plays, the script waiting.
     assert!(play.stage().film_playing(), "cine01 plays");
+    assert!(
+        play.stage().music_muted(),
+        "a 1-argument film mutes the music"
+    );
     frames(&mut play, 30);
     let film = shot(&play, "a5-film.png");
     assert!(film.iter().any(|&p| p & 0xff_ffff != 0), "a film picture");
     play.skip();
     frames(&mut play, 3);
     assert!(!play.stage().film_playing());
+    assert!(!play.stage().music_muted());
     assert_eq!(play.game.state(), 4, "play");
     assert_eq!(
         play.stage().address(),
@@ -422,4 +427,38 @@ fn zoom_and_fade_darkens_the_view() {
     frames(&mut play, 2);
     assert_eq!(play.stage().fade, 0.0);
     assert!(mean(&shot(&play, "a5-fade-after.png")) > 20);
+}
+
+/// `Atl_Video_Play`'s 5-argument form (@ 0x0040c990): RECT (left, top,
+/// right, bottom) = arguments (3, 2, 5, 4); the view blended with
+/// `oldpaper.tga` under the film, the film 1:1 in the rectangle; the music
+/// at half its level meanwhile (@ 0x0045caf0), not muted; back after.
+#[test]
+fn a_five_argument_film_plays_over_the_paper() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    let view = shot(&play, "a5-paper-view.png");
+    let music = play.stage().config.music;
+    assert!(play
+        .game
+        .run_string("return function() Atl_Video_Play(\"is0001\", 144, 256, 432, 768) end"));
+    frames(&mut play, 1);
+    assert!(play.stage().film_playing());
+    assert_eq!(play.stage().film_rect(), Some([256, 144, 768, 432]));
+    assert!(!play.stage().music_muted());
+    frames(&mut play, 40);
+    assert!((play.stage().music_level() - music * 0.5).abs() < 1e-4);
+    let px = shot(&play, "a5-paper-film.png");
+    // Outside the rectangle: neither the view nor black.
+    let outside = (0..VIEW_HEIGHT * VIEW_WIDTH)
+        .filter(|i| (i % VIEW_WIDTH) < 256 || (i / VIEW_WIDTH) < 144)
+        .filter(|&i| px[i] != view[i])
+        .count();
+    assert!(outside > 100_000, "the paper over the view: {outside}");
+    play.skip();
+    for _ in 0..40 {
+        frames(&mut play, 1);
+    }
+    assert!(!play.stage().film_playing());
+    assert!((play.stage().music_level() - music).abs() < 1e-4);
 }

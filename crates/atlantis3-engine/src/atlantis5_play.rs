@@ -656,8 +656,17 @@ pub struct Stage {
     /// The holders of the half music level (0x0068e710, @ 0x0045caf0 /
     /// 0x0045cb20).
     duck_count: u32,
-    /// The film playing is `Atl_Video_Play`'s (it holds the level).
+    /// The film playing is `Atl_Video_Play`'s 5-argument form (it holds
+    /// the level).
     film_ducks: bool,
+    /// The film playing is `Atl_Video_Play`'s 1-argument form: the music
+    /// channels 0..4 muted (`FSOUND_SetMute(1..5, 1)` @ 0x0045b470 before
+    /// its loop, unmuted @ 0x0045b490 after).
+    music_muted: bool,
+    /// The 5-argument form's picture under the film (`back`, the view
+    /// blended with `oldpaper.tga`) and the film's rectangle (left, top,
+    /// right, bottom).
+    film_paper: Option<(Vec<u32>, [i32; 4])>,
     /// Menus the scripts asked for: `Atl_GameOver`'s death panel with its
     /// text's key (@ 0x00405b70: @ 0x00410d00, mode 10), `Atl_ExamineItem`'s
     /// examine view with its item (@ 0x00405d70: @ 0x004137b0, mode 11).
@@ -739,6 +748,8 @@ impl Stage {
             music_fade: None,
             duck_count: 0,
             film_ducks: false,
+            music_muted: false,
+            film_paper: None,
             menu_requests: Vec::new(),
             wait_ended: false,
             clock: 0.0,
@@ -835,6 +846,16 @@ impl Stage {
     /// Whether a film plays.
     pub fn film_playing(&self) -> bool {
         self.film.is_some()
+    }
+
+    /// Whether the music channels are muted (a 1-argument film).
+    pub fn music_muted(&self) -> bool {
+        self.music_muted
+    }
+
+    /// The 5-argument film's rectangle (left, top, right, bottom).
+    pub fn film_rect(&self) -> Option<[i32; 4]> {
+        self.film_paper.as_ref().map(|p| p.1)
     }
 
     /// The music channels' playlists and tracks (name, track, volume).
@@ -1139,7 +1160,11 @@ impl Stage {
                 CHANNEL_MUSIC_2004 + ch,
                 dec.rate(),
                 dec.channels() as u16,
-                c.volume * self.config.master * self.music_level,
+                if self.music_muted {
+                    0.0
+                } else {
+                    c.volume * self.config.master * self.music_level
+                },
             );
         }
         c.stream = Some(MusicStream {
@@ -1264,7 +1289,11 @@ impl Stage {
                 }
                 // @ 0x0045a640: each channel at master × its volume ×
                 // the music level.
-                let g = c.volume * master_music;
+                let g = if self.music_muted {
+                    0.0
+                } else {
+                    c.volume * master_music
+                };
                 audio.set_gain(CHANNEL_MUSIC_2004 + ch, [g; 2]);
             }
         }
@@ -1430,6 +1459,8 @@ impl Stage {
         if std::mem::take(&mut self.film_ducks) {
             self.music_unduck();
         }
+        self.music_muted = false;
+        self.film_paper = None;
         // `BinkClose` (@ 0x00456c77, from the player's close) ends its
         // sound.
         if std::mem::take(&mut self.film_bink_sound) {
@@ -1627,19 +1658,99 @@ impl Stage {
         out.fill(0);
         if let Some((film, _)) = &self.film {
             let (w, h) = film.size();
-            let (ox, oy) = (
-                VIEW_WIDTH.saturating_sub(w) / 2,
-                VIEW_HEIGHT.saturating_sub(h) / 2,
-            );
-            for y in 0..h.min(VIEW_HEIGHT) {
-                for x in 0..w.min(VIEW_WIDTH) {
-                    out[(oy + y) * VIEW_WIDTH + ox + x] = film.xrgb[y * w + x];
+            if let Some((back, [l, t, r, b])) = &self.film_paper {
+                // The 5-argument form's frame: `back` blitted whole, then
+                // the film's frame `Blt` into the rectangle (@ 0x00456da0:
+                // stretched, 1:1 for the scripts' calls; nearest here, the
+                // filter [UNKNOWN: DirectDraw's]).
+                out.copy_from_slice(back);
+                let (rw, rh) = (r - l, b - t);
+                #[allow(
+                    clippy::cast_possible_wrap,
+                    clippy::cast_sign_loss,
+                    clippy::cast_possible_truncation
+                )]
+                if rw > 0 && rh > 0 {
+                    for y in (*t).max(0)..(*b).min(VIEW_HEIGHT as i32) {
+                        let sy = ((y - t) as usize * h) / rh as usize;
+                        for x in (*l).max(0)..(*r).min(VIEW_WIDTH as i32) {
+                            let sx = ((x - l) as usize * w) / rw as usize;
+                            out[y as usize * VIEW_WIDTH + x as usize] = film.xrgb[sy * w + sx];
+                        }
+                    }
+                }
+            } else {
+                let (ox, oy) = (
+                    VIEW_WIDTH.saturating_sub(w) / 2,
+                    VIEW_HEIGHT.saturating_sub(h) / 2,
+                );
+                for y in 0..h.min(VIEW_HEIGHT) {
+                    for x in 0..w.min(VIEW_WIDTH) {
+                        out[(oy + y) * VIEW_WIDTH + ox + x] = film.xrgb[y * w + x];
+                    }
                 }
             }
             self.draw_film_subtitle(out);
             return;
         }
-        let Some(v) = &self.view else { return };
+        if !self.render_view(out) {
+            return;
+        }
+        if self.fade > 0.0 {
+            darken(out, self.fade);
+        }
+        self.draw_menu(out);
+        self.draw_inventory(out);
+        self.draw_dialog(out);
+    }
+
+    /// The 5-argument film's `back` (@ 0x0040c990, its first loop frame):
+    /// the view drawn alone (@ 0x0044bd30: the cube and the sprites, no
+    /// cursor, inventory or dialog), `sprites2d/fx/oldpaper.tga` (path
+    /// entry 0xf + 0x0066b310; 1024 × 768) stretched to the display
+    /// (`Blt` with no rectangles, 0x0040cd3d: nearest here, the filter
+    /// [UNKNOWN: DirectDraw's or the driver's]) and blended into it per
+    /// byte, back = (paper · 150 + back · 106) >> 8 (@ 0x0047a8a4). Made at
+    /// the call: the sprites are not stepped before the film's first
+    /// frame, so it is the same picture (the original shows the previous
+    /// picture during that first frame). `None` when the paper is missing
+    /// (logged; the original throws `Impossible d'ouvrir le fichier %s`).
+    fn film_paper_back(&self) -> Option<Vec<u32>> {
+        let file = "datas/sprites2d/fx/oldpaper.tga";
+        let img = self
+            .read(file)
+            .and_then(|d| atlantis4_data::image::decode_tga(&d).ok());
+        let Some(img) = img else {
+            log::warn!("Atl_Video_Play: {file} cannot be opened: the film is not played");
+            return None;
+        };
+        let mut back = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        self.render_view(&mut back);
+        let (pw, ph) = (img.width as usize, img.height as usize);
+        if pw == 0 || ph == 0 {
+            return Some(back);
+        }
+        for y in 0..VIEW_HEIGHT {
+            let sy = y * ph / VIEW_HEIGHT;
+            for x in 0..VIEW_WIDTH {
+                let sx = x * pw / VIEW_WIDTH;
+                let p = &img.pixels[(sy * pw + sx) * 4..][..4];
+                let paper = (u32::from(p[0]) << 16) | (u32::from(p[1]) << 8) | u32::from(p[2]);
+                let v = &mut back[y * VIEW_WIDTH + x];
+                let mut o = 0u32;
+                for sh in [0, 8, 16, 24] {
+                    let (a, b) = ((paper >> sh) & 0xff, (*v >> sh) & 0xff);
+                    o |= ((a * 150 + b * 106) >> 8) << sh;
+                }
+                *v = o;
+            }
+        }
+        Some(back)
+    }
+
+    /// The view with its sprites (@ 0x0044bd30): false without a view.
+    fn render_view(&self, out: &mut [u32]) -> bool {
+        let Some(v) = &self.view else { return false };
         let mut faces = v.faces.clone();
         for s in &self.sprites {
             for (face, px) in faces.iter_mut().enumerate() {
@@ -1661,12 +1772,7 @@ impl Stage {
             face: FACE,
         });
         r.render(&faces, &cam.matrix(), cam.projection(), out);
-        if self.fade > 0.0 {
-            darken(out, self.fade);
-        }
-        self.draw_menu(out);
-        self.draw_inventory(out);
-        self.draw_dialog(out);
+        true
     }
 
     /// The zone under screen point (sx, sy): the first of the view's
@@ -2801,6 +2907,8 @@ impl Stage {
         // configuration's at once.
         self.duck_count = 0;
         self.film_ducks = false;
+        self.music_muted = false;
+        self.film_paper = None;
         self.music_fade = None;
         self.music_level = self.config.music;
         self.speed = [0.0; 2];
@@ -2852,17 +2960,32 @@ impl Engine for Stage {
             // @ 0x00405d10: mode 12 asked of the menus (@ 0x0041b5d0).
             Call::PuzzlePokerStart => self.menu_requests.push((menus::POKER, Vec::new())),
             Call::VideoPlay { name, rect } => {
-                if rect.is_some() {
-                    // The 5-argument form draws the film over `oldpaper.tga`
-                    // in the rectangle [not ported: shown like the others].
-                    log::info!("film {} in a rectangle: drawn full", lossy(name));
-                }
+                // The 5-argument form (@ 0x0040c990's second branch): the
+                // paper made first (`oldpaper.tga` missing throws out of
+                // the handler, so the film does not play; Native logs it
+                // and goes on with the script), the rectangle RECT (left,
+                // top, right, bottom) = arguments (3, 2, 5, 4) after
+                // `ftol` (@ 0x00456b10).
+                let paper = match rect {
+                    Some(r) => match self.film_paper_back() {
+                        Some(back) => Some((back, [r[1], r[0], r[3], r[2]])),
+                        None => return Reply::Done,
+                    },
+                    None => None,
+                };
                 if self.video_play(name) {
-                    // `Atl_Video_Play` holds the half music level
-                    // (@ 0x0040ce21) until the film's end (@ 0x0040d0bd);
-                    // the start's logos (another loop) do not.
-                    self.film_ducks = true;
-                    self.music_duck(0.5);
+                    if paper.is_some() {
+                        // It holds the half music level (@ 0x0040ce21)
+                        // until the film's end (@ 0x0040d0bd).
+                        self.film_paper = paper;
+                        self.film_ducks = true;
+                        self.music_duck(0.5);
+                    } else {
+                        // The 1-argument form mutes the music channels
+                        // 0..4 for the film (@ 0x0045b470 / 0x0045b490).
+                        // (The start's logos, another loop, do neither.)
+                        self.music_muted = true;
+                    }
                     return Reply::Wait;
                 }
             }
