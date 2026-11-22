@@ -488,3 +488,70 @@ fn the_inventory_bubble_and_the_hand_name() {
     frames(&mut play, 1);
     assert_eq!(play.stage().inventory_texts(), Some((String::new(), coin)));
 }
+
+/// The gorilla's mouth during dialog 1 (@ 0x004346f0): each frame of a
+/// 3D talker's tirade it plays `talk` when the voice's 0.3 s window at the
+/// tirade's time is loud, else `listen`, as the analyser of its voice file
+/// says (@ 0x0045cb40); `listen` again at the tirade's end.
+#[test]
+fn the_3d_talker_moves_its_mouth_with_its_voice() {
+    use atlantis3_engine::atlantis5_dialog::{voice_path, LipSync};
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play
+        .game
+        .run_string("return function() Atl_Dialog_Play(1) end"));
+    let src = Atlantis5Source::open(&d.join("datas")).unwrap();
+    let lips = |k: usize| {
+        let data =
+            atlantis_data::FileSource::read(&src, &voice_path("french", 1, k)).expect("the voice");
+        let v = atlantis4_data::audio::decode_vorbis(&data).unwrap();
+        LipSync::analyse(&v.samples, v.channels, v.sample_rate)
+    };
+    let dt = 1.0f64 / 30.0;
+    // (tirade, the player's time before the frame's step) while state 3.
+    let mut at: Option<(usize, f32, LipSync)> = None;
+    let (mut checked, mut talks, mut listens) = (0, 0, 0);
+    for _ in 0..30 * 120 {
+        frames(&mut play, 1);
+        let Some((_, tirade, state)) = play.stage().dialog_state() else {
+            break;
+        };
+        let anim = anim(&play, "gorilla").unwrap_or_default();
+        match &mut at {
+            // A frame of state 3 that went on: the lip-sync read the time
+            // before it grew.
+            Some((k, t, l)) if *k == tirade && state == 3 => {
+                let want = if l.talking(*t) { "talk" } else { "listen" };
+                assert_eq!(anim, want, "tirade {k} at {t}");
+                checked += 1;
+                if want == "talk" {
+                    talks += 1;
+                } else {
+                    listens += 1;
+                }
+                *t = (dt + f64::from(*t)) as f32;
+            }
+            Some((k, _, _)) if *k != tirade => {
+                // The tirade ended: `listen`.
+                assert_eq!(anim, "listen", "after tirade {k}");
+                at = None;
+            }
+            _ => {}
+        }
+        if at.is_none() && state == 3 {
+            // State 0 ran this frame: time 0, the lip-sync at 0, no time
+            // added.
+            let l = lips(tirade);
+            let want = if l.talking(0.0) { "talk" } else { "listen" };
+            assert_eq!(anim, want, "tirade {tirade} starts");
+            at = Some((tirade, 0.0, l));
+        }
+    }
+    assert!(play.stage().dialog_state().is_none(), "dialog 1 is over");
+    assert!(
+        checked > 30 && talks > 5 && listens > 5,
+        "{checked} frames, {talks} talk, {listens} listen"
+    );
+}

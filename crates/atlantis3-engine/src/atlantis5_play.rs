@@ -494,6 +494,12 @@ struct DialogRun {
     /// 760) and the box.
     text_h: i32,
     text: String,
+    /// The lip-sync analyser of a 3D talker's tirade (+0x60, made at the
+    /// tirade's start, deleted at its end, 0x0043373d).
+    lips: Option<dlg::LipSync>,
+    /// The `talk` and `listen` pictures read during the dialog (Native
+    /// reads a file once, the original's insert reads it each time).
+    lip_banks: Vec<(String, Bank)>,
 }
 
 /// The subject menu (`CMenu_Dialog`, mode 9).
@@ -888,6 +894,20 @@ impl Stage {
                 return None;
             }
         };
+        self.insert_sprite(object, animation, bank, mode, priority, persistent)
+    }
+
+    /// A sprite of `bank` put in the list before the first of a priority
+    /// not above its own (frames 0..count − 1, time 0).
+    fn insert_sprite(
+        &mut self,
+        object: &[u8],
+        animation: &[u8],
+        bank: Bank,
+        mode: Mode,
+        priority: i32,
+        persistent: bool,
+    ) -> Option<&mut Sprite> {
         let at = self
             .sprites
             .iter()
@@ -1676,6 +1696,8 @@ impl Stage {
             portrait: None,
             text_h: 0,
             text: String::new(),
+            lips: None,
+            lip_banks: Vec::new(),
         };
         let in_menu = self.menu.is_some();
         if !in_menu {
@@ -1746,6 +1768,13 @@ impl Stage {
         }
         let playing = self.voice_playing();
         let Some(run) = &mut self.dialog else { return };
+        // The state and time the step starts from (the lip-sync reads the
+        // time before it grows).
+        let (state, time) = (run.player.state, run.player.time);
+        let talker = run
+            .tirades
+            .get(run.player.tirade)
+            .map(|t| t.0.as_bytes().to_vec());
         let act = run.player.step(dt, clicks, space, playing);
         match act {
             Some(Act::Start(k, _)) => self.tirade_start(k),
@@ -1758,9 +1787,26 @@ impl Stage {
                 }
                 run.portrait = None;
                 run.bubble = None;
+                if state == 3 {
+                    // @ 0x004336c0: `listen` (whatever the talker plays,
+                    // its time kept), then the analyser deleted
+                    // (0x004336e6..0x0043373d).
+                    if let Some(t) = &talker {
+                        self.lip_swap(t, b"listen");
+                    }
+                    if let Some(run) = &mut self.dialog {
+                        run.lips = None;
+                    }
+                }
             }
             Some(Act::Over) => self.dialog_end(),
-            None => {}
+            None => {
+                if state == 3 {
+                    if let Some(t) = &talker {
+                        self.lip_sync(t, time);
+                    }
+                }
+            }
         }
         if let Some(run) = &mut self.dialog {
             if let Some(f) = &mut run.portrait {
@@ -1792,9 +1838,17 @@ impl Stage {
         let voice = self.read(&path);
         let has_voice = voice.is_some();
         let mut v = None;
+        // A 3D talker's analyser (@ 0x00432b3c..: when the sample is not
+        // loaded yet, which it never is at a tirade's start: the previous
+        // tirade's stop freed it, @ 0x00459a00); an unreadable voice
+        // leaves its list empty.
+        let mut lips = (kind == Kind::ThreeD).then(dlg::LipSync::default);
         if let Some(data) = voice {
             match atlantis4_data::audio::decode_vorbis(&data) {
                 Ok(d) => {
+                    if kind == Kind::ThreeD {
+                        lips = Some(dlg::LipSync::analyse(&d.samples, d.channels, d.sample_rate));
+                    }
                     #[allow(clippy::cast_precision_loss)]
                     let length = d.samples.len() as f64
                         / f64::from(d.channels.max(1))
@@ -1836,7 +1890,79 @@ impl Stage {
         run.portrait = portrait;
         run.text_h = text_h;
         run.text = text;
+        run.lips = lips;
         run.player.started(kind, has_voice);
+        if kind == Kind::ThreeD {
+            // @ 0x004346f0 at the time 0, before the bubble.
+            self.lip_sync(talker.as_bytes(), 0.0);
+        }
+    }
+
+    /// The 3D talker's mouth (@ 0x004346f0, the player's state 0 and each
+    /// frame of state 3 before its time grows): with an analyser, the
+    /// talker's sprite (the sprite list's first whose object is the
+    /// talker; its animation, the file's fourth part, or nothing) gets
+    /// `talk` (0x0066d2ac, @ 0x00433fd0) when the analyser says the voice
+    /// is loud at the tirade's time and it is not `talk` already, else
+    /// `listen` (0x00669f4c, @ 0x00434360) when it is not `listen`.
+    fn lip_sync(&mut self, talker: &[u8], t: f32) {
+        let Some(lips) = self.dialog.as_ref().and_then(|r| r.lips.as_ref()) else {
+            return;
+        };
+        let talking = lips.talking(t);
+        let anim = self
+            .sprites
+            .iter()
+            .find(|s| s.object == talker)
+            .map(|s| s.animation.clone())
+            .unwrap_or_default();
+        let want: &[u8] = if talking { b"talk" } else { b"listen" };
+        if anim != want {
+            self.lip_swap(talker, want);
+        }
+    }
+
+    /// @ 0x00433fd0 / @ 0x00434360: the talker's sprite (when it has one)
+    /// removed (@ 0x00441a00) and its file with `animation` inserted with
+    /// its priority (@ 0x00441830(file, priority, 0)), in a loop (mode 3,
+    /// @ 0x00448ce0) from the old sprite's time (@ 0x00448c60 kept,
+    /// @ 0x00448cf0 set): the mouth moves on the same clock.
+    fn lip_swap(&mut self, object: &[u8], animation: &[u8]) {
+        let Some(old) = self.sprites.iter().find(|s| s.object == object) else {
+            return;
+        };
+        let (priority, time) = (old.priority, old.time);
+        let Some(v) = &self.view else { return };
+        #[allow(clippy::cast_sign_loss)]
+        let path = sprite_path(
+            &lossy(&v.scene),
+            v.view.max(0) as u32,
+            &lossy(object),
+            &lossy(animation),
+        );
+        let cached = self.dialog.as_ref().and_then(|r| {
+            r.lip_banks
+                .iter()
+                .find(|(p, _)| *p == path)
+                .map(|(_, b)| b.clone())
+        });
+        let bank = cached.or_else(|| {
+            let b = self
+                .read(&path)
+                .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok())?;
+            if let Some(r) = &mut self.dialog {
+                r.lip_banks.push((path.clone(), b.clone()));
+            }
+            Some(b)
+        });
+        self.sprites.retain(|s| s.object != object);
+        let Some(bank) = bank else {
+            log::warn!("{path}: not found");
+            return;
+        };
+        if let Some(s) = self.insert_sprite(object, animation, bank, Mode::Loop, priority, false) {
+            s.time = time;
+        }
     }
 
     /// The end of `Atl_Dialog_Play`: the faced talkers' `unfacing` (the

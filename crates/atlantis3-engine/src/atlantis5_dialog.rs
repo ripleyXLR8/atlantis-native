@@ -392,6 +392,72 @@ pub fn scroll_px(t: f32, text_h: i32, box_h: i32) -> i32 {
     }
 }
 
+/// The lip-sync analyser's window (0x00655700, the float 0.3).
+pub const LIP_WINDOW: f32 = 0.3;
+
+/// A sample louder than this (|s| > 0x12c) counts as voice
+/// (0x0045ccaa).
+const LIP_QUIET: i32 = 0x12c;
+
+/// The lip-sync analyser of a 3D talker's voice (@ 0x0045cb40, the dialog
+/// player's +0x60): the voice file loaded whole as a sample
+/// (`FSOUND_Sample_Load(FSOUND_UNMANAGED, path, 0x30, 0, 0)`) and locked;
+/// its sample frames walked with a clock stepping by 1 / its rate (the
+/// float `1.0 / freq` added on the x87 stack), a counter + 1 for a loud
+/// frame (a sample, or in stereo either channel, with |s| > 300) and − 1
+/// for a quiet one; when the clock passes 0.3 a window is kept: its start
+/// (0, then the last's + 0.3 as a float) and whether the counter is ≥ 0;
+/// clock and counter start again. The frames after the last full window
+/// make none.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct LipSync {
+    /// (start, talking) per window.
+    pub windows: Vec<(f32, bool)>,
+}
+
+impl LipSync {
+    /// The windows of `samples` (16-bit, `channels` interleaved, `rate`
+    /// frames a second). A voice that cannot be read gives none (the
+    /// load fails: the list stays empty).
+    pub fn analyse(samples: &[i16], channels: u8, rate: u32) -> LipSync {
+        let mut windows: Vec<(f32, bool)> = Vec::new();
+        if rate == 0 || !(1..=2).contains(&channels) {
+            return LipSync { windows };
+        }
+        // FILD freq, FDIVR 1.0, FSTP float (0x0045cc6d..0x0045cc7c); the
+        // clock stays on the x87 stack, at the CRT's 53-bit precision
+        // [INFERRED: nothing in the program changes the FPU's control].
+        #[allow(clippy::cast_possible_truncation)]
+        let step = f64::from((1.0 / f64::from(rate)) as f32);
+        let window = f64::from(LIP_WINDOW);
+        let (mut clock, mut count) = (0.0f64, 0i32);
+        for frame in samples.chunks_exact(usize::from(channels)) {
+            clock += step;
+            let loud = frame.iter().any(|&v| i32::from(v).abs() > LIP_QUIET);
+            count += if loud { 1 } else { -1 };
+            if clock > window {
+                #[allow(clippy::cast_possible_truncation)]
+                let start = windows
+                    .last()
+                    .map_or(0.0, |w| (f64::from(w.0) + window) as f32);
+                windows.push((start, count >= 0));
+                clock = 0.0;
+                count = 0;
+            }
+        }
+        LipSync { windows }
+    }
+
+    /// Whether the talker talks at `t` (@ 0x0045ce90): the first window
+    /// whose start + 0.3 is not below `t` says; after the last, no.
+    pub fn talking(&self, t: f32) -> bool {
+        self.windows
+            .iter()
+            .find(|w| f64::from(w.0) + f64::from(LIP_WINDOW) >= f64::from(t))
+            .is_some_and(|w| w.1)
+    }
+}
+
 /// The dialog player (`CDialogPlayer`, its step @ 0x004329a0): +0x28 the
 /// tirade, +0x2c its time (a float), +0x30 the state, +0x38 whether the
 /// voice file exists, +0x39 the end asked.
@@ -612,6 +678,34 @@ pub const SUBTITLE_ZONE: Zone = Zone::new(0, 0, 0, 0, 2, 1);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lip_sync_windows() {
+        // 22050 Hz mono: a loud 0.5 s, a quiet 0.5 s, 4500 loud frames.
+        let mut v = vec![1000i16; 11025];
+        v.extend(vec![-300i16; 11025]);
+        v.extend(vec![-301i16; 4500]);
+        let l = LipSync::analyse(&v, 1, 22050);
+        // Windows of 6616 frames (the float step 1 / 22050 summed until
+        // above 0.3): four full ones in 26,550 frames.
+        assert_eq!(l.windows.len(), 4);
+        assert_eq!(l.windows[0], (0.0, true));
+        // Window 1 holds 4409 loud and 2207 quiet frames; window 2 is all
+        // quiet; window 3: 2202 quiet, 4414 loud.
+        assert!(l.windows[1].1);
+        assert!(!l.windows[2].1);
+        assert!(l.windows[3].1);
+        assert_eq!(l.windows[1].0, 0.3);
+        assert_eq!(l.windows[2].0, 0.3f32 + 0.3f32);
+        assert!(l.talking(0.0) && l.talking(0.3) && !l.talking(0.7));
+        assert!(!l.talking(5.0));
+        // Stereo: quiet only when both channels are.
+        let st: Vec<i16> = (0..2 * 7000)
+            .map(|i| if i % 2 == 0 { 0 } else { 400 })
+            .collect();
+        assert!(LipSync::analyse(&st, 2, 22050).windows[0].1);
+        assert!(LipSync::analyse(&[], 1, 22050).windows.is_empty());
+    }
 
     fn sub(start: i32, end: i32) -> Subtitle {
         Subtitle {
