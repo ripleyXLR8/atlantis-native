@@ -77,7 +77,12 @@ impl Walker {
             cell0: None,
             right_button: None,
             steps: 0,
-            avoid: vec!["lift_floor".into(), "stairway_".into()],
+            avoid: vec![
+                "lift_floor".into(),
+                "stairway_".into(),
+                "zeppelin_exit".into(),
+                "ish_pal_zeppelin_in".into(),
+            ],
             redirects: Vec::new(),
         }
     }
@@ -1322,9 +1327,135 @@ fn chapter_7(w: &mut Walker) {
     w.talk("sing_like_rain", "ishtar");
 }
 
+/// The buttons of a 3 × 5 lights-out grid (`Atl_PuzzleLightOut_OnClicked`'s
+/// neighbours: ±5, +1 unless at a row's end, −1 unless at its start) that
+/// turn every light off from all on: the first subset found.
+fn light_out_solution() -> Vec<i32> {
+    let toggles = |b: i32| -> u32 {
+        let mut m = 1 << (b - 1);
+        if b - 5 > 0 {
+            m |= 1 << (b - 6);
+        }
+        if b + 5 < 16 {
+            m |= 1 << (b + 4);
+        }
+        if b % 5 != 0 {
+            m |= 1 << b;
+        }
+        if b % 5 != 1 {
+            m |= 1 << (b - 2);
+        }
+        m
+    };
+    (1u32..1 << 15)
+        .map(|set| {
+            let presses: Vec<i32> = (1..=15).filter(|b| set & (1 << (b - 1)) != 0).collect();
+            let lit = presses.iter().fold(0x7fff, |g, &b| g ^ toggles(b));
+            (presses, lit)
+        })
+        .find(|(_, lit)| *lit == 0)
+        .map(|(p, _)| p)
+        .expect("a solution")
+}
+
+/// The sudoku's answer: the grid `DoSudoku` (the scripts' own debug
+/// shortcut) sets.
+const SUDOKU: [i32; 81] = [
+    7, 3, 2, 4, 9, 8, 5, 1, 6, 4, 5, 1, 7, 6, 2, 9, 3, 8, 9, 6, 8, 5, 1, 3, 4, 7, 2, 6, 7, 4, 3, 8,
+    1, 2, 9, 5, 1, 9, 5, 2, 4, 7, 8, 6, 3, 8, 2, 3, 6, 5, 9, 1, 4, 7, 3, 1, 7, 8, 2, 4, 6, 5, 9, 5,
+    8, 9, 1, 3, 6, 7, 2, 4, 2, 4, 6, 9, 7, 5, 3, 8, 1,
+];
+
+/// Chapter 8, the zeppelin over Ishtar's palace (`chapter_08.lua`,
+/// `on_click_ishtar.lua`): the sanskrit copied with the zeppelin's pencil
+/// and paper and translated by Ishtar; the five stones (the book's
+/// sapphire, the Vishnu chest's emerald, the lights-out statuette's ruby,
+/// the elephant's pearl cut with the knife, Sing like Rain's moonstone
+/// for it) in the light ray's slots; the bas-relief taken (Sing like
+/// Rain's betrayal), the sudoku, the prong that opens Ishtar's cage; the
+/// bas-relief code with Ishtar on the flagstone, the fresco's talk
+/// (Mesopotamia), back to the zeppelin: chapter 9.
+fn chapter_8(w: &mut Walker) {
+    w.touch("zeppelin_pencil");
+    w.touch("zeppelin_sheet_of_paper");
+    w.combine("zeppelin_pencil", "zeppelin_sheet_of_paper");
+    assert!(w.has("zeppelin_paper_and_pencil"));
+    w.touch("zeppelin_knife");
+    w.go_to("zeppelin_exit", "ishtar");
+    w.use_on_zone("zeppelin_paper_and_pencil", "sanscrit_inscription");
+    w.use_on_sprite("sanscrit_text", "ishtar-captive");
+    assert!(w.has("translated_sanscrit_text"));
+    // The stones.
+    w.touch("sapphire_in_book");
+    w.touch("sapphire_in_book");
+    assert!(w.has("sapphire"));
+    for (arm, target) in [(1, 4), (2, 4), (3, 2), (4, 4)] {
+        while num(&w.lua(&format!("atl.puzzle.vishnu_chest.arm_state[{arm}]"))) != target {
+            w.touch(&format!("vishnu_arm_{arm}"));
+        }
+    }
+    assert_eq!(w.state("ishtar_palace_chest_lid"), "open");
+    w.touch("emerald");
+    w.walk(18);
+    for b in light_out_solution() {
+        w.empty_hand();
+        w.click_zone(b, "light_out");
+    }
+    assert_eq!(w.state("vishnu_statuette"), "open");
+    w.touch("ruby");
+    w.use_on_sprite("zeppelin_knife", "perl");
+    assert!(w.has("perl"));
+    w.use_on_sprite("perl", "sing_like_rain-read_library");
+    assert!(w.has("moon_stone"));
+    for ivy in ["emerald_ivy", "sapphire_ivy", "ruby_ivy"] {
+        w.use_on_sprite("zeppelin_knife", ivy);
+    }
+    for (slot, stone) in [
+        (1, "emerald"),
+        (2, "sapphire"),
+        (3, "ruby"),
+        (4, "moon_stone"),
+    ] {
+        w.use_on_zone(stone, &format!("gem_slot_{slot}"));
+    }
+    assert_eq!(w.flag("mission_light_ray"), "done");
+    // The bas-relief taken: the betrayal, view 30 and the sudoku.
+    w.touch("column_niche_door");
+    w.touch("ishtar_palace_bas_relief");
+    assert_eq!(w.address().1, 30);
+    for (i, &v) in SUDOKU.iter().enumerate() {
+        let case = i32::try_from(i + 1).expect("case");
+        while num(&w.lua(&format!("atl.puzzle.sudoku.grid[{case}]"))) != v {
+            w.empty_hand();
+            w.click_zone(case, "sudoku");
+        }
+    }
+    assert_eq!(w.address().1, 27);
+    w.touch("prong");
+    w.use_on_sprite("prong", "cage_mecanism");
+    assert_eq!(w.state("ishtar"), "free");
+    w.talk("ishtar-captive", "porte_de_la_verite");
+    w.talk("ishtar-captive", "sing_like_rain");
+    assert_eq!(w.state("ishtar"), "follow_howard");
+    // The bas-relief's code with Ishtar on the flagstone.
+    w.touch_zone("info_bas_relief");
+    for part in [1, 2, 2, 2, 1, 1] {
+        w.empty_hand();
+        w.click_zone(part, "bas_relief");
+    }
+    assert_eq!(w.state("ishtar_palace_door_2"), "open");
+    w.touch_zone("ish_pal_cavern_in_1");
+    w.touch_zone("fresque");
+    for subject in ["atlantide", "medaillon", "prophetie"] {
+        w.talk("ishtar-front_fresque", subject);
+    }
+    assert_eq!(w.flag("know_mesopotamia"), "true");
+    w.touch_zone("ish_pal_zeppelin_in");
+}
+
 /// The chapters' plays, in order.
-const CHAPTERS: [fn(&mut Walker); 7] = [
-    chapter_1, chapter_2, chapter_3, chapter_4, chapter_5, chapter_6, chapter_7,
+const CHAPTERS: [fn(&mut Walker); 8] = [
+    chapter_1, chapter_2, chapter_3, chapter_4, chapter_5, chapter_6, chapter_7, chapter_8,
 ];
 
 /// A new game played through chapter `n`: the chapters before it set
@@ -1396,4 +1527,9 @@ fn chapter_06() {
 #[test]
 fn chapter_07() {
     play_chapter(7);
+}
+
+#[test]
+fn chapter_08() {
+    play_chapter(8);
 }
