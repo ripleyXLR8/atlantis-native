@@ -62,6 +62,7 @@ use crate::atlantis5_camera::{
 };
 use crate::atlantis5_dialog::{self as dlg, Act, FilmSubtitles, Fonts, Kind, MenuState, Player};
 use crate::atlantis5_menu::{self as menus, Config, Effect, Menus};
+use crate::atlantis5_poker::{self as poker, Poker};
 use crate::audio::{Audio, CHANNEL_CINEMA, CHANNEL_MUSIC_2004, CHANNEL_SOUND, CHANNEL_VOICE};
 use crate::film2004::{Film, FilmSound};
 use crate::px::Faces;
@@ -2224,6 +2225,8 @@ impl Engine for Stage {
         match call {
             Call::GameOver(key) => self.menu_requests.push((menus::DEATH, key.clone())),
             Call::ExamineItem(item) => self.menu_requests.push((menus::EXAMINE, item.clone())),
+            // @ 0x00405d10: mode 12 asked of the menus (@ 0x0041b5d0).
+            Call::PuzzlePokerStart => self.menu_requests.push((menus::POKER, Vec::new())),
             Call::VideoPlay { name, rect } => {
                 if rect.is_some() {
                     // The 5-argument form draws the film over `oldpaper.tga`
@@ -2687,6 +2690,53 @@ pub struct Play {
     pub menus: Menus,
     /// The music held for a menu.
     sound_held: bool,
+    /// The poker board (mode 12) when it is up.
+    poker: Option<Poker>,
+    src: Arc<dyn FileSource>,
+}
+
+/// The poker board's side of the game: the scripts' one-shot strings
+/// (@ 0x00454220), the program's `rand`, the texts.
+struct PokerHost<'a> {
+    game: &'a mut Game,
+    stage: &'a Rc<RefCell<Stage>>,
+    menus: &'a Menus,
+}
+
+impl PokerHost<'_> {
+    fn report(&self, e: &str) {
+        log::warn!("poker: {e}");
+    }
+}
+
+impl poker::Host for PokerHost<'_> {
+    fn call(&mut self, source: &str, args: Option<&[Value]>, nresults: usize) -> Vec<Value> {
+        match self.game.script().one_shot(source, args, nresults) {
+            Ok(v) => v,
+            Err(e) => {
+                self.report(&e);
+                vec![Value::Nil; nresults]
+            }
+        }
+    }
+
+    fn run(&mut self, source: &str, args: Option<Vec<Value>>) {
+        if !self.game.run_one_shot(source, args) {
+            self.report(&format!("{source}: not run"));
+        }
+    }
+
+    fn busy(&self) -> bool {
+        self.game.busy()
+    }
+
+    fn rand(&mut self) -> u32 {
+        atlantis5_script::script::msvcrt_rand(&mut self.stage.borrow_mut().crt_rand)
+    }
+
+    fn string(&self, key: &str) -> String {
+        self.menus.string(key)
+    }
 }
 
 impl Play {
@@ -2698,7 +2748,7 @@ impl Play {
         audio: Option<Audio>,
     ) -> Result<Play, String> {
         let menus = Menus::new(src.clone(), language);
-        let stage = Rc::new(RefCell::new(Stage::new(src, language, audio)));
+        let stage = Rc::new(RefCell::new(Stage::new(src.clone(), language, audio)));
         let game = Game::new(stage.clone()).map_err(|e| e.to_string())?;
         Ok(Play {
             game,
@@ -2708,6 +2758,8 @@ impl Play {
             hover: None,
             menus,
             sound_held: false,
+            poker: None,
+            src,
         })
     }
 
@@ -2741,6 +2793,28 @@ impl Play {
 
     pub fn new_game(&mut self) {
         self.game.new_game();
+    }
+
+    /// The poker board, when it is up.
+    pub fn poker(&self) -> Option<&Poker> {
+        self.poker.as_ref()
+    }
+
+    /// Moves the mouse to the middle of the poker board's shown button
+    /// `name` and presses the left button (tests and tools).
+    #[doc(hidden)]
+    pub fn click_poker(&mut self, name: &str) -> bool {
+        let p = {
+            let st = self.stage.borrow();
+            self.poker
+                .as_ref()
+                .and_then(|p| p.point_of(name, &st.fonts))
+        };
+        let Some((x, y)) = p else { return false };
+        self.mouse_at(x, y);
+        self.update(0.0);
+        self.click();
+        true
     }
 
     /// The program's start (`CGameManager` ctor @ 0x0042eac0): the main
@@ -2804,7 +2878,7 @@ impl Play {
         for (mode, arg) in requests {
             if mode == menus::DEATH {
                 self.menus.set_death_text(&lossy(&arg));
-            } else {
+            } else if mode == menus::EXAMINE {
                 self.menus.set_examine_item(&arg);
             }
             self.menus.request(mode);
@@ -2912,7 +2986,12 @@ impl Play {
             }
         }
         if self.stage.borrow_mut().menu_take_closed() {
-            self.game.menu_closed();
+            // A mode queued meanwhile (`Atl_PuzzlePoker_Start` from a
+            // subject's script): the manager stays in state 3 and opens it
+            // at the next frame (@ 0x0041b780).
+            if !self.menus.active() {
+                self.game.menu_closed();
+            }
         }
     }
 
@@ -2922,6 +3001,43 @@ impl Play {
     /// on and the manager takes its next request. With no menu up nor
     /// queued, state 3 ends at once (logged).
     fn menus_frame(&mut self, clicks: usize, dt: f64) {
+        if self.poker.is_none() && self.menus.take_next(menus::POKER) {
+            // The mode opens (@ 0x0041b780): the mouse at the screen's
+            // centre, the board's init (state 0, @ 0x00425890).
+            #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+            self.menus
+                .mouse_at(VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+            let host = PokerHost {
+                game: &mut self.game,
+                stage: &self.stage,
+                menus: &self.menus,
+            };
+            self.poker = Some(Poker::new(&self.src, &host));
+        }
+        if let Some(mut poker) = self.poker.take() {
+            let mouse = self.menus.mouse;
+            let closed = {
+                let stage = self.stage.clone();
+                let measure = |f: &str, t: &str, w: i32| stage.borrow().fonts.text_height(f, t, w);
+                let mut host = PokerHost {
+                    game: &mut self.game,
+                    stage: &self.stage,
+                    menus: &self.menus,
+                };
+                poker.frame(&mut host, mouse, clicks, &measure)
+            };
+            if closed {
+                // Its process returned 1: mode 0xd; with a mode queued
+                // (the death panel of `Atl_GameOver`) the manager stays in
+                // state 3, else it takes its next request.
+                if !self.menus.active() {
+                    self.game.menu_closed();
+                }
+            } else {
+                self.poker = Some(poker);
+            }
+            return;
+        }
         // Mode 8 queued (after the examine view of an inventory item): the
         // inventory again.
         if self.menus.take_next(menus::INVENTORY) {
@@ -2966,6 +3082,7 @@ impl Play {
         let dir = self.stage.borrow().save_dir.clone();
         match e {
             Effect::NewGame => {
+                self.poker = None;
                 self.stage.borrow_mut().end_game();
                 self.game.new_game();
             }
@@ -2991,6 +3108,7 @@ impl Play {
                 }
             }
             Effect::EndGame => {
+                self.poker = None;
                 self.game.end_game();
                 let mut st = self.stage.borrow_mut();
                 st.end_game();
@@ -3262,6 +3380,15 @@ impl Play {
         }
         if self.menus.current().is_some() {
             self.menus.render(out, &st.fonts);
+        } else if let Some(p) = &self.poker {
+            // Drawn by the menus' frame; a dialog or a film of its scripts
+            // draws in its own loop.
+            if !self.game.busy() {
+                p.draw(out, &st.fonts);
+                if p.cursor {
+                    self.menus.draw_cursor(out);
+                }
+            }
         } else if st.inventory_open_now() || st.menu_open_now() {
             self.menus.draw_cursor(out);
         }

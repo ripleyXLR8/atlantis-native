@@ -245,6 +245,38 @@ impl Game {
         true
     }
 
+    /// A C-side string the program runs inside a menu's process
+    /// (@ 0x00454220, e.g. the poker board's `Atl_Dialog_Play(275)`),
+    /// as a script run: the original's call runs the dialog's or the
+    /// film's loop before it returns; here the run waits and [`Game::busy`]
+    /// holds until it ends. With `args`, the string returns a function
+    /// called with them (`return Atl_PuzzlePoker_OnLose`, then
+    /// `lua_pushnumber`, `lua_pcall`). Ignored while a script runs.
+    pub fn run_one_shot(&mut self, source: &str, args: Option<Vec<Value>>) -> bool {
+        if self.busy() {
+            return false;
+        }
+        let (task, args) = match args {
+            Some(a) => match self.script.string_task(source, a) {
+                Some(t) => t,
+                None => return false,
+            },
+            None => match self.script.chunk_task(source) {
+                Some(t) => (t, Vec::new()),
+                None => return false,
+            },
+        };
+        self.runs.push(Run {
+            task,
+            args: Some(args),
+            block: None,
+            enter_view: false,
+            chapter: false,
+        });
+        self.run();
+        true
+    }
+
     /// The `on_click_<scene>.lua` of the current view (@ 0x0042f890).
     fn run_on_click(&mut self) {
         let (scene, _) = self.script.address();

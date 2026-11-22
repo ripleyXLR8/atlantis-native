@@ -165,13 +165,13 @@ pub enum Effect {
 }
 
 /// A `COLORREF` (0x00bbggrr) as 0x00rrggbb.
-fn rgb(colorref: u32) -> u32 {
+pub(crate) fn rgb(colorref: u32) -> u32 {
     ((colorref & 0xff) << 16) | (colorref & 0xff00) | ((colorref >> 16) & 0xff)
 }
 
 /// A text element's alignment (+0x80) as the layout's horizontal code
 /// (@ 0x00451600: 0 → 0, 1 → 2, 2 → 1).
-fn halign(align: u32) -> i32 {
+pub(crate) fn halign(align: u32) -> i32 {
     match align {
         1 => 2,
         2 => 1,

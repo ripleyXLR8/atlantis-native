@@ -20,6 +20,7 @@ pub mod atlantis5_camera;
 pub mod atlantis5_dialog;
 pub mod atlantis5_menu;
 pub mod atlantis5_play;
+pub mod atlantis5_poker;
 pub mod audio;
 pub mod caption;
 pub mod cinema;

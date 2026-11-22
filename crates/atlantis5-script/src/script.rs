@@ -1311,6 +1311,87 @@ impl Script {
         Some((task, args))
     }
 
+    /// A task for a C-side string run as a chunk (@ 0x00454220 with no
+    /// result: `luaL_loadbuffer` as `one_shot_func`, then `lua_pcall`), for
+    /// the strings whose calls may wait (`Atl_Dialog_Play(275)`, ...).
+    pub fn chunk_task(&mut self, source: &str) -> Option<Task> {
+        let f = match self
+            .lua
+            .state_mut()
+            .load_bytes(source.as_bytes(), "=one_shot_func")
+        {
+            Ok(f) => f,
+            Err(e) => {
+                self.event(&Event::Error(
+                    ErrorSite::String(source.as_bytes().to_vec()),
+                    e.to_string().as_bytes(),
+                ));
+                return None;
+            }
+        };
+        self.new_task(Val::Function(f.gc_ref()), source.as_bytes())
+            .ok()
+    }
+
+    /// A C-side string run at once (@ 0x00454220: `luaL_loadbuffer` as
+    /// `one_shot_func`, `lua_pcall(0, nresults)`), outside any task: with
+    /// `args`, its one result is a function called with them
+    /// (`return Atl_PuzzlePoker_GetPlayerCash` then `lua_pushnumber`,
+    /// `lua_pcall(n, nresults)`). A call that would wait cannot (a Rust
+    /// frame is under it): it is logged and done at once.
+    pub fn one_shot(
+        &mut self,
+        source: &str,
+        args: Option<&[Value]>,
+        nresults: usize,
+    ) -> Result<Vec<Value>, String> {
+        let vals: Vec<Val> = args
+            .unwrap_or_default()
+            .iter()
+            .map(|a| self.lua_val(a))
+            .collect();
+        let state = self.lua.state_mut();
+        let f = state
+            .load_bytes(source.as_bytes(), "=one_shot_func")
+            .map_err(|e| format!("{source}: {e}"))?;
+        let func_pos = state.top;
+        let (saved_base, saved_ci) = (state.base, state.ci);
+        state.ensure_stack(1);
+        state.stack_set(func_pos, Val::Function(f.gc_ref()));
+        state.top = func_pos + 1;
+        let first = if args.is_some() { 1 } else { nresults };
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let r = state.call_function(func_pos, first as i32);
+        if let Err(e) = r {
+            state.top = func_pos;
+            state.base = saved_base;
+            state.ci = saved_ci;
+            return Err(format!("{source}: {e}"));
+        }
+        if args.is_some() {
+            let g = state.stack_get(func_pos);
+            state.ensure_stack(1 + vals.len());
+            state.stack_set(func_pos, g);
+            for (i, v) in vals.iter().enumerate() {
+                state.stack_set(func_pos + 1 + i, *v);
+            }
+            state.top = func_pos + 1 + vals.len();
+            #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+            let r = state.call_function(func_pos, nresults as i32);
+            if let Err(e) = r {
+                state.top = func_pos;
+                state.base = saved_base;
+                state.ci = saved_ci;
+                return Err(format!("{source}: {e}"));
+            }
+        }
+        let out: Vec<Value> = (0..nresults)
+            .map(|i| value_of(state, state.stack_get(func_pos + i)))
+            .collect();
+        state.top = func_pos;
+        Ok(out)
+    }
+
     fn lua_val(&mut self, v: &Value) -> Val {
         let state = self.lua.state_mut();
         match v {
