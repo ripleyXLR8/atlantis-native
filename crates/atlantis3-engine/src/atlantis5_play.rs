@@ -1447,19 +1447,20 @@ impl Stage {
         if let (Some(s), Some(a)) = (sound.as_mut(), &self.audio) {
             s.pump(a);
         }
-        let mut over = false;
-        while film.due(now) {
+        // The step @ 0x00456cb0, once per update: `BinkWait`, and only
+        // when it returns 0 `BinkDoFrame` then `BinkNextFrame`.
+        if film.due(now) {
             film.do_frame();
             if self.film_bink_sound {
                 if let Some(a) = &self.audio {
                     a.push(CHANNEL_BINK, &film.take_audio(0));
                 }
             }
-            if !film.next_frame() {
-                over = true;
-                break;
-            }
+            film.next_frame();
         }
+        // Over when `FrameNum` = `Frames` − 1 (the last two frames are
+        // never shown); a film of at most one frame at once.
+        let over = film.frames() <= 1 || film.frame_num + 1 >= film.frames();
         // @ 0x0042b0f0: after the film's step, its subtitles.
         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let (frame, rate) = (film.frame_num, film.fps().round() as u32);
