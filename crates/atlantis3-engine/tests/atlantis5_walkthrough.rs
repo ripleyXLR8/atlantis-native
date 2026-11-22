@@ -77,7 +77,7 @@ impl Walker {
             cell0: None,
             right_button: None,
             steps: 0,
-            avoid: vec!["lift_".into(), "stairway_".into()],
+            avoid: vec!["lift_floor".into(), "stairway_".into()],
             redirects: Vec::new(),
         }
     }
@@ -340,6 +340,7 @@ impl Walker {
     /// Walks to `view` of the current scene by its move zones.
     fn walk(&mut self, view: i32) {
         let chapter = self.chapter_now();
+        let mut tries: HashMap<(i32, i32, String), u32> = HashMap::new();
         for _ in 0..40 {
             let (scene, here) = self.address();
             if here == view {
@@ -351,6 +352,13 @@ impl Walker {
                 .unwrap_or_else(|| panic!("no path from {scene} {here} to {view}"))
                 .clone();
             let (to, name) = path[0].clone();
+            // A door opens at the first click and moves at the second.
+            let n = tries.entry((here, to, name.clone())).or_default();
+            *n += 1;
+            assert!(
+                *n <= 2,
+                "the zone {name:?} {to} of {scene} {here} does not move"
+            );
             if !name.is_empty() && self.play.game.zone(name.as_bytes()) == Some((2, true)) {
                 // A door: the hand empty to open it.
                 self.empty_hand();
@@ -999,8 +1007,43 @@ fn num(v: &Value) -> i32 {
     }
 }
 
+/// Chapter 5, floor −2 (`chapter_05.lua`, `on_click_etage-2.lua`): the
+/// extinguisher breaks the cupboard (the jumpers), the engine room's key
+/// opens its door, the board's key unlocks the lift board, and the
+/// jumpers plugged to the code of `Atl_PuzzleLiftBoard_Init` cheat the
+/// lifts (`lifts_cheated`); the lift to floor 14 starts chapter 6.
+fn chapter_5(w: &mut Walker) {
+    w.use_on_zone("engine_room_key", "engine_room_in");
+    assert_eq!(w.state("engine_room_door"), "open");
+    w.touch("floor-2_extinguisher");
+    w.use_on_sprite("floor-2_extinguisher", "floor-2_cupboard_door");
+    w.touch("jumpers");
+    w.use_on_zone("lift_board_key", "lift_board_lock");
+    w.use_on_zone("jumpers", "drop_jumpers");
+    assert_eq!(w.state("jumpers"), "in_liftboard");
+    w.touch("floor-2_lift_board_key");
+    assert_eq!(w.flag("lift_board_locked"), "false");
+    // Elevator e spans the code's floors code[e]..code[e + 1].
+    let plugs = [
+        (1, 0),
+        (1, 10),
+        (2, 10),
+        (2, 15),
+        (3, 9),
+        (3, 15),
+        (4, 9),
+        (4, 16),
+    ];
+    for (k, (e, floor)) in plugs.into_iter().enumerate() {
+        w.touch(&format!("unplugged_jumper_0{}", k + 1));
+        w.click_zone(floor, &format!("elevator{e}"));
+    }
+    assert_eq!(w.flag("lifts_cheated"), "true");
+    w.touch_zone("lift_floor_14");
+}
+
 /// The chapters' plays, in order.
-const CHAPTERS: [fn(&mut Walker); 4] = [chapter_1, chapter_2, chapter_3, chapter_4];
+const CHAPTERS: [fn(&mut Walker); 5] = [chapter_1, chapter_2, chapter_3, chapter_4, chapter_5];
 
 /// A new game played through chapter `n`: the chapters before it set
 /// what it needs (the characters' subjects, the flags), as in the game.
@@ -1056,4 +1099,9 @@ fn chapter_03() {
 #[test]
 fn chapter_04() {
     play_chapter(4);
+}
+
+#[test]
+fn chapter_05() {
+    play_chapter(5);
 }
