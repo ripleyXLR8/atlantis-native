@@ -3249,11 +3249,28 @@ impl Play {
     /// tools; the player turns with the mouse). False without such a zone.
     #[doc(hidden)]
     pub fn aim_at_zone(&mut self, id: i32) -> bool {
+        self.aim_at(id, None)
+    }
+
+    /// As [`Play::aim_at_zone`], for the zone numbered `id` named `name`
+    /// (several zones of a view may share a number).
+    #[doc(hidden)]
+    pub fn aim_at_zone_named(&mut self, id: i32, name: &[u8]) -> bool {
+        self.aim_at(id, Some(name))
+    }
+
+    fn aim_at(&mut self, id: i32, name: Option<&[u8]>) -> bool {
         let mut st = self.stage.borrow_mut();
         let Some(points) = st
             .view
             .as_ref()
-            .and_then(|v| v.zones.iter().find(|z| z.value == id && z.kind < 1000))
+            .and_then(|v| {
+                v.zones.iter().find(|z| {
+                    z.value == id
+                        && z.kind < 1000
+                        && name.is_none_or(|n| z.name.as_deref().unwrap_or("").as_bytes() == n)
+                })
+            })
             .map(|z| z.points.clone())
         else {
             return false;
@@ -3264,11 +3281,39 @@ impl Play {
                 d[i] += p[i];
             }
         }
-        let (pitch, yaw) = crate::atlantis5_camera::angles_of(&normalize3(d));
+        let c = normalize3(d);
+        let (pitch, yaw) = crate::atlantis5_camera::angles_of(&c);
         st.set_pitch(pitch);
         st.set_yaw(yaw);
         drop(st);
         self.pick();
+        // The sum's direction can fall outside a zone that is not convex:
+        // then directions between it and each point, until the pick takes
+        // the zone.
+        let taken = |h: &Option<Hover>| matches!(h, Some(Hover::Zone(i, n)) if *i == id && name.is_none_or(|w| n == w));
+        if taken(&self.hover) {
+            return true;
+        }
+        for k in [0.25f32, 0.5, 0.75] {
+            for p in &points {
+                let q = normalize3(*p);
+                let v = normalize3([
+                    c[0] * (1.0 - k) + q[0] * k,
+                    c[1] * (1.0 - k) + q[1] * k,
+                    c[2] * (1.0 - k) + q[2] * k,
+                ]);
+                let (pitch, yaw) = crate::atlantis5_camera::angles_of(&v);
+                {
+                    let mut st = self.stage.borrow_mut();
+                    st.set_pitch(pitch);
+                    st.set_yaw(yaw);
+                }
+                self.pick();
+                if taken(&self.hover) {
+                    return true;
+                }
+            }
+        }
         true
     }
 
