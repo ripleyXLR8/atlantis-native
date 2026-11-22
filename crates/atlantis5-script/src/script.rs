@@ -1792,6 +1792,85 @@ impl Script {
         Ok(out)
     }
 
+    /// `atl.hero.inventory`: its `size` (@ 0x00403bb0) and the items of
+    /// slots 0..size (`items[slot + 1]`, @ 0x00403920: a string, or
+    /// nothing).
+    pub fn inventory(&mut self) -> (usize, Vec<Option<Vec<u8>>>) {
+        let inv: &[&[u8]] = &[b"atl", b"hero", b"inventory"];
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let size = match self.get_field(inv, b"size") {
+            Value::Num(x) if x > 0.0 => x as usize,
+            _ => 0,
+        };
+        let Some(items) = self.global_table(&[b"atl", b"hero", b"inventory", b"items"]) else {
+            return (size, vec![None; size]);
+        };
+        let state = self.lua.state_mut();
+        let list = (0..size)
+            .map(|i| {
+                #[allow(clippy::cast_precision_loss)]
+                let v = raw_get(state, items, Val::Num((i + 1) as f64));
+                match v {
+                    Val::Str(_) => bytes_of(state, v),
+                    _ => None,
+                }
+            })
+            .collect();
+        (size, list)
+    }
+
+    /// `ClearInventorySlot` (@ 0x00403390): `items[slot + 1]` = nil,
+    /// `nb_items` − 1 (as a number).
+    pub fn inventory_clear(&mut self, slot: usize) {
+        self.inventory_write(slot, None);
+    }
+
+    /// `SetInventoryItem` (@ 0x00403650): `items[slot + 1]` = the name,
+    /// `nb_items` + 1.
+    pub fn inventory_set(&mut self, slot: usize, name: &[u8]) {
+        self.inventory_write(slot, Some(name));
+    }
+
+    fn inventory_write(&mut self, slot: usize, name: Option<&[u8]>) {
+        let inv: &[&[u8]] = &[b"atl", b"hero", b"inventory"];
+        let Some(items) = self.global_table(&[b"atl", b"hero", b"inventory", b"items"]) else {
+            return;
+        };
+        let n = match self.get_field(inv, b"nb_items") {
+            Value::Num(x) => x,
+            _ => return,
+        };
+        let state = self.lua.state_mut();
+        let v = match name {
+            Some(b) => Val::Str(state.gc.intern_string(b)),
+            None => Val::Nil,
+        };
+        #[allow(clippy::cast_precision_loss)]
+        let _ = raw_set(state, items, Val::Num((slot + 1) as f64), v);
+        let d = if name.is_some() { 1.0 } else { -1.0 };
+        self.set_field(inv, b"nb_items", &Value::Num(n + d));
+    }
+
+    /// `atl.hero.handled_item` set (@ 0x00404120) or cleared
+    /// (@ 0x00403d30: nil).
+    pub fn set_handled_item(&mut self, name: Option<&[u8]>) {
+        let v = name.map_or(Value::Nil, |b| Value::Str(b.to_vec()));
+        self.set_field(&[b"atl", b"hero"], b"handled_item", &v);
+    }
+
+    /// `SetClickedInventoryInfo` (@ 0x00401dc0): the event
+    /// `compound_inventory_object` (0x0066835c), the click fields
+    /// cleared, `atl.event.click.inventory.num_slot` = slot + 1.
+    pub fn set_click_inventory(&mut self, slot: usize) {
+        self.begin_event(b"compound_inventory_object");
+        #[allow(clippy::cast_precision_loss)]
+        self.set_field(
+            &[b"atl", b"event", b"click", b"inventory"],
+            b"num_slot",
+            &Value::Num((slot + 1) as f64),
+        );
+    }
+
     /// `return Atl_Address_GetCurrent()` as the load runs it
     /// (@ 0x0043b210: `lua_tostring(-2)`, `lua_tonumber(-1)`).
     pub fn address_get_current(&mut self) -> Result<(Vec<u8>, f64), String> {

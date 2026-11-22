@@ -368,6 +368,41 @@ impl Game {
         true
     }
 
+    /// A left press on slot `slot` of the inventory (@ 0x00417120, the
+    /// grid's event 2), as the original: with something in the hand, a
+    /// slot holding an item gives the `compound_inventory_object` event
+    /// and the scene's `on_click` (@ 0x00401dc0, 0x0042f890), an empty slot
+    /// takes the hand's item (@ 0x00403d30, 0x00403650); with an empty
+    /// hand a slot's item goes into the hand (@ 0x00404120, 0x00403390).
+    /// The inventory runs in state 3.
+    pub fn click_inventory(&mut self, slot: usize) -> bool {
+        if self.busy() || self.state != 3 {
+            return false;
+        }
+        let hand = match self.script.handled_item() {
+            Ok(h) => h,
+            Err(e) => {
+                self.lua_error(&e);
+                return false;
+            }
+        };
+        let (_, items) = self.script.inventory();
+        let item = items.get(slot).cloned().flatten().unwrap_or_default();
+        if hand.is_empty() {
+            if !item.is_empty() {
+                self.script.set_handled_item(Some(&item));
+                self.script.inventory_clear(slot);
+            }
+        } else if item.is_empty() {
+            self.script.set_handled_item(None);
+            self.script.inventory_set(slot, &hand);
+        } else {
+            self.script.set_click_inventory(slot);
+            self.run_on_click();
+        }
+        true
+    }
+
     /// An error the original throws a `CException` on (the game ends);
     /// here it is reported.
     fn lua_error(&self, message: &str) {

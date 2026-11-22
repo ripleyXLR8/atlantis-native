@@ -294,3 +294,60 @@ fn the_right_button_puts_the_hands_object_back() {
     frames(&mut play, 1);
     assert_eq!(play.game.script().global(b"native_has"), Value::Bool(true));
 }
+
+#[test]
+fn the_inventory_takes_and_puts_back() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 4);
+    assert!(play.aim_at_sprite(b"coin"));
+    play.click();
+    frames(&mut play, 2);
+    // The hand's coin into the inventory, then the empty hand opens it.
+    play.right_press();
+    frames(&mut play, 1);
+    play.right_press();
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 3);
+    assert!(play.stage().inventory_open_now());
+    let items = play.stage().inventory_items();
+    let slot = items
+        .iter()
+        .position(|i| i.as_deref() == Some(&b"coin"[..]))
+        .expect("the coin in a slot");
+    let _ = shot(&play, "a5-inventory.png");
+    // A press on its cell: the coin into the hand, the slot empty.
+    let x = (1024 - 800) / 2;
+    let _ = x;
+    let mut found = None;
+    'outer: for y in (300..576).step_by(4) {
+        for x in (0..1024).step_by(4) {
+            play.mouse_at(x, y);
+            if play.stage().inventory_hit()
+                == Some(atlantis3_engine::atlantis5_play::InventoryHit::Slot(slot))
+            {
+                found = Some((x, y));
+                break 'outer;
+            }
+        }
+    }
+    let (x, y) = found.expect("the slot's cell");
+    play.mouse_at(x, y);
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().handled_item(), Ok(b"coin".to_vec()));
+    assert_eq!(play.stage().inventory_items()[slot], None);
+    // Again on the now empty slot: back in it.
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().handled_item(), Ok(Vec::new()));
+    assert_eq!(
+        play.stage().inventory_items()[slot].as_deref(),
+        Some(&b"coin"[..])
+    );
+    // The right button closes it.
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(!play.stage().inventory_open_now());
+    assert_eq!(play.game.state(), 4);
+}

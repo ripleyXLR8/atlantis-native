@@ -302,6 +302,30 @@ struct SubjectMenu {
     closed: bool,
 }
 
+/// The inventory (`CMenu_Inventory`, mode 8).
+struct InventoryMenu {
+    /// +0x14: the first slot shown.
+    offset: usize,
+    size: usize,
+    items: Vec<Option<Vec<u8>>>,
+    background: Option<Bank>,
+    /// Left and right buttons: normal, focused.
+    left: [Option<Bank>; 2],
+    right: [Option<Bank>; 2],
+    icons: Vec<Option<Bank>>,
+    hand_icon: Option<Bank>,
+    closed: bool,
+}
+
+/// What a left press in the inventory hits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum InventoryHit {
+    /// A slot (the grid's cell + the offset).
+    Slot(usize),
+    Left,
+    Right,
+}
+
 /// The engine's side of the scripts' calls.
 pub struct Stage {
     src: Arc<dyn FileSource>,
@@ -367,6 +391,8 @@ pub struct Stage {
     dialog: Option<DialogRun>,
     /// The subject menu (mode 9).
     menu: Option<SubjectMenu>,
+    /// The inventory (mode 8).
+    inventory: Option<InventoryMenu>,
     /// Left presses and Space presses for the dialog and the menu this
     /// frame.
     clicks: usize,
@@ -438,6 +464,7 @@ impl Stage {
             fonts,
             dialog: None,
             menu: None,
+            inventory: None,
             clicks: 0,
             space: false,
             mouse: (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2),
@@ -1229,6 +1256,7 @@ impl Stage {
         });
         r.render(&faces, &cam.matrix(), cam.projection(), out);
         self.draw_menu(out);
+        self.draw_inventory(out);
         self.draw_dialog(out);
     }
 
@@ -1872,6 +1900,192 @@ impl Stage {
         }
     }
 
+    /// The inventory's sprites (@ 0x00414db0): `background.spr`,
+    /// `button_left[_focus].spr`, `button_right[_focus].spr` of
+    /// `sprites2d/menu/inventory/` (path 25); each item's icon
+    /// `sprites2d/objects_icon/<item>.spr` (path 18), `proxy_object.spr`
+    /// when missing; the hand's icon likewise.
+    fn inventory_build(
+        &self,
+        size: usize,
+        items: Vec<Option<Vec<u8>>>,
+        hand: Vec<u8>,
+        offset: usize,
+    ) -> InventoryMenu {
+        let spr = |path: &str| {
+            self.read(path)
+                .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok())
+        };
+        let dir = "datas/sprites2d/menu/inventory";
+        let icon = |name: &[u8]| {
+            spr(&format!("datas/sprites2d/objects_icon/{}.spr", lossy(name)))
+                .or_else(|| spr("datas/sprites2d/objects_icon/proxy_object.spr"))
+        };
+        let icons = items
+            .iter()
+            .map(|i| i.as_ref().and_then(|n| icon(n)))
+            .collect();
+        InventoryMenu {
+            offset,
+            size,
+            hand_icon: (!hand.is_empty()).then(|| icon(&hand)).flatten(),
+            items,
+            background: spr(&format!("{dir}/background.spr")),
+            left: [
+                spr(&format!("{dir}/button_left.spr")),
+                spr(&format!("{dir}/button_left_focus.spr")),
+            ],
+            right: [
+                spr(&format!("{dir}/button_right.spr")),
+                spr(&format!("{dir}/button_right_focus.spr")),
+            ],
+            icons,
+            closed: false,
+        }
+    }
+
+    /// The inventory opens (mode 8, its Initialize @ 0x00414bb0: the
+    /// elements, alpha 1, state 2).
+    pub fn inventory_open(&mut self, size: usize, items: Vec<Option<Vec<u8>>>, hand: Vec<u8>) {
+        self.inventory = Some(self.inventory_build(size, items, hand, 0));
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        {
+            self.mouse = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+        }
+    }
+
+    /// The elements made again (@ 0x00415fe0) after a click.
+    pub fn inventory_refresh(&mut self, size: usize, items: Vec<Option<Vec<u8>>>, hand: Vec<u8>) {
+        let offset = self.inventory.as_ref().map_or(0, |i| i.offset);
+        if self.inventory.is_some() {
+            self.inventory = Some(self.inventory_build(size, items, hand, offset));
+        }
+    }
+
+    /// Whether the inventory is open.
+    pub fn inventory_open_now(&self) -> bool {
+        self.inventory.is_some()
+    }
+
+    /// The items shown, from the offset (tests).
+    pub fn inventory_items(&self) -> Vec<Option<Vec<u8>>> {
+        self.inventory
+            .as_ref()
+            .map(|i| i.items.clone())
+            .unwrap_or_default()
+    }
+
+    /// The layout (@ 0x00414bb0, the grid's size its background's): the
+    /// grid at ((W − w) / 2, H − h − 10), the left button left of it, the
+    /// right one right of it, both 10 above the bottom; the grid's 10
+    /// cells at (3 + 80 i, 4), 64 × 64 (@ 0x00415397..0x004153c0)
+    /// [INFERRED: positions as the elements' top-left hot spots].
+    fn inventory_layout(inv: &InventoryMenu) -> ((i32, i32), (i32, i32), (i32, i32)) {
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
+        let size = |b: &Option<Bank>| {
+            b.as_ref()
+                .and_then(|b| b.info(0))
+                .map_or((0, 0), |i| (i32::from(i.w), i32::from(i.h)))
+        };
+        let (gw, gh) = size(&inv.background);
+        let (lw, lh) = size(&inv.left[0]);
+        let (_, rh) = size(&inv.right[0]);
+        let gx = (w - gw) / 2;
+        (
+            (gx, h - gh - 10),
+            (gx - lw, h - lh - 10),
+            ((w + gw) / 2, h - rh - 10),
+        )
+    }
+
+    /// What a left press at the mouse hits.
+    pub fn inventory_hit(&self) -> Option<InventoryHit> {
+        let inv = self.inventory.as_ref()?;
+        let (x, y) = self.mouse;
+        let ((gx, gy), (lx, ly), (rx, ry)) = Self::inventory_layout(inv);
+        for c in 0..10usize {
+            #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+            let (cx, cy) = (gx + 3 + 80 * c as i32, gy + 4);
+            if (cx..cx + 64).contains(&x) && (cy..cy + 64).contains(&y) {
+                return Some(InventoryHit::Slot(c + inv.offset));
+            }
+        }
+        let inside = |b: &Option<Bank>, bx: i32, by: i32| {
+            b.as_ref().and_then(|b| b.info(0)).is_some_and(|i| {
+                (bx..bx + i32::from(i.w)).contains(&x) && (by..by + i32::from(i.h)).contains(&y)
+            })
+        };
+        if inside(&inv.left[0], lx, ly) {
+            return Some(InventoryHit::Left);
+        }
+        if inside(&inv.right[0], rx, ry) {
+            return Some(InventoryHit::Right);
+        }
+        None
+    }
+
+    /// The buttons (@ 0x00417670 → 0x00414d50: the offset − 1 when above
+    /// 0; @ 0x004176a0 → 0x00414d60: + 1 while offset + 10 < size).
+    pub fn inventory_page(&mut self, right: bool) {
+        let Some(inv) = &mut self.inventory else {
+            return;
+        };
+        if right {
+            if inv.offset + 10 < inv.size {
+                inv.offset += 1;
+            }
+        } else if inv.offset > 0 {
+            inv.offset -= 1;
+        }
+    }
+
+    /// A right press (@ 0x00414a30 state 2): state 4, the inventory ends.
+    pub fn inventory_close(&mut self) {
+        if let Some(inv) = &mut self.inventory {
+            inv.closed = true;
+        }
+    }
+
+    /// Whether the inventory has ended; it is dropped then.
+    pub fn inventory_take_closed(&mut self) -> bool {
+        if self.inventory.as_ref().is_some_and(|i| i.closed) {
+            self.inventory = None;
+            return true;
+        }
+        false
+    }
+
+    /// The inventory over the view (@ 0x00414b70): the grid and buttons
+    /// (a button's focus picture under the mouse [INFERRED]), the icons
+    /// in their cells, the hand's icon at (5, 30) (@ 0x00415a8f..).
+    fn draw_inventory(&self, out: &mut [u32]) {
+        let Some(inv) = &self.inventory else { return };
+        let ((gx, gy), (lx, ly), (rx, ry)) = Self::inventory_layout(inv);
+        let hit = self.inventory_hit();
+        let mut t = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
+        if let Some(b) = &inv.background {
+            b.draw(&mut t, Some(gx), gy, 0);
+        }
+        let lb = usize::from(hit == Some(InventoryHit::Left));
+        if let Some(b) = inv.left[lb].as_ref().or(inv.left[0].as_ref()) {
+            b.draw(&mut t, Some(lx), ly, 0);
+        }
+        let rb = usize::from(hit == Some(InventoryHit::Right));
+        if let Some(b) = inv.right[rb].as_ref().or(inv.right[0].as_ref()) {
+            b.draw(&mut t, Some(rx), ry, 0);
+        }
+        for c in 0..10usize {
+            if let Some(Some(icon)) = inv.icons.get(c + inv.offset) {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+                icon.draw(&mut t, Some(gx + 3 + 80 * c as i32), gy + 4, 0);
+            }
+        }
+        if let Some(h) = &inv.hand_icon {
+            h.draw(&mut t, Some(5), 0x1e, 0);
+        }
+    }
+
     /// The film's subtitle (@ 0x0042b220): black at the bottom centre,
     /// then white 2 pixels up and left.
     fn draw_film_subtitle(&self, out: &mut [u32]) {
@@ -2478,6 +2692,10 @@ impl Play {
     /// 12, the game's menus) is not, and ends at once (logged), so the
     /// manager takes its next request.
     fn menu_frame(&mut self, clicks: usize) {
+        if self.stage.borrow().inventory_open_now() {
+            self.inventory_frame(clicks);
+            return;
+        }
         if !self.stage.borrow().menu_open_now() {
             log::info!("menu of state 3: not ported, closed");
             self.game.menu_closed();
@@ -2521,8 +2739,48 @@ impl Play {
             Ok(h) if !h.is_empty() => {
                 self.game.run_string("return Atl_Hero_ArrangeHandledObject");
             }
-            Ok(_) => log::info!("the inventory (mode 8): not ported"),
+            Ok(_) => {
+                // Mode 8, state 3 (@ 0x004305d0).
+                let (size, items) = self.game.script().inventory();
+                self.game.open_menu();
+                self.stage
+                    .borrow_mut()
+                    .inventory_open(size, items, Vec::new());
+            }
             Err(e) => log::warn!("{e}"),
+        }
+    }
+
+    /// A right press while the inventory is open: it ends (@ 0x00414a30
+    /// state 2: a mouse event with the buttons 4).
+    pub fn right_press(&mut self) {
+        if self.game.state() == 3 && self.stage.borrow().inventory_open_now() {
+            self.stage.borrow_mut().inventory_close();
+        } else {
+            self.right_click();
+        }
+    }
+
+    /// The inventory's frame: each left press on a slot (@ 0x00417120)
+    /// or a button; then the elements made again (@ 0x00415fe0) from the
+    /// database; at its end the manager's next request.
+    fn inventory_frame(&mut self, clicks: usize) {
+        for _ in 0..clicks {
+            let hit = self.stage.borrow().inventory_hit();
+            match hit {
+                Some(InventoryHit::Slot(s)) => {
+                    self.game.click_inventory(s);
+                }
+                Some(InventoryHit::Left) => self.stage.borrow_mut().inventory_page(false),
+                Some(InventoryHit::Right) => self.stage.borrow_mut().inventory_page(true),
+                None => continue,
+            }
+            let (size, items) = self.game.script().inventory();
+            let hand = self.game.script().handled_item().unwrap_or_default();
+            self.stage.borrow_mut().inventory_refresh(size, items, hand);
+        }
+        if self.stage.borrow_mut().inventory_take_closed() {
+            self.game.menu_closed();
         }
     }
 

@@ -279,7 +279,7 @@ impl ApplicationHandler for A5App {
                 state: ElementState::Pressed,
                 button: MouseButton::Right,
                 ..
-            } => self.play.right_click(),
+            } => self.play.right_press(),
             // In a menu the mouse moves a cursor on the picture.
             WindowEvent::CursorMoved { position, .. } => {
                 if let Some(w) = &self.window {
