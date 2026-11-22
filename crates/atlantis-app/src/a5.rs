@@ -142,8 +142,37 @@ fn language(src: &Atlantis5Source) -> String {
         .unwrap_or_else(|| "french".to_string())
 }
 
+/// What the game needs before it starts, while the start's first logo is
+/// read in the background ([`start`]).
+struct Start {
+    src: Arc<dyn atlantis_data::FileSource>,
+    lang: String,
+    audio: Audio,
+    warm: std::thread::JoinHandle<()>,
+}
+
+/// The game made and booted once the logos are read; meanwhile the window
+/// is black. From a disc the first run reads (and decodes) the cabinet's
+/// `Videos` folder up to the logos, about 460 MB with the French DVD: the
+/// port's own, the original plays from its install.
+fn start(src: Arc<dyn atlantis_data::FileSource>, lang: String, audio: Audio) -> Start {
+    let s = src.clone();
+    let warm = std::thread::spawn(move || {
+        for logo in atlantis3_engine::atlantis5_play::LOGOS {
+            let _ = s.read(&format!("datas/videos/{logo}.bik"));
+        }
+    });
+    Start {
+        src,
+        lang,
+        audio,
+        warm,
+    }
+}
+
 struct A5App {
-    play: Play,
+    play: Option<Play>,
+    start: Option<Start>,
     picture: Vec<u32>,
     title: String,
     fullscreen: bool,
@@ -156,6 +185,8 @@ struct A5App {
     /// Whether the mouse is free for a menu.
     menu_cursor: bool,
     _audio: Option<cpal::Stream>,
+    /// Why the game could not be made, for the caller.
+    error: Option<String>,
 }
 
 impl A5App {
@@ -206,18 +237,57 @@ impl A5App {
         let _ = buf.present();
     }
 
+    /// The game, made once the start's reads end (black until then).
+    fn ready(&mut self, el: &ActiveEventLoop) -> bool {
+        if self.play.is_some() {
+            return true;
+        }
+        if self.start.as_ref().is_some_and(|s| !s.warm.is_finished()) {
+            return false;
+        }
+        let Some(start) = self.start.take() else {
+            return false;
+        };
+        let _ = start.warm.join();
+        match Play::new(start.src, &start.lang, Some(start.audio)) {
+            Ok(mut play) => {
+                // The saves (`saves/autoslot`, `slot_<n>`) in the player's
+                // data folder; their dates in local time.
+                play.set_save_dir(Some(saves_dir()));
+                play.menus.utc_offset = crate::a2::utc_offset_now;
+                play.boot();
+                self.play = Some(play);
+                self.last = Instant::now();
+                true
+            }
+            Err(e) => {
+                log::error!("{e}");
+                self.error = Some(e);
+                el.exit();
+                false
+            }
+        }
+    }
+
     fn frame(&mut self, el: &ActiveEventLoop) {
+        if !self.ready(el) {
+            self.present();
+            return;
+        }
+        let Some(play) = self.play.as_mut() else {
+            return;
+        };
         let now = Instant::now();
         let dt = now.duration_since(self.last).as_secs_f64().min(0.25);
         self.last = now;
-        self.play.update(dt);
-        if self.play.quit_requested() {
+        play.update(dt);
+        if play.quit_requested() {
             el.exit();
             return;
         }
         // A menu frees the mouse (the game draws its cursor); play holds
         // it. The system cursor stays hidden (ShowCursor(0), @ 0x0043c200).
-        let menu = self.play.in_menu();
+        let menu = play.in_menu();
         if menu != self.menu_cursor {
             self.menu_cursor = menu;
             if let Some(w) = &self.window {
@@ -228,7 +298,7 @@ impl A5App {
                 }
             }
         }
-        self.play.render(&mut self.picture);
+        play.render(&mut self.picture);
         self.present();
     }
 }
@@ -275,7 +345,9 @@ impl ApplicationHandler for A5App {
         if let DeviceEvent::MouseMotion { delta } = event {
             if self.focused {
                 #[allow(clippy::cast_possible_truncation)]
-                self.play.look(delta.0 as f32, delta.1 as f32);
+                if let Some(p) = self.play.as_mut() {
+                    p.look(delta.0 as f32, delta.1 as f32);
+                }
             }
         }
     }
@@ -287,14 +359,27 @@ impl ApplicationHandler for A5App {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        if self.play.is_none() {
+            // Black while the start's reads go on: only closing and the
+            // redraws that make the game once they end.
+            match event {
+                WindowEvent::CloseRequested => el.exit(),
+                WindowEvent::RedrawRequested => self.frame(el),
+                _ => {}
+            }
+            return;
+        }
+        let Some(play) = self.play.as_mut() else {
+            return;
+        };
         match event {
             WindowEvent::CloseRequested => el.exit(),
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
                 match event.logical_key {
                     // Escape (DIK 1): a film ends, or the in-game menu.
-                    Key::Named(NamedKey::Escape) => self.play.escape(),
+                    Key::Named(NamedKey::Escape) => play.escape(),
                     // Space (0x39): a film or a dialog ends.
-                    Key::Named(NamedKey::Space) => self.play.space(),
+                    Key::Named(NamedKey::Space) => play.space(),
                     // The port's own, as in the other games: F11 switches
                     // between the window and the full screen.
                     Key::Named(NamedKey::F11) => {
@@ -315,12 +400,12 @@ impl ApplicationHandler for A5App {
                 state: ElementState::Pressed,
                 button: MouseButton::Left,
                 ..
-            } => self.play.click(),
+            } => play.click(),
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
                 button: MouseButton::Right,
                 ..
-            } => self.play.right_press(),
+            } => play.right_press(),
             // In a menu the mouse moves a cursor on the picture.
             WindowEvent::CursorMoved { position, .. } => {
                 if let Some(w) = &self.window {
@@ -331,7 +416,7 @@ impl ApplicationHandler for A5App {
                     let k = (ww / gw).min(wh / gh);
                     let (ox, oy) = ((ww - gw * k) / 2.0, (wh - gh * k) / 2.0);
                     #[allow(clippy::cast_possible_truncation)]
-                    self.play.mouse_at(
+                    play.mouse_at(
                         ((position.x - ox) / k) as i32,
                         ((position.y - oy) / k) as i32,
                     );
@@ -368,14 +453,10 @@ pub fn run_window_on(
         crate::audio_out::start_with(move |buf, rate, channels| a.fill(buf, rate, channels))
     };
     let src: Arc<dyn atlantis_data::FileSource> = Arc::new(src);
-    let mut play = Play::new(src, &lang, Some(audio))?;
-    // The saves (`saves/autoslot`, `slot_<n>`) in the player's data
-    // folder; their dates in local time.
-    play.set_save_dir(Some(saves_dir()));
-    play.menus.utc_offset = crate::a2::utc_offset_now;
-    play.boot();
     let mut app = A5App {
-        play,
+        play: None,
+        start: Some(start(src, lang, audio)),
+        error: None,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
         title: format!(
             "{} (2006) - Atlantis Native",
@@ -391,6 +472,9 @@ pub fn run_window_on(
     };
     el.run_app_on_demand(&mut app)
         .map_err(|e| format!("The window failed: {e}"))?;
+    if let Some(e) = app.error {
+        return Err(e);
+    }
     Ok(crate::a2::Ended::Quit)
 }
 
