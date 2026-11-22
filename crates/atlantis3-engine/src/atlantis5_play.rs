@@ -2507,6 +2507,31 @@ impl Play {
         }
     }
 
+    /// A press of the right button (the mouse event of kind 0 with the
+    /// buttons 4, @ 0x004300d0), in play: with something in the hand,
+    /// `return Atl_Hero_ArrangeHandledObject` (0x0066ce60, run as the
+    /// one-shot strings are) puts it back in the inventory; with an empty
+    /// hand the original opens the inventory (mode 8, state 3), which is
+    /// not ported (logged).
+    pub fn right_click(&mut self) {
+        if self.game.state() != 4 || self.game.busy() {
+            return;
+        }
+        match self.game.script().handled_item() {
+            Ok(h) if !h.is_empty() => {
+                self.game.run_string("return Atl_Hero_ArrangeHandledObject");
+            }
+            Ok(_) => log::info!("the inventory (mode 8): not ported"),
+            Err(e) => log::warn!("{e}"),
+        }
+    }
+
+    /// Whether a menu is up (the manager's state 3): the mouse moves a
+    /// cursor then.
+    pub fn in_menu(&self) -> bool {
+        self.game.state() == 3
+    }
+
     /// The mouse at (x, y) on the 1024 × 576 picture (menus).
     pub fn mouse_at(&mut self, x: i32, y: i32) {
         self.stage.borrow_mut().mouse = (x, y);

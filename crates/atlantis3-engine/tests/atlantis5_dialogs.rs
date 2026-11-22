@@ -269,3 +269,28 @@ fn the_autosave_is_written_and_loaded() {
     assert!(play.game.timer_names().contains(&b"native_t".to_vec()));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn the_right_button_puts_the_hands_object_back() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    // The coin is reachable from view 4 (`chapter_01.lua`'s Init_Coin).
+    go(&mut play, 4);
+    assert!(play.aim_at_sprite(b"coin"), "the coin under the centre");
+    play.click();
+    frames(&mut play, 2);
+    assert_eq!(
+        play.game.script().handled_item(),
+        Ok(b"coin".to_vec()),
+        "the coin in the hand"
+    );
+    // `return Atl_Hero_ArrangeHandledObject`: into the inventory.
+    play.right_click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().handled_item(), Ok(Vec::new()));
+    assert!(play.game.run_string(
+        "return function() native_has = Atl_Inventory_HasItem(atl.hero.inventory, \"coin\") end"
+    ));
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().global(b"native_has"), Value::Bool(true));
+}

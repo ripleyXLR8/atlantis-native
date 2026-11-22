@@ -6,9 +6,12 @@
 //! ([`atlantis5_script`] through [`atlantis3_engine::atlantis5_play`]).
 //! As in the original, the mouse turns the view (its relative moves, the
 //! system cursor hidden and kept in the window) and a left click acts on
-//! what is under the screen centre; Escape or Space ends a film; Escape out
-//! of a film, or closing the window, ends the game. Dialogs, inventory,
-//! menus, the game's own cursors and saves are the next milestones.
+//! what is under the screen centre; Escape or Space ends a film, Space a
+//! dialog, a left click a tirade; the right button puts the hand's object
+//! back; in the subject menu the system cursor picks a subject. Escape out
+//! of a film, or closing the window, ends the game. The autosave goes to
+//! the data folder's `atlantis5/saves`. The inventory, the game's menus
+//! and its own cursors are not ported yet.
 
 use std::num::NonZeroU32;
 use std::path::Path;
@@ -117,6 +120,8 @@ struct A5App {
     /// Whether the window has the focus (the mouse's moves turn the view
     /// only then).
     focused: bool,
+    /// Whether the system cursor is shown for a menu.
+    menu_cursor: bool,
     _audio: Option<cpal::Stream>,
 }
 
@@ -173,6 +178,20 @@ impl A5App {
         let dt = now.duration_since(self.last).as_secs_f64().min(0.25);
         self.last = now;
         self.play.update(dt);
+        // A menu shows the system cursor and frees it; play hides and
+        // holds it (the game's own cursor pictures are not drawn).
+        let menu = self.play.in_menu();
+        if menu != self.menu_cursor {
+            self.menu_cursor = menu;
+            if let Some(w) = &self.window {
+                w.set_cursor_visible(menu);
+                if menu {
+                    let _ = w.set_cursor_grab(CursorGrabMode::None);
+                } else if w.set_cursor_grab(CursorGrabMode::Locked).is_err() {
+                    let _ = w.set_cursor_grab(CursorGrabMode::Confined);
+                }
+            }
+        }
         self.play.render(&mut self.picture);
         self.present();
     }
@@ -243,7 +262,8 @@ impl ApplicationHandler for A5App {
                             el.exit();
                         }
                     }
-                    Key::Named(NamedKey::Space) => self.play.skip(),
+                    // Space (0x39): a film or a dialog ends.
+                    Key::Named(NamedKey::Space) => self.play.space(),
                     _ => {}
                 }
             }
@@ -255,6 +275,27 @@ impl ApplicationHandler for A5App {
                 button: MouseButton::Left,
                 ..
             } => self.play.click(),
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Right,
+                ..
+            } => self.play.right_click(),
+            // In a menu the mouse moves a cursor on the picture.
+            WindowEvent::CursorMoved { position, .. } => {
+                if let Some(w) = &self.window {
+                    let size = w.inner_size();
+                    let (ww, wh) = (f64::from(size.width.max(1)), f64::from(size.height.max(1)));
+                    #[allow(clippy::cast_precision_loss)]
+                    let (gw, gh) = (VIEW_WIDTH as f64, VIEW_HEIGHT as f64);
+                    let k = (ww / gw).min(wh / gh);
+                    let (ox, oy) = ((ww - gw * k) / 2.0, (wh - gh * k) / 2.0);
+                    #[allow(clippy::cast_possible_truncation)]
+                    self.play.mouse_at(
+                        ((position.x - ox) / k) as i32,
+                        ((position.y - oy) / k) as i32,
+                    );
+                }
+            }
             WindowEvent::RedrawRequested => self.frame(),
             _ => {}
         }
@@ -274,6 +315,10 @@ pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
     };
     let src: Arc<dyn atlantis_data::FileSource> = Arc::new(src);
     let mut play = Play::new(src, &lang, Some(audio))?;
+    // The saves (`saves/autoslot`) in the player's data folder.
+    play.set_save_dir(Some(
+        crate::desktop::data_dir().join("atlantis5").join("saves"),
+    ));
     play.new_game();
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     let mut app = A5App {
@@ -285,6 +330,7 @@ pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
         surface: None,
         last: Instant::now(),
         focused: false,
+        menu_cursor: false,
         _audio: out,
     };
     el.run_app(&mut app)
