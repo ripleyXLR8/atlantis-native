@@ -343,3 +343,217 @@ fn lift_board() {
     assert!(play.zones().iter().all(|z| !z.1.starts_with(b"elevator")));
     shot(&play, &format!("a5-puzzle-lift-board-{view}.png"));
 }
+
+/// One move on the chessboard: the pawn taken (it lights the squares it
+/// may go to), then the square clicked.
+fn chess_move(play: &mut Play, square: i32) {
+    sprite(play, "player_pawn");
+    assert_eq!(lua(play, "atl.hero.handled_item"), s("player_pawn"));
+    let name = format!("chess_white_box_{square}");
+    let id = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1 == name.as_bytes())
+        .map(|z| z.0)
+        .unwrap_or_else(|| panic!("{name} lit"));
+    zone_id(play, &name, id);
+}
+
+fn chessboard_start(d: &std::path::Path) -> Play {
+    let mut play = chapter(d, 6);
+    go(&mut play, "etage28", 8);
+    // Bugsy's subject starts the game (on_click_etage28.lua).
+    run(
+        &mut play,
+        "Atl_PuzzleChessboard_Start() Atl_PuzzleChessboard_Display(8)",
+    );
+    play
+}
+
+#[test]
+fn chessboard() {
+    let Some(d) = dvd() else { return };
+    let mut play = chessboard_start(&d);
+    // A line found by a breadth-first walk of the scripts' own rules
+    // under the reference Lua 5.0.3 (the scarab's shortest path is the
+    // script's): the three crystals eaten, the scarab never on the pawn.
+    for sq in [11, 7, 3, 9, 15, 19, 25, 19, 13, 17, 21, 17, 11, 7, 3, 9, 5] {
+        assert_eq!(
+            lua(&mut play, "Atl_Flag_Get(\"chessboard_game\")"),
+            s("playing")
+        );
+        chess_move(&mut play, sq);
+    }
+    assert_eq!(
+        lua(&mut play, "Atl_Flag_Get(\"chessboard_game\")"),
+        s("won")
+    );
+    shot(&play, "a5-puzzle-chessboard.png");
+}
+
+#[test]
+fn chessboard_lost() {
+    let Some(d) = dvd() else { return };
+    let mut play = chessboard_start(&d);
+    // 3, then 9: the scarab reaches the pawn.
+    chess_move(&mut play, 3);
+    chess_move(&mut play, 9);
+    assert_eq!(
+        lua(&mut play, "Atl_Flag_Get(\"chessboard_game\")"),
+        s("lost")
+    );
+    assert_eq!(
+        lua(&mut play, "Atl_PuzzleChessboard_GetScarabeePosition()"),
+        Value::Num(9.0)
+    );
+}
+
+/// A move list (the slots, 0..16, whose piece goes into the hole) that
+/// orders a 4 × 4 sliding puzzle: weighted A* on the Manhattan distance
+/// (not the shortest, found fast). `slots[i]` is the piece of slot i, 16
+/// the hole; ordered is `slots[i] == i + 1`.
+fn sliding_solution(start: [u8; 16]) -> Vec<usize> {
+    use std::collections::{BinaryHeap, HashMap};
+    let h = |s: &[u8; 16]| -> u32 {
+        let mut d = 0;
+        for (i, &p) in s.iter().enumerate() {
+            if p != 16 {
+                let g = usize::from(p - 1);
+                d += (i / 4).abs_diff(g / 4) + (i % 4).abs_diff(g % 4);
+            }
+        }
+        u32::try_from(d).expect("small")
+    };
+    let mut best: HashMap<[u8; 16], (u32, Option<([u8; 16], usize)>)> = HashMap::new();
+    let mut open = BinaryHeap::new();
+    best.insert(start, (0, None));
+    open.push(std::cmp::Reverse((3 * h(&start), 0u32, start)));
+    while let Some(std::cmp::Reverse((_, g, s))) = open.pop() {
+        if h(&s) == 0 {
+            let mut out = Vec::new();
+            let mut cur = s;
+            while let Some((_, Some((prev, slot)))) = best.get(&cur).copied() {
+                out.push(slot);
+                cur = prev;
+            }
+            out.reverse();
+            return out;
+        }
+        if best.get(&s).is_some_and(|b| b.0 < g) {
+            continue;
+        }
+        let e = s.iter().position(|&p| p == 16).expect("a hole");
+        let mut next = Vec::new();
+        if e >= 4 {
+            next.push(e - 4);
+        }
+        if e % 4 < 3 {
+            next.push(e + 1);
+        }
+        if e < 12 {
+            next.push(e + 4);
+        }
+        if e % 4 > 0 {
+            next.push(e - 1);
+        }
+        for slot in next {
+            let mut t = s;
+            t.swap(e, slot);
+            if best.get(&t).is_none_or(|b| b.0 > g + 1) {
+                best.insert(t, (g + 1, Some((s, slot))));
+                open.push(std::cmp::Reverse((g + 1 + 3 * h(&t), g + 1, t)));
+            }
+        }
+    }
+    panic!("no solution");
+}
+
+#[test]
+fn taquin() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 7);
+    go(&mut play, "macao", 7);
+    // The curtain opened: the slots around the hole are lit.
+    sprite(&mut play, "taquin_curtain");
+    let mut slots = [0u8; 16];
+    for (i, v) in slots.iter_mut().enumerate() {
+        *v = u8::try_from(int(&lua(
+            &mut play,
+            &format!("atl.puzzle.taquin.slots[{}]", i + 1),
+        )))
+        .expect("a piece");
+    }
+    assert_eq!(int(&lua(&mut play, "atl.puzzle.taquin.empty_slot")), 15);
+    let moves = sliding_solution(slots);
+    assert!(!moves.is_empty());
+    for (k, slot) in moves.iter().enumerate() {
+        assert_eq!(
+            lua(&mut play, "Atl_PuzzleTaquin_Check()"),
+            Value::Bool(false)
+        );
+        zone_id(
+            &mut play,
+            &format!("taquin_slot_{slot}"),
+            i32::try_from(*slot).expect("slot"),
+        );
+        if k == 0 {
+            shot(&play, "a5-puzzle-taquin-start.png");
+        }
+    }
+    assert_eq!(
+        lua(&mut play, "Atl_PuzzleTaquin_Check()"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        lua(&mut play, "Atl_Object_GetState(\"cash_room_door\")"),
+        s("open")
+    );
+    assert_eq!(play.game.zone(b"cash_room_in").map(|z| z.1), Some(true));
+    shot(&play, "a5-puzzle-taquin.png");
+}
+
+#[test]
+fn winch() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 7);
+    // The punter's `partie_poker` subject with the winch code in hand
+    // (on_click_macao.lua): the winches' zones on, view 18.
+    run(&mut play, "Atl_PuzzleWinch_Start()");
+    go(&mut play, "macao", 18);
+    // The zones' numbers are the winches; each turns −5..=5.
+    for _ in 0..7 {
+        zone_id(&mut play, "winch_left", 1);
+    }
+    assert_eq!(
+        int(&lua(&mut play, "atl.puzzle.winch.states[1]")),
+        -5,
+        "kept at −5"
+    );
+    assert_eq!(
+        lua(&mut play, "Atl_PuzzleWinch_Check(18)"),
+        Value::Bool(false)
+    );
+    for (winch, target) in [(1, 3), (2, -4), (3, 2)] {
+        loop {
+            let now = int(&lua(
+                &mut play,
+                &format!("atl.puzzle.winch.states[{winch}]"),
+            ));
+            if now == target {
+                break;
+            }
+            let way = if now < target {
+                "winch_right"
+            } else {
+                "winch_left"
+            };
+            zone_id(&mut play, way, winch);
+        }
+    }
+    // The sail goes up (film ma0010), the winches off, the poker room's
+    // door on.
+    assert_eq!(lua(&mut play, "Atl_Object_GetState(\"veil\")"), s("up"));
+    assert_eq!(play.game.zone(b"winch_left").map(|z| z.1), Some(false));
+    assert_eq!(play.game.zone(b"poker_room_in").map(|z| z.1), Some(true));
+    shot(&play, "a5-puzzle-winch.png");
+}
