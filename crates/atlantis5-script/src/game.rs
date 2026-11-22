@@ -155,6 +155,11 @@ impl Game {
         !self.runs.is_empty() || !self.transitions.is_empty()
     }
 
+    /// Whether requests wait in the manager's queue (+0x2c).
+    pub fn requests_pending(&self) -> bool {
+        !self.queue.is_empty()
+    }
+
     /// Whether the engine is running a call the scripts wait for.
     pub fn waiting_for_engine(&self) -> bool {
         self.runs.iter().any(|r| r.block == Some(Block::Engine))
