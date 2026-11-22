@@ -1795,6 +1795,12 @@ impl Script {
         (scene, view)
     }
 
+    /// `math.random`'s MSVCRT state (tests and tools; `math.randomseed`
+    /// sets it).
+    pub fn lua_holdrand(&self) -> u32 {
+        self.shared.borrow().holdrand
+    }
+
     /// A global's value (tests).
     pub fn global(&mut self, name: &[u8]) -> Value {
         let state = self.lua.state_mut();

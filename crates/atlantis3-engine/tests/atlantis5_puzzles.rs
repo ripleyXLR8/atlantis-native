@@ -1084,3 +1084,289 @@ fn gridlock() {
     assert_eq!(play.game.zone(b"trap_room_in").map(|z| z.1), Some(true));
     shot(&play, "a5-puzzle-gridlock.png");
 }
+
+/// The bees to move, from `slots` (0 the hole), until each side holds
+/// the other's (`RefreshActivity`'s rule: a bee of the left, numbered
+/// below `center`, steps or jumps right into the hole; one of the right
+/// left), by a depth-first walk; `dead` instead finds a line that leaves
+/// no bee to move before the end.
+fn bees_line(slots: &[i32], center: i32, dead: bool) -> Option<Vec<i32>> {
+    let n = slots.len();
+    let hole = slots.iter().position(|&b| b == 0)?;
+    let mut moves = Vec::new();
+    for (c, right) in [
+        (hole.wrapping_sub(2), true),
+        (hole.wrapping_sub(1), true),
+        (hole + 1, false),
+        (hole + 2, false),
+    ] {
+        if c < n && slots[c] != 0 && ((slots[c] < center) == right) {
+            moves.push(c);
+        }
+    }
+    let solved = (0..n).all(|s| {
+        let s1 = i32::try_from(s + 1).expect("slot");
+        if s1 < center {
+            slots[s] >= center
+        } else if s1 > center {
+            slots[s] != 0 && slots[s] < center
+        } else {
+            true
+        }
+    });
+    if moves.is_empty() {
+        return if solved != dead {
+            Some(Vec::new())
+        } else {
+            None
+        };
+    }
+    for c in moves {
+        let mut t = slots.to_vec();
+        t.swap(c, hole);
+        if let Some(mut rest) = bees_line(&t, center, dead) {
+            rest.insert(0, slots[c]);
+            return Some(rest);
+        }
+    }
+    None
+}
+
+fn bees_slots(play: &mut Play) -> (Vec<i32>, i32) {
+    let level = int(&lua(play, "atl.puzzle.bees.level"));
+    let nb = int(&lua(play, &format!("atl.puzzle.bees.nb_bees[{level}]")));
+    let slots = (1..=2 * nb + 1)
+        .map(|s| int(&lua(play, &format!("atl.puzzle.bees.slots[{s}]"))))
+        .collect();
+    (slots, nb + 1)
+}
+
+fn bee(play: &mut Play, b: i32) {
+    let level = int(&lua(play, "atl.puzzle.bees.level"));
+    run(play, "Atl_Hero_SetHandledItem(\"bee_smoker_on\")");
+    sprite(play, &format!("bee_{level}{b}"));
+}
+
+#[test]
+fn bees() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 9);
+    // The swarm smoked away from the hive (the story's step before).
+    run(&mut play, "Atl_Object_SetState(\"bees_cloud\", \"away\")");
+    go(&mut play, "mesopotamie", 13);
+    sprite(&mut play, "hive_lid");
+    assert_eq!(int(&lua(&mut play, "atl.puzzle.bees.level")), 1);
+    // A line that blocks the bees: the level starts again.
+    let (slots, center) = bees_slots(&mut play);
+    let dead = bees_line(&slots, center, true).expect("a dead end");
+    for b in dead {
+        bee(&mut play, b);
+    }
+    assert_eq!(bees_slots(&mut play).0, slots, "level 1 again");
+    for level in 1..=3 {
+        assert_eq!(int(&lua(&mut play, "atl.puzzle.bees.level")), level);
+        let (slots, center) = bees_slots(&mut play);
+        for b in bees_line(&slots, center, false).expect("a solution") {
+            bee(&mut play, b);
+        }
+        // Solved: the level's tray can be taken off.
+        assert_eq!(
+            int(&lua(
+                &mut play,
+                &format!("atl.objects.hive_level_{level}.warp_reachable[1]")
+            )),
+            13
+        );
+        run(&mut play, "Atl_Hero_SetHandledItem(nil)");
+        if level < 3 {
+            sprite(&mut play, &format!("hive_level_{level}"));
+        }
+    }
+    shot(&play, "a5-puzzle-bees.png");
+}
+
+/// A search for the hex player's moves, run in the game's own Lua state
+/// on the scripts' own `Atl_PuzzleHex_OnClick` (the computer's answer
+/// included, its `math.random` replayed from the state `seed`): at each
+/// ply the moves are tried, ranked by the player's resistance after them
+/// (the script's `resistance_board_2`), the `beam` best kept; a line is
+/// dropped when the computer's resistance falls to 0 (`Check`'s 1). The
+/// board, the generator and the zones are put back at the end, the
+/// pawns the search showed taken off. Returns "x,y;..."
+/// or nil.
+const HEX_SEARCH: &str = r#"
+local seed, beam, depth = ...
+local hx = atl.puzzle.hex
+local function cp(b) local r = {} for y = 1, 7 do r[y] = {} for x = 1, 7 do r[y][x] = b[y][x] end end return r end
+local function min2() local m for i = 1, 7 do local v = hx.resistance_board_2[1][i] if type(v) == "number" and (m == nil or m > v) then m = v end end return m end
+local function min1() local m for i = 1, 7 do local v = hx.resistance_board_1[i][7] if type(v) == "number" and (m == nil or m > v) then m = v end end return m end
+local function next_seed(s) return math.mod(s * 214013 + 2531011, 4294967296) end
+local start, start_seed = cp(hx.board_state), seed
+local function rec(board, s, d, path)
+  local cands, n = {}, 0
+  for y = 1, 7 do for x = 1, 7 do if board[y][x] == 0 then
+    hx.board_state = cp(board)
+    math.randomseed(s)
+    Atl_PuzzleHex_OnClick(29, x, y)
+    local h, c = min2(), min1()
+    local s2 = s
+    if h ~= nil and c ~= nil then s2 = next_seed(s) end
+    local p = path .. x .. "," .. y .. ";"
+    if h == 0 then return p end
+    Atl_PuzzleHex_CalculateResistanceBoard(1, hx.resistance_board_1)
+    local c2 = min1()
+    if c2 ~= 0 and h ~= nil then
+      n = n + 1
+      cands[n] = { h = h, c = c2 or 99, board = cp(hx.board_state), s = s2, p = p }
+    end
+  end end end
+  if d == 0 then return nil end
+  for i = 2, n do
+    local v, j = cands[i], i - 1
+    while j >= 1 and (cands[j].h > v.h or (cands[j].h == v.h and cands[j].c < v.c)) do cands[j + 1] = cands[j] j = j - 1 end
+    cands[j + 1] = v
+  end
+  for i = 1, math.min(beam, n) do
+    local r = rec(cands[i].board, cands[i].s, d - 1, cands[i].p)
+    if r then return r end
+  end
+  return nil
+end
+local r = rec(start, seed, depth, "")
+hx.board_state = start
+math.randomseed(start_seed)
+for y = 1, 7 do for x = 1, 7 do Atl_Sprite_Stop("hex_pawn_" .. string.sub("abcdefg", x, x) .. y) end end
+Atl_PuzzleHex_SetActivityZone()
+return r
+"#;
+
+#[test]
+fn hex() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 9);
+    go(&mut play, "mesopotamie", 29);
+    // The Atlantean crystal on the ark's console lights the board.
+    run(&mut play, "Atl_Hero_SetHandledItem(\"atlantean_cristal\")");
+    zone(&mut play, "ark_crystal_place");
+    settle(&mut play);
+    let seed = play.game.script().lua_holdrand();
+    let found = play
+        .game
+        .script()
+        .one_shot(
+            &format!("return (function(...) {HEX_SEARCH} end)({seed}, 3, 12)"),
+            None,
+            1,
+        )
+        .expect("the search")
+        .remove(0);
+    assert_eq!(
+        play.game.script().lua_holdrand(),
+        seed,
+        "the generator put back"
+    );
+    let Value::Str(line) = found else {
+        panic!("no winning line: {found:?}")
+    };
+    let line = String::from_utf8(line).expect("text");
+    for mv in line.split(';').filter(|m| !m.is_empty()) {
+        assert_eq!(
+            lua(&mut play, "Atl_Object_GetState(\"atlantean_crystal\")"),
+            s("on_ark_console_off")
+        );
+        let (x, y) = mv.split_once(',').expect("x,y");
+        let name = format!("hex_pawn_{x}{y}");
+        let id = play
+            .zones()
+            .into_iter()
+            .find(|z| z.1 == name.as_bytes())
+            .map(|z| z.0)
+            .unwrap_or_else(|| panic!("{name} free"));
+        zone_id(&mut play, &name, id);
+    }
+    // The player's path joins the two sides (Check's 2): the crystal lit.
+    assert_eq!(
+        lua(&mut play, "Atl_Object_GetState(\"atlantean_crystal\")"),
+        s("on_ark_console_on")
+    );
+    shot(&play, "a5-puzzle-hex.png");
+}
+
+#[test]
+fn hex_lost() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 9);
+    go(&mut play, "mesopotamie", 29);
+    run(&mut play, "Atl_Hero_SetHandledItem(\"atlantean_cristal\")");
+    zone(&mut play, "ark_crystal_place");
+    settle(&mut play);
+    // The player fills the top rows from the left, letting the computer
+    // join its sides: film me0016, the death panel (`_gameover_ark`).
+    'play: for y in 1..=7 {
+        for x in 1..=7 {
+            let name = format!("hex_pawn_{x}{y}");
+            let Some(id) = play
+                .zones()
+                .into_iter()
+                .find(|z| z.1 == name.as_bytes())
+                .map(|z| z.0)
+            else {
+                continue;
+            };
+            assert!(play.aim_at_zone_named(id, name.as_bytes()));
+            play.click();
+            for _ in 0..300 {
+                frames(&mut play, 1);
+                if play.game.state() != 4 || !play.game.busy() {
+                    break;
+                }
+            }
+            if play.game.state() == 3 {
+                break 'play;
+            }
+            settle(&mut play);
+        }
+    }
+    frames(&mut play, 5);
+    assert_eq!(
+        play.menus.current(),
+        Some(atlantis3_engine::atlantis5_menu::DEATH),
+        "the death panel"
+    );
+}
+
+#[test]
+fn pipe() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 1);
+    go(&mut play, "zeppelin", 25);
+    let done = |play: &mut Play| lua(play, "Atl_Flag_Get(\"mission_fix_pipe\")") == s("done");
+    // The broken pipe not patched yet: the valves alone fix nothing.
+    sprite(&mut play, "valve_01");
+    sprite(&mut play, "valve_03");
+    assert_eq!(lua(&mut play, "IsPipeFixed()"), Value::Bool(false));
+    assert!(!done(&mut play));
+    sprite(&mut play, "valve_01");
+    sprite(&mut play, "valve_03");
+    // The healthy pipe set as the patch (the story's step before,
+    // on_click_zeppelin.lua), then valve 1 open, valve 3 closed with the
+    // gas lever open: IsPipeFixed.
+    run(
+        &mut play,
+        "Atl_Object_SetState(\"healthy_pipe\", \"patch\")",
+    );
+    assert_eq!(
+        lua(&mut play, "Atl_Object_GetState(\"gaz_lever\")"),
+        s("open")
+    );
+    sprite(&mut play, "valve_01");
+    assert!(!done(&mut play));
+    sprite(&mut play, "valve_03");
+    assert_eq!(lua(&mut play, "IsPipeFixed()"), Value::Bool(true));
+    assert!(done(&mut play));
+    assert_eq!(
+        lua(&mut play, "atl.objects.valve_01.warp_reachable[1]"),
+        Value::Nil
+    );
+    shot(&play, "a5-puzzle-pipe.png");
+}
