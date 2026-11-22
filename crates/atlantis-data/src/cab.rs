@@ -22,9 +22,19 @@
 //! therefore one stream: reading a file deep in a large folder decodes it
 //! from the start the first time. The reader keeps the 32 KiB history at
 //! every [`CHECKPOINT_BLOCKS`]-th block it passes and its last position,
-//! so a later read starts from the nearest point before it.
+//! so a later read starts from the nearest point before it; with an index
+//! folder ([`set_index_dir`]) those checkpoints and the blocks' sizes are
+//! kept in files between runs.
+//!
+//! On a disc every read is a seek: the cabinet's file is read by aligned
+//! parts of [`CHUNK`] bytes, the last few kept, and the block headers are
+//! walked as the decoding reaches them, so a folder's bytes are read once
+//! in large parts (the French DVD's start: 441 reads of 1 MiB, where one
+//! read per header and per block made 35,584).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::io::{Seek, SeekFrom, Write};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use miniz_oxide::inflate::core::{decompress, inflate_flags, DecompressorOxide};
@@ -85,15 +95,29 @@ struct Block {
     start: u64,
 }
 
+impl Block {
+    fn end(&self) -> u64 {
+        self.start + u64::from(self.unpacked)
+    }
+}
+
 #[derive(Default)]
 struct FolderState {
-    /// Filled on first use.
-    blocks: Option<Vec<Block>>,
+    /// The blocks walked so far, from the first: the headers are read
+    /// only as far as a read needs (a header per block, each a seek on
+    /// a disc, 32,489 of them in *Atlantis V*'s largest folder).
+    blocks: Vec<Block>,
+    /// The header of the next block to walk.
+    next_at: u64,
+    /// The index file has been looked for.
+    prepared: bool,
     /// Block index → the last 32 KiB of output before it.
     checkpoints: HashMap<usize, Vec<u8>>,
     /// The last block decoded: its index, its output, the history before
     /// it.
     last: Option<(usize, Vec<u8>, Vec<u8>)>,
+    /// Where the checkpoints are kept between runs, when they are.
+    index: Option<IndexFile>,
 }
 
 struct Folder {
@@ -103,14 +127,61 @@ struct Folder {
     state: Mutex<FolderState>,
 }
 
+/// The cabinet's file is read by aligned parts of this many bytes, the
+/// last [`CHUNKS_KEPT`] kept: the small reads (an 8-byte block header, a
+/// block's few KiB) come from them, so a disc sees few, large reads.
+pub const CHUNK: u64 = 1 << 20;
+
+/// The parts kept per cabinet.
+const CHUNKS_KEPT: usize = 16;
+
+/// The folder where the cabinets' checkpoint indexes are kept, for the
+/// cabinets opened after it is set (`None`: none kept).
+static INDEX_DIR: Mutex<Option<PathBuf>> = Mutex::new(None);
+
+/// Keeps the folders' checkpoints (the 32 KiB of output before every
+/// [`CHECKPOINT_BLOCKS`]-th block, and the blocks' sizes) in `dir`
+/// between runs, for the cabinets opened from now on: a read deep in a
+/// large folder then starts from the nearest checkpoint a previous run
+/// passed instead of the folder's start. `None` keeps none.
+pub fn set_index_dir(dir: Option<PathBuf>) {
+    *INDEX_DIR.lock().unwrap() = dir;
+}
+
 /// One cabinet, read through `src` (its file `path` there).
 pub struct Cabinet {
     src: Arc<dyn FileSource>,
     path: String,
+    size: u64,
     data_reserve: u64,
     folders: Vec<Folder>,
     files: Vec<CabFile>,
+    /// The parts of the file read last (offset, bytes), oldest first.
+    chunks: Mutex<VecDeque<(u64, Arc<Vec<u8>>)>>,
+    /// Where the checkpoint indexes are kept.
+    index_dir: Option<PathBuf>,
+    /// A hash of the cabinet's header tables, naming its indexes.
+    identity: u64,
 }
+
+/// FNV-1a, 64 bits.
+fn fnv(data: &[u8]) -> u64 {
+    data.iter().fold(0xcbf2_9ce4_8422_2325u64, |h, &b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
+/// A folder's checkpoints in a file: a header naming the cabinet and the
+/// folder, then records (`B`: block sizes from a block on; `C`: a
+/// checkpoint), each its tag, u32 length, the payload and the FNV-1a of
+/// tag and payload. Appended as a run decodes; a damaged tail is dropped.
+struct IndexFile {
+    file: std::fs::File,
+    /// The blocks written so far.
+    saved: usize,
+}
+
+const INDEX_MAGIC: &[u8; 8] = b"ANCABIX1";
 
 fn u16_at(d: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_le_bytes(d.get(at..at + 2)?.try_into().ok()?))
@@ -212,12 +283,18 @@ impl Cabinet {
             });
             o += 16 + name_end + 1;
         }
+        let mut id = table.clone();
+        id.extend_from_slice(&list);
         Ok(Cabinet {
             src,
             path: path.to_string(),
+            size,
             data_reserve,
             folders,
             files,
+            chunks: Mutex::new(VecDeque::new()),
+            index_dir: INDEX_DIR.lock().unwrap().clone(),
+            identity: fnv(&id),
         })
     }
 
@@ -226,36 +303,232 @@ impl Cabinet {
         &self.files
     }
 
-    /// The folder's blocks, read from their headers on first use.
-    fn blocks(&self, folder: &Folder, state: &mut FolderState) -> Option<()> {
-        if state.blocks.is_some() {
-            return Some(());
+    /// Keeps this cabinet's checkpoint indexes in `dir` (`None`: none),
+    /// in place of the folder [`set_index_dir`] gave when it was opened.
+    /// For the folders not read yet.
+    pub fn use_index_dir(&mut self, dir: Option<PathBuf>) {
+        self.index_dir = dir;
+    }
+
+    /// `len` bytes at `at` of the cabinet's file, through the kept parts
+    /// (a read larger than two parts is made directly).
+    fn read_raw(&self, at: u64, len: usize) -> Option<Vec<u8>> {
+        let end = at.checked_add(len as u64)?;
+        if end > self.size {
+            return None;
         }
-        let mut v = Vec::with_capacity(usize::from(folder.blocks));
-        let (mut at, mut start) = (folder.first_data, 0u64);
-        for _ in 0..folder.blocks {
-            let h = self.src.read_at(&self.path, at, 8)?;
-            let packed = u16_at(&h, 4)?;
-            let unpacked = u16_at(&h, 6)?;
-            let data_at = at + 8 + self.data_reserve;
-            v.push(Block {
+        if len as u64 > 2 * CHUNK {
+            return self.src.read_at(&self.path, at, len);
+        }
+        let mut out = Vec::with_capacity(len);
+        let mut pos = at;
+        while pos < end {
+            let c = pos / CHUNK * CHUNK;
+            let chunk = self.chunk(c)?;
+            let lo = (pos - c) as usize;
+            let hi = ((end - c) as usize).min(chunk.len());
+            if hi <= lo {
+                return None;
+            }
+            out.extend_from_slice(&chunk[lo..hi]);
+            pos = c + hi as u64;
+        }
+        Some(out)
+    }
+
+    /// The part of the file at `c` (a multiple of [`CHUNK`]).
+    fn chunk(&self, c: u64) -> Option<Arc<Vec<u8>>> {
+        let mut kept = self.chunks.lock().unwrap();
+        if let Some(i) = kept.iter().position(|e| e.0 == c) {
+            let e = kept.remove(i)?;
+            let data = e.1.clone();
+            kept.push_back(e);
+            return Some(data);
+        }
+        let n = CHUNK.min(self.size - c) as usize;
+        let data = Arc::new(self.src.read_at(&self.path, c, n)?);
+        if kept.len() >= CHUNKS_KEPT {
+            kept.pop_front();
+        }
+        kept.push_back((c, data.clone()));
+        Some(data)
+    }
+
+    /// Reads the next block's header; false after the folder's last
+    /// block. The headers are walked as the decoding reaches them, so
+    /// that a disc's parts are read once for both.
+    fn walk_one(&self, folder: &Folder, st: &mut FolderState) -> Option<bool> {
+        if st.blocks.len() >= usize::from(folder.blocks) {
+            return Some(false);
+        }
+        if st.blocks.is_empty() {
+            st.next_at = folder.first_data;
+        }
+        let at = st.next_at;
+        let h = self.read_raw(at, 8)?;
+        let packed = u16_at(&h, 4)?;
+        let unpacked = u16_at(&h, 6)?;
+        let data_at = at + 8 + self.data_reserve;
+        let start = st.blocks.last().map_or(0, Block::end);
+        st.blocks.push(Block {
+            data_at,
+            packed,
+            unpacked,
+            start,
+        });
+        st.next_at = data_at + u64::from(packed);
+        Some(true)
+    }
+
+    /// The index file's name for folder `k`.
+    fn index_path(&self, dir: &Path, k: usize) -> PathBuf {
+        let name: String = self
+            .path
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+            .collect();
+        dir.join(format!(
+            "{name}-{:x}-{:016x}-f{k}.idx",
+            self.size, self.identity
+        ))
+    }
+
+    /// The index file's header for folder `k`.
+    fn index_header(&self, folder: &Folder, k: usize) -> Vec<u8> {
+        let mut h = INDEX_MAGIC.to_vec();
+        h.extend(self.size.to_le_bytes());
+        h.extend(self.identity.to_le_bytes());
+        h.extend((k as u32).to_le_bytes());
+        h.extend(folder.first_data.to_le_bytes());
+        h.extend(folder.blocks.to_le_bytes());
+        h.extend(folder.compression.to_le_bytes());
+        h
+    }
+
+    /// On a folder's first use: its index file read (the blocks and
+    /// checkpoints a previous run kept) and kept open to add to. Only an
+    /// MSZIP folder larger than a checkpoint's span has one.
+    fn prepare(&self, k: usize, folder: &Folder, st: &mut FolderState) {
+        if st.prepared {
+            return;
+        }
+        st.prepared = true;
+        let Some(dir) = &self.index_dir else { return };
+        if folder.compression != 1 || usize::from(folder.blocks) <= CHECKPOINT_BLOCKS {
+            return;
+        }
+        let path = self.index_path(dir, k);
+        let header = self.index_header(folder, k);
+        let old = std::fs::read(&path).unwrap_or_default();
+        let mut good = 0;
+        if old.starts_with(&header) {
+            good = header.len();
+            st.next_at = folder.first_data;
+            // The records, up to the first damaged or out-of-order one.
+            while let Some((tag, payload, next)) = index_record(&old, good) {
+                let ok = match tag {
+                    b'B' => self.load_blocks(folder, st, payload),
+                    b'C' => load_checkpoint(st, payload),
+                    _ => false,
+                };
+                if !ok {
+                    break;
+                }
+                good = next;
+            }
+        }
+        let opened = std::fs::create_dir_all(dir).and_then(|()| {
+            let mut f = std::fs::OpenOptions::new()
+                .create(true)
+                .truncate(false)
+                .read(true)
+                .write(true)
+                .open(&path)?;
+            if good == 0 {
+                f.set_len(0)?;
+                f.write_all(&header)?;
+            } else {
+                f.set_len(good as u64)?;
+            }
+            f.seek(SeekFrom::End(0))?;
+            Ok(f)
+        });
+        match opened {
+            Ok(file) => {
+                log::debug!(
+                    "{}: folder {k}: {} blocks and {} checkpoints from {}",
+                    self.path,
+                    st.blocks.len(),
+                    st.checkpoints.len(),
+                    path.display()
+                );
+                st.index = Some(IndexFile {
+                    file,
+                    saved: st.blocks.len(),
+                })
+            }
+            Err(e) => log::warn!("{}: {e}", path.display()),
+        }
+    }
+
+    /// A `B` record: blocks from `first` on (u16 packed, u16 unpacked).
+    fn load_blocks(&self, folder: &Folder, st: &mut FolderState, p: &[u8]) -> bool {
+        let Some(first) = u32_at(p, 0) else {
+            return false;
+        };
+        let sizes = &p[4..];
+        if first as usize != st.blocks.len()
+            || !sizes.len().is_multiple_of(4)
+            || st.blocks.len() + sizes.len() / 4 > usize::from(folder.blocks)
+        {
+            return false;
+        }
+        for s in sizes.as_chunks::<4>().0 {
+            let (packed, unpacked) = (
+                u16::from_le_bytes([s[0], s[1]]),
+                u16::from_le_bytes([s[2], s[3]]),
+            );
+            let data_at = st.next_at + 8 + self.data_reserve;
+            let start = st.blocks.last().map_or(0, Block::end);
+            st.blocks.push(Block {
                 data_at,
                 packed,
                 unpacked,
                 start,
             });
-            at = data_at + u64::from(packed);
-            start += u64::from(unpacked);
+            st.next_at = data_at + u64::from(packed);
         }
-        state.blocks = Some(v);
-        Some(())
+        true
+    }
+
+    /// Adds the checkpoint at block `b` (and the blocks walked since the
+    /// last record) to the folder's index file.
+    fn save_checkpoint(&self, st: &mut FolderState, b: usize, history: &[u8]) {
+        let Some(ix) = &mut st.index else { return };
+        let mut out = Vec::new();
+        if ix.saved < st.blocks.len() {
+            let mut p = (ix.saved as u32).to_le_bytes().to_vec();
+            for blk in &st.blocks[ix.saved..] {
+                p.extend(blk.packed.to_le_bytes());
+                p.extend(blk.unpacked.to_le_bytes());
+            }
+            push_record(&mut out, b'B', &p);
+        }
+        let mut p = (b as u32).to_le_bytes().to_vec();
+        p.extend_from_slice(history);
+        push_record(&mut out, b'C', &p);
+        match ix.file.write_all(&out) {
+            Ok(()) => ix.saved = st.blocks.len(),
+            Err(e) => {
+                log::warn!("{}: the checkpoint index: {e}", self.path);
+                st.index = None;
+            }
+        }
     }
 
     /// Decodes block `b` after `history` (the 32 KiB before it).
     fn decode(&self, folder: &Folder, b: &Block, history: &[u8]) -> Option<Vec<u8>> {
-        let packed = self
-            .src
-            .read_at(&self.path, b.data_at, usize::from(b.packed))?;
+        let packed = self.read_raw(b.data_at, usize::from(b.packed))?;
         let n = usize::from(b.unpacked);
         if folder.compression == 0 {
             return (packed.len() == n).then_some(packed);
@@ -288,24 +561,29 @@ impl Cabinet {
     /// `len` bytes at `offset` of folder `k`'s uncompressed bytes.
     fn read_folder(&self, k: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
         let folder = self.folders.get(k)?;
-        let mut st = folder.state.lock().unwrap();
-        self.blocks(folder, &mut st)?;
-        let blocks = st.blocks.clone()?;
+        let mut guard = folder.state.lock().unwrap();
+        let st = &mut *guard;
         let mut out = Vec::with_capacity(len);
         if len == 0 {
             return Some(out);
         }
         let end = offset.checked_add(len as u64)?;
-        let first = blocks.partition_point(|b| b.start + u64::from(b.unpacked) <= offset);
-        if first >= blocks.len() {
-            return None;
-        }
-        // Where to start decoding: the last block decoded, or the nearest
-        // checkpoint before `first`.
-        let mut from = (first / CHECKPOINT_BLOCKS) * CHECKPOINT_BLOCKS;
-        while from > 0 && !st.checkpoints.contains_key(&from) {
-            from -= CHECKPOINT_BLOCKS;
-        }
+        self.prepare(k, folder, st);
+        // The first block holding `offset`, when walked already (else
+        // the number walked: it lies beyond).
+        let first = st.blocks.partition_point(|b| b.end() <= offset);
+        // Where to start decoding: a stored folder's block itself; else
+        // the last block decoded, or the nearest checkpoint before
+        // `first`.
+        let mut from = if folder.compression == 0 {
+            first
+        } else {
+            let mut from = (first / CHECKPOINT_BLOCKS) * CHECKPOINT_BLOCKS;
+            while from > 0 && !st.checkpoints.contains_key(&from) {
+                from -= CHECKPOINT_BLOCKS;
+            }
+            from
+        };
         let mut history: Vec<u8> = st.checkpoints.get(&from).cloned().unwrap_or_default();
         let mut cached: Option<(usize, Vec<u8>)> = None;
         if let Some((i, data, before)) = &st.last {
@@ -322,10 +600,26 @@ impl Cabinet {
             }
         }
         let mut b = from;
-        while b < blocks.len() && blocks[b].start < end {
-            let block = blocks[b];
-            if b.is_multiple_of(CHECKPOINT_BLOCKS) && b > 0 {
-                st.checkpoints.entry(b).or_insert_with(|| history.clone());
+        loop {
+            if b == st.blocks.len() && !self.walk_one(folder, st)? {
+                break;
+            }
+            let block = st.blocks[b];
+            if block.start >= end {
+                break;
+            }
+            if folder.compression == 0 && block.end() <= offset {
+                // A stored block before the bytes asked: not read.
+                b += 1;
+                continue;
+            }
+            if folder.compression != 0
+                && b.is_multiple_of(CHECKPOINT_BLOCKS)
+                && b > 0
+                && !st.checkpoints.contains_key(&b)
+            {
+                st.checkpoints.insert(b, history.clone());
+                self.save_checkpoint(st, b, &history);
             }
             let data = match cached.take() {
                 Some((i, d)) if i == b => d,
@@ -355,6 +649,46 @@ impl Cabinet {
         }
         self.read_folder(usize::from(f.folder), u64::from(f.offset) + offset, len)
     }
+}
+
+/// The record at `at` of an index file: its tag, payload and the next
+/// record's offset; `None` at the end or on a damaged record.
+fn index_record(d: &[u8], at: usize) -> Option<(u8, &[u8], usize)> {
+    let tag = *d.get(at)?;
+    let n = u32_at(d, at + 1)? as usize;
+    let p_end = (at + 5).checked_add(n)?;
+    let payload = d.get(at + 5..p_end)?;
+    let sum = u64::from_le_bytes(d.get(p_end..p_end + 8)?.try_into().ok()?);
+    let mut h = vec![tag];
+    h.extend_from_slice(payload);
+    (fnv(&h) == sum).then_some((tag, payload, p_end + 8))
+}
+
+fn push_record(out: &mut Vec<u8>, tag: u8, payload: &[u8]) {
+    let mut h = vec![tag];
+    h.extend_from_slice(payload);
+    out.push(tag);
+    out.extend((payload.len() as u32).to_le_bytes());
+    out.extend_from_slice(payload);
+    out.extend(fnv(&h).to_le_bytes());
+}
+
+/// A `C` record: a block index (a multiple of [`CHECKPOINT_BLOCKS`],
+/// walked) and the history before it.
+fn load_checkpoint(st: &mut FolderState, p: &[u8]) -> bool {
+    let Some(b) = u32_at(p, 0).map(|b| b as usize) else {
+        return false;
+    };
+    let history = &p[4..];
+    if b == 0
+        || !b.is_multiple_of(CHECKPOINT_BLOCKS)
+        || b >= st.blocks.len()
+        || history.len() > WINDOW
+    {
+        return false;
+    }
+    st.checkpoints.insert(b, history.to_vec());
+    true
 }
 
 /// A file name as a key: `/`-separated, lower case, no `.` component.
@@ -531,6 +865,75 @@ mod tests {
             assert_eq!(f.list("Datas"), ["A.bin", "Sub"]);
             assert_eq!(f.list(""), ["Datas"]);
         }
+    }
+
+    /// A source that counts the bytes read.
+    struct Counted(MemFiles, std::sync::atomic::AtomicU64);
+
+    impl FileSource for Counted {
+        fn size(&self, name: &str) -> Option<u64> {
+            self.0.size(name)
+        }
+        fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
+            self.1
+                .fetch_add(len as u64, std::sync::atomic::Ordering::Relaxed);
+            self.0.read_at(name, offset, len)
+        }
+        fn has_dir(&self, name: &str) -> bool {
+            self.0.has_dir(name)
+        }
+    }
+
+    #[test]
+    fn checkpoints_kept_between_runs() {
+        // 300 MSZIP blocks of 4 KiB: 4 checkpoints, a 1.2 MB folder over
+        // two parts.
+        let a: Vec<u8> = (0..1_228_800u32).map(|i| (i * 13 % 241) as u8).collect();
+        let cab = build(&[("big.bin", &a), ("tail.txt", b"end")], 4096, true);
+        let dir = std::env::temp_dir().join(format!("an-cab-index-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let open = || {
+            let mut m = MemFiles::new();
+            m.insert("x.cab", cab.clone());
+            let src = Arc::new(Counted(m, Default::default()));
+            let mut c = Cabinet::open(src.clone(), "x.cab").unwrap();
+            c.use_index_dir(Some(dir.clone()));
+            (CabFiles::new(vec![c]), src)
+        };
+        let read = |f: &CabFiles, src: &Counted| {
+            let before = src.1.load(std::sync::atomic::Ordering::Relaxed);
+            let got = f.read_at("big.bin", 1_228_000, 800).unwrap();
+            assert_eq!(got, a[1_228_000..]);
+            assert_eq!(f.read("tail.txt").unwrap(), b"end");
+            src.1.load(std::sync::atomic::Ordering::Relaxed) - before
+        };
+        let (f, src) = open();
+        let cold = read(&f, &src);
+        drop(f);
+        let (f, src) = open();
+        let warm = read(&f, &src);
+        // From the last checkpoint (block 256): the second part only.
+        assert!(cold as usize > a.len(), "{cold}");
+        assert!(warm <= CHUNK, "{warm}");
+        assert_eq!(f.read("big.bin").unwrap(), a);
+        drop(f);
+        // A damaged tail is dropped, the records before it kept.
+        let file = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .next()
+            .unwrap()
+            .path();
+        let mut bytes = std::fs::read(&file).unwrap();
+        let n = bytes.len();
+        bytes[n - 3] ^= 0xff;
+        std::fs::write(&file, &bytes).unwrap();
+        let (f, src) = open();
+        read(&f, &src);
+        assert_eq!(f.read("big.bin").unwrap(), a);
+        // Cut at the damaged checkpoint, which was written again.
+        assert_eq!(std::fs::read(&file).unwrap().len(), n);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

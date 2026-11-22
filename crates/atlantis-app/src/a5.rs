@@ -34,7 +34,13 @@ use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 
 /// The data at `path` and what they are, for people: the build of the
 /// program beside them (when there is one), the form, the languages.
+///
+/// The disc's cabinets keep their checkpoint indexes in the player's data
+/// folder ([`cab_index_dir`]): a run after the first starts its reads
+/// deep in the disc's large folders without decoding them from their
+/// start.
 pub fn open(path: &Path) -> Result<(Atlantis5Source, String), String> {
+    atlantis_data::cab::set_index_dir(Some(cab_index_dir()));
     let src = Atlantis5Source::open(path).map_err(|e| format!("{}: {e}", path.display()))?;
     let build = match src.build() {
         Some(Ok(b)) => b.label.to_string(),
@@ -386,6 +392,15 @@ pub fn run_window_on(
     el.run_app_on_demand(&mut app)
         .map_err(|e| format!("The window failed: {e}"))?;
     Ok(crate::a2::Ended::Quit)
+}
+
+/// The cabinets' checkpoint indexes: `atlantis5/cabinets` in the per-user
+/// data folder (about 26 MB for the French DVD once played through its
+/// largest folders; deleting it only makes the next run slower).
+pub fn cab_index_dir() -> std::path::PathBuf {
+    crate::desktop::data_dir()
+        .join("atlantis5")
+        .join("cabinets")
 }
 
 /// The player's saves: `atlantis5/saves` in the per-user data folder.

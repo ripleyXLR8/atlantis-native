@@ -21,7 +21,7 @@
 //! `/`) from what the player has: the disc's root (a drive or a copy),
 //! the disc's image, or an installed or extracted folder.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use atlantis_data::cab::{CabFiles, Cabinet};
@@ -219,8 +219,26 @@ impl Atlantis5Source {
     /// The disc's files in `src` (its root): `DATAS.cab` and every
     /// `DATAS_<language>.cab` beside it.
     pub fn from_disc(src: Arc<dyn FileSource>, form: Form) -> Result<Atlantis5Source, OpenError> {
-        let main =
-            Cabinet::open(src.clone(), DATA_CAB).map_err(|e| OpenError::Cabinet(e.to_string()))?;
+        Self::from_disc_indexed(src, form, None)
+    }
+
+    /// [`Atlantis5Source::from_disc`] with the cabinets' checkpoint
+    /// indexes kept in `index` (see [`atlantis_data::cab::set_index_dir`],
+    /// which gives the folder when `index` is `None`).
+    pub fn from_disc_indexed(
+        src: Arc<dyn FileSource>,
+        form: Form,
+        index: Option<PathBuf>,
+    ) -> Result<Atlantis5Source, OpenError> {
+        let open = |name: &str| {
+            Cabinet::open(src.clone(), name).map(|mut c| {
+                if index.is_some() {
+                    c.use_index_dir(index.clone());
+                }
+                c
+            })
+        };
+        let main = open(DATA_CAB).map_err(|e| OpenError::Cabinet(e.to_string()))?;
         let mut cabs = vec![main];
         let mut names: Vec<String> = src
             .list("")
@@ -232,7 +250,7 @@ impl Atlantis5Source {
             .collect();
         names.sort_by_key(|n| n.to_ascii_lowercase());
         for n in names {
-            match Cabinet::open(src.clone(), &n) {
+            match open(&n) {
                 Ok(c) => cabs.push(c),
                 Err(e) => log::warn!("{n}: {e}"),
             }
