@@ -1686,12 +1686,14 @@ impl Menu {
                         Some((bh, s)) => {
                             // @ 0x00450c10: the text laid out in a box its
                             // width and max(its height, the box's), left,
-                            // vertically centred, on a surface filled with
-                            // the key 0xffffffff (@ 0x0047c2d0); the rows
-                            // s..s + bh blitted with that key
-                            // (@ 0x00453270).
+                            // zone valign 2 (`DT_VCENTER`, no effect on a
+                            // multi-line `DrawTextW`: at the top [INFERRED:
+                            // Win32's rule, "used only with DT_SINGLELINE"]),
+                            // on a surface filled with the key 0xffffffff
+                            // (@ 0x0047c2d0); the rows s..s + bh blitted
+                            // with that key (@ 0x00453270).
                             let th = fonts.text_height(&t.font, &t.text, t.width).max(bh);
-                            let zone = Zone::new(0, 0, 0, 0, 0, 2);
+                            let zone = Zone::new(0, 0, 0, 0, 0, 0);
                             let lines = fonts.lines(&t.font, &t.text, t.width, th, zone);
                             let mut pic =
                                 vec![0x00ff_ffffu32; t.width.max(1) as usize * th.max(1) as usize];

@@ -2050,11 +2050,13 @@ impl Stage {
         }
         let (bx, by, bw, bh) = dlg::text_box(kind, w, h);
         let scroll = dlg::scroll_px(run.player.time, run.text_h, bh);
-        let lines = self.fonts.lines(
+        // @ 0x00433910: the zone (0, 0, +0x48 − 1, …), the text
+        // partitioned at draw (@ 0x00461bf0) at 759 for the 760-wide box,
+        // while its height was measured at 760 (state 0).
+        let lines = self.fonts.lines_partitioned(
             "AtlFont_Dialog",
             &run.text,
-            bw,
-            run.text_h.max(bh) + 1,
+            bw - 1,
             crate::text::Zone::new(0, 0, 0, 0, 0, 0),
         );
         // The text surface (+0x3c): filled with its colour key, white
@@ -2598,36 +2600,42 @@ impl Stage {
         );
     }
 
-    /// The film's subtitle (@ 0x0042b220): black at the bottom centre,
-    /// then white 2 pixels up and left.
+    /// The film's subtitle (@ 0x0042b220): partitioned once at the
+    /// screen's width W (@ 0x00461e80), its height h at W (@ 0x00461800);
+    /// drawn black in (0, H − h, W, H), centred (`DrawTextW`, no
+    /// partition), then white in (−2, H − h − 2, W, H): only the left and
+    /// top move, so the white copy is centred in W + 2 from −2, 1 pixel
+    /// left and 2 up of the black.
     fn draw_film_subtitle(&self, out: &mut [u32]) {
         let Some(text) = self.film_subtitles.as_ref().and_then(|f| f.shown.as_ref()) else {
             return;
         };
         #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
         let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
-        let lines = self
-            .fonts
-            .lines("AtlFont_Subtitle", text, w, h, dlg::SUBTITLE_ZONE);
+        let font = "AtlFont_Subtitle";
+        let lines = self.fonts.lines(font, text, w, h, dlg::SUBTITLE_ZONE);
+        let top = h - self.fonts.text_height(font, text, w);
+        self.fonts
+            .draw(font, &lines, 0, out, VIEW_WIDTH, VIEW_HEIGHT, 0, top);
+        let white: Vec<crate::text::Line> = lines
+            .iter()
+            .map(|l| {
+                let cx: i32 = l.dx.iter().sum();
+                crate::text::Line {
+                    x: -2 + (w + 2 - cx) / 2,
+                    ..l.clone()
+                }
+            })
+            .collect();
         self.fonts.draw(
-            "AtlFont_Subtitle",
-            &lines,
-            0,
-            out,
-            VIEW_WIDTH,
-            VIEW_HEIGHT,
-            0,
-            0,
-        );
-        self.fonts.draw(
-            "AtlFont_Subtitle",
-            &lines,
+            font,
+            &white,
             0x00ff_ffff,
             out,
             VIEW_WIDTH,
             VIEW_HEIGHT,
-            -2,
-            -2,
+            0,
+            top - 2,
         );
     }
 

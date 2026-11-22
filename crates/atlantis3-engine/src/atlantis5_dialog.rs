@@ -35,7 +35,7 @@ use atlantis3_data::atlantis5_texts::{Dialog, Dialogs, Picturing, Subtitle};
 use atlantis3_data::font_txt::{FontDef, FontTxt};
 use atlantis_data::FileSource;
 
-use crate::text::{layout, to_cp1252, GdiFont, Glyphs, Line, Zone};
+use crate::text::{to_cp1252, GdiFont, Glyphs, Line, Zone};
 
 /// The shipped fonts Native draws `font.txt`'s faces with, in
 /// [`Face`]'s order.
@@ -217,25 +217,172 @@ impl Fonts {
         )
     }
 
-    /// The lines of `text` in a `w` × `h` box with the layout `zone`.
-    pub fn lines(&self, id: &str, text: &str, w: i32, h: i32, zone: Zone) -> Vec<Line> {
+    /// `CTextManager`'s partition @ 0x00461a70 in mode 1 (`font.txt`'s
+    /// `[PartitionMode] AUTOMATIC`, the French file's; separator 0x20, its
+    /// only `[PartitionCode]`), on `text` (Windows-1252 bytes) at `width`.
+    /// The text is cut into chunks (@ 0x00461a00): up to and including a
+    /// space (code 0), up to and including a `\n` (code 1, a new line
+    /// starts after it) or the rest (code 2, the last). The line so far
+    /// plus the chunk, its trailing space or `\n` included, is measured
+    /// with `GetTextExtentPoint32W` (each character's A + B + C, nothing
+    /// trimmed); it joins the line when the extent is `< width`, else the
+    /// character before the chunk (the space that ended the line) becomes
+    /// `\n` and the chunk is measured again at the start of the next line
+    /// (a code 2 chunk is not: the routine returns after it). On an empty
+    /// line (a word wider than `width`) the routine throws `PartitionText
+    /// -> texte trop grand pour la page` (0x0066f46c): `Err` with the text
+    /// broken up to that word.
+    pub fn partition(g: &GdiFont, text: &[u8], width: i32) -> Result<Vec<u8>, Vec<u8>> {
+        let mut t = text.to_vec();
+        let extent = |s: &[u8]| -> i32 {
+            s.iter()
+                .map(|&c| {
+                    let (a, b, cc) = g.abc[usize::from(c)];
+                    a + b + cc
+                })
+                .sum()
+        };
+        // iVar6: the line's start; iVar5: its length so far.
+        let (mut start, mut len) = (0usize, 0usize);
+        loop {
+            let at = start + len;
+            let mut n = 0usize;
+            let code = loop {
+                match t.get(at + n) {
+                    None => break 2,
+                    Some(b' ') => {
+                        n += 1;
+                        break 0;
+                    }
+                    Some(b'\n') => {
+                        n += 1;
+                        break 1;
+                    }
+                    Some(_) => n += 1,
+                }
+            };
+            if n > 0 {
+                if extent(&t[start..at + n]) < width {
+                    len += n;
+                    if code == 1 {
+                        start += len;
+                        len = 0;
+                        continue;
+                    }
+                } else {
+                    if len == 0 {
+                        return Err(t);
+                    }
+                    t[at - 1] = b'\n';
+                    start = at;
+                    len = 0;
+                }
+            }
+            if code == 2 {
+                return Ok(t);
+            }
+        }
+    }
+
+    /// `text` as Windows-1252 bytes (the `\r`s dropped), partitioned at
+    /// `width` by @ 0x00461e80 (`PrintText`'s partition of a menu, poker
+    /// or inventory text, of a film subtitle): a too-wide word is caught
+    /// there, logged (`CTextManager :: PrintText -> Erreur %s`,
+    /// 0x0066f49c) and the text kept broken up to that word, the rest on
+    /// one line.
+    fn partitioned(&self, g: &GdiFont, id: &str, text: &str, width: i32) -> Vec<u8> {
+        let bytes: Vec<u8> = text.chars().filter(|&c| c != '\r').map(to_cp1252).collect();
+        Fonts::partition(g, &bytes, width).unwrap_or_else(|t| {
+            log::warn!("{id}: a word of {text:?} is wider than {width}: the text is broken up to it (@ 0x00461e80)");
+            t
+        })
+    }
+
+    /// The lines of `bytes` (already broken) drawn by `DrawTextW`
+    /// (@ 0x00461bf0 → @ 0x00460160) into the rectangle (ml, mt, w − mr,
+    /// h − mb) with `DT_NOPREFIX | DT_NOCLIP` and no `DT_WORDBREAK`: one
+    /// line per `\n`, at the top, tmHeight apart; halign 0 at the left,
+    /// 2 centred, left + (W − cx) / 2, 1 at the right, right − cx
+    /// [INFERRED: `DrawTextW`'s placement]. `DT_BOTTOM` / `DT_VCENTER` (the
+    /// zone's valign) have no effect without `DT_SINGLELINE` [INFERRED:
+    /// Win32's documented rule], so `zone.valign` is not used.
+    fn placed(g: &GdiFont, bytes: &[u8], w: i32, zone: Zone) -> Vec<Line> {
+        let (left, right) = (zone.ml, w - zone.mr);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+        bytes
+            .split(|&c| c == b'\n')
+            .enumerate()
+            .map(|(i, l)| {
+                let dx: Vec<i32> = l
+                    .iter()
+                    .map(|&c| {
+                        let (a, b, cc) = g.abc[usize::from(c)];
+                        a + b + cc
+                    })
+                    .collect();
+                let cx: i32 = dx.iter().sum();
+                let x = match zone.halign {
+                    1 => right - cx,
+                    2 => left + (right - left - cx) / 2,
+                    _ => left,
+                };
+                Line {
+                    x,
+                    y: zone.mt + i as i32 * g.tm_height,
+                    bytes: l.to_vec(),
+                    dx,
+                }
+            })
+            .collect()
+    }
+
+    /// The lines of `text` (a menu, poker or inventory text, a film
+    /// subtitle: @ 0x00451600, @ 0x0042b220) in a `w`-wide rectangle with
+    /// the margins and alignment of `zone`: partitioned once at the inner
+    /// width by @ 0x00461e80, then drawn without partition (`DT_NOCLIP`:
+    /// the height is not used; lines below it are drawn too).
+    pub fn lines(&self, id: &str, text: &str, w: i32, _h: i32, zone: Zone) -> Vec<Line> {
+        let Some(g) = self.gdi(id) else {
+            return Vec::new();
+        };
+        let bytes = self.partitioned(&g, id, text, w - zone.mr - zone.ml);
+        Fonts::placed(&g, &bytes, w, zone)
+    }
+
+    /// The lines of `text` partitioned at draw time (@ 0x00461bf0 with its
+    /// partition flag, the dialog box @ 0x00433910), at the rectangle's
+    /// inner width (right − mR − mL − left, @ 0x00461d78). A too-wide
+    /// word: the draw's own catch logs `CTextManager :: PrintText ->
+    /// Erreur %s` and resumes after `DrawTextW` (0x00461e3f): nothing is
+    /// drawn.
+    pub fn lines_partitioned(&self, id: &str, text: &str, w: i32, zone: Zone) -> Vec<Line> {
         let Some(g) = self.gdi(id) else {
             return Vec::new();
         };
         let bytes: Vec<u8> = text.chars().filter(|&c| c != '\r').map(to_cp1252).collect();
-        layout(&g, &bytes, w, h, zone)
+        match Fonts::partition(&g, &bytes, w - zone.mr - zone.ml) {
+            Ok(t) => Fonts::placed(&g, &t, w, zone),
+            Err(_) => {
+                log::warn!("{id}: a word of {text:?} is wider than {w}: the text is not drawn (@ 0x00461bf0)");
+                Vec::new()
+            }
+        }
     }
 
-    /// The height of `text` broken into lines `w` wide (@ 0x00461800: the
-    /// lines × the line step).
+    /// The height of `text` partitioned at `w` (@ 0x00461800): (the number
+    /// of `\n` + 1) × tmHeight. A too-wide word is caught there (`GetPage
+    /// Height -> Erreur %s`, 0x0066f440) and the breaks made so far are
+    /// counted.
     pub fn text_height(&self, id: &str, text: &str, w: i32) -> i32 {
         let Some(g) = self.gdi(id) else { return 0 };
-        let n = self
-            .lines(id, text, w, i32::MAX / 4, Zone::new(0, 0, 0, 0, 0, 0))
-            .len();
+        let bytes: Vec<u8> = text.chars().filter(|&c| c != '\r').map(to_cp1252).collect();
+        let t = Fonts::partition(&g, &bytes, w).unwrap_or_else(|t| {
+            log::warn!("{id}: a word of {text:?} is wider than {w}: its height counts the breaks before it (@ 0x00461800)");
+            t
+        });
         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
-        let n = n as i32;
-        n * g.tm_height
+        let n = t.iter().filter(|&&c| c == b'\n').count() as i32;
+        (n + 1) * g.tm_height
     }
 
     /// Draws `lines` of font `id` in `rgb` at offset (ox, oy) into `out`
@@ -760,13 +907,83 @@ impl FilmSubtitles {
 }
 
 /// The film subtitle's layout (@ 0x0042b220): `AtlFont_Subtitle`, margins
-/// 0, centred (2), bottom (1), over the whole screen: drawn black, then
-/// white 2 pixels up and left.
+/// 0, centred (2), bottom (1; no effect on `DrawTextW` without
+/// `DT_SINGLELINE` [INFERRED: Win32's rule], the rectangle's top is
+/// H − the text's height), over the whole screen: drawn black, then white
+/// with the rectangle's left and top 2 pixels less.
 pub const SUBTITLE_ZONE: Zone = Zone::new(0, 0, 0, 0, 2, 1);
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A font whose every character is 10 wide (A 1, B 8, C 1).
+    fn tens() -> GdiFont {
+        GdiFont {
+            height: 16,
+            tm_height: 16,
+            ascent: 13,
+            ave_char_width: 10,
+            charset: 0,
+            abc: vec![(1, 8, 1); 256],
+        }
+    }
+
+    /// @ 0x00461a70: chunks with their trailing space measured, `< width`,
+    /// the space before an overflowing chunk turned into `\n`, no French
+    /// rule, a too-wide word thrown, a last chunk not measured alone.
+    #[test]
+    fn a5_partition() {
+        let g = tens();
+        let p = |t: &str, w: i32| -> Result<String, String> {
+            Fonts::partition(&g, t.as_bytes(), w)
+                .map(|t| String::from_utf8(t).unwrap())
+                .map_err(|t| String::from_utf8(t).unwrap())
+        };
+        assert_eq!(p("ab cd", 51), Ok("ab cd".into()));
+        // 50 is not < 50.
+        assert_eq!(p("ab cd", 50), Ok("ab\ncd".into()));
+        // "ab cd " is 60 with its trailing space: down at 60, though
+        // "ab cd" alone (50) would fit.
+        assert_eq!(p("ab cd ef", 60), Ok("ab\ncd ef".into()));
+        assert_eq!(p("ab cd ef", 61), Ok("ab cd\nef".into()));
+        assert_eq!(p("ab cd ef", 81), Ok("ab cd ef".into()));
+        assert_eq!(p("abc ?", 50), Ok("abc\n?".into()));
+        // A `\n` ends a chunk and starts a line, measured with the line.
+        assert_eq!(p("a\nb c", 40), Ok("a\nb c".into()));
+        assert_eq!(p("ab\ncd", 31), Ok("ab\ncd".into()));
+        assert_eq!(p("ab\ncd", 30), Err("ab\ncd".into()));
+        // A tab is no separator.
+        assert_eq!(p("ab\tcd ef", 61), Ok("ab\tcd\nef".into()));
+        // A too-wide first word throws; a too-wide last one is not
+        // measured alone; one in the middle throws after the break.
+        assert_eq!(p("abcdef gh", 50), Err("abcdef gh".into()));
+        assert_eq!(p("ab abcdefgh", 50), Ok("ab\nabcdefgh".into()));
+        assert_eq!(p("ab abcdefgh ij", 50), Err("ab\nabcdefgh ij".into()));
+        assert_eq!(p("", 10), Ok(String::new()));
+    }
+
+    /// `DrawTextW`'s placement of the broken lines: left, centred in the
+    /// full width, right; tmHeight apart from the top whatever the valign.
+    #[test]
+    fn a5_placement() {
+        let g = tens();
+        let at = |h: i32, v: i32| -> Vec<(i32, i32)> {
+            Fonts::placed(&g, b"abc\nab ", 100, Zone::new(5, 7, 3, 0, h, v))
+                .iter()
+                .map(|l| (l.x, l.y))
+                .collect()
+        };
+        assert_eq!(at(0, 0), [(5, 3), (5, 19)]);
+        assert_eq!(at(0, 2), at(0, 0));
+        assert_eq!(at(0, 1), at(0, 0));
+        // Centre: 5 + (88 − 30) / 2 = 34, 5 + (88 − 30) / 2 (the trailing
+        // space counted).
+        assert_eq!(at(2, 0), [(34, 3), (34, 19)]);
+        assert_eq!(at(1, 0), [(63, 3), (63, 19)]);
+        let l = Fonts::placed(&g, b"ab", 100, Zone::new(0, 0, 0, 0, 0, 0));
+        assert_eq!(l[0].dx, [10, 10], "no first A or last C trimmed");
+    }
 
     /// A `font.txt` with the inventory's and the credits' Lucida fonts,
     /// a Lucida Console and an Arial.
