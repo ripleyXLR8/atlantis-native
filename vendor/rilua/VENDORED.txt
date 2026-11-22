@@ -76,3 +76,29 @@ PATCHES
    that `table overflow` (the 2^25th level); with 26 it grew past 6 GB.
    Reproducer: crates/atlantis3-engine/tests/atlantis5_puzzles.rs
    `chessboard_path_to_the_same_square_overflows` (run with --ignored).
+
+8. src/vm/table.rs, src/vm/state.rs, src/bin/rilua.rs: Lua 5.0.3's table
+   layout per state. `Gc::table_lua50` (false by default) is given to
+   every table `alloc_table` makes; a table with it set runs Lua 5.0.3's
+   ltable.c: `newkey` keeps `firstfree` on a node whose key is nil (from
+   the last node down) and rehashes as soon as an insert takes the last
+   one, the new key counted with the value `false` (5.1 grows when an
+   insert finds no free node; an empty hash part is 5.0's one-node
+   `dummynode`); `rehash` sizes the parts as 5.0's `numuse` and
+   `computesizes` (`a >= 2^(i-1)`, the loop on `*narray >= 2^(i-1)`) and
+   the hash part as 2^(floor(log2 n) + 1) nodes (n = 4 gives 8, 0 the
+   dummy node); `resize` grows the array, makes the node vector,
+   re-inserts a shrinking array's vanishing slice, then the old nodes
+   from last to first. Lookups, `next`, `NewTable50` (log size C) and
+   `SetList50` (plain `luaH_setnum` per item) already were 5.0's. Lua 5.1
+   states keep the code above unchanged. atlantis5-script's `Script::new`
+   sets it with `table_max_bits` 24, so `pairs` walks Atlantis V's tables
+   (and its save writes the LUA_DB) in Lua 5.0.3's order. The `rilua`
+   binary turns both on when its script is a Lua 5.0 binary chunk
+   (header `ESC "Lua" 0x50`), for differential runs against Lua 5.0.3's
+   `lua`. Not reproduced: a key whose value is nil and whose string the
+   collector freed (5.0 then no longer finds the node, rilua may), which
+   depends on each collector's timing. Reproducers: the `lua50_*` tests
+   of src/vm/table.rs (orders printed by Lua 5.0.3's `lua`) and
+   crates/atlantis5-script/tests/table_order.rs (the walk of `atl` after
+   a new game and after events, the MD5 of Lua 5.0.3's walk).

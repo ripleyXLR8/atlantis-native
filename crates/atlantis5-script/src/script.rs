@@ -1159,6 +1159,10 @@ impl Script {
             // and keys past 2^24 never go to the array part. Set before any
             // table is made.
             state.gc.table_max_bits = 24;
+            // Lua 5.0.3's ltable.c layout (rilua Native patch 8), so `next`
+            // walks tables in 5.0.3's order, the order the game's save
+            // writes its LUA_DB in.
+            state.gc.table_lua50 = true;
             rilua::stdlib::open_libs_selective(
                 state,
                 StdLib::BASE

@@ -447,9 +447,19 @@ fn handle_script(
     script_idx: usize,
     progname: Option<&str>,
 ) -> bool {
-    let script_args = build_arg_table(lua, argv, script_idx);
-
     let fname = &argv[script_idx];
+
+    // Native patch 8: a Lua 5.0 binary chunk as the script (header
+    // `ESC "Lua" 0x50`) runs with Lua 5.0.3's tables (layout and
+    // `MAXBITS` 24) for every table made from here on, as Atlantis V's
+    // `Script` state has them, so `pairs` walks them in Lua 5.0.3's order.
+    if std::fs::read(fname).is_ok_and(|b| b.starts_with(b"\x1bLua\x50")) {
+        let state = lua.state_mut();
+        state.gc.table_lua50 = true;
+        state.gc.table_max_bits = 24;
+    }
+
+    let script_args = build_arg_table(lua, argv, script_idx);
 
     // "-" means stdin, unless preceded by "--".
     let load_result = if fname == "-" && (script_idx == 0 || argv[script_idx - 1] != "--") {

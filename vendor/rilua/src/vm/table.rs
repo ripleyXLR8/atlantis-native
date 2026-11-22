@@ -157,6 +157,10 @@ pub struct Table {
     /// This table's `MAXBITS` (at most [`MAXBITS`]): Lua 5.0.3 builds
     /// with 24 where 5.1 has 26 (Native patch 7).
     max_bits: u8,
+    /// Lua 5.0.3's layout (Native patch 8): `last_free` is 5.0's
+    /// `firstfree`, the table grows when an insert takes the last free
+    /// node, and rehash sizes the parts as 5.0's `numuse`/`computesizes`.
+    lua50: bool,
 }
 
 impl Table {
@@ -170,6 +174,7 @@ impl Table {
             metatable: None,
             flags: 0,
             max_bits: MAXBITS,
+            lua50: false,
         }
     }
 
@@ -178,6 +183,17 @@ impl Table {
     /// ltable.c; clamped to [`MAXBITS`].
     pub fn set_max_bits(&mut self, bits: u8) {
         self.max_bits = bits.min(MAXBITS);
+    }
+
+    /// Lays the table out as Lua 5.0.3's ltable.c does (Native patch 8),
+    /// so `next` walks it in Lua 5.0.3's order. Set on a new table, before
+    /// any key goes in: a pre-sized hash part gets 5.0's `firstfree`
+    /// (its last node).
+    pub fn set_lua50(&mut self, on: bool) {
+        self.lua50 = on;
+        if on {
+            self.last_free = (self.nodes.len() as u32).saturating_sub(1);
+        }
     }
 
     /// Creates a table with pre-allocated array and hash parts.
@@ -196,6 +212,7 @@ impl Table {
                 metatable: None,
                 flags: 0,
                 max_bits: MAXBITS,
+                lua50: false,
             }
         } else {
             let log2 = ceil_log2(hash_size);
@@ -212,6 +229,7 @@ impl Table {
                 metatable: None,
                 flags: 0,
                 max_bits: MAXBITS,
+                lua50: false,
             }
         }
     }
@@ -968,6 +986,10 @@ impl Table {
             _ => {}
         }
 
+        if self.lua50 {
+            return self.raw_set50(key, value, strings);
+        }
+
         // Try array part for integer keys.
         if let Val::Num(n) = key
             && let Some(k) = number_to_int_key(n)
@@ -1010,6 +1032,221 @@ impl Table {
             }
             Err(e) => Err(e),
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Lua 5.0.3's layout (Native patch 8)
+    // -----------------------------------------------------------------------
+
+    /// Writes `value` at `key`'s slot if the key is in the array range or
+    /// already in the hash part (`luaH_get` finding an object other than
+    /// `luaO_nilobject`). Returns false when the key needs a new node.
+    fn set_existing(&mut self, key: Val, value: Val, strings: &Arena<LuaString>) -> bool {
+        if let Val::Num(n) = key
+            && let Some(k) = number_to_int_key(n)
+        {
+            let idx = (k as u64).wrapping_sub(1);
+            if idx < self.array.len() as u64 {
+                self.array[idx as usize] = value;
+                return true;
+            }
+        }
+        if !self.nodes.is_empty() {
+            let mp = self.main_position(&key, strings);
+            let mut cur = Some(mp);
+            while let Some(i) = cur {
+                if self.nodes[i as usize].key == key {
+                    self.nodes[i as usize].value = value;
+                    return true;
+                }
+                cur = self.nodes[i as usize].next;
+            }
+        }
+        false
+    }
+
+    /// Lua 5.0.3's `luaH_set` followed by the store of `value`.
+    fn raw_set50(&mut self, key: Val, value: Val, strings: &Arena<LuaString>) -> LuaResult<()> {
+        if self.set_existing(key, value, strings) {
+            return Ok(());
+        }
+        self.new_key50(key, value, strings)
+    }
+
+    /// Lua 5.0.3's `newkey`. An empty hash part is 5.0's `dummynode`, a
+    /// single node: the key takes it, no free node remains, so the table
+    /// is rehashed with the key in it at once. `last_free` is 5.0's
+    /// `firstfree`, kept on a node whose key is nil; when the insert takes
+    /// the last such node, the value is set to `false` (so the key is
+    /// counted and kept), the table rehashed, and the value stored where
+    /// the key went.
+    fn new_key50(&mut self, key: Val, value: Val, strings: &Arena<LuaString>) -> LuaResult<()> {
+        if self.nodes.is_empty() {
+            // dummynode: one free node, lsizenode 0, firstfree on it.
+            self.nodes.push(Node::empty());
+            self.log2_size = 0;
+            self.last_free = 0;
+        }
+        let mut mp = self.main_position(&key, strings);
+        if !self.nodes[mp as usize].value.is_nil() {
+            let occupant_key = self.nodes[mp as usize].key;
+            let mut othern = self.main_position(&occupant_key, strings);
+            let n = self.last_free;
+            if othern == mp {
+                // Colliding node in its own main position: the new key
+                // goes to the free node, chained after mp.
+                self.nodes[n as usize].next = self.nodes[mp as usize].next;
+                self.nodes[mp as usize].next = Some(n);
+                mp = n;
+            } else {
+                // Colliding node out of its main position: move it to the
+                // free node (mp keeps its old key until overwritten).
+                while self.nodes[othern as usize].next != Some(mp) {
+                    match self.nodes[othern as usize].next {
+                        Some(next) => othern = next,
+                        None => break,
+                    }
+                }
+                self.nodes[othern as usize].next = Some(n);
+                let occ_val = self.nodes[mp as usize].value;
+                let occ_next = self.nodes[mp as usize].next;
+                self.nodes[n as usize].key = occupant_key;
+                self.nodes[n as usize].value = occ_val;
+                self.nodes[n as usize].next = occ_next;
+                self.nodes[mp as usize].next = None;
+                self.nodes[mp as usize].value = Val::Nil;
+            }
+        }
+        self.nodes[mp as usize].key = key;
+        // Correct `firstfree`.
+        loop {
+            if self.nodes[self.last_free as usize].key.is_nil() {
+                self.nodes[mp as usize].value = value;
+                return Ok(());
+            } else if self.last_free == 0 {
+                break;
+            }
+            self.last_free -= 1;
+        }
+        // No more free places: grow with the key counted.
+        self.nodes[mp as usize].value = Val::Bool(false);
+        self.rehash50(strings)?;
+        let found = self.set_existing(key, value, strings);
+        debug_assert!(found, "rehash lost the new key");
+        Ok(())
+    }
+
+    /// Lua 5.0.3's `arrayindex`: an integer key in `[1, 2^MAXBITS]`.
+    fn array_index50(&self, key: &Val) -> Option<usize> {
+        if let Val::Num(n) = key
+            && let Some(k) = number_to_int_key(*n)
+            && k >= 1
+            && ((k - 1) >> self.max_bits) == 0
+        {
+            return Some(k as usize);
+        }
+        None
+    }
+
+    /// Lua 5.0.3's `rehash`: `numuse` and `computesizes`, then
+    /// `resize(nasize, luaO_log2(nhsize) + 1)`.
+    fn rehash50(&mut self, strings: &Arena<LuaString>) -> LuaResult<()> {
+        let max_bits = self.max_bits as usize;
+        let mut nums = [0usize; MAXBITS as usize + 1];
+        let mut totaluse = 0usize;
+        // numuse: elements in the array part, slice [2^(lg-1), 2^lg).
+        let asize = self.array.len();
+        let mut i = 0usize;
+        for (lg, num) in nums.iter_mut().enumerate().take(max_bits + 1) {
+            let mut ttlg = 1usize << lg;
+            if ttlg > asize {
+                ttlg = asize;
+                if i >= ttlg {
+                    break;
+                }
+            }
+            while i < ttlg {
+                if !self.array[i].is_nil() {
+                    *num += 1;
+                    totaluse += 1;
+                }
+                i += 1;
+            }
+        }
+        let mut narray = totaluse;
+        // Elements in the hash part.
+        for node in self.nodes.iter().rev() {
+            if !node.value.is_nil() {
+                if let Some(k) = self.array_index50(&node.key) {
+                    nums[ceil_log2(k) as usize] += 1;
+                    narray += 1;
+                }
+                totaluse += 1;
+            }
+        }
+        // computesizes.
+        let mut a = nums[0];
+        let mut na = a;
+        let mut n: Option<usize> = if na == 0 { None } else { Some(0) };
+        let mut i = 1usize;
+        while i < nums.len() && a < narray && narray >= (1usize << (i - 1)) {
+            if nums[i] > 0 {
+                a += nums[i];
+                if a >= (1usize << (i - 1)) {
+                    n = Some(i);
+                    na = a;
+                }
+            }
+            i += 1;
+        }
+        let nhsize = totaluse - na;
+        let nasize = n.map_or(0, |n| 1usize << n);
+        // luaO_log2(nhsize) + 1: 0 for no element (the dummy node).
+        let lsize = (usize::BITS - nhsize.leading_zeros()) as usize;
+        self.resize50(nasize, lsize, strings)
+    }
+
+    /// Lua 5.0.3's `resize`: the array grows first, then a new node
+    /// vector; a shrinking array re-inserts its vanishing slice in index
+    /// order, then the old nodes are re-inserted from last to first.
+    fn resize50(
+        &mut self,
+        nasize: usize,
+        lsize: usize,
+        strings: &Arena<LuaString>,
+    ) -> LuaResult<()> {
+        let oldasize = self.array.len();
+        if nasize > oldasize {
+            self.array.resize(nasize, Val::Nil);
+        }
+        if lsize > self.max_bits as usize {
+            return Err(runtime_error("table overflow"));
+        }
+        let new_nodes = if lsize == 0 {
+            Vec::new()
+        } else {
+            let mut v = Vec::with_capacity(1usize << lsize);
+            v.resize_with(1usize << lsize, Node::empty);
+            v
+        };
+        let size = new_nodes.len() as u32;
+        let old_nodes = core::mem::replace(&mut self.nodes, new_nodes);
+        self.log2_size = lsize as u8;
+        self.last_free = size.saturating_sub(1);
+        if nasize < oldasize {
+            let vanishing = self.array.split_off(nasize);
+            for (j, v) in vanishing.into_iter().enumerate() {
+                if !v.is_nil() {
+                    self.raw_set50(Val::Num((nasize + j + 1) as f64), v, strings)?;
+                }
+            }
+        }
+        for node in old_nodes.into_iter().rev() {
+            if !node.value.is_nil() {
+                self.raw_set50(node.key, node.value, strings)?;
+            }
+        }
+        Ok(())
     }
 
     /// Insert a new key into the hash part using Brent's algorithm.
@@ -2013,5 +2250,125 @@ mod tests {
             let val = table.get_str(*r, &arena);
             assert!(!val.is_nil(), "live entry '{name}' lost");
         }
+    }
+
+    // -- Lua 5.0.3 layout (Native patch 8) --
+    //
+    // Each expected order is the output of PUC-Rio Lua 5.0.3's `lua` for
+    // the same operations (`for k in pairs(t) do ... tostring(k)`).
+
+    /// Runs `ops` (key, set to `true` or to nil) on a Lua 5.0 table of
+    /// MAXBITS 24, presized as `with_sizes(array, hash)`, and returns the
+    /// keys in `next` order as Lua 5.0.3's `tostring` writes them.
+    fn walk50(presize: (usize, usize), ops: &[(&str, bool)]) -> String {
+        let mut arena = Arena::new();
+        let mut strs = StringTable::new();
+        let mut t = Table::with_sizes(presize.0, presize.1);
+        t.set_max_bits(24);
+        t.set_lua50(true);
+        for &(k, set) in ops {
+            let key = match k {
+                "true" => Val::Bool(true),
+                "false" => Val::Bool(false),
+                _ => match k.parse::<f64>() {
+                    Ok(n) => Val::Num(n),
+                    Err(_) => Val::Str(intern_str(&mut arena, &mut strs, k.as_bytes())),
+                },
+            };
+            let v = if set { Val::Bool(true) } else { Val::Nil };
+            assert!(t.raw_set(key, v, &arena).is_ok());
+        }
+        let mut out = Vec::new();
+        let mut key = Val::Nil;
+        while let Ok(Some((k, _))) = t.next(key, &arena) {
+            out.push(match k {
+                Val::Num(n) if n.fract() == 0.0 => format!("{}", n as i64),
+                Val::Num(n) => format!("{n}"),
+                Val::Bool(b) => format!("{b}"),
+                Val::Str(r) => {
+                    String::from_utf8_lossy(arena.get(r).map_or(&[][..], |s| s.data())).into_owned()
+                }
+                _ => unreachable!(),
+            });
+            key = k;
+        }
+        out.join(" ")
+    }
+
+    fn sets(keys: &[&'static str]) -> Vec<(&'static str, bool)> {
+        keys.iter().map(|&k| (k, true)).collect()
+    }
+
+    #[test]
+    fn lua50_grows_when_the_last_free_node_is_taken() {
+        // for _, k in ipairs({"a",...,"h"}) do t[k] = true end
+        let ops = sets(&["a", "b", "c", "d", "e", "f", "g", "h"]);
+        assert_eq!(walk50((0, 0), &ops), "a c b e d g f h");
+    }
+
+    #[test]
+    fn lua50_numbers_and_booleans() {
+        // t[0], t[-1], t[0.5], t[2.5], t[100], t[1000000], t[true],
+        // t[false], t[1], t[3] = true
+        let ops = sets(&[
+            "0", "-1", "0.5", "2.5", "100", "1000000", "true", "false", "1", "3",
+        ]);
+        assert_eq!(
+            walk50((0, 0), &ops),
+            "false 2.5 0 1 3 100 0.5 1000000 -1 true"
+        );
+    }
+
+    #[test]
+    fn lua50_interleaved_array_and_strings() {
+        // for i = 1, 5 do t[i] = true; t[string.char(96 + i)] = true end
+        let ops = sets(&["1", "a", "2", "b", "3", "c", "4", "d", "5", "e"]);
+        assert_eq!(walk50((0, 0), &ops), "1 2 3 4 a c b e d 5");
+    }
+
+    #[test]
+    fn lua50_sparse_even_integers_go_to_the_array() {
+        // for i = 1, 9 do t[i * 2] = true end
+        let ops = sets(&["2", "4", "6", "8", "10", "12", "14", "16", "18"]);
+        assert_eq!(walk50((0, 0), &ops), "2 4 6 8 10 12 14 16 18");
+    }
+
+    #[test]
+    fn lua50_fractional_keys() {
+        // for i = 1, 8 do t[i + 0.25] = true end
+        let ops = sets(&[
+            "1.25", "2.25", "3.25", "4.25", "5.25", "6.25", "7.25", "8.25",
+        ]);
+        assert_eq!(
+            walk50((0, 0), &ops),
+            "8.25 6.25 1.25 4.25 3.25 5.25 2.25 7.25"
+        );
+    }
+
+    #[test]
+    fn lua50_deleted_keys_then_new_ones() {
+        // a..f set, t.b = nil, t.c = nil, then g, h, i set
+        let mut ops = sets(&["a", "b", "c", "d", "e", "f"]);
+        ops.extend([("b", false), ("c", false)]);
+        ops.extend(sets(&["g", "h", "i"]));
+        assert_eq!(walk50((0, 0), &ops), "a h i e d g f");
+    }
+
+    #[test]
+    fn lua50_array_shrink_reinserts_the_vanishing_slice() {
+        // for i = 1, 16 do t[i] = true end; for i = 1, 12 do t[i] = nil end;
+        // then p, q, r, s, t set
+        let keys: Vec<String> = (1..=16).map(|i| i.to_string()).collect();
+        let mut ops: Vec<(&str, bool)> = keys.iter().map(|k| (k.as_str(), true)).collect();
+        ops.extend(keys[..12].iter().map(|k| (k.as_str(), false)));
+        ops.extend(sets(&["p", "q", "r", "s", "t"]));
+        assert_eq!(walk50((0, 0), &ops), "q p s 13 14 15 16 t r");
+    }
+
+    #[test]
+    fn lua50_presized_hash_part() {
+        // t = {a=1,b=2,c=3,d=4,e=5} (NEWTABLE C = 3: 8 nodes); f..i set
+        let ops = sets(&["a", "b", "c", "d", "e", "f", "g", "h", "i"]);
+        assert_eq!(walk50((0, 8), &ops), "a c b e d g f i h");
     }
 }

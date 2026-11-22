@@ -15,3 +15,4 @@ log = "0.4"
 atlantis-data = { path = "../atlantis-data" }
 atlantis2-data = { path = "../atlantis2-data" }
 atlantis3-data = { path = "../atlantis3-data" }
+md-5 = "0.10"
