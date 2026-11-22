@@ -290,21 +290,38 @@ pub enum Call {
         play: PlayType,
         priority: i32,
     },
-    /// `Atl_Sprite_PlayRebound(...)` (@ 0x0040aa00): arguments kept raw.
-    SpritePlayRebound(Vec<Value>),
+    /// `Atl_Sprite_PlayRebound(object, animation, playtype[, priority[,
+    /// first, last]])` (@ 0x0040aa00): the player's mode 2 (`"stop"`) or
+    /// 4 (`"loop"`), its frames `first..=last` (@ 0x00448cc0: +0x10,
+    /// +0x14; `lua_tonumber` of absent arguments 5 and 6 gives 0).
+    SpritePlayRebound {
+        object: Vec<u8>,
+        animation: Vec<u8>,
+        /// `"loop"` (mode 4) rather than `"stop"` (mode 2).
+        looped: bool,
+        priority: i32,
+        first: i32,
+        last: i32,
+    },
     /// `Atl_Sprite_Stop(object)`.
     SpriteStop {
         object: Vec<u8>,
     },
-    /// `Atl_Sprite_GetFrame(object)` (unused by the scripts).
+    /// `Atl_Sprite_GetFrame(object, animation)` (@ 0x0040b400; unused by
+    /// the scripts): the frame (+0x18) of the sprite of that file in the
+    /// current view, as a number; none (logged) when no sprite plays it.
     SpriteGetFrame {
         object: Vec<u8>,
+        animation: Vec<u8>,
     },
-    /// `Atl_Sprite_Randomize(object, a[, b])` (single floats).
+    /// `Atl_Sprite_Randomize(object, tick1[, tick2])` (@ 0x0040b720 →
+    /// 0x00443380; single floats, `tick2` 0 when absent): the percents of
+    /// the `Tick1` and `Tick2` animations the object's sprite takes when
+    /// it ends.
     SpriteRandomize {
         object: Vec<u8>,
-        a: f32,
-        b: Option<f32>,
+        tick1: f32,
+        tick2: f32,
     },
     /// `Atl_Sprite_SetPriority(object, priority)` (unused by the scripts).
     SpriteSetPriority {

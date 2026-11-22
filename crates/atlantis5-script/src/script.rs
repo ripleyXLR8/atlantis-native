@@ -324,8 +324,40 @@ fn check(state: &LuaState, b: Binding) -> (Checked, Vec<&'static str>) {
                 }
             }
         }
-        // @ 0x0040aa00 [checks not ported: the call is passed raw]
-        Binding::SpritePlayRebound => Ok_(Call::SpritePlayRebound(args_of(state))),
+        // @ 0x0040aa00: 3, 4 or 6 arguments; checked from the last one
+        // down (6, 5, then 4, then 3 and its value, 2, 1).
+        Binding::SpritePlayRebound => {
+            let looped = to_string(state, 3);
+            if top != 3 && top != 4 && top != 6 {
+                Rejected("Atl_Sprite_PlayRebound: usage")
+            } else if top == 6 && !is_number(state, 6) {
+                Rejected("Atl_Sprite_PlayRebound: argument 6 is not a number")
+            } else if top == 6 && !is_number(state, 5) {
+                Rejected("Atl_Sprite_PlayRebound: argument 5 is not a number")
+            } else if top >= 4 && !is_number(state, 4) {
+                Rejected("Atl_Sprite_PlayRebound: argument 4 is not a number")
+            } else if !is_string(state, 3) {
+                Rejected("Atl_Sprite_PlayRebound: argument 3 is not a string")
+            } else if looped != b"stop" && looped != b"loop" {
+                // 0x0066a5e0: neither "stop" nor "loop".
+                Rejected("Atl_Sprite_PlayRebound: argument 3 is not \"stop\" or \"loop\"")
+            } else if !is_string(state, 2) {
+                Rejected("Atl_Sprite_PlayRebound: argument 2 is not a string")
+            } else if !is_string(state, 1) {
+                Rejected("Atl_Sprite_PlayRebound: argument 1 is not a string")
+            } else {
+                Ok_(Call::SpritePlayRebound {
+                    object: to_string(state, 1),
+                    animation: to_string(state, 2),
+                    looped: looped == b"loop",
+                    priority: if top == 3 { 0 } else { to_int(state, 4) },
+                    // 0x0040afb8..0x0040afdc: `__ftol` of arguments 6 and
+                    // 5 (0 when absent) to @ 0x00448cc0(first, last).
+                    first: to_int(state, 5),
+                    last: to_int(state, 6),
+                })
+            }
+        }
         // @ 0x0040b2e0
         Binding::SpriteStop => {
             if top != 1 {
@@ -338,13 +370,19 @@ fn check(state: &LuaState, b: Binding) -> (Checked, Vec<&'static str>) {
                 })
             }
         }
+        // @ 0x0040b400
         Binding::SpriteGetFrame => {
-            if top == 1 && is_string(state, 1) {
+            if top != 2 {
+                Rejected("Atl_Sprite_GetFrame: usage")
+            } else if !is_string(state, 1) {
+                Rejected("Atl_Sprite_GetFrame: argument 1 is not a string")
+            } else if !is_string(state, 2) {
+                Rejected("Atl_Sprite_GetFrame: argument 2 is not a string")
+            } else {
                 Ok_(Call::SpriteGetFrame {
                     object: to_string(state, 1),
+                    animation: to_string(state, 2),
                 })
-            } else {
-                Rejected("Atl_Sprite_GetFrame: usage")
             }
         }
         // @ 0x0040b720
@@ -358,10 +396,11 @@ fn check(state: &LuaState, b: Binding) -> (Checked, Vec<&'static str>) {
             } else if top == 3 && !is_number(state, 3) {
                 Rejected("Atl_Sprite_Randomize: argument 3 is not a number")
             } else {
+                // Two arguments: @ 0x00443380(object, tick1, 0).
                 Ok_(Call::SpriteRandomize {
                     object: to_string(state, 1),
-                    a: to_f32(state, 2),
-                    b: (top == 3).then(|| to_f32(state, 3)),
+                    tick1: to_f32(state, 2),
+                    tick2: if top == 3 { to_f32(state, 3) } else { 0.0 },
                 })
             }
         }

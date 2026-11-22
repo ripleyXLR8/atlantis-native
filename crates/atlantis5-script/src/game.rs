@@ -223,6 +223,28 @@ impl Game {
         self.state = 0;
     }
 
+    /// Runs a function of Native's own (tests, tools; `source` returns
+    /// it, as the program's one-shot strings do) as a script run, the way
+    /// a click's script runs: its calls may wait (a transition, a film).
+    /// Ignored while a script runs.
+    pub fn run_string(&mut self, source: &str) -> bool {
+        if self.busy() {
+            return false;
+        }
+        let Some((task, args)) = self.script.string_task(source, Vec::new()) else {
+            return false;
+        };
+        self.runs.push(Run {
+            task,
+            args: Some(args),
+            block: None,
+            enter_view: false,
+            chapter: false,
+        });
+        self.run();
+        true
+    }
+
     /// The `on_click_<scene>.lua` of the current view (@ 0x0042f890).
     fn run_on_click(&mut self) {
         let (scene, _) = self.script.address();

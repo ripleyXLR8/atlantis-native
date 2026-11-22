@@ -165,3 +165,85 @@ fn a_new_game_walks_the_zeppelin() {
     let trace = &play.stage().trace;
     assert!(!trace.iter().any(|l| l.starts_with("error")), "{trace:?}");
 }
+
+/// A new game to the zeppelin's first view (the film skipped).
+fn to_first_view(d: &std::path::Path) -> Play {
+    let src: Arc<dyn atlantis_data::FileSource> =
+        Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
+    let mut play = Play::new(src, "french", None).expect("play");
+    play.new_game();
+    frames(&mut play, 3);
+    play.skip();
+    frames(&mut play, 3);
+    assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
+    play
+}
+
+/// The scripts' own `Atl_Address_Go` to `view`, without a transition.
+fn go(play: &mut Play, view: i32) {
+    assert!(play.game.run_string(&format!(
+        "return function() Atl_Address_Go(\"zeppelin\", {view}, \"no_fx\") end"
+    )));
+    for _ in 0..60 {
+        frames(play, 1);
+        if play.stage().address() == Some((b"zeppelin".to_vec(), view)) {
+            break;
+        }
+    }
+    frames(play, 2);
+    assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), view)));
+}
+
+#[test]
+fn the_zeppelins_clocks_and_its_randomized_gorilla() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    // View 8: `Display_Clocks` plays the corridor's clock with
+    // `Atl_Sprite_PlayRebound(..., "loop", 0, 0, 0)`: frame 0 held.
+    go(&mut play, 8);
+    let clock = |play: &Play| {
+        play.stage()
+            .sprites()
+            .into_iter()
+            .find(|s| s.0 == "corridor_clock")
+    };
+    assert_eq!(
+        clock(&play),
+        Some(("corridor_clock".into(), "z1".into(), 0))
+    );
+    frames(&mut play, 90);
+    assert_eq!(
+        clock(&play),
+        Some(("corridor_clock".into(), "z1".into(), 0))
+    );
+    shot(&play, "a5-zeppelin-8.png");
+    // View 17: the gorilla's `stand` played once ("stop"), randomized
+    // (`Atl_Sprite_Randomize("gorilla", 10)`): at its end it goes on as
+    // `Stand` or `Tick1` instead of leaving.
+    go(&mut play, 17);
+    let gorilla = |play: &Play| {
+        play.stage()
+            .sprites()
+            .into_iter()
+            .find(|s| s.0 == "gorilla")
+            .map(|s| s.1)
+    };
+    assert_eq!(gorilla(&play).as_deref(), Some("stand"));
+    let mut seen = Vec::new();
+    for _ in 0..30 * 60 {
+        frames(&mut play, 1);
+        let a = gorilla(&play).expect("the gorilla stays");
+        if seen.last() != Some(&a) {
+            seen.push(a);
+        }
+    }
+    assert!(seen.len() > 1, "{seen:?}");
+    assert!(
+        seen[1..].iter().all(|a| a == "Stand" || a == "Tick1"),
+        "{seen:?}"
+    );
+    if play.aim_at_sprite(b"gorilla") {
+        frames(&mut play, 1);
+    }
+    shot(&play, "a5-zeppelin-17.png");
+}

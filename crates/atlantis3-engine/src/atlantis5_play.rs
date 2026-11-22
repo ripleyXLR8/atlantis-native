@@ -15,12 +15,16 @@
 //!   its limits when `Atl_Camera_Limit*` set them, else `fmod(angle, 360)`;
 //!   the field of view of `Atl_Camera_SetFOV`; the mouse look's inertia
 //!   (@ 0x0042cdc0, 0x0042cf80 mode 0); the turns of mode 2 (the animated
-//!   `Atl_Camera_LookAt`, `centring`; [`crate::atlantis5_camera`]).
+//!   `Atl_Camera_LookAt`, `centring`; [`crate::atlantis5_camera`]);
+//!   `BoatFx` (@ 0x0042ccc0: the camera under a node of its controller,
+//!   rocked about X at each step).
 //! - Sprites: `Atl_Sprite_Play` (@ 0x0040a0d0): the file of the current
 //!   view, an earlier sprite of the object removed, inserted by priority
 //!   (@ 0x00441830), its player (@ 0x00448c30, 0x00442920: frames 0..n−1
 //!   at the bank's rate, 15 for SPW files @ 0x00440e50) stepped each frame
-//!   (@ 0x00441c30 → 0x00448d20).
+//!   (@ 0x00441c30 → 0x00448d20); `Atl_Sprite_PlayRebound`'s modes 2 and 4
+//!   and frame range (@ 0x0040aa00); `Atl_Sprite_Randomize`'s records and
+//!   the next animation drawn at a sprite's end (@ 0x00443160).
 //! - Picks and clicks: each play frame picks what is under the screen
 //!   centre, the first zone of the WAM view (type below 1000) holding the
 //!   centre's direction whose name is empty or active in `atl.zones`
@@ -52,7 +56,9 @@ use atlantis5_script::{
 use atlantis_data::FileSource;
 
 use crate::atlantis5::{panorama_name, sprite_path, ViewError, FACE, VIEW_HEIGHT, VIEW_WIDTH};
-use crate::atlantis5_camera::{forward, look_at_direction, Turn};
+use crate::atlantis5_camera::{
+    euler_quat, forward, look_at_direction, look_rotation, quat_matrix, quat_mul, Quat, Turn,
+};
 use crate::audio::{Audio, CHANNEL_CINEMA, CHANNEL_MUSIC_2004, CHANNEL_SOUND};
 use crate::film2004::{Film, FilmSound};
 use crate::px::Faces;
@@ -67,51 +73,138 @@ pub const MUSIC_CHANNELS: usize = 5;
 /// (0x006559c8 = 15).
 const FADE_RATE: f32 = 15.0;
 
+/// A sprite's player's mode (+0x1c, @ 0x00448ce0; @ 0x00448c30 makes it
+/// 1): `Atl_Sprite_Play`'s `stay` 0, `stop` 1, `loop` 3;
+/// `Atl_Sprite_PlayRebound`'s `stop` 2, `loop` 4.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Mode {
+    Stay = 0,
+    Stop = 1,
+    Rebound = 2,
+    Loop = 3,
+    ReboundLoop = 4,
+}
+
+impl From<PlayType> for Mode {
+    fn from(p: PlayType) -> Mode {
+        match p {
+            PlayType::Stay => Mode::Stay,
+            PlayType::Stop => Mode::Stop,
+            PlayType::Loop => Mode::Loop,
+        }
+    }
+}
+
 /// A sprite's player (@ 0x00448c30..0x00448d20).
 struct Sprite {
     object: Vec<u8>,
     animation: Vec<u8>,
     bank: Bank,
-    /// +0x1c: 0 stay, 1 stop, 3 loop.
-    mode: PlayType,
+    /// +0x1c.
+    mode: Mode,
+    /// +0x10, +0x14: the first and last frames (0 and the bank's count −
+    /// 1, @ 0x00442920; `Atl_Sprite_PlayRebound` sets them).
+    first: u32,
+    last: u32,
     /// +0x20.
     priority: i32,
     /// +0x00: seconds played.
     time: f64,
     /// +0x18: the frame shown.
-    frame: usize,
+    frame: u32,
     /// +0x29: a persistent sprite.
     persistent: bool,
 }
 
-impl Sprite {
-    fn frames(&self) -> usize {
-        self.bank.len().max(1)
-    }
+/// MSVC's `__ftol` (@ 0x0062abdc): truncation toward zero to 64 bits,
+/// the low 32 kept.
+#[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+fn ftol(x: f64) -> u32 {
+    x as i64 as u32
+}
 
-    /// @ 0x00448d20: the frame for the time played, and whether a `stop`
-    /// sprite is over. `stay`: ftol(t · fps), held at the last frame;
-    /// `stop`: the same, over once t > frames / fps; `loop`:
-    /// floor(t · fps) mod frames. (The `__ftol` of modes 0–2 takes t · fps:
-    /// `fmul [esi+8]` before `call 0x0062abdc`.)
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+/// The frame and the end of @ 0x00448d20 at time `t` (see
+/// [`Sprite::step`]), in the code's 32-bit unsigned arithmetic.
+fn player_frame(mode: Mode, first: u32, last: u32, t: f64) -> (u32, bool) {
+    let n1 = last.wrapping_sub(first).wrapping_add(1);
+    let span = last.wrapping_sub(first).wrapping_mul(2);
+    let fps = SPRITE_FPS;
+    let u = ftol(t * fps);
+    match mode {
+        Mode::Stay | Mode::Stop => {
+            let u = if u >= n1 { n1.wrapping_sub(1) } else { u };
+            let over = mode == Mode::Stop && (t < 0.0 || f64::from(n1) / fps < t);
+            (first.wrapping_add(u), over)
+        }
+        Mode::Rebound => {
+            let u = if u >= n1 { span.wrapping_sub(u) } else { u };
+            let period = n1.wrapping_mul(2).wrapping_sub(1);
+            (first.wrapping_add(u), f64::from(period) / fps < t)
+        }
+        Mode::Loop => {
+            let u = ftol((t * fps).floor());
+            (first.wrapping_add(u.checked_rem(n1).unwrap_or(0)), false)
+        }
+        Mode::ReboundLoop => {
+            let period = n1.wrapping_mul(2).wrapping_sub(1);
+            let u = u.checked_rem(period).unwrap_or(0);
+            let u = if u >= n1 { span.wrapping_sub(u) } else { u };
+            (first.wrapping_add(u), false)
+        }
+    }
+}
+
+impl Sprite {
+    /// @ 0x00448d20, as its code does it in 32-bit unsigned arithmetic
+    /// (n1 = last − first + 1, `EDI`; u = `__ftol`(t · fps)): time += dt;
+    /// then by mode [CONFIRMED-STATIC]
+    /// - 0 `stay`: frame = first + min(u, n1 − 1);
+    /// - 1 `stop`: the same; over when t < 0 or n1 / fps < t;
+    /// - 2 (rebound): u, or 2(last − first) − u once u ≥ n1; over when
+    ///   (2 n1 − 1) / fps < t;
+    /// - 3 `loop`: first + `__ftol`(floor(t · fps)) mod n1;
+    /// - 4 (rebound loop): u mod (2 n1 − 1), mirrored as in mode 2.
+    ///
+    /// Returns whether the sprite is over. (A divisor of 0, a bank
+    /// without frames, would fault in the original; the frame is then
+    /// `first`.)
     fn step(&mut self, dt: f64) -> bool {
         self.time += dt;
-        let n1 = self.frames();
-        let at = (self.time * SPRITE_FPS) as usize;
-        match self.mode {
-            PlayType::Stay => {
-                self.frame = at.min(n1 - 1);
-                false
-            }
-            PlayType::Stop => {
-                self.frame = at.min(n1 - 1);
-                (n1 as f64) / SPRITE_FPS < self.time
-            }
-            PlayType::Loop => {
-                self.frame = ((self.time * SPRITE_FPS).floor() as usize) % n1;
-                false
-            }
+        let (frame, over) = player_frame(self.mode, self.first, self.last, self.time);
+        self.frame = frame;
+        over
+    }
+
+    /// The frame as the bank's index.
+    fn index(&self) -> usize {
+        self.frame as usize
+    }
+}
+
+/// An `Atl_Sprite_Randomize` record (the sprite manager's map +0x20, by
+/// object; @ 0x00443380: +0x24 tick1, +0x28 tick2, +0x20 = 100 − both,
+/// +0x2c = 1).
+struct Randomized {
+    object: Vec<u8>,
+    tick1: f32,
+    tick2: f32,
+}
+
+impl Randomized {
+    /// @ 0x00443160: r = `rand`() × 0.0030518509 (100 / 32767, the float
+    /// 0x006557cc) on the x87 stack; `Tick2` when r < tick2, `Tick1` when
+    /// r < tick2 + tick1, else `Stand` (0x0066e534, 0x0066e52c,
+    /// 0x0066e524) [CONFIRMED-STATIC].
+    fn choose(&self, rand: &mut u32) -> &'static [u8] {
+        let r = f64::from(atlantis5_script::script::msvcrt_rand(rand))
+            * f64::from(f32::from_bits(0x3b48_0190));
+        let tick2 = f64::from(self.tick2);
+        if r < tick2 {
+            b"Tick2"
+        } else if r < tick2 + f64::from(self.tick1) {
+            b"Tick1"
+        } else {
+            b"Stand"
         }
     }
 }
@@ -191,14 +284,26 @@ pub struct Stage {
     /// the default one.
     pub cursor: Option<i32>,
     sprites: Vec<Sprite>,
+    /// `BoatFx` (the camera controller's +0x20 = 0, @ 0x0042ccc0): its
+    /// clock (+0x24, seconds, a float).
+    boat: Option<f32>,
+    /// The rotation of the controller's own node (+0x28, a child of the
+    /// scene root: its world rotation).
+    boat_q: Quat,
+    /// The camera node hangs under that node (from `BoatFx` until
+    /// `NoFx`), so its world rotation is boat_q ⊗ its own.
+    on_boat: bool,
     /// Persistent sprites: object, priority, seconds played.
     persistent: Vec<(Vec<u8>, i32, f64)>,
     music: [MusicChannel; MUSIC_CHANNELS],
     music_tick: f64,
-    /// The program's own CRT `rand` (statically linked; the music's start
-    /// and random tracks): seed 1 [INFERRED: its `srand` calls are not
-    /// searched].
-    music_rand: u32,
+    /// The program's own CRT `rand` (statically linked, `_rand`
+    /// @ 0x0062b352, one state for the thread: the music's start and
+    /// random tracks, the randomized sprites' next animation): seed 1
+    /// [INFERRED: its `srand` calls are not searched].
+    crt_rand: u32,
+    /// The randomized objects (`Atl_Sprite_Randomize`).
+    randomized: Vec<Randomized>,
     /// The sound on FMOD channel 6.
     sound: Option<Vec<u8>>,
     film: Option<(Film, Option<FilmSound>)>,
@@ -233,10 +338,14 @@ impl Stage {
             hover_zone: None,
             cursor: None,
             sprites: Vec::new(),
+            boat: None,
+            boat_q: [0.0, 0.0, 0.0, 1.0],
+            on_boat: false,
             persistent: Vec::new(),
             music: Default::default(),
             music_tick: 0.0,
-            music_rand: 1,
+            crt_rand: 1,
+            randomized: Vec::new(),
             sound: None,
             film: None,
             wait_ended: false,
@@ -277,8 +386,32 @@ impl Stage {
         c.q = [0.0, 0.0, 0.0, 1.0];
         c.yaw(fpu.f32(fpu.mul(fpu.mul(-f64::from(self.yaw), pi), inv180)));
         c.pitch(fpu.f32(fpu.mul(fpu.mul(f64::from(self.pitch), pi), inv180)));
+        // Under the boat's node the world rotation (what the draw and the
+        // picks read, @ 0x0048a850 relative to the root) is the parent's
+        // world rotation times the node's own (@ 0x0048aff0 →
+        // 0x0048a7c0 with the parent's world rotation as `this`).
+        if self.on_boat {
+            c.q = quat_mul(&self.boat_q, &c.q);
+        }
         c.set_fov(self.fov, w, h);
         c
+    }
+
+    /// A direction of the world in the camera's parent's frame (the turns'
+    /// targets, @ 0x0042d610 and @ 0x00406f00): the boat's node's
+    /// rotation undone while the camera hangs under it; the root's frame
+    /// otherwise.
+    fn to_parent_frame(&self, v: [f32; 3]) -> [f32; 3] {
+        if !self.on_boat {
+            return v;
+        }
+        // Rᵀ · v (R rows of the rotation).
+        let m = quat_matrix(&self.boat_q);
+        [
+            m[0] * v[0] + m[3] * v[1] + m[6] * v[2],
+            m[1] * v[0] + m[4] * v[1] + m[7] * v[2],
+            m[2] * v[0] + m[5] * v[1] + m[8] * v[2],
+        ]
     }
 
     /// The angles (pitch, yaw) in degrees.
@@ -295,7 +428,7 @@ impl Stage {
     pub fn sprites(&self) -> Vec<(String, String, usize)> {
         self.sprites
             .iter()
-            .map(|s| (lossy(&s.object), lossy(&s.animation), s.frame))
+            .map(|s| (lossy(&s.object), lossy(&s.animation), s.index()))
             .collect()
     }
 
@@ -331,43 +464,50 @@ impl Stage {
             .and_then(|d| Wam::parse(&d).ok())
             .and_then(|w| w.view(view_u).map(|v| v.zones.clone()))
             .unwrap_or_default();
+        let scene_changed = self.view.as_ref().is_some_and(|v| v.scene != scene);
         self.view = Some(ViewState {
             scene: scene.to_vec(),
             view,
             faces,
             zones,
         });
-        // The view change drops the sprites; the persistent ones come
-        // back (@ 0x004424d0): each object's `z1` of the new view if the
-        // file exists, with its time played, while it is not over.
+        // Another scene drops the persistent sprites (@ 0x0044b8c8 →
+        // 0x00442460, in the branch that loads the new scene). Every view
+        // change drops the sprites and the randomize records
+        // (@ 0x0044b8d0 → 0x004421a0 → 0x00443730); the persistent ones
+        // come back (@ 0x004424d0): each object's `z1` of the new view if
+        // the file exists, with its time played, while it is not over.
+        if scene_changed {
+            self.persistent.clear();
+        }
         self.sprites.clear();
+        self.randomized.clear();
         let persistent = std::mem::take(&mut self.persistent);
         for (object, priority, time) in persistent {
-            if self.add_sprite(&object, b"z1", PlayType::Stop, priority, true) {
-                if let Some(s) = self.sprites.iter_mut().find(|s| s.object == object) {
-                    s.time = time;
-                }
+            if let Some(s) = self.add_sprite(&object, b"z1", Mode::Stop, priority, true) {
+                s.time = time;
                 self.persistent.push((object, priority, time));
             }
         }
         Ok(())
     }
 
-    /// `Atl_Sprite_Play`'s work: the file of the current view; an earlier
-    /// sprite of the object removed; inserted before the first sprite of
-    /// lower or equal priority (@ 0x00441830); frame 0, time 0
-    /// (@ 0x00448d00). False when the file is missing.
+    /// `Atl_Sprite_Play`'s work (@ 0x0040a0d0; `Atl_Sprite_PlayRebound`'s
+    /// the same): an earlier sprite of the object removed (the list walk
+    /// comparing the files' object part, @ 0x00449f50, then @ 0x00441a00)
+    /// before the file of the current view is looked for; inserted before
+    /// the first sprite of lower or equal priority (@ 0x00441830); its
+    /// player (@ 0x00442920: frames 0..count − 1) at time 0, frame 0
+    /// (@ 0x00448d00), in `mode`. `None` when the file is missing.
     fn add_sprite(
         &mut self,
         object: &[u8],
         animation: &[u8],
-        mode: PlayType,
+        mode: Mode,
         priority: i32,
         persistent: bool,
-    ) -> bool {
-        let Some(v) = &self.view else {
-            return false;
-        };
+    ) -> Option<&mut Sprite> {
+        let v = self.view.as_ref()?;
         #[allow(clippy::cast_sign_loss)]
         let path = sprite_path(
             &lossy(&v.scene),
@@ -375,24 +515,26 @@ impl Stage {
             &lossy(object),
             &lossy(animation),
         );
+        self.sprites.retain(|s| s.object != object);
         let Some(data) = self.read(&path) else {
             // `LUA_3DSprite_Play -> Le fichier %s n'existe pas` (0x0066a590)
             log::warn!("{path}: not found");
-            return false;
+            return None;
         };
         let bank = match Bank::parse(&data, Depth::Xrgb8888) {
             Ok(b) => b,
             Err(e) => {
                 log::warn!("{path}: {e}");
-                return false;
+                return None;
             }
         };
-        self.sprites.retain(|s| s.object != object);
         let at = self
             .sprites
             .iter()
             .position(|s| s.priority <= priority)
             .unwrap_or(self.sprites.len());
+        #[allow(clippy::cast_possible_truncation)]
+        let last = (bank.len() as u32).wrapping_sub(1);
         self.sprites.insert(
             at,
             Sprite {
@@ -400,13 +542,73 @@ impl Stage {
                 animation: animation.to_vec(),
                 bank,
                 mode,
+                first: 0,
+                last,
                 priority,
                 time: 0.0,
                 frame: 0,
                 persistent,
             },
         );
-        true
+        self.sprites.get_mut(at)
+    }
+
+    /// A randomized sprite at its end (@ 0x00441c30, 0x00441d41..
+    /// 0x00441f85): the record's choice (@ 0x00443160); the same
+    /// animation (the file's fourth part, @ 0x00449ff0, compared byte for
+    /// byte, @ 0x00455110) plays again from its time less (last −
+    /// first) / fps (@ 0x00448c70, 0x00448cf0); another replaces the
+    /// sprite in its place in the list: the file with that animation
+    /// (@ 0x0044a090), a new player (@ 0x00442920: mode 1, frames 0..count
+    /// − 1, the old one's priority, not persistent). A missing file throws
+    /// `C3DSpriteManager :: ProcessSpriteAnimation -> Impossible de trouver
+    /// le fichier %s, changement de sprite annulé` (0x0066e468); its catch
+    /// is not read: Native logs it and leaves the sprite.
+    fn randomize_next(&mut self, i: usize) {
+        let Some(r) = self
+            .randomized
+            .iter()
+            .find(|r| r.object == self.sprites[i].object)
+        else {
+            return;
+        };
+        let next = r.choose(&mut self.crt_rand);
+        let s = &mut self.sprites[i];
+        if s.animation == next {
+            let n = s.last.wrapping_sub(s.first);
+            s.time -= f64::from(n) / SPRITE_FPS;
+            return;
+        }
+        let Some(v) = &self.view else { return };
+        #[allow(clippy::cast_sign_loss)]
+        let path = sprite_path(
+            &lossy(&v.scene),
+            v.view.max(0) as u32,
+            &lossy(&s.object),
+            &lossy(next),
+        );
+        let Some(bank) = self
+            .read(&path)
+            .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok())
+        else {
+            log::warn!("{path}: not found, the sprite's change cancelled");
+            return;
+        };
+        let s = &mut self.sprites[i];
+        #[allow(clippy::cast_possible_truncation)]
+        let last = (bank.len() as u32).wrapping_sub(1);
+        *s = Sprite {
+            object: std::mem::take(&mut s.object),
+            animation: next.to_vec(),
+            bank,
+            mode: Mode::Stop,
+            first: 0,
+            last,
+            priority: s.priority,
+            time: 0.0,
+            frame: 0,
+            persistent: false,
+        };
     }
 
     // -- sound -------------------------------------------------------------
@@ -466,8 +668,7 @@ impl Stage {
             return;
         }
         let track = if list.random {
-            (atlantis5_script::script::msvcrt_rand(&mut self.music_rand) as usize)
-                % list.tracks.len()
+            (atlantis5_script::script::msvcrt_rand(&mut self.crt_rand) as usize) % list.tracks.len()
         } else {
             0
         };
@@ -637,7 +838,7 @@ impl Stage {
             let next = if list.looped {
                 Some(if c.track + 1 < n { c.track + 1 } else { 0 })
             } else if list.random {
-                Some((atlantis5_script::script::msvcrt_rand(&mut self.music_rand) as usize) % n)
+                Some((atlantis5_script::script::msvcrt_rand(&mut self.crt_rand) as usize) % n)
             } else if c.track + 1 < n {
                 Some(c.track + 1)
             } else {
@@ -724,9 +925,24 @@ impl Stage {
     /// 0x0042d28c: `fcomp` 1.0, `test ah, 0x41`, so not at 1), both speeds
     /// × 0.55 (0x00655704) and the clock − 1. Mode 2: the turn's step
     /// ([`Turn::step`]), false until it ends. Other modes: nothing. True
-    /// unless a turn goes on. (`BoatFx`, the sine at the step's top, is
-    /// not ported.)
+    /// unless a turn goes on. First, with `BoatFx` on (+0x20 = 0) and
+    /// outside a turn (0x0042cf8a..0x0042cfd1): the clock +0x24 = dt +
+    /// clock (stored as a float), a = sin(clock · 0.5) · 0.03 (0x00655408,
+    /// 0x00655734, a float), and the boat's node set to the rotation
+    /// @ 0x0048f5f0(a, 0, 0) relative to the root: a about X.
     fn camera_step(&mut self, dt: f32) -> bool {
+        if let Some(clock) = self.boat.as_mut() {
+            if self.mode != 2 {
+                let t = f64::from(dt) + f64::from(*clock);
+                #[allow(clippy::cast_possible_truncation)]
+                {
+                    *clock = t as f32;
+                    let a = ((t * f64::from(0.5f32)).sin() * f64::from(f32::from_bits(0x3cf5_c28f)))
+                        as f32;
+                    self.boat_q = euler_quat(a, 0.0, 0.0);
+                }
+            }
+        }
         match self.mode {
             0 => {
                 let pi = f32::from_bits(0x4049_0fdb);
@@ -831,16 +1047,24 @@ impl Stage {
         for p in &mut self.persistent {
             p.2 += dt;
         }
-        let mut over = Vec::new();
-        for (i, s) in self.sprites.iter_mut().enumerate() {
-            if s.step(dt) {
-                over.push(i);
+        // Each sprite in list order; one over goes on with its object's
+        // randomize record (@ 0x004432c0), or is removed with its
+        // persistent record (@ 0x00442350).
+        let mut i = 0;
+        while i < self.sprites.len() {
+            if !self.sprites[i].step(dt) {
+                i += 1;
+                continue;
             }
-        }
-        for &i in over.iter().rev() {
-            let s = self.sprites.remove(i);
-            if s.persistent {
-                self.persistent.retain(|p| p.0 != s.object);
+            let object = &self.sprites[i].object;
+            if self.randomized.iter().any(|r| &r.object == object) {
+                self.randomize_next(i);
+                i += 1;
+            } else {
+                let s = self.sprites.remove(i);
+                if s.persistent {
+                    self.persistent.retain(|p| p.0 != s.object);
+                }
             }
         }
         self.music_update(dt);
@@ -877,7 +1101,7 @@ impl Stage {
                     xmin: 0,
                     xmax: FACE as i32,
                 };
-                s.bank.draw_face(&mut t, s.frame, face);
+                s.bank.draw_face(&mut t, s.index(), face);
             }
         }
         let cam = self.camera();
@@ -930,7 +1154,7 @@ impl Stage {
         let c = self.camera();
         let (face, u, v) = c.texel_face(c.cx, c.cy, FACE as u32)?;
         for s in self.sprites.iter().rev() {
-            let Some(info) = s.bank.face_info(s.frame, face) else {
+            let Some(info) = s.bank.face_info(s.index(), face) else {
                 continue;
             };
             let (x, y) = (-i32::from(info.xoff), -i32::from(info.yoff));
@@ -938,7 +1162,7 @@ impl Stage {
             if !(x <= u && u <= x + w && y <= v && v <= y + h) {
                 continue;
             }
-            if s.bank.face_opaque_at(s.frame, face, u, v) {
+            if s.bank.face_opaque_at(s.index(), face, u, v) {
                 return Some((s.object.clone(), s.animation.clone()));
             }
         }
@@ -975,18 +1199,82 @@ impl Engine for Stage {
                 play,
                 priority,
             } => {
-                self.add_sprite(object, animation, *play, *priority, false);
+                self.add_sprite(object, animation, (*play).into(), *priority, false);
+            }
+            Call::SpritePlayRebound {
+                object,
+                animation,
+                looped,
+                priority,
+                first,
+                last,
+            } => {
+                // @ 0x0040aa00: as `Atl_Sprite_Play` (the earlier sprite
+                // of the object removed, the file's player inserted by
+                // priority, time and frame 0 @ 0x00448d00), then mode 2 or
+                // 4 (@ 0x00448ce0) and the frames first..=last
+                // (@ 0x00448cc0, from `__ftol`, kept as unsigned).
+                let mode = if *looped {
+                    Mode::ReboundLoop
+                } else {
+                    Mode::Rebound
+                };
+                if let Some(s) = self.add_sprite(object, animation, mode, *priority, false) {
+                    #[allow(clippy::cast_sign_loss)]
+                    {
+                        s.first = *first as u32;
+                        s.last = *last as u32;
+                    }
+                }
+            }
+            Call::SpriteGetFrame { object, animation } => {
+                // @ 0x0040b400: the sprite of the file (scene, view,
+                // object, animation) in the list (@ 0x00441480, the bank's
+                // file name compared), its +0x18 pushed as an unsigned
+                // number; none: `Le fichier de sprite %s n'existe pas`
+                // (0x0066aac4), no result.
+                if let Some(s) = self
+                    .sprites
+                    .iter()
+                    .find(|s| &s.object == object && &s.animation == animation)
+                {
+                    return Reply::Values(vec![f64::from(s.frame)]);
+                }
+                log::warn!(
+                    "Atl_Sprite_GetFrame: no sprite {} {}",
+                    lossy(object),
+                    lossy(animation)
+                );
+            }
+            Call::SpriteRandomize {
+                object,
+                tick1,
+                tick2,
+            } => {
+                // @ 0x0040b720: an earlier record of the object erased
+                // (@ 0x004432c0, 0x00443480), then @ 0x00443380.
+                self.randomized.retain(|r| &r.object != object);
+                self.randomized.push(Randomized {
+                    object: object.clone(),
+                    tick1: *tick1,
+                    tick2: *tick2,
+                });
             }
             Call::SpriteStop { object } => {
-                // @ 0x0040b2e0 → 0x00441a90.
+                // @ 0x0040b2e0 → 0x00441a90; the object's randomize record
+                // erased too (@ 0x0040b3a3 → 0x00443480).
                 self.sprites.retain(|s| &s.object != object);
+                self.randomized.retain(|r| &r.object != object);
             }
             Call::PersistantSpritePlay { object, priority } => {
                 // @ 0x0040ba20: once only; the `z1` of the view played
                 // with the player's default mode (1, stop, @ 0x00448c30).
                 if self.persistent.iter().any(|p| &p.0 == object) {
                     log::info!("persistent sprite {} already", lossy(object));
-                } else if self.add_sprite(object, b"z1", PlayType::Stop, *priority, true) {
+                } else if self
+                    .add_sprite(object, b"z1", Mode::Stop, *priority, true)
+                    .is_some()
+                {
                     self.persistent.push((object.clone(), *priority, 0.0));
                 }
             }
@@ -1022,7 +1310,7 @@ impl Engine for Stage {
                     // then a loop on the camera's step, the first with a
                     // time of 0; the angles are the last step's.
                     let saved = self.mode;
-                    self.start_turn(look_at_direction(*pitch, *yaw));
+                    self.start_turn(self.to_parent_frame(look_at_direction(*pitch, *yaw)));
                     if self.camera_step(0.0) {
                         self.restore_mode(saved);
                     } else {
@@ -1035,11 +1323,29 @@ impl Engine for Stage {
                 }
             }
             Call::CameraSetFov { radians, .. } => self.fov = *radians,
-            Call::CameraActivateFx(fx) => {
-                if let CameraFx::BoatFx(v) = fx {
-                    log::info!("BoatFx {v:?}: the pitching is not ported");
+            Call::CameraActivateFx(fx) => match fx {
+                CameraFx::BoatFx(v) => {
+                    // @ 0x0042ccc0: +0x20 = 0; the camera node moved under
+                    // the root, then under the controller's node +0x28,
+                    // both keeping its world transform (@ 0x0048ac60,
+                    // 0x0048aca0 with 1); that node's rotation relative to
+                    // its parent (+0x68 = +0x28 + 0x40: the root, from its
+                    // constructor @ 0x0048a3c0) set to the look rotation of
+                    // the vector with up (0, −1, 0) (@ 0x0048f7e0); the
+                    // clock +0x24 = 0. (The kept world transform lasts until
+                    // the setters rebuild the camera node's own rotation
+                    // from the angles, which Native always does.)
+                    self.boat = Some(0.0);
+                    self.boat_q = look_rotation(v, &[0.0, -1.0, 0.0]);
+                    self.on_boat = true;
                 }
-            }
+                CameraFx::NoFx => {
+                    // @ 0x0042cd50: +0x20 = 1, +0x24 = 0, the camera node
+                    // back under the root (@ 0x0048ac60 with 1).
+                    self.boat = None;
+                    self.on_boat = false;
+                }
+            },
             Call::DisplayGetScreenSize => {
                 // The display's +0xc, +0x10: the back buffer, 1024 × 576.
                 #[allow(clippy::cast_precision_loss)]
@@ -1148,6 +1454,8 @@ impl Engine for Stage {
                 sum[i] += p[i];
             }
         }
+        // Into the camera's parent's frame first, then normalised.
+        let sum = self.to_parent_frame(sum);
         let l2 = f64::from(sum[0]) * f64::from(sum[0])
             + f64::from(sum[1]) * f64::from(sum[1])
             + f64::from(sum[2]) * f64::from(sum[2]);
@@ -1390,13 +1698,13 @@ impl Play {
             };
             let mut out = Vec::new();
             for face in 0..6 {
-                let Some(info) = s.bank.face_info(s.frame, face) else {
+                let Some(info) = s.bank.face_info(s.index(), face) else {
                     continue;
                 };
                 let (x0, y0) = (-i32::from(info.xoff), -i32::from(info.yoff));
                 for v in y0..y0 + i32::from(info.h) {
                     for u in x0..x0 + i32::from(info.w) {
-                        if s.bank.face_opaque_at(s.frame, face, u, v) {
+                        if s.bank.face_opaque_at(s.index(), face, u, v) {
                             out.push((face, u, v));
                         }
                     }
@@ -1592,5 +1900,102 @@ mod tests {
         s.camera_restore(0);
         assert_eq!(s.mode, 0);
         assert!((s.yaw - 5.0).abs() < 0.01, "{}", s.yaw);
+    }
+
+    fn frames(mode: Mode, first: u32, last: u32, k: u32) -> Vec<(u32, bool)> {
+        // Mid-frame times, as a 15 fps step would see them.
+        (0..k)
+            .map(|i| player_frame(mode, first, last, (f64::from(i) + 0.5) / SPRITE_FPS))
+            .collect()
+    }
+
+    #[test]
+    fn rebound_sprites_go_and_come_back() {
+        // Mode 4, frames 3..=5: a period of 2 · 3 − 1 frames, mirrored.
+        let f: Vec<u32> = frames(Mode::ReboundLoop, 3, 5, 10)
+            .iter()
+            .map(|x| x.0)
+            .collect();
+        assert_eq!(f, [3, 4, 5, 4, 3, 3, 4, 5, 4, 3]);
+        // Mode 2, frames 0..=2: once, over after 5 frames.
+        let f = frames(Mode::Rebound, 0, 2, 6);
+        assert_eq!(
+            f,
+            [
+                (0, false),
+                (1, false),
+                (2, false),
+                (1, false),
+                (0, false),
+                (u32::MAX, true)
+            ]
+        );
+        // The zeppelin's clocks: "loop", 0, 0 shows frame 0 for ever.
+        assert!(frames(Mode::ReboundLoop, 0, 0, 40)
+            .iter()
+            .all(|&x| x == (0, false)));
+        // A stop sprite of 3 frames: over once 3 / 15 s have passed.
+        let f = frames(Mode::Stop, 0, 2, 4);
+        assert_eq!(f, [(0, false), (1, false), (2, false), (2, true)]);
+        // A puzzle's frame chosen by first = last.
+        assert_eq!(player_frame(Mode::ReboundLoop, 7, 7, 3.0), (7, false));
+    }
+
+    #[test]
+    fn randomized_sprites_draw_their_next_animation() {
+        // rand() from seed 1: 41, 18467, 6334, 26500 → r = 0.125, 56.4,
+        // 19.3, 80.9.
+        let r = Randomized {
+            object: b"barman".to_vec(),
+            tick1: 10.0,
+            tick2: 25.0,
+        };
+        let mut seed = 1;
+        let next: Vec<&[u8]> = (0..4).map(|_| r.choose(&mut seed)).collect();
+        assert_eq!(next, [&b"Tick2"[..], b"Stand", b"Tick2", b"Stand"]);
+        let r = Randomized {
+            object: b"gorilla".to_vec(),
+            tick1: 20.0,
+            tick2: 0.0,
+        };
+        let mut seed = 1;
+        let next: Vec<&[u8]> = (0..3).map(|_| r.choose(&mut seed)).collect();
+        assert_eq!(next, [&b"Tick1"[..], b"Stand", b"Tick1"]);
+    }
+
+    #[test]
+    fn boat_fx_rocks_the_camera_about_x() {
+        let mut s = stage();
+        s.set_yaw(30.0);
+        let still = s.camera().q;
+        s.call(&Call::CameraActivateFx(CameraFx::BoatFx([0.0, 0.0, 1.0])));
+        assert!(s.on_boat);
+        // The look rotation of (0, 0, 1) with up (0, −1, 0) is no turn.
+        let q = s.camera().q;
+        assert!(q.iter().zip(still).all(|(a, b)| (a - b).abs() < 1e-6));
+        // One second: a = sin(0.5) · 0.03 about X.
+        assert!(s.camera_step(1.0));
+        let a = (0.5f64.sin() * 0.03) as f32;
+        let want = [(a * 0.5).sin(), 0.0, 0.0, (a * 0.5).cos()];
+        assert!(s.boat_q.iter().zip(want).all(|(x, y)| (x - y).abs() < 1e-6));
+        assert_eq!(s.camera().q, quat_mul(&s.boat_q, &still));
+        // A direction of the world back in the boat's frame.
+        let f = forward(s.pitch, s.yaw);
+        let m = quat_matrix(&s.boat_q);
+        let world = crate::atlantis5_camera::mat_vec(&m, &f);
+        let back = s.to_parent_frame(world);
+        assert!(back.iter().zip(f).all(|(x, y)| (x - y).abs() < 1e-6));
+        // No rocking during a turn.
+        s.start_turn(forward(0.0, 40.0));
+        let held = s.boat_q;
+        s.camera_step(0.1);
+        assert_eq!(s.boat_q, held);
+        s.restore_mode(0);
+        s.set_pitch(0.0);
+        s.set_yaw(30.0);
+        // NoFx: the camera back under the root.
+        s.call(&Call::CameraActivateFx(CameraFx::NoFx));
+        assert!(!s.on_boat && s.boat.is_none());
+        assert_eq!(s.camera().q, still);
     }
 }

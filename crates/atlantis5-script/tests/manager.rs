@@ -16,6 +16,7 @@ struct Probe {
     requests: Vec<Request>,
     errors: Vec<String>,
     rejected: Vec<String>,
+    seen: Vec<Call>,
     wait: bool,
 }
 
@@ -26,6 +27,10 @@ impl Engine for Probe {
     }
 
     fn call(&mut self, call: &Call) -> Reply {
+        self.seen.push(call.clone());
+        if matches!(call, Call::SpriteGetFrame { .. }) {
+            return Reply::Values(vec![7.0]);
+        }
         if matches!(call, Call::VideoPlay { .. }) && self.wait {
             return Reply::Wait;
         }
@@ -289,4 +294,67 @@ fn math_random_is_msvcrt_rand_from_seed_1() {
     assert_eq!(g.script().global(b"A"), Value::Num(25.0));
     assert_eq!(g.script().global(b"B"), Value::Num(11.0));
     assert_eq!(g.script().global(b"C"), Value::Num(6334.0 / 32767.0));
+}
+
+#[test]
+fn the_sprite_handlers_check_and_convert() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().seen.clear();
+    g.script()
+        .exec(
+            "Atl_Sprite_PlayRebound(\"clock\", \"z1\", \"loop\", 2, 3.9, 5) \
+             Atl_Sprite_PlayRebound(\"clock\", \"z1\", \"stop\") \
+             Atl_Sprite_PlayRebound(\"clock\", \"z1\", \"stay\", 1) \
+             Atl_Sprite_PlayRebound(\"clock\", \"z1\", \"loop\", 1, 2) \
+             Atl_Sprite_PlayRebound(\"clock\", \"z1\", \"loop\", 1, 2, {}) \
+             F = Atl_Sprite_GetFrame(\"clock\", \"z1\") \
+             G = Atl_Sprite_GetFrame(\"clock\") \
+             Atl_Sprite_Randomize(\"man\", 10) \
+             Atl_Sprite_Randomize(\"man\", 10, 25)",
+        )
+        .expect("run");
+    let p = probe.borrow();
+    let rebound = |object: &str, looped, priority, first, last| Call::SpritePlayRebound {
+        object: object.as_bytes().to_vec(),
+        animation: b"z1".to_vec(),
+        looped,
+        priority,
+        first,
+        last,
+    };
+    assert_eq!(
+        p.seen,
+        [
+            rebound("clock", true, 2, 3, 5),
+            rebound("clock", false, 0, 0, 0),
+            Call::SpriteGetFrame {
+                object: b"clock".to_vec(),
+                animation: b"z1".to_vec(),
+            },
+            Call::SpriteRandomize {
+                object: b"man".to_vec(),
+                tick1: 10.0,
+                tick2: 0.0,
+            },
+            Call::SpriteRandomize {
+                object: b"man".to_vec(),
+                tick1: 10.0,
+                tick2: 25.0,
+            },
+        ]
+    );
+    assert_eq!(
+        p.rejected,
+        [
+            "Atl_Sprite_PlayRebound: Atl_Sprite_PlayRebound: argument 3 is not \"stop\" or \"loop\"",
+            "Atl_Sprite_PlayRebound: Atl_Sprite_PlayRebound: usage",
+            "Atl_Sprite_PlayRebound: Atl_Sprite_PlayRebound: argument 6 is not a number",
+            "Atl_Sprite_GetFrame: Atl_Sprite_GetFrame: usage",
+        ]
+    );
+    drop(p);
+    assert_eq!(g.script().global(b"F"), Value::Num(7.0));
+    assert_eq!(g.script().global(b"G"), Value::Nil);
 }

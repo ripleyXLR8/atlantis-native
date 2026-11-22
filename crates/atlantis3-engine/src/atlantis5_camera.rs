@@ -231,9 +231,32 @@ pub fn camera_rotation(pitch: f32, yaw: f32) -> Quat {
     quat_mul(&qy, &qp)
 }
 
+/// The quaternion of the angles (x, y, z) radians (@ 0x0048f5f0: halves
+/// by 0.5 (0x00655408); cos z/2 and sin y/2 stored as floats, as is
+/// sin x/2 in the last two products): q = (s1 c2 c3 − c1 s2 s3,
+/// s1 c2 s3 + c1 s2 c3, c1 c2 s3 − s1 s2 c3, c1 c2 c3 + s1 s2 s3).
+#[allow(clippy::cast_possible_truncation, clippy::many_single_char_names)]
+pub fn euler_quat(x: f32, y: f32, z: f32) -> Quat {
+    let half = f64::from(0.5f32);
+    let c3 = f64::from((f64::from(z) * half).cos() as f32);
+    let s3 = (f64::from(z) * half).sin();
+    let c2 = (f64::from(y) * half).cos();
+    let s2 = f64::from((f64::from(y) * half).sin() as f32);
+    let c1 = (f64::from(x) * half).cos();
+    let s1 = (f64::from(x) * half).sin();
+    let c1s2 = c1 * s2;
+    let s1s2 = f64::from(s1 as f32) * s2;
+    [
+        (s1 * c2 * c3 - c1s2 * s3) as f32,
+        (s1 * c2 * s3 + c1s2 * c3) as f32,
+        (c1 * c2 * s3 - s1s2 * c3) as f32,
+        (c1 * c2 * c3 + s1s2 * s3) as f32,
+    ]
+}
+
 /// The camera's direction for the angles, in its parent's frame: the
 /// node's rotation times (0, 0, 1) (@ 0x0042cac0 reads it from the node's
-/// world transform; the parent is taken at rest, see the notes).
+/// world transform; under `BoatFx` that frame is the boat's node, [`crate::atlantis5_play`]).
 pub fn forward(pitch: f32, yaw: f32) -> Vec3 {
     mat_vec(&quat_matrix(&camera_rotation(pitch, yaw)), &[0.0, 0.0, 1.0])
 }
