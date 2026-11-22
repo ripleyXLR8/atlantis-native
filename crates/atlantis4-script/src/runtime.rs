@@ -164,6 +164,12 @@ fn new_state(engine: &EngineRef, options: Options) -> LuaResult<Lua> {
     Ok(lua)
 }
 
+/// `lua_rawset`: the pair stored, then the table's backward barrier
+/// (`luaC_barriert`), so a table the incremental collector already marked
+/// black goes back to gray and a white value stored in it is not swept.
+/// The callers here run while the state is made, the collector still in
+/// its pause, where the barrier does nothing; it is kept as `lua_rawset`
+/// has it (Atlantis V's bindings hit the missing barrier in play).
 fn raw_set(state: &mut LuaState, table: GcRef<Table>, key: Val, value: Val) -> LuaResult<()> {
     let strings = &state.gc.string_arena;
     let t = state
@@ -171,7 +177,9 @@ fn raw_set(state: &mut LuaState, table: GcRef<Table>, key: Val, value: Val) -> L
         .tables
         .get_mut(table)
         .ok_or_else(|| runtime_error("table not found".into()))?;
-    t.raw_set(key, value, strings)
+    t.raw_set(key, value, strings)?;
+    state.gc.barrier_back(table);
+    Ok(())
 }
 
 fn raw_get(state: &LuaState, table: GcRef<Table>, key: Val) -> Val {
