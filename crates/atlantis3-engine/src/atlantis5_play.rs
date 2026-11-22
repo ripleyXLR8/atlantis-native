@@ -1240,8 +1240,10 @@ impl Stage {
     /// The music part of the update @ 0x00459fd0: the music level's fade
     /// (step 2: elapsed += dt, level = start + (target − start) ·
     /// min(elapsed / time, 1)), the channels' fades (step 3: one step per
-    /// 1/15 s here [INFERRED: the original steps once per call, which is
-    /// once per frame]), then the next track when one ended (step 4).
+    /// call, which is once per frame: the frame ends with
+    /// `Flip(NULL, DDFLIP_WAIT)` @ 0x0047dd11, the screen's refresh; here
+    /// one step per 1/60 s, `FRAME_HZ`), then the next track when one ended
+    /// (step 4).
     fn music_update(&mut self, dt: f64) {
         // The configuration's music given to the level when it changes
         // (the sound page, a configuration applied: @ 0x0045a640).
@@ -1299,9 +1301,13 @@ impl Stage {
                 audio.set_gain(CHANNEL_MUSIC_2004 + ch, [g; 2]);
             }
         }
+        // A 60 Hz refresh [INFERRED: DDFLIP_WAIT waits for the vertical
+        // blank, DirectDraw's documentation; the screen's rate is the
+        // player's].
+        const FRAME_HZ: f64 = 60.0;
         self.music_tick += dt;
-        while self.music_tick >= 1.0 / 15.0 {
-            self.music_tick -= 1.0 / 15.0;
+        while self.music_tick >= 1.0 / FRAME_HZ {
+            self.music_tick -= 1.0 / FRAME_HZ;
             for ch in 0..MUSIC_CHANNELS {
                 let c = &mut self.music[ch];
                 if c.stream.is_none() || c.fade == 0 || c.fade_time <= 0.0 {
