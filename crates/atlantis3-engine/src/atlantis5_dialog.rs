@@ -10,9 +10,13 @@
 //!   `Name` file (`cour.TTF`, `Atlantis.ttf`) is only given to
 //!   `AddFontResourceA` first (@ 0x0046124f), which fails when it is
 //!   missing (they are not shipped), so Windows draws the `Type` face.
-//!   Native draws every face with Liberation Sans (the shipped font whose
-//!   metrics are Arial's; Courier New and Lucida Sans Unicode have no free
-//!   metric twin shipped), regular weight.
+//!   Native draws each `Type` with the Liberation face of the same
+//!   metrics: `arial` with Liberation Sans, `Courier New` with Liberation
+//!   Mono, Bold for a `Weight` nearer `FW_BOLD` than `FW_NORMAL` (the
+//!   faces Windows has are 400 and 700). `Lucida sans unicode` and
+//!   `lucida console` have no free metric twin: Liberation Sans stands in
+//!   (a known deviation, logged). Italic is not drawn (no font of the
+//!   French file asks for it).
 //! - The dialog player (`CDialogPlayer` step @ 0x004329a0, drawing
 //!   @ 0x00433910), driven by `Atl_Dialog_Play` (@ 0x00407ac0): see
 //!   [`Player`].
@@ -30,15 +34,61 @@ use atlantis_data::FileSource;
 
 use crate::text::{layout, to_cp1252, GdiFont, Glyphs, Line, Zone};
 
-/// The shipped font Native draws `font.txt`'s faces with.
-static LIBERATION_SANS: &[u8] = include_bytes!("../../../assets/fonts/LiberationSans-Regular.ttf");
+/// The shipped fonts Native draws `font.txt`'s faces with, in
+/// [`Face`]'s order.
+static FACES: [&[u8]; 4] = [
+    include_bytes!("../../../assets/fonts/LiberationSans-Regular.ttf"),
+    include_bytes!("../../../assets/fonts/LiberationSans-Bold.ttf"),
+    include_bytes!("../../../assets/fonts/LiberationMono-Regular.ttf"),
+    include_bytes!("../../../assets/fonts/LiberationMono-Bold.ttf"),
+];
+
+/// The shipped face that draws a `font.txt` font.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Face {
+    /// Liberation Sans (Arial's metrics).
+    Sans,
+    /// Liberation Sans Bold (Arial Bold's).
+    SansBold,
+    /// Liberation Mono (Courier New's).
+    Mono,
+    /// Liberation Mono Bold (Courier New Bold's).
+    MonoBold,
+}
+
+impl Face {
+    /// The face for `Type` `face` at GDI weight `weight`. GDI matches the
+    /// face name without case (`arial` in the French file); Arial and
+    /// Courier New come in weights 400 and 700, and the nearer one is
+    /// taken [INFERRED: GDI's font mapper; the French file only uses
+    /// `FW_NORMAL` and `FW_BOLD`]. Any other name (`Lucida sans unicode`,
+    /// `lucida console`) gets Liberation Sans as a stand-in.
+    pub fn of(face: &str, weight: i32) -> Face {
+        let bold = weight > 550;
+        match (face.to_ascii_lowercase().as_str(), bold) {
+            ("courier new", false) => Face::Mono,
+            ("courier new", true) => Face::MonoBold,
+            (_, false) => Face::Sans,
+            (_, true) => Face::SansBold,
+        }
+    }
+
+    /// Whether this face has the metrics of `face` (else it stands in).
+    pub fn twin_of(face: &str) -> bool {
+        matches!(face.to_ascii_lowercase().as_str(), "arial" | "courier new")
+    }
+
+    fn index(self) -> usize {
+        self as usize
+    }
+}
 
 /// `font.txt`'s fonts with their glyphs.
 pub struct Fonts {
     defs: Vec<FontDef>,
-    glyphs: Option<Glyphs>,
-    font: Option<ab_glyph::FontVec>,
-    cache: std::cell::RefCell<HashMap<i32, GdiFont>>,
+    glyphs: Vec<Option<Glyphs>>,
+    fonts: Vec<Option<ab_glyph::FontVec>>,
+    cache: std::cell::RefCell<HashMap<(Face, i32), GdiFont>>,
 }
 
 impl Fonts {
@@ -48,12 +98,31 @@ impl Fonts {
             .read(&format!("datas/fonts/{language}/font.txt"))
             .map(|d| FontTxt::parse_atlantis5(&d).fonts)
             .unwrap_or_default();
+        for d in &defs {
+            if !Face::twin_of(&d.face) {
+                log::info!(
+                    "font.txt: {} asks for {:?}, which has no shipped twin: Liberation Sans stands in",
+                    d.id,
+                    d.face
+                );
+            }
+        }
         Fonts {
             defs,
-            glyphs: Glyphs::new(LIBERATION_SANS.to_vec()),
-            font: ab_glyph::FontVec::try_from_vec(LIBERATION_SANS.to_vec()).ok(),
+            glyphs: FACES.iter().map(|f| Glyphs::new(f.to_vec())).collect(),
+            fonts: FACES
+                .iter()
+                .map(|f| ab_glyph::FontVec::try_from_vec(f.to_vec()).ok())
+                .collect(),
             cache: std::cell::RefCell::new(HashMap::new()),
         }
+    }
+
+    /// The shipped face that draws the font `id` (Liberation Sans for an
+    /// unknown id).
+    pub fn face(&self, id: &str) -> Face {
+        self.def(id)
+            .map_or(Face::Sans, |d| Face::of(&d.face, d.weight()))
     }
 
     /// The font of `id` (the first with that id: @ 0x00461375).
@@ -64,11 +133,12 @@ impl Fonts {
     /// The measures of the font `id` at its height.
     pub fn gdi(&self, id: &str) -> Option<GdiFont> {
         let h = self.def(id)?.height;
-        let font = self.font.as_ref()?;
+        let face = self.face(id);
+        let font = self.fonts[face.index()].as_ref()?;
         Some(
             self.cache
                 .borrow_mut()
-                .entry(h)
+                .entry((face, h))
                 .or_insert_with(|| gdi_of(font, h))
                 .clone(),
         )
@@ -112,7 +182,7 @@ impl Fonts {
         ox: i32,
         oy: i32,
     ) {
-        let (Some(g), Some(glyphs)) = (self.gdi(id), &self.glyphs) else {
+        let (Some(g), Some(glyphs)) = (self.gdi(id), &self.glyphs[self.face(id).index()]) else {
             return;
         };
         let antialias = self.def(id).is_none_or(|d| d.antialias);
@@ -549,6 +619,55 @@ mod tests {
             end,
             text: format!("{start}"),
         }
+    }
+
+    #[test]
+    fn each_type_and_weight_gets_its_twin() {
+        assert_eq!(Face::of("arial", 700), Face::SansBold);
+        assert_eq!(Face::of("Arial", 400), Face::Sans);
+        assert_eq!(Face::of("Courier New", 400), Face::Mono);
+        assert_eq!(Face::of("courier new", 700), Face::MonoBold);
+        assert_eq!(Face::of("Lucida sans unicode", 700), Face::SansBold);
+        assert!(Face::twin_of("ARIAL") && Face::twin_of("Courier New"));
+        assert!(!Face::twin_of("Lucida sans unicode"));
+    }
+
+    fn fonts_of(txt: &[u8]) -> Fonts {
+        let mut f = Fonts::load(&(Arc::new(NoFiles) as Arc<dyn FileSource>), "x");
+        f.defs = FontTxt::parse_atlantis5(txt).fonts;
+        f
+    }
+
+    struct NoFiles;
+    impl FileSource for NoFiles {
+        fn size(&self, _: &str) -> Option<u64> {
+            None
+        }
+        fn read_at(&self, _: &str, _: u64, _: usize) -> Option<Vec<u8>> {
+            None
+        }
+        fn has_dir(&self, _: &str) -> bool {
+            false
+        }
+    }
+
+    #[test]
+    fn courier_new_is_drawn_monospace_and_bold_is_wider() {
+        let f = fonts_of(
+            b"[Font]\r\nNameID M\r\nType \"Courier New\"\r\nHeight 16\r\n[EndFont]\r\n\
+[Font]\r\nNameID R\r\nType arial\r\nHeight 20\r\n[EndFont]\r\n\
+[Font]\r\nNameID B\r\nType arial\r\nHeight 20\r\nWeight FW_BOLD\r\n[EndFont]\r\n",
+        );
+        let adv = |g: &GdiFont, b: u8| {
+            let (a, bb, c) = g.abc[b as usize];
+            a + bb + c
+        };
+        let m = f.gdi("M").unwrap();
+        assert_eq!(adv(&m, b'i'), adv(&m, b'W'));
+        let (r, b) = (f.gdi("R").unwrap(), f.gdi("B").unwrap());
+        assert_ne!(adv(&r, b'i'), adv(&r, b'W'));
+        let width = |g: &GdiFont| b"Atlantis".iter().map(|&c| adv(g, c)).sum::<i32>();
+        assert!(width(&b) > width(&r));
     }
 
     #[test]

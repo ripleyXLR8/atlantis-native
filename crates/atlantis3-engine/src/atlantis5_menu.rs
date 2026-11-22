@@ -27,8 +27,9 @@
 //!   is its click (event 2, @ 0x0044eb60), which calls the menu's handler
 //!   with the element's name.
 //! - A sprite button (`CIE_Button` @ 0x0044ee40): two `.spr` files,
-//!   `button_click` (+0x44) and `button_focus` (+0x5c)
-//!   [INFERRED: which argument is which, from the names and the use];
+//!   `button_click` and `button_focus` (arguments 3 and 4, kept at +0x48
+//!   and +0x60 @ 0x0044ee9f..0x0044eeb8; the credits push them in that
+//!   order @ 0x0040de60..0x0040de75);
 //!   state +0x98 0: the first's frame 0; 1 (the mouse over it): the
 //!   second played in a loop; 2 (pressed): the first played once; when
 //!   it ends, the click (@ 0x0044f0e0, @ 0x0044f210, @ 0x0044f300). Both
@@ -856,8 +857,9 @@ impl Menus {
         }
         let mut up = self.sprite_button(dir, "up", "up_button.spr", "up_button_over.spr");
         let mut down = self.sprite_button(dir, "down", "down_button.spr", "down_button_over.spr");
-        // Their parent is the description [INFERRED: from their places,
-        // (140, −64) and (140, 370), which fall above and below it].
+        // Their parent is the description: the scroll text kept at +0x1c
+        // (0x004132ac) is both calls' parent argument (0x004133f3,
+        // 0x004135f6).
         up.parent = Some(1);
         down.parent = Some(1);
         let elements = vec![

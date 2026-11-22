@@ -500,6 +500,11 @@ The subtitle font, Liberation Sans Regular
 (`assets/fonts/LiberationSans-Regular.ttf`, Copyright (c) 2010 Google
 Corporation, Copyright (c) 2012 Red Hat, Inc.), is licensed under the SIL
 Open Font License, version 1.1 (see `assets/fonts/LICENSE-LiberationSans`).
+So are Liberation Sans Bold and Liberation Mono Regular and Bold
+(`assets/fonts/LiberationSans-Bold.ttf`, `LiberationMono-Regular.ttf`,
+`LiberationMono-Bold.ttf`, the same 2.1.5 release and copyright; see
+`LICENSE-LiberationSans` and `LICENSE-LiberationMono`), which draw
+*Atlantis V*'s Arial bold and Courier New texts.
 
 The game library's font, P052 Roman and Italic
 (`assets/fonts/P052-Roman.otf`, `P052-Italic.otf`, URW's Palatino-style
@@ -520,7 +525,8 @@ Font License, version 1.1 (see `assets/fonts/LICENSE-NotoSansJP`).
 Noto is a trademark of Google Inc. The fonts are built into the program
 (the web version fetches the Chinese and Japanese ones from its `fonts`
 folder, for a Chinese or the Japanese release only); every package carries
-their licence files, `LICENSE-LiberationSans`, `LICENSE-NotoSerifCJK` and
+their licence files, `LICENSE-LiberationSans`, `LICENSE-LiberationMono`,
+`LICENSE-NotoSerifCJK` and
 `LICENSE-NotoSansJP`, beside `LICENSE`.
 
 The Theora video decoder, the `theora-rs` crate 0.1.0
