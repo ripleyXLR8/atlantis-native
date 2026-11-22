@@ -462,3 +462,31 @@ fn a_five_argument_film_plays_over_the_paper() {
     assert!(!play.stage().film_playing());
     assert!((play.stage().music_level() - music).abs() < 1e-4);
 }
+
+/// A randomized sprite whose next animation has no file (@ 0x0044218d
+/// throws `... changement de sprite annulé`, 0x0066e468): the catch of
+/// `CGameManager::Process` (@ 0x0042f3c6) logs it and the game goes on;
+/// that frame the rest of the list and the sound update are skipped; the
+/// sprite stays, ended.
+#[test]
+fn a_randomized_sprite_without_its_next_file_stays() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    go(&mut play, 17);
+    // `Tick2` always (tick2 100): the gorilla has no such file.
+    assert!(play
+        .game
+        .run_string("return function() Atl_Sprite_Randomize(\"gorilla\", 0, 100) end"));
+    let gorilla = |play: &Play| {
+        play.stage()
+            .sprites()
+            .into_iter()
+            .find(|s| s.0 == "gorilla")
+            .map(|s| s.1)
+    };
+    for _ in 0..30 * 20 {
+        frames(&mut play, 1);
+        assert_eq!(gorilla(&play).as_deref(), Some("stand"));
+    }
+    assert_eq!(play.game.state(), 4);
+}

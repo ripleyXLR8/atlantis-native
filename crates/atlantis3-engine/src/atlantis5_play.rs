@@ -997,24 +997,25 @@ impl Stage {
     /// (@ 0x0044a090), a new player (@ 0x00442920: mode 1, frames 0..count
     /// − 1, the old one's priority, not persistent). A missing file throws
     /// `C3DSpriteManager :: ProcessSpriteAnimation -> Impossible de trouver
-    /// le fichier %s, changement de sprite annulé` (0x0066e468); its catch
-    /// is not read: Native logs it and leaves the sprite.
-    fn randomize_next(&mut self, i: usize) {
+    /// le fichier %s, changement de sprite annulé` (0x0066e468, @ 0x0044218d,
+    /// before the old player is touched): false then (the sprite left as
+    /// it is).
+    fn randomize_next(&mut self, i: usize) -> bool {
         let Some(r) = self
             .randomized
             .iter()
             .find(|r| r.object == self.sprites[i].object)
         else {
-            return;
+            return true;
         };
         let next = r.choose(&mut self.crt_rand);
         let s = &mut self.sprites[i];
         if s.animation == next {
             let n = s.last.wrapping_sub(s.first);
             s.time -= f64::from(n) / SPRITE_FPS;
-            return;
+            return true;
         }
-        let Some(v) = &self.view else { return };
+        let Some(v) = &self.view else { return true };
         #[allow(clippy::cast_sign_loss)]
         let path = sprite_path(
             &lossy(&v.scene),
@@ -1027,7 +1028,7 @@ impl Stage {
             .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok())
         else {
             log::warn!("{path}: not found, the sprite's change cancelled");
-            return;
+            return false;
         };
         let s = &mut self.sprites[i];
         #[allow(clippy::cast_possible_truncation)]
@@ -1044,6 +1045,7 @@ impl Stage {
             frame: 0,
             persistent: false,
         };
+        true
     }
 
     // -- sound -------------------------------------------------------------
@@ -1729,16 +1731,22 @@ impl Stage {
         // `Atl_Dialog_Play`'s loop: its checks, then the scene's update.
         self.dialog_update(dt);
         self.menu_close_step();
-        if scene {
-            self.sprites_step(dt);
+        // A randomized sprite's missing file throws out of the sprites'
+        // step; `CGameManager::Process`'s catch (@ 0x0042f3c6) logs it
+        // (`CGameManager :: Process -> %s`, 0x0066cc4c) and goes on after
+        // its try (@ 0x0042f464): that frame the rest of the sprite list
+        // and the sound update (@ 0x00459fd0) are skipped.
+        let thrown = scene && !self.sprites_step(dt);
+        if !thrown {
+            self.music_update(dt);
         }
-        self.music_update(dt);
         self.film_update();
     }
 
     /// The sprites' step (@ 0x00441c30, from the scene's update
-    /// @ 0x0044c380).
-    fn sprites_step(&mut self, dt: f64) {
+    /// @ 0x0044c380). False when a randomized sprite's file is missing:
+    /// the throw ends the step there (the sprites after it not stepped).
+    fn sprites_step(&mut self, dt: f64) -> bool {
         for p in &mut self.persistent {
             p.2 += dt;
         }
@@ -1757,7 +1765,9 @@ impl Stage {
                 .iter()
                 .any(|r| &r.object == object && !r.held)
             {
-                self.randomize_next(i);
+                if !self.randomize_next(i) {
+                    return false;
+                }
                 i += 1;
             } else {
                 let s = self.sprites.remove(i);
@@ -1766,6 +1776,7 @@ impl Stage {
                 }
             }
         }
+        true
     }
 
     /// The picture: the film while one plays, else the view with its
