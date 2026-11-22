@@ -57,3 +57,12 @@ PATCHES
 5. src/stdlib/coroutine.rs: `auxresume` made public, so an embedder can
    resume a coroutine from Rust (atlantis5-script runs each script as a
    coroutine that waits at the calls the original runs over frames).
+
+6. src/vm/string.rs (`intern`): a string found in the table while it is
+   dead (the other white, before the sweep frees it) gets the current
+   white, as PUC-Rio's `luaS_newlstr` does. rilua returned it as it was,
+   so the sweep freed a string a new constant or key had just taken
+   (Atlantis V's scripts then failed with "attempt to concatenate a
+   string value" under a busy collector). Reproducer: the walkthrough of
+   crates/atlantis3-engine/tests/atlantis5_walkthrough.rs with
+   A5_GC_STRESS set.

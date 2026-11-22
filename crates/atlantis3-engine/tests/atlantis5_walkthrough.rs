@@ -11,12 +11,14 @@
 //! are skipped and dialogs ended with Space. What the steps do comes from
 //! the scripts' own events and flags: each chapter's test plays its
 //! chapter until the scripts start the next one (`Atl_InitChapter`), the
-//! last one until `Atl_TerminateGame` and the credits. Puzzles solved in
-//! `atlantis5_puzzles.rs` are solved here the same way.
+//! last one until `Atl_TerminateGame` and the credits.
 //!
-//! Each chapter starts from `Atl_InitChapter(n)` (the scripts set every
-//! object, flag and item of a chapter there); `whole_game` plays them all
-//! in one run from a new game.
+//! `chapter_0n` plays a new game through chapter n (the chapters before
+//! set what it needs: the characters' subjects, the flags);
+//! `whole_game` plays the nine and the credits; a game over (the death
+//! panel, then the autosave loaded) has its own test. Puzzles are solved
+//! from the scripts' own state (the codes, the boards), with the solvers
+//! of `atlantis5_puzzles.rs`.
 
 use std::collections::{HashMap, VecDeque};
 use std::path::{Path, PathBuf};
@@ -69,7 +71,24 @@ impl Walker {
     fn new(d: &Path) -> Walker {
         let src: Arc<dyn FileSource> =
             Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
-        let play = Play::new(src.clone(), "french", None).expect("play");
+        let mut play = Play::new(src.clone(), "french", None).expect("play");
+        // The player's saves (the autosave `Atl_Save` writes, `Atl_Load`
+        // reads) in a scratch folder of their own.
+        static RUN: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let base =
+            std::env::var_os("ATLANTIS_NATIVE_DATA").map_or_else(std::env::temp_dir, PathBuf::from);
+        let saves = base.join(format!(
+            "a5-walk-{}-{}",
+            std::process::id(),
+            RUN.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&saves);
+        std::fs::create_dir_all(&saves).expect("scratch folder");
+        play.set_save_dir(Some(saves));
+        // `A5_GC_STRESS`: the Lua collector runs all the time.
+        if std::env::var_os("A5_GC_STRESS").is_some() {
+            play.game.script().gc_pace(100, 1000);
+        }
         Walker {
             play,
             src,
@@ -92,17 +111,6 @@ impl Walker {
         let mut w = Walker::new(d);
         w.play.new_game();
         w.settle();
-        w
-    }
-
-    /// A new game, then chapter `n` started by the scripts' own
-    /// `Atl_InitChapter`.
-    fn chapter(d: &Path, n: u32) -> Walker {
-        let mut w = Walker::new_game(d);
-        if n != 1 {
-            w.run(&format!("Atl_InitChapter({n})"));
-        }
-        assert_eq!(w.chapter_now(), n);
         w
     }
 
@@ -162,17 +170,6 @@ impl Walker {
             Value::Nil => String::new(),
             v => format!("{v:?}"),
         }
-    }
-
-    /// Runs `body` as a script run (its calls may wait) and settles.
-    fn run(&mut self, body: &str) {
-        assert!(
-            self.play
-                .game
-                .run_string(&format!("return function() {body} end")),
-            "{body}"
-        );
-        self.settle();
     }
 
     fn chapter_now(&mut self) -> u32 {
@@ -379,12 +376,6 @@ impl Walker {
         panic!("not at {view}: {:?}", self.address());
     }
 
-    /// Clicks this view's move zone without a name toward `to` (the view's
-    /// script may send elsewhere).
-    fn click_move(&mut self, to: i32) {
-        self.click_zone(to, "");
-    }
-
     /// The views of the current scene holding a zone named `name`.
     fn views_with_zone(&mut self, name: &str) -> Vec<(i32, i32)> {
         let (scene, _) = self.address();
@@ -401,11 +392,6 @@ impl Walker {
             }
         }
         out
-    }
-
-    /// Goes to the nearest view with the zone `name` and clicks it.
-    fn zone(&mut self, name: &str) {
-        self.zone_with(name, None);
     }
 
     /// Goes to the nearest view with the zone `name`, takes `item` in the
@@ -430,18 +416,6 @@ impl Walker {
             None => {}
         }
         self.click_zone(best.1, name);
-    }
-
-    /// Clicks zone `name` in `view` (several views may hold it).
-    fn zone_in(&mut self, view: i32, name: &str) {
-        self.walk(view);
-        let id = self
-            .views_with_zone(name)
-            .into_iter()
-            .find(|z| z.0 == view)
-            .unwrap_or_else(|| panic!("zone {name} in view {view}"))
-            .1;
-        self.click_zone(id, name);
     }
 
     /// Clicks the sprite of `object` in this view.
@@ -513,16 +487,6 @@ impl Walker {
             "no sprite {object} to click (at {:?}, reachable from {:?})",
             self.address(),
             self.reachable(object)
-        );
-    }
-
-    /// Clicks the sprite of `object` in `view`.
-    fn sprite_in(&mut self, view: i32, object: &str) {
-        self.walk(view);
-        assert!(
-            self.click_sprite_here(object),
-            "sprite {object} in {:?}",
-            self.address()
         );
     }
 
@@ -1453,10 +1417,456 @@ fn chapter_8(w: &mut Walker) {
     w.touch_zone("ish_pal_zeppelin_in");
 }
 
+/// The bees to move, from `slots` (0 the hole), until each side holds
+/// the other's (`Atl_PuzzleBees`' `RefreshActivity` rule: a bee of the
+/// left, numbered below `center`, steps or jumps right into the hole; one
+/// of the right left), by a depth-first walk.
+fn bees_line(slots: &[i32], center: i32) -> Option<Vec<i32>> {
+    let n = slots.len();
+    let hole = slots.iter().position(|&b| b == 0)?;
+    let mut moves = Vec::new();
+    for (c, right) in [
+        (hole.wrapping_sub(2), true),
+        (hole.wrapping_sub(1), true),
+        (hole + 1, false),
+        (hole + 2, false),
+    ] {
+        if c < n && slots[c] != 0 && ((slots[c] < center) == right) {
+            moves.push(c);
+        }
+    }
+    let solved = (0..n).all(|s| {
+        let s1 = i32::try_from(s + 1).expect("slot");
+        if s1 < center {
+            slots[s] >= center
+        } else if s1 > center {
+            slots[s] != 0 && slots[s] < center
+        } else {
+            true
+        }
+    });
+    if moves.is_empty() {
+        return solved.then(Vec::new);
+    }
+    for c in moves {
+        let mut t = slots.to_vec();
+        t.swap(c, hole);
+        if let Some(mut rest) = bees_line(&t, center) {
+            rest.insert(0, slots[c]);
+            return Some(rest);
+        }
+    }
+    None
+}
+
+/// The trap's buttons to press, from step 4 up, until steps 2..=10 are
+/// up: a breadth-first walk of `Atl_PuzzleTrap_OnClick`'s rule (as in
+/// `atlantis5_puzzles.rs`).
+fn trap_solution() -> Vec<usize> {
+    const ACTIONS: [&[usize]; 11] = [
+        &[],
+        &[2, 3],
+        &[3, 6, 9],
+        &[5, 8],
+        &[6, 8, 10],
+        &[3, 9],
+        &[2, 4, 7],
+        &[3, 10],
+        &[4, 5, 7],
+        &[4, 10],
+        &[2, 5, 9],
+    ];
+    let up = |s: u16, i: usize| s & (1 << i) != 0;
+    let start: u16 = 1 << 4;
+    let goal = |s: u16| (2..=10).all(|i| up(s, i));
+    let mut prev = HashMap::from([(start, (start, 0))]);
+    let mut queue = VecDeque::from([start]);
+    while let Some(s) = queue.pop_front() {
+        if goal(s) {
+            let mut out = Vec::new();
+            let mut x = s;
+            while x != start {
+                let (p, b) = prev[&x];
+                out.push(b);
+                x = p;
+            }
+            out.reverse();
+            return out;
+        }
+        for b in (1..=10).filter(|&b| up(s, b)) {
+            let mut t = s & !(1 << b);
+            if b == 1 {
+                t |= (1 << 2) | (1 << 3);
+            } else {
+                for &a in ACTIONS[b] {
+                    t ^= 1 << a;
+                }
+                if (4..=10).all(|i| up(t, i)) {
+                    if up(t, 1) {
+                        continue;
+                    }
+                    t |= 1 << 1;
+                }
+            }
+            if let std::collections::hash_map::Entry::Vacant(e) = prev.entry(t) {
+                e.insert((s, b));
+                queue.push_back(t);
+            }
+        }
+    }
+    panic!("no solution");
+}
+
+/// The hex player's search of `atlantis5_puzzles.rs`: run in the game's
+/// own Lua state on the scripts' own `Atl_PuzzleHex_OnClick` (the
+/// computer's answer included, its `math.random` replayed from the state
+/// `seed`), a beam over the player's resistance (`resistance_board_2`);
+/// the board, the generator and the zones put back. Returns "x,y;..." or
+/// nil.
+const HEX_SEARCH: &str = r#"
+local seed, beam, depth = ...
+local hx = atl.puzzle.hex
+local function cp(b) local r = {} for y = 1, 7 do r[y] = {} for x = 1, 7 do r[y][x] = b[y][x] end end return r end
+local function min2() local m for i = 1, 7 do local v = hx.resistance_board_2[1][i] if type(v) == "number" and (m == nil or m > v) then m = v end end return m end
+local function min1() local m for i = 1, 7 do local v = hx.resistance_board_1[i][7] if type(v) == "number" and (m == nil or m > v) then m = v end end return m end
+local function next_seed(s) return math.mod(s * 214013 + 2531011, 4294967296) end
+local start, start_seed = cp(hx.board_state), seed
+local function rec(board, s, d, path)
+  local cands, n = {}, 0
+  for y = 1, 7 do for x = 1, 7 do if board[y][x] == 0 then
+    hx.board_state = cp(board)
+    math.randomseed(s)
+    Atl_PuzzleHex_OnClick(29, x, y)
+    local h, c = min2(), min1()
+    local s2 = s
+    if h ~= nil and c ~= nil then s2 = next_seed(s) end
+    local p = path .. x .. "," .. y .. ";"
+    if h == 0 then return p end
+    Atl_PuzzleHex_CalculateResistanceBoard(1, hx.resistance_board_1)
+    local c2 = min1()
+    if c2 ~= 0 and h ~= nil then
+      n = n + 1
+      cands[n] = { h = h, c = c2 or 99, board = cp(hx.board_state), s = s2, p = p }
+    end
+  end end end
+  if d == 0 then return nil end
+  for i = 2, n do
+    local v, j = cands[i], i - 1
+    while j >= 1 and (cands[j].h > v.h or (cands[j].h == v.h and cands[j].c < v.c)) do cands[j + 1] = cands[j] j = j - 1 end
+    cands[j + 1] = v
+  end
+  for i = 1, math.min(beam, n) do
+    local r = rec(cands[i].board, cands[i].s, d - 1, cands[i].p)
+    if r then return r end
+  end
+  return nil
+end
+local r = rec(start, seed, depth, "")
+hx.board_state = start
+math.randomseed(start_seed)
+for y = 1, 7 do for x = 1, 7 do Atl_Sprite_Stop("hex_pawn_" .. string.sub("abcdefg", x, x) .. y) end end
+Atl_PuzzleHex_SetActivityZone()
+return r
+"#;
+
+impl Walker {
+    /// The zone named `name` of this view (its number: the first active).
+    fn zone_here(&mut self, name: &str) -> i32 {
+        self.play
+            .zones()
+            .into_iter()
+            .find(|z| z.1 == name.as_bytes())
+            .map(|z| z.0)
+            .unwrap_or_else(|| panic!("{name} active in {:?}", self.address()))
+    }
+}
+
+/// Chapter 9, Mesopotamia (`chapter_09.lua`, `on_click_mesopotamie.lua`):
+/// Ishtar's talk opens the village; her Nisir language makes the
+/// villagers speak (the herbalist's cataplasm for the pearl, the farmer's
+/// honey bread for the hermit); the bees smoked and their hive solved
+/// give the honey; the hermit sees the medallion and asks for aloes (the
+/// snake kept off by Ishtar and the cataplasm), whose remedy heals Sing
+/// like Rain. The little girl freed from the taulas, her doll fished from
+/// the well, tells where her uncle's key is: the sculptor's house (the
+/// madder ground, sieved and blended into paints, the stones cut). In
+/// Marduk's temple the stones set and painted give the Atlantean crystal;
+/// the engraved prong opens the trap room (the gridlock), the medallion
+/// on its post the dark trap (Ishtar's scarf lit with the matches), the
+/// ring and the buttons the way up; the bull's horns lead to the ark,
+/// whose hex game won ends the game (film cine06, `Atl_TerminateGame`).
+fn chapter_9(w: &mut Walker) {
+    for subject in ["atlantide", "elliot", "sing_like_rain"] {
+        w.talk("ishtar-stand_near_zeppelin", subject);
+    }
+    assert_eq!(w.state("ishtar"), "follow_howard");
+    // The village: the herbalist (the language, the cataplasm).
+    w.talk("herbalist-searching_for_herbs", "marchand");
+    assert_eq!(w.flag("know_nisir_language"), "true");
+    w.talk("herbalist-searching_for_herbs", "marchand");
+    w.talk("herbalist-searching_for_herbs", "plantes");
+    w.use_on_sprite("perl", "herbalist-searching_for_herbs");
+    assert!(w.has("cataplasm"));
+    w.talk("herbalist-searching_for_herbs", "sing_like_rain");
+    w.talk("herbalist-searching_for_herbs", "ermite");
+    // The little girl under the taulas, the sculptor's closed door.
+    w.touch("iron_bar");
+    w.use_on_sprite("iron_bar", "taulas");
+    w.talk("little_girl-free_near_taulas", "petite_fille");
+    assert_eq!(w.flag("know_uncle_samal"), "true");
+    w.touch("sculptor_house_door");
+    // The farmer: the hermit's honey bread, the matches.
+    w.talk("farmer-deal_with_fire", "fermiere");
+    w.talk("farmer-deal_with_fire", "ermite");
+    w.talk("farmer-deal_with_fire", "pain_au_miel");
+    w.touch("match_box");
+    // The bees: the smoker lit, the swarm away, the three trays.
+    w.touch("bee_smoker");
+    w.combine("bee_smoker_off", "match_box");
+    assert_eq!(w.hand(), "bee_smoker_on");
+    w.sprite("hive_lid");
+    assert_eq!(w.state("bees_cloud"), "away");
+    w.touch("hive_lid");
+    for level in 1..=3 {
+        assert_eq!(num(&w.lua("atl.puzzle.bees.level")), level);
+        let nb = num(&w.lua(&format!("atl.puzzle.bees.nb_bees[{level}]")));
+        let slots: Vec<i32> = (1..=2 * nb + 1)
+            .map(|s| num(&w.lua(&format!("atl.puzzle.bees.slots[{s}]"))))
+            .collect();
+        for b in bees_line(&slots, nb + 1).expect("a solution") {
+            w.hold("bee_smoker_on");
+            assert!(w.click_sprite_here(&format!("bee_{level}{b}")), "bee {b}");
+        }
+        w.touch(&format!("hive_level_{level}"));
+    }
+    assert!(w.has("hive_level_3"));
+    w.use_on_sprite("hive_level_3", "farmer-deal_with_fire");
+    // The hermit comes after 45 s (the timer prophet_arrived).
+    w.wait(47.0);
+    assert_eq!(w.state("prophet"), "eat_bread");
+    w.use_on_sprite("medallion", "prophet-eat_bread");
+    // Sing like Rain lies in the abandoned house (its door a sprite).
+    w.touch("abandoned_house_door");
+    w.touch("sing_like_rain-sick");
+    w.talk("prophet-eat_bread", "ermite");
+    w.talk("prophet-eat_bread", "sing_like_rain");
+    assert_eq!(w.state("little_girl_doll"), "in_well");
+    // The aloes (Ishtar and the cataplasm keep the snake off), the remedy.
+    w.talk("herbalist-searching_for_herbs", "aloes_pour_remede");
+    w.touch("aloes");
+    assert!(w.has("aloes"));
+    w.use_on_sprite("aloes", "prophet-eat_bread");
+    w.talk("prophet-eat_bread", "remede");
+    w.use_on_sprite("remedy", "sing_like_rain-sick");
+    assert_eq!(w.state("sing_like_rain"), "healed");
+    for subject in [
+        "sing_like_rain",
+        "temple",
+        "elliot",
+        "sing_like_rain",
+        "medaillon",
+    ] {
+        w.talk("sing_like_rain-healed", subject);
+    }
+    assert_eq!(w.state("sing_like_rain"), "follow_howard");
+    // The doll: the wire cut with the torture, the bucket's handle, the
+    // well.
+    w.touch("torture");
+    w.use_on_zone("torture", "nisir_wire");
+    w.touch("bucket");
+    w.combine("bucket", "nisir_wire");
+    assert_eq!(w.hand(), "bucket_with_handle");
+    w.use_on_sprite("bucket_with_handle", "well");
+    w.touch("well");
+    w.wait(5.0);
+    w.touch("well");
+    assert!(w.has("little_girl_doll"));
+    w.use_on_sprite("little_girl_doll", "little_girl-near_well");
+    w.talk("little_girl-near_well", "porte_fermee");
+    // The uncle's key, the sculptor's house.
+    w.touch("board_and_key");
+    w.touch("board_and_key");
+    w.use_on_sprite("sculptor_house_key", "sculptor_house_door");
+    w.touch("sculptor_house_door");
+    assert_eq!(w.state("sculptor_house_door"), "open");
+    // The madder: dug, ground, sieved, refined, in the blender, lit.
+    w.touch("hoe");
+    w.use_on_sprite("hoe", "garance");
+    w.touch("garance");
+    w.touch("pestle");
+    w.use_on_zone("garance_root", "mortar");
+    w.use_on_sprite("pestle", "garance_root");
+    w.touch("garance_root");
+    assert!(w.has("smached_garance"));
+    w.touch("sieve");
+    w.use_on_zone("sieve", "sieve_place");
+    w.use_on_sprite("smached_garance", "sieve");
+    w.touch("garance_root");
+    w.wait(5.0);
+    w.touch("garance_root");
+    w.use_on_zone("refined_garance", "blender_input");
+    w.use_on_zone("match_box", "blender_light_zone");
+    // The four paints: both valves open light orange, the left dark
+    // orange, the right light blue, none dark blue.
+    let (mut left, mut right) = (false, false);
+    let mut paints = HashMap::new();
+    for (l, r, name, colour) in [
+        (true, true, "paint_light_orange", "lo"),
+        (true, false, "paint_dark_orange", "do"),
+        (false, true, "paint_light_blue", "lb"),
+        (false, false, "paint_dark_blue", "db"),
+    ] {
+        if l != left {
+            w.touch("nisir_left_valve");
+            left = l;
+        }
+        if r != right {
+            w.touch("nisir_right_valve");
+            right = r;
+        }
+        w.touch("nisir_main_valve");
+        w.touch(name);
+        let held = w.hand();
+        assert!(held.ends_with(colour), "{held}");
+        paints.insert(colour, held);
+    }
+    // The stones cut to the holes' sizes (3, 5, 8, 8).
+    w.touch("sculptor_tools");
+    let sizes = [3, 5, 8, 8];
+    for (n, size) in (1..=4).zip(sizes) {
+        w.touch("gross_stone_heap");
+        assert_eq!(w.hand(), format!("stone{n}_1"));
+        w.use_on_zone(&format!("stone{n}_1"), "cut_zone");
+        for _ in 1..size {
+            w.use_on_sprite("sculptor_tools", "gross_stone");
+        }
+        w.touch("gross_stone");
+        assert_eq!(w.hand(), format!("stone{n}_{size}"));
+    }
+    // Marduk's temple: the stones set and painted, the medallion on the
+    // eye: the crystal.
+    for (n, size) in (1..=4).zip(sizes) {
+        w.use_on_zone(&format!("stone{n}_{size}"), &format!("marduk_stone_{n}"));
+    }
+    for (n, colour) in [(1, "db"), (2, "lo"), (3, "lb"), (4, "do")] {
+        let paint = paints[colour].clone();
+        w.use_on_sprite(&paint, &format!("marduk_stone_{n}"));
+    }
+    assert_eq!(w.lua("Atl_PuzzleStonePainting_Check()"), Value::Bool(true));
+    w.use_on_zone("medallion", "marduk_eye");
+    assert_eq!(w.hand(), "atlantean_cristal");
+    w.touch_zone("marduk_eye");
+    assert_eq!(w.hand(), "medallion");
+    // The engraved prong turned by the medallion: the trap room's door.
+    w.use_on_zone("medallion", "engraved_prong_1");
+    w.use_on_zone("medallion", "engraved_prong_2");
+    assert_eq!(w.state("nisir_trap_room_door"), "open");
+    // The gridlock, set by the crystal (it comes back a second later).
+    w.use_on_zone("atlantean_cristal", "gridlock_reset");
+    w.wait(2.0);
+    assert_eq!(w.hand(), "atlantean_cristal");
+    w.empty_hand();
+    for z in [
+        3, 17, 11, 22, 15, 8, 9, 21, 14, 15, 19, 13, 7, 20, 14, 32, 27, 22, 21, 20, 27, 28, 32, 33,
+        34, 27, 20, 13, 2, 35, 28, 21, 14, 9, 20, 15, 26, 21, 28, 22, 16, 10, 15, 16, 29, 24, 17,
+        18,
+    ] {
+        w.click_zone(z, &format!("gridlock_{z}"));
+    }
+    assert_eq!(w.lua("Atl_PuzzleGridlock_IsSolved()"), Value::Bool(true));
+    // The trap room: Elliot's backpack, the medallion on its post.
+    w.touch_zone("trap_room_in");
+    w.touch("elliot_backpack");
+    assert!(w.has("diary_page"));
+    w.touch("false_medallion");
+    w.use_on_zone("medallion", "medallion_post");
+    w.wait(2.0);
+    assert_eq!(w.address().1, 22);
+    // The dark trap: Ishtar's scarf on the torch, lit.
+    w.touch_zone("trap_torch");
+    w.talk("ishtar-inside_dark_trap_scarf", "echarpe");
+    w.wait(2.0);
+    assert_eq!(w.hand(), "scarf");
+    w.use_on_zone("scarf", "trap_torch");
+    w.use_on_zone("match_box", "trap_torch");
+    w.wait(4.0);
+    assert_eq!(w.address().1, 23);
+    // The ring pulled thrice, the buttons.
+    for _ in 0..3 {
+        w.touch("trap_ring");
+    }
+    for b in trap_solution() {
+        w.touch(&format!("trap_button_{b}"));
+    }
+    assert_eq!(w.lua("Atl_PuzzleTrap_IsSolved()"), Value::Bool(true));
+    w.touch_zone("trap_upstairs");
+    w.use_on_sprite("iron_bar", "bull_horns");
+    assert_eq!(w.address().1, 25);
+    // The ark: the crystal on its console, the hex game.
+    w.use_on_zone("atlantean_cristal", "ark_crystal_place");
+    // Each move searched again from the board and the generator as they
+    // are (the scene's timers draw from the same `math.random`).
+    for _ in 0..49 {
+        let seed = w.play.game.script().lua_holdrand();
+        let found = w
+            .play
+            .game
+            .script()
+            .one_shot(
+                &format!("return (function(...) {HEX_SEARCH} end)({seed}, 3, 12)"),
+                None,
+                1,
+            )
+            .expect("the search")
+            .remove(0);
+        let Value::Str(line) = found else {
+            panic!("no winning line: {found:?}")
+        };
+        let line = String::from_utf8(line).expect("text");
+        let moves: Vec<&str> = line.split(';').filter(|m| !m.is_empty()).collect();
+        let (x, y) = moves[0].split_once(',').expect("x,y");
+        let name = format!("hex_pawn_{x}{y}");
+        let id = w.zone_here(&name);
+        if moves.len() > 1 {
+            w.click_zone(id, &name);
+        } else {
+            // The last pawn: the crystal lit, a second later the last
+            // film and the end of the game.
+            assert!(w.play.aim_at_zone_named(id, name.as_bytes()));
+            w.play.click();
+            return;
+        }
+    }
+    panic!("the hex game not won");
+}
+
 /// The chapters' plays, in order.
-const CHAPTERS: [fn(&mut Walker); 8] = [
+const CHAPTERS: [fn(&mut Walker); 9] = [
     chapter_1, chapter_2, chapter_3, chapter_4, chapter_5, chapter_6, chapter_7, chapter_8,
+    chapter_9,
 ];
+
+/// The end, after the hex game's last pawn: the timer `atlantean_crystal`
+/// (1 s) plays cine06 and calls `Atl_TerminateGame`; the manager's state 7
+/// deletes the autosave, ends the game and shows the credits.
+fn the_end(w: &mut Walker) {
+    let mut credits = false;
+    for _ in 0..30 * 30 {
+        w.frames(1);
+        if w.play.menus.current() == Some(atlantis3_engine::atlantis5_menu::CREDITS) {
+            credits = true;
+            break;
+        }
+    }
+    assert!(credits, "the credits (state {})", w.play.game.state());
+    assert_eq!(w.play.game.state(), 3);
+    w.frames(30 * 10);
+    w.shot("a5-the-end-credits.png");
+    assert_eq!(
+        w.play.menus.current(),
+        Some(atlantis3_engine::atlantis5_menu::CREDITS)
+    );
+}
 
 /// A new game played through chapter `n`: the chapters before it set
 /// what it needs (the characters' subjects, the flags), as in the game.
@@ -1532,4 +1942,80 @@ fn chapter_07() {
 #[test]
 fn chapter_08() {
     play_chapter(8);
+}
+
+/// A game over: in chapter 3 Elmore accused twice of Harry's groom
+/// business (`_gameover_groom`, on_click_etage0.lua): the death panel,
+/// then `Atl_Load` of the autosave chapter 3's start wrote.
+#[test]
+fn a_game_over_loads_the_autosave() {
+    let Some(d) = dvd() else { return };
+    let mut w = Walker::new_game(&d);
+    chapter_1(&mut w);
+    chapter_2(&mut w);
+    assert_eq!(w.chapter_now(), 3);
+    let start = w.address();
+    w.talk("journalist", "journaliste");
+    w.talk("journalist", "vedette");
+    w.talk("hostess", "vedette");
+    w.talk("hostess", "drague");
+    w.talk("elmore", "vedette");
+    w.talk("elmore", "groom_harry");
+    assert_eq!(w.flag("harry_accused"), "true");
+    w.talk("elmore", "vedette");
+    // The second accusation: the subject's script ends on the panel.
+    w.empty_hand();
+    assert!(w.play.aim_at_sprite(b"elmore"));
+    w.play.click();
+    let mut subjects = Vec::new();
+    for _ in 0..600 {
+        w.frames(1);
+        subjects = w.play.stage().menu_subjects();
+        if !subjects.is_empty() {
+            break;
+        }
+    }
+    let i = subjects
+        .iter()
+        .position(|s| s == b"groom_harry")
+        .expect("groom_harry");
+    let (x, y) = w.play.stage().menu_subject_point(i).expect("subject");
+    w.play.mouse_at(x, y);
+    w.play.click();
+    for _ in 0..30 * 60 {
+        w.frames(1);
+        if w.play.menus.current() == Some(atlantis3_engine::atlantis5_menu::DEATH) {
+            break;
+        }
+    }
+    assert_eq!(
+        w.play.menus.current(),
+        Some(atlantis3_engine::atlantis5_menu::DEATH)
+    );
+    w.shot("a5-game-over.png");
+    assert!(w.play.click_menu("button"));
+    // The panel ends; the queued load (state 2) reads the autosave.
+    w.settle();
+    assert_eq!(w.chapter_now(), 3);
+    assert_eq!(w.flag("harry_accused"), "false");
+    assert_eq!(w.address(), start);
+}
+
+/// The whole game: the nine chapters from a new game, the last film,
+/// `Atl_TerminateGame` and the credits.
+#[test]
+fn whole_game() {
+    let Some(d) = dvd() else { return };
+    let mut w = Walker::new_game(&d);
+    for (i, body) in CHAPTERS.iter().enumerate() {
+        let c = u32::try_from(i + 1).expect("chapter");
+        assert_eq!(w.chapter_now(), c);
+        let before = w.steps;
+        body(&mut w);
+        eprintln!("chapter {c}: {} clicks", w.steps - before);
+        if c < 9 {
+            assert_eq!(w.chapter_now(), c + 1, "chapter {c} ends in the next");
+        }
+    }
+    the_end(&mut w);
 }

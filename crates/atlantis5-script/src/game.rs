@@ -802,6 +802,22 @@ impl Game {
         self.timer_walk = None;
     }
 
+    /// State 7, the end of a game after `Atl_TerminateGame` (@ 0x0042f000
+    /// case 7): `saves/autoslot` (the save folder, path 0x27, and the
+    /// name at 0x0066a07c) deleted when it exists (0x0042f562..0x0042f576),
+    /// the game ended (@ 0x0042ffd0: the manager's part here, the
+    /// engine's in [`Request::GameEnded`]), the menus asked for mode 1,
+    /// the credits (@ 0x0041b5d0 with 1, 0x0042f588), the request 3
+    /// queued (0x0042f6fa) and the next request taken: state 3.
+    fn terminate(&mut self) {
+        self.note("game manager: the end of the game".into());
+        self.request(&Request::DeleteAutosave);
+        self.end_game();
+        self.request(&Request::GameEnded);
+        self.queue.push_back(3);
+        self.next_request();
+    }
+
     /// The menu of state 3 has ended (its process returned 1,
     /// @ 0x0042f000 case 3 falling into case 0): the next request.
     pub fn menu_closed(&mut self) {
@@ -1071,9 +1087,10 @@ impl Game {
                 self.load();
                 self.next_request();
             }
+            7 => self.terminate(),
             s => {
                 // 3: a menu, driven by the engine's side (`open_menu`,
-                // `menu_closed`); 7 (end of a game): not ported.
+                // `menu_closed`).
                 let _ = s;
             }
         }

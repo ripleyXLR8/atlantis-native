@@ -67,6 +67,10 @@ fn str_val(state: &mut LuaState, s: &[u8]) -> Val {
     Val::Str(state.gc.intern_string(s))
 }
 
+/// `lua_rawset`: the pair stored, then the table's backward barrier
+/// (`luaC_barriert`): a table the incremental collector already marked
+/// black goes back to gray, or a white value stored in it (a new thread,
+/// a new table) would be swept while reachable.
 fn raw_set(state: &mut LuaState, table: GcRef<Table>, key: Val, value: Val) -> LuaResult<()> {
     let strings = &state.gc.string_arena;
     let t = state
@@ -74,7 +78,9 @@ fn raw_set(state: &mut LuaState, table: GcRef<Table>, key: Val, value: Val) -> L
         .tables
         .get_mut(table)
         .ok_or_else(|| runtime_error("table not found".into()))?;
-    t.raw_set(key, value, strings)
+    t.raw_set(key, value, strings)?;
+    state.gc.barrier_back(table);
+    Ok(())
 }
 
 fn raw_get(state: &LuaState, table: GcRef<Table>, key: Val) -> Val {
@@ -1331,6 +1337,15 @@ impl Script {
         };
         self.new_task(Val::Function(f.gc_ref()), source.as_bytes())
             .ok()
+    }
+    /// The collector's pace (tests: a small pause and a large step make
+    /// it collect all the time, to find a missing barrier).
+    #[doc(hidden)]
+    pub fn gc_pace(&mut self, pause: u32, stepmul: u32) {
+        let gc = &mut self.lua.state_mut().gc.gc_state;
+        gc.gc_pause = pause;
+        gc.gc_stepmul = stepmul;
+        gc.gc_threshold = gc.total_bytes;
     }
 
     /// A C-side string run at once (@ 0x00454220: `luaL_loadbuffer` as

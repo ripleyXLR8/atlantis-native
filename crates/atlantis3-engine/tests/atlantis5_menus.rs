@@ -56,7 +56,16 @@ fn booted(d: &std::path::Path, saves: &std::path::Path) -> Play {
     let mut play = Play::new(src, "french", None).expect("play");
     play.set_save_dir(Some(saves.to_path_buf()));
     play.boot();
-    frames(&mut play, 1);
+    // The logos (skipped as films), then the main menu.
+    for _ in 0..10 {
+        if play.stage().film_playing() {
+            play.skip();
+        }
+        frames(&mut play, 1);
+        if play.menus.current().is_some() {
+            break;
+        }
+    }
     play
 }
 
@@ -403,4 +412,33 @@ fn a_right_press_on_an_inventory_item_examines_it() {
     assert!(!play.stage().inventory_open_now());
     assert_eq!(play.game.state(), 4);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn the_logos_play_before_the_main_menu() {
+    let Some(d) = dvd() else { return };
+    let src: Arc<dyn atlantis_data::FileSource> =
+        Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
+    let mut play = Play::new(src, "french", None).expect("play");
+    play.boot();
+    assert!(play.logos_playing());
+    // Each logo to its end (nothing pressed), the Nobilis one first, then
+    // the main menu.
+    let mut seen: Vec<String> = Vec::new();
+    for _ in 0..30 * 60 {
+        if let Some(n) = play.stage().film_name() {
+            if seen.last() != Some(&n) {
+                seen.push(n);
+            }
+        }
+        if play.menus.current() == Some(menus::MAIN) {
+            break;
+        }
+        // The logos, or the main menu asked once they end.
+        assert!(play.logos_playing() || play.menus.active());
+        frames(&mut play, 1);
+    }
+    assert_eq!(seen, ["Logo_Nobilis", "Logo_AIE"]);
+    assert_eq!(play.menus.current(), Some(menus::MAIN));
+    assert!(!play.logos_playing());
 }

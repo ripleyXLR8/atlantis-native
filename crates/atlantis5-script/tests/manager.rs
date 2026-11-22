@@ -358,3 +358,21 @@ fn the_sprite_handlers_check_and_convert() {
     assert_eq!(g.script().global(b"F"), Value::Num(7.0));
     assert_eq!(g.script().global(b"G"), Value::Nil);
 }
+
+#[test]
+fn terminate_game_ends_the_game_on_the_credits() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    assert_eq!(g.state(), 4);
+    probe.borrow_mut().requests.clear();
+    assert!(g.run_string("return function() Atl_TerminateGame() end"));
+    settle(&mut g, 3);
+    // State 7 (@ 0x0042f000): the autosave deleted, the game ended with
+    // the credits asked, then state 3 (the request 3 queued).
+    assert_eq!(g.state(), 3);
+    assert!(!g.busy());
+    assert!(g.timer_names().is_empty());
+    let p = probe.borrow();
+    assert_eq!(p.requests, [Request::DeleteAutosave, Request::GameEnded]);
+}

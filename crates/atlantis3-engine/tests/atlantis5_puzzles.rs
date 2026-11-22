@@ -88,6 +88,9 @@ fn chapter(d: &std::path::Path, n: u32) -> Play {
     let src: Arc<dyn atlantis_data::FileSource> =
         Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
     let mut play = Play::new(src, "french", None).expect("play");
+    if std::env::var_os("A5_GC_STRESS").is_some() {
+        play.game.script().gc_pace(100, 1000);
+    }
     play.new_game();
     settle(&mut play);
     run(&mut play, &format!("Atl_InitChapter({n})"));

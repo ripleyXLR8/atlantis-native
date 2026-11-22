@@ -446,6 +446,11 @@ pub enum Request {
     TransitionEnd,
     /// Delete the autosave (`autoslot`, @ 0x0042fc50) before a new game.
     DeleteAutosave,
+    /// The game ended by `Atl_TerminateGame` (the manager's state 7,
+    /// @ 0x0042f000): the engine's part of the end of a game
+    /// (@ 0x0042ffd0) and the menus asked for mode 1, the credits
+    /// (@ 0x0041b5d0(1) at 0x0042f58d).
+    GameEnded,
     /// A click on a character with subjects and an empty hand: the
     /// original opens its subject menu (@ 0x004300d0: mode 9,
     /// @ 0x00410f80(name), state 3). The menu is the dialogs' milestone.

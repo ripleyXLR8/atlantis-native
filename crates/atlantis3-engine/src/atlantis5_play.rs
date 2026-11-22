@@ -563,6 +563,11 @@ impl Stage {
             .collect()
     }
 
+    /// The film playing, by its name.
+    pub fn film_name(&self) -> Option<String> {
+        self.film.as_ref().map(|(f, _)| f.name().to_string())
+    }
+
     /// Whether a film plays.
     pub fn film_playing(&self) -> bool {
         self.film.is_some()
@@ -2469,6 +2474,12 @@ impl Engine for Stage {
                 }
             }
             Request::SubjectMenu { character } => self.menu_open(character),
+            Request::GameEnded => {
+                // @ 0x0042ffd0's engine part, then the credits (mode 1).
+                self.end_game();
+                self.config.reset_for_new_session();
+                self.menu_requests.push((menus::CREDITS, Vec::new()));
+            }
         }
     }
 
@@ -2693,7 +2704,15 @@ pub struct Play {
     /// The poker board (mode 12) when it is up.
     poker: Option<Poker>,
     src: Arc<dyn FileSource>,
+    /// The logos still to play before the main menu ([`Play::boot`]).
+    logos: Vec<&'static str>,
+    /// Whether the start's logos play (the application's state 0).
+    in_logos: bool,
 }
+
+/// The logos the program plays at its start, in order (@ 0x0043d320
+/// state 0: `Logo_Nobilis` 0x0066e15c, then `Logo_AIE` 0x0066e150).
+pub const LOGOS: [&str; 2] = ["Logo_Nobilis", "Logo_AIE"];
 
 /// The poker board's side of the game: the scripts' one-shot strings
 /// (@ 0x00454220), the program's `rand`, the texts.
@@ -2760,6 +2779,8 @@ impl Play {
             sound_held: false,
             poker: None,
             src,
+            logos: Vec::new(),
+            in_logos: false,
         })
     }
 
@@ -2820,9 +2841,36 @@ impl Play {
     /// The program's start (`CGameManager` ctor @ 0x0042eac0): the main
     /// menu asked (@ 0x0041b5d0(0)) and the request 3 queued: the game
     /// starts in the main menu.
+    ///
+    /// First the logos (the application's state 0, @ 0x0043d320): each
+    /// played to its end by the film player's own loop (@ 0x0043d6a0, the
+    /// full display as its rectangle, the step @ 0x0042b0f0 ending it on
+    /// its last frame or a key), the game manager not run meanwhile; then
+    /// state 1, the manager's frames. Their sound is the Bink files' own
+    /// audio track, which Native's Bink decoder does not decode: they play
+    /// silent (logged).
     pub fn boot(&mut self) {
+        self.logos = LOGOS.iter().rev().copied().collect();
+        self.in_logos = true;
+        self.next_logo();
+    }
+
+    /// The next logo, or the main menu once they have played.
+    fn next_logo(&mut self) {
+        while let Some(name) = self.logos.pop() {
+            if self.stage.borrow_mut().video_play(name.as_bytes()) {
+                log::info!("logo {name}: its Bink audio track is not decoded (silent)");
+                return;
+            }
+        }
+        self.in_logos = false;
         self.menus.request(menus::MAIN);
         self.game.open_menu();
+    }
+
+    /// Whether the start's logos are playing.
+    pub fn logos_playing(&self) -> bool {
+        self.in_logos
     }
 
     /// Whether the game asked to quit (the request 8 of the main menu's
@@ -2854,6 +2902,17 @@ impl Play {
     /// with none, the sprite (@ 0x00430b70). Moves and clicks outside play
     /// are dropped.
     pub fn update(&mut self, dt: f64) {
+        if self.logos_playing() {
+            // The logos' loop (@ 0x0043d6a0): the film's steps only.
+            self.clicks = 0;
+            self.moves.clear();
+            self.stage.borrow_mut().update(dt, false);
+            let ended = std::mem::take(&mut self.stage.borrow_mut().wait_ended);
+            if ended && !self.stage().film_playing() {
+                self.next_logo();
+            }
+            return;
+        }
         self.game.set_fov(self.stage.borrow().fov);
         let play = self.game.state() == 4 && !self.game.busy();
         let moves = std::mem::take(&mut self.moves);
