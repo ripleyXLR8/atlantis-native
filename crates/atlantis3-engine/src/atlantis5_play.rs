@@ -67,6 +67,11 @@ use crate::audio::{Audio, CHANNEL_CINEMA, CHANNEL_MUSIC_2004, CHANNEL_SOUND, CHA
 use crate::film2004::{Film, FilmSound};
 use crate::px::Faces;
 
+/// The mix's channel of a film's own Bink audio track (Bink's DirectSound
+/// buffer beside FMOD's channels in the original): one *Atlantis V*
+/// leaves free.
+pub const CHANNEL_BINK: usize = crate::audio::CHANNEL_MUSIC;
+
 /// The SPW sprites' frame rate (@ 0x00440e50: 0xf for an SPW file).
 pub const SPRITE_FPS: f64 = 15.0;
 
@@ -584,6 +589,8 @@ pub struct Stage {
     /// The sound on FMOD channel 6.
     sound: Option<Vec<u8>>,
     film: Option<(Film, Option<FilmSound>)>,
+    /// The film's own Bink audio track plays on [`CHANNEL_BINK`].
+    film_bink_sound: bool,
     /// The film's subtitles (`kinematic_subtitles.xml`).
     film_subtitles: Option<FilmSubtitles>,
     /// The text tables of the language.
@@ -667,6 +674,7 @@ impl Stage {
             randomized: Vec::new(),
             sound: None,
             film: None,
+            film_bink_sound: false,
             film_subtitles: None,
             dialogs: None,
             kinematic: None,
@@ -1212,13 +1220,30 @@ impl Stage {
             log::warn!("{file}: not found");
             return false;
         };
-        let film = match Film::open(&lossy(name), Arc::from(data), Depth::Xrgb8888, self.clock) {
+        let mut film = match Film::open(&lossy(name), Arc::from(data), Depth::Xrgb8888, self.clock)
+        {
             Ok(f) => f,
             Err(e) => {
                 log::warn!("{file}: {e:?}");
                 return false;
             }
         };
+        // The film player's Bink handle (@ 0x00456b50, made by the player
+        // @ 0x0042a950 with FMOD's output handle) routes Bink's sound to
+        // FMOD's DirectSound object (`BinkSetSoundSystem(BinkOpenDirectSound,
+        // FSOUND_GetOutputHandle())`, 0x00456b72; @ 0x0043d6a0 for the
+        // logos) and opens the file with `BinkOpen(name, 0)` (0x00456bbe):
+        // RAD's default, the first audio track played [INFERRED: RAD's
+        // API, binkw32 not read]. The program imports no `BinkSetVolume`,
+        // so the track plays at Bink's own volume, whatever the options'
+        // volumes. Only the two logos have a track.
+        self.film_bink_sound = false;
+        if let Some(a) = &self.audio {
+            if let Some((rate, channels)) = film.enable_audio(0) {
+                a.start_stream(CHANNEL_BINK, rate, channels, 1.0);
+                self.film_bink_sound = true;
+            }
+        }
         let voice = format!("datas/sounds/video/{}/{}.ogg", self.language, lossy(name));
         let sound = match (&self.audio, self.read(&voice)) {
             (Some(a), Some(d)) => FilmSound::open(a, CHANNEL_CINEMA, d, 1.0),
@@ -1251,6 +1276,11 @@ impl Stage {
         let mut over = false;
         while film.due(now) {
             film.do_frame();
+            if self.film_bink_sound {
+                if let Some(a) = &self.audio {
+                    a.push(CHANNEL_BINK, &film.take_audio(0));
+                }
+            }
             if !film.next_frame() {
                 over = true;
                 break;
@@ -1269,6 +1299,13 @@ impl Stage {
 
     fn end_film(&mut self) {
         self.film_subtitles = None;
+        // `BinkClose` (@ 0x00456c77, from the player's close) ends its
+        // sound.
+        if std::mem::take(&mut self.film_bink_sound) {
+            if let Some(a) = &self.audio {
+                a.stop(CHANNEL_BINK);
+            }
+        }
         if let Some((_, sound)) = self.film.take() {
             if let (Some(s), Some(a)) = (sound, &self.audio) {
                 s.stop(a);
@@ -3052,8 +3089,8 @@ impl Play {
     /// full display as its rectangle, the step @ 0x0042b0f0 ending it on
     /// its last frame or a key), the game manager not run meanwhile; then
     /// state 1, the manager's frames. Their sound is the Bink files' own
-    /// audio track, which Native's Bink decoder does not decode: they play
-    /// silent (logged).
+    /// audio track (DCT, stereo, 44100 Hz), played as the films' player
+    /// routes it ([`CHANNEL_BINK`]).
     pub fn boot(&mut self) {
         self.logos = LOGOS.iter().rev().copied().collect();
         self.in_logos = true;
@@ -3064,7 +3101,6 @@ impl Play {
     fn next_logo(&mut self) {
         while let Some(name) = self.logos.pop() {
             if self.stage.borrow_mut().video_play(name.as_bytes()) {
-                log::info!("logo {name}: its Bink audio track is not decoded (silent)");
                 return;
             }
         }

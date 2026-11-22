@@ -925,6 +925,13 @@ impl Menus {
                         self.effects
                             .push(Effect::MusicPlay(4, b"death_theme".to_vec()));
                     }
+                    if mode == CREDITS {
+                        // @ 0x0040e510 state 0 (its first frame): the
+                        // music stopped at once (0x0040e59c, fade 0) and
+                        // `credits` (0x0066b854) on channel 4 (0x0040e5bd).
+                        self.effects.push(Effect::MusicStopAll(0.0));
+                        self.effects.push(Effect::MusicPlay(4, b"credits".to_vec()));
+                    }
                 }
                 None => {
                     log::info!("menu mode {mode}: not ported, closed");

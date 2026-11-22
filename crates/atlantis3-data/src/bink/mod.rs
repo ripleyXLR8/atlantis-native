@@ -5,14 +5,18 @@
 // Shishkov.
 
 //! Bink video (RAD Game Tools), the films of *Atlantis Evolution*'s 2004
-//! CD program: a port of the video part of ScummVM's `BinkDecoder`.
+//! CD program: a port of ScummVM's `BinkDecoder`, its video and, on
+//! request, its audio tracks.
 //!
 //! What the CD needs: its 300 films are all `BIKi`, without audio tracks,
 //! 182 of them with an alpha plane (video flag `0x00100000`), at 15, 24
 //! or 25 frames per second. The port keeps ScummVM's code for the four
 //! revisions it reads (`BIKf`, `BIKg`, `BIKh`, `BIKi`), the alpha plane
-//! and odd sizes; it decodes no audio (the packets of any audio tracks
-//! are skipped as ScummVM reads them) and does not seek.
+//! and odd sizes; it does not seek. Audio packets are skipped as ScummVM
+//! reads them unless a track's decoding is asked
+//! ([`BinkVideo::enable_audio`], for *The Secrets of Atlantis*' two logos,
+//! `BIKi` with a DCT stereo track at 44100 Hz): then ScummVM's
+//! `BinkAudioTrack` (DCT and RDFT codecs, [`AudioTrack`]) decodes them.
 //!
 //! - [`BinkVideo`]: the header, the frame index and the frames in order;
 //! - [`Frame`]: a decoded frame's Y, U, V (and A) planes, and their
@@ -23,10 +27,14 @@
 //! decode or convert differently from ScummVM's code; only ScummVM's is
 //! ported.
 
+mod audio;
 mod bits;
 mod decoder;
 mod tables;
+mod transform;
 mod yuv;
+
+pub use audio::{AudioTrack, AUDIO_FLAG_DCT, AUDIO_FLAG_STEREO};
 
 use decoder::VideoTrack;
 
@@ -78,6 +86,11 @@ pub struct BinkVideo<D: AsRef<[u8]>> {
     fps_den: u32,
     video_flags: u32,
     audio_tracks: u32,
+    /// Each audio track's sample rate and flags.
+    audio_headers: Vec<(u16, u16)>,
+    /// The tracks whose packets are decoded, and their samples not taken
+    /// yet.
+    audio: Vec<Option<(AudioTrack, Vec<i16>)>>,
     frames: Vec<FrameEntry>,
     track: VideoTrack,
     /// The number of frames decoded (the next frame's index).
@@ -127,11 +140,17 @@ impl<D: AsRef<[u8]>> BinkVideo<D> {
         // The audio tracks' headers: a dword each, then sample rate and
         // flags, then a dword each again.
         let mut pos = 44usize;
+        let mut audio_headers = Vec::new();
         if audio_tracks > 0 {
             pos = (audio_tracks as usize)
                 .checked_mul(12)
                 .and_then(|n| n.checked_add(pos))
                 .ok_or(BinkError::BadHeader("too many audio tracks"))?;
+            for i in 0..audio_tracks as usize {
+                let at = 44 + 4 * audio_tracks as usize + 4 * i;
+                let v = u32_at(d, at)?;
+                audio_headers.push((v as u16, (v >> 16) as u16));
+            }
         }
 
         if frame_count == 0 {
@@ -172,6 +191,8 @@ impl<D: AsRef<[u8]>> BinkVideo<D> {
             fps_den,
             video_flags,
             audio_tracks,
+            audio: audio_headers.iter().map(|_| None).collect(),
+            audio_headers,
             frames,
             track,
             next: 0,
@@ -220,9 +241,36 @@ impl<D: AsRef<[u8]>> BinkVideo<D> {
         self.track.has_alpha
     }
 
-    /// The number of audio tracks (whose packets are skipped).
+    /// The number of audio tracks (whose packets are skipped unless
+    /// asked).
     pub fn audio_tracks(&self) -> u32 {
         self.audio_tracks
+    }
+
+    /// Audio track `track`'s header: its sample rate and flags.
+    pub fn audio_header(&self, track: usize) -> Option<(u16, u16)> {
+        self.audio_headers.get(track).copied()
+    }
+
+    /// Decodes audio track `track` from the next frame read on
+    /// (`initAudioTrack`): its output's rate and channels, `None` without
+    /// such a track.
+    pub fn enable_audio(&mut self, track: usize) -> Option<(u32, u16)> {
+        let (rate, flags) = self.audio_header(track)?;
+        let t = AudioTrack::new(rate, flags);
+        let out = (t.out_rate, t.out_channels);
+        self.audio[track] = Some((t, Vec::new()));
+        Some(out)
+    }
+
+    /// The samples of track `track` decoded since the last call
+    /// (interleaved), empty when it is not decoded.
+    pub fn take_audio(&mut self, track: usize) -> Vec<i16> {
+        self.audio
+            .get_mut(track)
+            .and_then(Option::as_mut)
+            .map(|(_, s)| std::mem::take(s))
+            .unwrap_or_default()
     }
 
     /// Whether frame `frame` is a key frame.
@@ -249,6 +297,13 @@ impl<D: AsRef<[u8]>> BinkVideo<D> {
     pub fn rewind(&mut self) {
         self.track.rewind();
         self.next = 0;
+        // ScummVM's audio seek: the next block is a first one again.
+        for (i, a) in self.audio.iter_mut().enumerate() {
+            if a.is_some() {
+                let (rate, flags) = self.audio_headers[i];
+                *a = Some((AudioTrack::new(rate, flags), Vec::new()));
+            }
+        }
     }
 
     /// Decodes the next frame (`readNextPacket` and `decodePacket`), or
@@ -274,7 +329,7 @@ impl<D: AsRef<[u8]>> BinkVideo<D> {
         }
         let mut frame_size = entry.size;
 
-        for _ in 0..self.audio_tracks {
+        for t in 0..self.audio_tracks as usize {
             let len = u32_at(d, pos).map_err(|_| bad.clone())?;
             pos += 4;
             frame_size = frame_size
@@ -284,6 +339,12 @@ impl<D: AsRef<[u8]>> BinkVideo<D> {
                 return Err(BinkError::Corrupt("audio packet too big for the frame"));
             }
             if len >= 4 {
+                if let Some((track, out)) = self.audio.get_mut(t).and_then(Option::as_mut) {
+                    // The packet's first dword is its sample count in
+                    // bytes; the bits follow.
+                    let packet = d.get(pos + 4..pos + len as usize).ok_or(bad.clone())?;
+                    track.decode_packet(packet, out);
+                }
                 pos += len as usize;
                 frame_size -= len;
             }

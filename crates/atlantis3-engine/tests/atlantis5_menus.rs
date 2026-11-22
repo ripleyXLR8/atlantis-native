@@ -328,9 +328,13 @@ fn the_credits_turn_their_pages() {
     let Some(d) = dvd() else { return };
     let dir = scratch("credits");
     let mut play = booted(&d, &dir);
+    assert!(play.stage().music().is_empty(), "the main menu is silent");
     click(&mut play, "credits");
     frames(&mut play, 1);
     assert_eq!(play.menus.current(), Some(menus::CREDITS));
+    // @ 0x0040e510 state 0: the music stopped, `credits` on channel 4.
+    let music: Vec<String> = play.stage().music().into_iter().map(|m| m.0).collect();
+    assert_eq!(music, ["credits"]);
     let first = element(&play, "title").0;
     assert_eq!(
         first,
@@ -359,6 +363,9 @@ fn the_credits_turn_their_pages() {
         }
     }
     assert_eq!(play.menus.current(), Some(menus::MAIN));
+    // The credits' end (state 2): the music stopped with a 1 s fade.
+    frames(&mut play, 40);
+    assert!(play.stage().music().is_empty());
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -471,4 +478,33 @@ fn the_menu_cursor_is_drawn_at_the_mouse() {
     assert!(at_a > 20 && at_b > 20, "{at_a} {at_b}");
     assert_eq!(at_a + at_b, changed.len(), "only the cursor moved");
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The logos' sound: their Bink audio track (DCT, stereo, 44100 Hz) plays
+/// while each logo plays and stops when it is skipped (`BinkClose`).
+#[test]
+fn the_logos_sound_plays() {
+    use atlantis3_engine::atlantis5_play::CHANNEL_BINK;
+    use atlantis3_engine::audio::Audio;
+    let Some(d) = dvd() else { return };
+    let src: Arc<dyn atlantis_data::FileSource> =
+        Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
+    let audio = Audio::new();
+    let mut play = Play::new(src, "french", Some(audio.clone())).expect("play");
+    play.boot();
+    for logo in ["Logo_Nobilis", "Logo_AIE"] {
+        assert_eq!(play.stage().film_name().as_deref(), Some(logo));
+        frames(&mut play, 30);
+        assert!(audio.is_playing(CHANNEL_BINK), "{logo}");
+        // A second of the mix at the track's rate: not silent.
+        let mut out = vec![0f32; 44100 * 2];
+        audio.fill(&mut out, 44100, 2);
+        let peak = out.iter().fold(0f32, |m, v| m.max(v.abs()));
+        assert!(peak > 0.01, "{logo}: {peak}");
+        play.skip();
+        frames(&mut play, 1);
+        assert!(!audio.is_playing(CHANNEL_BINK), "{logo} skipped");
+    }
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::MAIN));
 }

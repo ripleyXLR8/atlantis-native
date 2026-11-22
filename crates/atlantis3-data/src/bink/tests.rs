@@ -149,3 +149,41 @@ fn cd_films_match_scummvm() {
     }
     assert!(films >= 5);
 }
+
+/// *The Secrets of Atlantis*' two logos (`ATLANTIS5_DVD_FR`, the folder
+/// holding `datas/`): their DCT stereo track decoded whole matches
+/// ScummVM's `BinkAudioTrack` (its code on ScummVM's own math objects,
+/// 27480b8143e), sample for sample. `BINK_AUDIO_OUT` names a folder for
+/// the decoded samples (raw s16le stereo, 44100 Hz).
+#[test]
+fn a5_logos_audio_matches_scummvm() {
+    let Some(dir) = std::env::var_os("ATLANTIS5_DVD_FR").map(PathBuf::from) else {
+        crate::testing::missing("ATLANTIS5_DVD_FR not set");
+        return;
+    };
+    for (name, samples, md5) in [
+        (
+            "Logo_Nobilis",
+            1_332_480,
+            "ba805f7b0a17cf5a88fad8b921ad5d28",
+        ),
+        ("Logo_AIE", 2_050_560, "781b59f9c2c153d5f115055ab8df869a"),
+    ] {
+        let path = dir.join(format!("datas/Datas/Videos/{name}.bik"));
+        let data = std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", path.display()));
+        let mut v = BinkVideo::open(&data[..]).expect("a Bink film");
+        assert_eq!(v.audio_header(0), Some((44100, 0x7000)));
+        assert_eq!(v.enable_audio(0), Some((44100, 2)));
+        let mut pcm = Vec::new();
+        while let Some(f) = v.next_frame() {
+            f.expect("a frame");
+            pcm.extend(v.take_audio(0));
+        }
+        let bytes: Vec<u8> = pcm.iter().flat_map(|s| s.to_le_bytes()).collect();
+        if let Some(out) = std::env::var_os("BINK_AUDIO_OUT") {
+            std::fs::write(Path::new(&out).join(format!("{name}.s16")), &bytes).unwrap();
+        }
+        assert_eq!(pcm.len(), samples, "{name}");
+        assert_eq!(format!("{:x}", Md5::digest(&bytes)), md5, "{name}");
+    }
+}
