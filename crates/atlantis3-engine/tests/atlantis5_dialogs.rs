@@ -373,3 +373,118 @@ fn the_inventory_takes_and_puts_back() {
     assert!(!play.stage().inventory_open_now());
     assert_eq!(play.game.state(), 4);
 }
+
+/// The pixels that differ between `a` and `b` in the rectangle (x0, y0,
+/// w, h), and how many of `a`'s there are near `rgb` (each channel
+/// within 40: the glyphs' edges are smoothed).
+fn changed(a: &[u32], b: &[u32], (x0, y0, w, h): (i32, i32, i32, i32), rgb: u32) -> (usize, usize) {
+    let (mut n, mut of) = (0, 0);
+    for y in y0.max(0)..(y0 + h).min(576) {
+        for x in x0.max(0)..(x0 + w).min(1024) {
+            let i = (y * 1024 + x) as usize;
+            if a[i] & 0x00ff_ffff != b[i] & 0x00ff_ffff {
+                n += 1;
+                let near = [0, 8, 16]
+                    .iter()
+                    .all(|&k| ((a[i] >> k) & 0xff).abs_diff((rgb >> k) & 0xff) <= 40);
+                if near {
+                    of += 1;
+                }
+            }
+        }
+    }
+    (n, of)
+}
+
+#[test]
+fn the_inventory_bubble_and_the_hand_name() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 4);
+    assert!(play.aim_at_sprite(b"coin"));
+    play.click();
+    frames(&mut play, 2);
+    play.right_press();
+    frames(&mut play, 1);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    let coin = play
+        .menus
+        .string_opt("_item_coin")
+        .expect("the coin's description");
+    assert!(!coin.is_empty());
+    // The mouse at the centre (off the cells): no texts.
+    assert_eq!(
+        play.stage().inventory_texts(),
+        Some((String::new(), String::new()))
+    );
+    play.mouse_at(500, 100);
+    frames(&mut play, 1);
+    let empty_hand = shot(&play, "a5-inventory-empty-hand.png");
+    let slot = play
+        .stage()
+        .inventory_items()
+        .iter()
+        .position(|i| i.as_deref() == Some(&b"coin"[..]))
+        .unwrap();
+    let mut cell = None;
+    'outer: for y in (300..576).step_by(2) {
+        for x in (0..1024).step_by(2) {
+            play.mouse_at(x, y);
+            if play.stage().inventory_hit()
+                == Some(atlantis3_engine::atlantis5_play::InventoryHit::Slot(slot))
+            {
+                cell = Some((x, y));
+                break 'outer;
+            }
+        }
+    }
+    // The cell's top-left corner (its 64 x 64 at the scan's first hit).
+    let (x, y) = cell.expect("the coin's cell");
+    play.mouse_at(x, y);
+    frames(&mut play, 1);
+    assert_eq!(
+        play.stage().inventory_texts(),
+        Some((coin.clone(), String::new())),
+        "the bubble over the coin"
+    );
+    let bubble = shot(&play, "a5-inventory-bubble.png");
+    // The coin into the hand: the elements made again (@ 0x00415fe0)
+    // empty the bubble, which an empty slot does not set again; the hand's
+    // name is under the cursor.
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().handled_item(), Ok(b"coin".to_vec()));
+    assert_eq!(
+        play.stage().inventory_texts(),
+        Some((String::new(), coin.clone()))
+    );
+    let no_bubble = shot(&play, "a5-inventory-no-bubble.png");
+    // Right of the cell, on the bubble's first line (from (x + 31, y −
+    // 1)): the black text over its white shadow, gone once emptied.
+    let (n, black) = changed(&bubble, &no_bubble, (x + 66, y - 1, 266, 16), 0);
+    assert!(n > 40 && black > 10, "{n} changed, {black} black");
+    // Nothing changed left of the cursor on those rows.
+    let (left, _) = changed(&bubble, &no_bubble, (x - 300, y - 1, 290, 16), 0);
+    assert_eq!(left, 0);
+    // The hand's name: white over its black shadow from (x − 1, y + 94)
+    // with the mouse at (500, 100); right of the hand's icon (5, 30)
+    // from the mouse, 64 wide.
+    play.mouse_at(500, 100);
+    frames(&mut play, 1);
+    let hand = shot(&play, "a5-inventory-hand-name.png");
+    let (n, white) = changed(&hand, &empty_hand, (575, 194, 225, 16), 0x00ff_ffff);
+    assert!(n > 40 && white > 10, "{n} changed, {white} white");
+    // The hand's icon follows the cursor: at (505, 130), not at (5, 30).
+    let (icon, _) = changed(&hand, &empty_hand, (505, 131, 60, 60), 0);
+    let (corner, _) = changed(&hand, &empty_hand, (5, 31, 60, 60), 0);
+    assert!(
+        icon > 500 && corner == 0,
+        "{icon} at the cursor, {corner} at (5, 30)"
+    );
+    // Off the cells, then back on the empty slot: the bubble stays empty.
+    play.mouse_at(x, y);
+    frames(&mut play, 1);
+    assert_eq!(play.stage().inventory_texts(), Some((String::new(), coin)));
+}

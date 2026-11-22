@@ -392,6 +392,11 @@ impl Menus {
         }
     }
 
+    /// The text `id` of `string_resources.xml`, `None` when it has none.
+    pub fn string_opt(&self, id: &str) -> Option<String> {
+        self.strings.get(id).map(|s| s.to_string())
+    }
+
     /// A mode asked (@ 0x0041b5d0, queued).
     pub fn request(&mut self, mode: u32) {
         self.queue.push_back(mode);

@@ -523,7 +523,22 @@ struct InventoryMenu {
     icons: Vec<Option<Bank>>,
     hand_icon: Option<Bank>,
     closed: bool,
+    /// +0x44: the slot last under the mouse (−1: none), its item's
+    /// description in the bubble (`info_bulle` and its shadow, +0x34 and
+    /// +0x38).
+    hover: Option<usize>,
+    info: String,
+    /// The hand's item's description (`handled_object_name` and its
+    /// shadow, +0x3c and +0x40).
+    hand_name: String,
 }
+
+/// The inventory's texts' font (@ 0x004144a0: every one of its four
+/// `CIE_Text`s).
+const INVENTORY_FONT: &str = "AtlFont_Inventory";
+
+/// The inventory's texts' width (@ 0x004144a0: 300 for each).
+const INVENTORY_TEXT_WIDTH: i32 = 300;
 
 /// What a left press in the inventory hits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -2207,6 +2222,9 @@ impl Stage {
             ],
             icons,
             closed: false,
+            hover: None,
+            info: String::new(),
+            hand_name: String::new(),
         }
     }
 
@@ -2322,9 +2340,11 @@ impl Stage {
         false
     }
 
-    /// The inventory over the view (@ 0x00414b70): the grid and buttons
-    /// (a button's focus picture under the mouse [INFERRED]), the icons
-    /// in their cells, the hand's icon at (5, 30) (@ 0x00415a8f..).
+    /// The inventory over the view (@ 0x00414b70): its background +4 with
+    /// its children, the grid and buttons (a button's focus picture under
+    /// the mouse [INFERRED]) and the icons in their cells. The cursor's
+    /// children come after the cursor
+    /// ([`Stage::draw_inventory_over_cursor`]).
     fn draw_inventory(&self, out: &mut [u32]) {
         let Some(inv) = &self.inventory else { return };
         let ((gx, gy), (lx, ly), (rx, ry)) = Self::inventory_layout(inv);
@@ -2347,9 +2367,109 @@ impl Stage {
                 icon.draw(&mut t, Some(gx + 3 + 80 * c as i32), gy + 4, 0);
             }
         }
-        if let Some(h) = &inv.hand_icon {
-            h.draw(&mut t, Some(5), 0x1e, 0);
+    }
+
+    /// The bubble over the slot under the mouse (@ 0x00416c50, each frame
+    /// of the inventory's state 2 after the events): the grid's cell
+    /// under the mouse (@ 0x00450520) + the page is the slot; when it
+    /// changes and holds an item, both bubble texts become its
+    /// description (`describe`); off the cells the texts are emptied
+    /// once (+0x44 back to −1). A slot without an item leaves the texts
+    /// as they were.
+    pub fn inventory_hover(&mut self, describe: impl Fn(&[u8]) -> String) {
+        let hit = self.inventory_hit();
+        let Some(inv) = &mut self.inventory else {
+            return;
+        };
+        match hit {
+            Some(InventoryHit::Slot(slot)) => {
+                if inv.hover != Some(slot) {
+                    inv.hover = Some(slot);
+                    if let Some(Some(item)) = inv.items.get(slot) {
+                        if !item.is_empty() {
+                            inv.info = describe(item);
+                        }
+                    }
+                }
+            }
+            _ => {
+                if inv.hover.is_some() {
+                    inv.hover = None;
+                    inv.info.clear();
+                }
+            }
         }
+    }
+
+    /// The hand's item's description (@ 0x00414db0, @ 0x00415fe0: the
+    /// elements made; empty with an empty hand).
+    pub fn inventory_set_hand_name(&mut self, text: String) {
+        if let Some(inv) = &mut self.inventory {
+            inv.hand_name = text;
+        }
+    }
+
+    /// The bubble's and the hand name's texts (tests).
+    pub fn inventory_texts(&self) -> Option<(String, String)> {
+        self.inventory
+            .as_ref()
+            .map(|i| (i.info.clone(), i.hand_name.clone()))
+    }
+
+    /// The inventory's elements that are the cursor's children, drawn
+    /// after the cursor (@ 0x00414b70: the cursor +8 at alpha 1 with its
+    /// children, then the hand's icon +0x30 again at the menu's alpha
+    /// +0x1c, which is always 1: Initialize @ 0x00414bb0 sets it and state
+    /// 2, and no code sets the fading states 1 or 3). A parent draws
+    /// itself, then its children from the last added (@ 0x004524e0; a
+    /// child is put first, @ 0x00452140 with index 0): the hand's icon
+    /// (made by the elements' builder, @ 0x00414db0, at (5, 0x1e)), the
+    /// hand name's shadow (black, (0, 0x5f)) with the hand name (white,
+    /// (−1, −1) from it), the bubble's shadow (white, (0x20, 0)) with the
+    /// bubble (black, (−1, −1)); all relative to the cursor, which is at
+    /// the mouse (@ 0x0040d920).
+    pub fn draw_inventory_over_cursor(&self, out: &mut [u32]) {
+        let Some(inv) = &self.inventory else { return };
+        let (mx, my) = self.mouse;
+        let icon = |out: &mut [u32]| {
+            if let Some(h) = &inv.hand_icon {
+                let mut t = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
+                h.draw(&mut t, Some(mx + 5), my + 0x1e, 0);
+            }
+        };
+        icon(out);
+        for (text, colour, x, y) in [
+            (&inv.hand_name, 0x0000_0000, mx, my + 0x5f),
+            (&inv.hand_name, 0x00ff_ffff, mx - 1, my + 0x5f - 1),
+            (&inv.info, 0x00ff_ffff, mx + 0x20, my),
+            (&inv.info, 0x0000_0000, mx + 0x20 - 1, my - 1),
+        ] {
+            self.draw_inventory_text(out, text, colour, x, y);
+        }
+        icon(out);
+    }
+
+    /// A `CIE_Text` of the inventory (@ 0x00451600): `AtlFont_Inventory`,
+    /// 300 wide, its height the text's at that width (@ 0x00461800), left
+    /// aligned (+0x80 0), top, in `colour` (a `COLORREF`).
+    fn draw_inventory_text(&self, out: &mut [u32], text: &str, colour: u32, x: i32, y: i32) {
+        if text.is_empty() {
+            return;
+        }
+        let w = INVENTORY_TEXT_WIDTH;
+        let h = self.fonts.text_height(INVENTORY_FONT, text, w);
+        let zone = crate::text::Zone::new(0, 0, 0, 0, menus::halign(0), 0);
+        let lines = self.fonts.lines(INVENTORY_FONT, text, w, h.max(1), zone);
+        self.fonts.draw(
+            INVENTORY_FONT,
+            &lines,
+            menus::rgb(colour),
+            out,
+            VIEW_WIDTH,
+            VIEW_HEIGHT,
+            x,
+            y,
+        );
     }
 
     /// The film's subtitle (@ 0x0042b220): black at the bottom centre,
@@ -3421,6 +3541,7 @@ impl Play {
             let (size, items) = self.game.script().inventory();
             let hand = self.game.script().handled_item().unwrap_or_default();
             self.stage.borrow_mut().inventory_open(size, items, hand);
+            self.inventory_hand_name();
             return;
         }
         if !self.menus.active() {
@@ -3519,6 +3640,7 @@ impl Play {
                 self.stage
                     .borrow_mut()
                     .inventory_open(size, items, Vec::new());
+                self.inventory_hand_name();
             }
             Err(e) => log::warn!("{e}"),
         }
@@ -3577,6 +3699,12 @@ impl Play {
             let (size, items) = self.game.script().inventory();
             let hand = self.game.script().handled_item().unwrap_or_default();
             self.stage.borrow_mut().inventory_refresh(size, items, hand);
+            self.inventory_hand_name();
+        }
+        // The bubble (@ 0x00416c50, after the events).
+        if self.stage.borrow().inventory_open_now() {
+            let mut st = self.stage.borrow_mut();
+            st.inventory_hover(|item| self.item_description(item));
         }
         // Its end: the manager's next mode (the examine view), or the
         // game manager's next request.
@@ -3816,7 +3944,32 @@ impl Play {
             }
         } else if st.inventory_open_now() || st.menu_open_now() {
             self.menus.draw_cursor(out);
+            st.draw_inventory_over_cursor(out);
         }
+    }
+
+    /// An item's description in the inventory (@ 0x00416c50,
+    /// @ 0x00414db0): the string `_item_<item>` of the texts, or the
+    /// program's `Description introuvable : _item_<item>` (0x0066bb34)
+    /// when there is none.
+    fn item_description(&self, item: &[u8]) -> String {
+        let name = String::from_utf8_lossy(item);
+        self.menus
+            .string_opt(&format!("_item_{name}"))
+            .unwrap_or_else(|| format!("Description introuvable : _item_{name}"))
+    }
+
+    /// The hand name's text after the inventory's elements are made
+    /// (@ 0x00414db0 when it opens, @ 0x00415fe0 after a click): the
+    /// hand's item's description, empty with an empty hand.
+    fn inventory_hand_name(&mut self) {
+        let hand = self.game.script().handled_item().unwrap_or_default();
+        let text = if hand.is_empty() {
+            String::new()
+        } else {
+            self.item_description(&hand)
+        };
+        self.stage.borrow_mut().inventory_set_hand_name(text);
     }
 
     /// The zones the player can click in this view (those the pick would
