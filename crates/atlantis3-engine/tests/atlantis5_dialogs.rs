@@ -270,6 +270,13 @@ fn the_autosave_is_written_and_loaded() {
     ] {
         assert!(text.contains(section), "{section}");
     }
+    // `CAMERA_MOVER` after `CONFIGURATION` (@ 0x00437f40): the free mode,
+    // its speeds, no boat.
+    let at = |s: &str| text.find(s).unwrap_or_else(|| panic!("{s}"));
+    assert!(at("<CONFIGURATION ") < at("<CAMERA_MOVER moving_type=\"0\""));
+    assert!(at("<CAMERA_MOVER ") < at("<CAMERA "));
+    assert!(text.contains("<MOVING_DATAS camera_speed_x="));
+    assert!(!text.contains("<FX_DATAS"));
     assert!(text.contains("<S v=\"yes\" sk=\"native_test\"/>"));
     assert!(text.contains("<N v=\"12.5\" sk=\"n\"/>"));
     assert!(text.contains("<CALLBACK_SHOOTER name=\"native_t\" duration=\"30\""));

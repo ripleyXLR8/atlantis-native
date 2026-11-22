@@ -1403,7 +1403,16 @@ impl Stage {
         }
         let voice = format!("datas/sounds/video/{}/{}.ogg", self.language, lossy(name));
         let sound = match (&self.audio, self.read(&voice)) {
-            (Some(a), Some(d)) => FilmSound::open(a, CHANNEL_CINEMA, d, 1.0),
+            // @ 0x00459630(name, 1.0): FMOD channel 7 at `ftol`(voice ×
+            // 1.0 × master × 1.0 × 255.0) (0x00459708..0x00459729), set
+            // once at the start: FMOD's 0..255 volume.
+            (Some(a), Some(d)) => {
+                #[allow(clippy::cast_possible_truncation)]
+                let v =
+                    (f64::from(self.config.voice) * f64::from(self.config.master) * 255.0) as i32;
+                #[allow(clippy::cast_precision_loss)]
+                FilmSound::open(a, CHANNEL_CINEMA, d, v as f32 / 255.0)
+            }
             _ => None,
         };
         // The film's subtitles (`kinematic_subtitles.xml`, by the film's
@@ -1477,6 +1486,114 @@ impl Stage {
     }
 
     // -- frame ---------------------------------------------------------------
+
+    /// `CAMERA_MOVER` (`CCameraMover :: Serialize` @ 0x00437f40, on a copy
+    /// of the camera controller): `moving_type` (`VT_I4`, the mode),
+    /// `moving_time` (a float, @ 0x00465390: the turn's time), `fx_type`
+    /// (`VT_I4`: 0 `BoatFx`, 1 `NoFx`), `fx_time` (the boat's clock); a
+    /// child `MOVING_DATAS` only in mode 0 (`camera_speed_x` the pitch
+    /// speed +0x08, `camera_speed_y` the yaw speed +0x0c, `decel_time`
+    /// the damping clock +0x10) or mode 2 (`sx`, `sy`, `sz` the turn's
+    /// start direction, `dx`, `dy`, `dz` its target), none in mode 1; a
+    /// child `FX_DATAS` only with `fx_type` 0: `qx`, `qy`, `qz`, `qw`, the
+    /// boat node's rotation relative to its parent (@ 0x0048a850).
+    fn camera_mover_section(&self) -> atlantis4_data::xml::Element {
+        use atlantis5_script::save::{attr_f32, element};
+        let mut e = element("CAMERA_MOVER");
+        e.attributes
+            .push(("moving_type".into(), self.mode.to_string()));
+        attr_f32(
+            &mut e,
+            "moving_time",
+            self.turn.as_ref().map_or(0.0, |t| t.t),
+        );
+        e.attributes.push((
+            "fx_type".into(),
+            if self.boat.is_some() { "0" } else { "1" }.into(),
+        ));
+        attr_f32(&mut e, "fx_time", self.boat.unwrap_or(0.0));
+        match self.mode {
+            0 => {
+                let mut m = element("MOVING_DATAS");
+                attr_f32(&mut m, "camera_speed_x", self.speed[1]);
+                attr_f32(&mut m, "camera_speed_y", self.speed[0]);
+                attr_f32(&mut m, "decel_time", self.damping);
+                e.children.push(m);
+            }
+            2 => {
+                let mut m = element("MOVING_DATAS");
+                let (from, to) = self
+                    .turn
+                    .as_ref()
+                    .map_or(([0.0; 3], [0.0; 3]), |t| (t.from, t.to));
+                for (n, v) in ["sx", "sy", "sz"].iter().zip(from) {
+                    attr_f32(&mut m, n, v);
+                }
+                for (n, v) in ["dx", "dy", "dz"].iter().zip(to) {
+                    attr_f32(&mut m, n, v);
+                }
+                e.children.push(m);
+            }
+            _ => {}
+        }
+        if self.boat.is_some() {
+            let mut f = element("FX_DATAS");
+            for (n, v) in ["qx", "qy", "qz", "qw"].iter().zip(self.boat_q) {
+                attr_f32(&mut f, n, v);
+            }
+            e.children.push(f);
+        }
+        e
+    }
+
+    /// `CSerializableCameraMover :: Deserialize` (@ 0x004383b0) and the
+    /// copy back into the controller (@ 0x0042d2b0, 0x0043b390): the mode,
+    /// the time, the speeds and the damping clock (mode 0) or the turn's
+    /// two vectors (mode 2), the boat's flag and clock, its node's
+    /// rotation when `fx_type` is 0 (the quaternion (0, 0, 0, 1) before
+    /// its four reads). The camera node is not re-parented (only `BoatFx`
+    /// does that): `on_boat` stays as it was. A missing element or
+    /// attribute throws in the original; Native keeps what it has.
+    fn read_camera_mover(&mut self, e: &atlantis4_data::xml::Element) {
+        use atlantis5_script::save::get_f64;
+        #[allow(clippy::cast_possible_truncation)]
+        let f = |e: &atlantis4_data::xml::Element, n: &str| get_f64(e, n).unwrap_or(0.0) as f32;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let mode = get_f64(e, "moving_type").unwrap_or(0.0) as u32;
+        let time = f(e, "moving_time");
+        self.mode = mode;
+        self.turn = None;
+        match (mode, e.child("MOVING_DATAS")) {
+            (0, Some(m)) => {
+                self.speed = [f(m, "camera_speed_y"), f(m, "camera_speed_x")];
+                self.damping = f(m, "decel_time");
+            }
+            (2, Some(m)) => {
+                self.turn = Some(Turn {
+                    t: time,
+                    from: [f(m, "sx"), f(m, "sy"), f(m, "sz")],
+                    to: [f(m, "dx"), f(m, "dy"), f(m, "dz")],
+                });
+            }
+            (0 | 2, None) => log::warn!("CAMERA_MOVER: no MOVING_DATAS"),
+            _ => {}
+        }
+        #[allow(clippy::cast_possible_truncation)]
+        let fx = get_f64(e, "fx_type").unwrap_or(1.0) as i32;
+        if fx == 0 {
+            self.boat = Some(f(e, "fx_time"));
+            match e.child("FX_DATAS") {
+                Some(q) => {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let qw = get_f64(q, "qw").unwrap_or(1.0) as f32;
+                    self.boat_q = [f(q, "qx"), f(q, "qy"), f(q, "qz"), qw];
+                }
+                None => log::warn!("CAMERA_MOVER: no FX_DATAS"),
+            }
+        } else {
+            self.boat = None;
+        }
+    }
 
     /// The camera's step (@ 0x0042cf80). Mode 0 (free): pitch and yaw
     /// turned by their speeds (@ 0x004444c0, 0x00444600: dt · speed ·
@@ -3251,9 +3368,8 @@ impl Engine for Stage {
     /// `pitch_limited`, `yaw`, `yaw_min`, `yaw_max`, `yaw_limited`),
     /// `SOUND` (@ 0x0043a4f0: a `PLAYLIST` with `channel` and `name` for
     /// each of the 5 channels playing a list) and `PERSISTANT_SPRITES`
-    /// (@ 0x00439f10: a `PS` with `name` and `time` each). The camera
-    /// mover's section (`CAMERA_MOVER`: its speeds and `BoatFx`) is not
-    /// written.
+    /// (@ 0x00439f10: a `PS` with `name` and `time` each); `CAMERA_MOVER`
+    /// after `CONFIGURATION` ([`Stage::camera_mover_section`]).
     fn save_sections(&mut self) -> Vec<atlantis4_data::xml::Element> {
         use atlantis5_script::save::{attr_bool, attr_f32, element};
         // `CConfiguration::Serialize` (@ 0x00429a60): `CONFIGURATION`
@@ -3308,11 +3424,14 @@ impl Engine for Stage {
             attr_f32(&mut e, "time", *time as f32);
             ps.children.push(e);
         }
-        vec![conf, cam, sound, ps]
+        vec![conf, self.camera_mover_section(), cam, sound, ps]
     }
 
     fn load_sections(&mut self, root: &atlantis4_data::xml::Element) {
         use atlantis5_script::save::{get_bool, get_f64};
+        if let Some(e) = root.child("CAMERA_MOVER") {
+            self.read_camera_mover(e);
+        }
         // `CConfiguration::Deserialize` (@ 0x00429e60, `./CONFIGURATION`):
         // each value through its setter; the reader runs it last, which
         // changes nothing here.
@@ -4690,6 +4809,53 @@ mod tests {
         s.config.music = 0.3;
         s.music_update(0.0);
         assert!((s.music_level() - 0.3).abs() < 1e-6);
+    }
+
+    /// `CAMERA_MOVER` written (@ 0x00437f40) and read back (@ 0x004383b0):
+    /// the mode with its speeds or turn, the boat's clock and node; the
+    /// camera's parent (`on_boat`) left as it was; a save without the
+    /// section (Native's older ones) changes nothing.
+    #[test]
+    fn the_camera_mover_section_round_trips() {
+        let mut s = stage();
+        s.call(&Call::CameraActivateFx(CameraFx::BoatFx([0.0, 0.0, 1.0])));
+        s.camera_step(0.7);
+        s.speed = [1.5, -0.25];
+        s.damping = 0.125;
+        let e = s.camera_mover_section();
+        let text = atlantis5_script::save::to_text(&e);
+        assert!(text.contains("moving_type=\"0\""), "{text}");
+        assert!(text.contains("fx_type=\"0\""), "{text}");
+        assert!(text.contains("camera_speed_x=\"-0.25\""), "{text}");
+        let mut t = stage();
+        t.read_camera_mover(&e);
+        assert_eq!((t.mode, t.speed, t.damping), (0, s.speed, s.damping));
+        assert_eq!(t.boat, s.boat);
+        assert!(t
+            .boat_q
+            .iter()
+            .zip(s.boat_q)
+            .all(|(a, b)| (a - b).abs() < 1e-6));
+        assert!(!t.on_boat, "not re-parented");
+        // A turn (mode 2), no boat: the two vectors, no FX_DATAS.
+        let mut s = stage();
+        s.start_turn(forward(10.0, 40.0));
+        s.camera_step(0.1);
+        let e = s.camera_mover_section();
+        assert!(e.child("FX_DATAS").is_none());
+        let mut t = stage();
+        t.read_camera_mover(&e);
+        assert_eq!(t.mode, 2);
+        let (a, b) = (t.turn.unwrap(), s.turn.clone().unwrap());
+        assert!((a.t - b.t).abs() < 1e-6);
+        assert!(a.to.iter().zip(b.to).all(|(x, y)| (x - y).abs() < 1e-6));
+        assert!(t.boat.is_none());
+        // No section: nothing changes.
+        let root = atlantis5_script::save::element("ATL_FILE");
+        let mut u = stage();
+        u.speed = [2.0, 3.0];
+        u.load_sections(&root);
+        assert_eq!(u.speed, [2.0, 3.0]);
     }
 
     #[test]
