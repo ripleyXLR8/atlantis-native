@@ -704,6 +704,36 @@ impl Walker {
         self.settle();
     }
 
+    /// Picks `subject` of `sprite`, whose script opens a board (poker):
+    /// frames until the board is up.
+    fn talk_open(&mut self, sprite: &str, subject: &str) {
+        self.empty_hand();
+        assert!(self.play.aim_at_sprite(sprite.as_bytes()), "{sprite}");
+        self.play.click();
+        let mut subjects = Vec::new();
+        for _ in 0..600 {
+            self.frames(1);
+            subjects = self.play.stage().menu_subjects();
+            if !subjects.is_empty() {
+                break;
+            }
+        }
+        let i = subjects
+            .iter()
+            .position(|s| s == subject.as_bytes())
+            .unwrap_or_else(|| panic!("{sprite}: no subject {subject}"));
+        let (x, y) = self.play.stage().menu_subject_point(i).expect("subject");
+        self.play.mouse_at(x, y);
+        self.play.click();
+        for _ in 0..600 {
+            self.frames(1);
+            if self.play.poker().is_some() {
+                return;
+            }
+        }
+        panic!("{sprite} {subject}: no board");
+    }
+
     fn reachable_or_here(&mut self, object: &str) -> Vec<i32> {
         let known = matches!(
             self.lua(&format!("atl.objects[\"{object}\"] ~= nil")),
@@ -1083,9 +1113,218 @@ fn chapter_6(w: &mut Walker) {
     w.touch_zone("floor14_out");
 }
 
+/// The 15-puzzle's shortest line (A*), as slots to click (the slot
+/// moved into the hole).
+fn sliding_solution(start: [u8; 16]) -> Vec<usize> {
+    use std::collections::BinaryHeap;
+    let h = |s: &[u8; 16]| -> u32 {
+        let mut d = 0;
+        for (i, &p) in s.iter().enumerate() {
+            if p != 16 {
+                let g = usize::from(p - 1);
+                d += (i / 4).abs_diff(g / 4) + (i % 4).abs_diff(g % 4);
+            }
+        }
+        u32::try_from(d).expect("small")
+    };
+    /// Each board's cost and the board and slot it came from.
+    type Seen = HashMap<[u8; 16], (u32, Option<([u8; 16], usize)>)>;
+    let mut best: Seen = HashMap::new();
+    let mut open = BinaryHeap::new();
+    best.insert(start, (0, None));
+    open.push(std::cmp::Reverse((3 * h(&start), 0u32, start)));
+    while let Some(std::cmp::Reverse((_, g, s))) = open.pop() {
+        if h(&s) == 0 {
+            let mut out = Vec::new();
+            let mut cur = s;
+            while let Some((_, Some((prev, slot)))) = best.get(&cur).copied() {
+                out.push(slot);
+                cur = prev;
+            }
+            out.reverse();
+            return out;
+        }
+        if best.get(&s).is_some_and(|b| b.0 < g) {
+            continue;
+        }
+        let e = s.iter().position(|&p| p == 16).expect("a hole");
+        let mut next = Vec::new();
+        if e >= 4 {
+            next.push(e - 4);
+        }
+        if e % 4 < 3 {
+            next.push(e + 1);
+        }
+        if e < 12 {
+            next.push(e + 4);
+        }
+        if e % 4 > 0 {
+            next.push(e - 1);
+        }
+        for slot in next {
+            let mut t = s;
+            t.swap(e, slot);
+            if best.get(&t).is_none_or(|b| b.0 > g + 1) {
+                best.insert(t, (g + 1, Some((s, slot))));
+                open.push(std::cmp::Reverse((g + 1 + 3 * h(&t), g + 1, t)));
+            }
+        }
+    }
+    panic!("no solution");
+}
+
+impl Walker {
+    /// `seconds` of play, then settled (a timer's handler runs).
+    fn wait(&mut self, seconds: f64) {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        self.frames((seconds * 30.0) as usize);
+        self.settle();
+    }
+
+    /// The poker board played to its end: on the panel (state 3) the
+    /// stake followed in games 1, 4 and 5 and stopped in 2 and 3 (the
+    /// scenario's strengths, as in `atlantis5_poker.rs`); Elliot's raise
+    /// (state 0xb) followed; each game's end (0xd) to the next.
+    fn play_poker(&mut self) {
+        for _ in 0..30_000 {
+            self.frames(1);
+            let Some(state) = self.play.poker().map(|p| p.state) else {
+                break;
+            };
+            if self.play.game.busy() {
+                continue;
+            }
+            let button = match state {
+                3 => match num(&self.lua("atl.puzzle.poker.game")) {
+                    2 | 3 => "stop_bet",
+                    _ => "follow_bet",
+                },
+                0xb => "follow_bet",
+                0xd => "next_game",
+                _ => continue,
+            };
+            assert!(self.play.click_poker(button), "{button}");
+        }
+        assert!(self.play.poker().is_none(), "the board ended");
+        self.settle();
+    }
+}
+
+/// Chapter 7, Macao (`chapter_07.lua`, `on_click_macao.lua`): the
+/// punter's rat race bet (the cash room behind the 15-puzzle, the
+/// password paper, the clerk's ticket); Ishtar's talk starts the
+/// blackout, for which the barman is made drunk (the bar's way to the
+/// technical room); Ishtar's money shows the gorilla the game, the paper's
+/// password gives the winch code; the winches raise the sail to the poker
+/// room, where the five games are won; Sing like Rain's talk then starts
+/// chapter 8.
+fn chapter_7(w: &mut Walker) {
+    // The punter's bet: his money, the cash room.
+    w.talk("punter-rat", "course_de_rat");
+    w.talk("punter-rat", "course_de_rat");
+    assert!(w.has("money_for_rat_run"));
+    w.touch("taquin_curtain");
+    let mut slots = [0u8; 16];
+    for (i, v) in slots.iter_mut().enumerate() {
+        *v = u8::try_from(num(&w.lua(&format!("atl.puzzle.taquin.slots[{}]", i + 1))))
+            .expect("a piece");
+    }
+    for slot in sliding_solution(slots) {
+        let id = i32::try_from(slot).expect("slot");
+        w.click_zone(id, &format!("taquin_slot_{slot}"));
+    }
+    assert_eq!(w.state("cash_room_door"), "open");
+    // The paper while the clerk sleeps; then he is woken.
+    w.touch("password_paper");
+    w.touch("cash_clerk");
+    w.wait(6.0);
+    w.use_on_sprite("money_for_rat_run", "cash_clerk");
+    w.talk("cash_clerk", "course_de_rat");
+    assert!(w.has("rat_run_ticket"));
+    w.use_on_sprite("rat_run_ticket", "punter-rat");
+    assert_eq!(w.flag("mission_punter_bet"), "done");
+    w.talk("punter-rat", "course_de_rat");
+    assert!(w.has("money_for_prostitute"));
+    w.talk("punter-rat", "partie_poker");
+    w.talk("punter-rat", "miss_sullivan");
+    assert_eq!(w.state("ishtar"), "gambling");
+    // Ishtar: the blackout.
+    w.talk("ishtar", "miss_sullivan");
+    w.talk("ishtar", "course_de_rat");
+    assert_eq!(w.flag("mission_blackout"), "in");
+    // The barman made drunk by the lady's drinks.
+    w.talk("prostitute", "dame_de_compagnie");
+    w.talk("barman", "payer_verre_dame_de_compagnie");
+    w.talk("barman", "ishtar");
+    w.talk("barman", "tripot");
+    w.talk("prostitute", "barman");
+    w.talk("prostitute", "barman");
+    assert_eq!(w.flag("d80"), "1");
+    w.use_on_sprite("money_for_prostitute", "barman");
+    // Three drinks, 15 s apart (the timer barman_drink).
+    w.wait(50.0);
+    assert_eq!(w.state("barman"), "asleep");
+    // The technical room, the generator's lever, out of its view before
+    // the gorilla puts the light back (10 s).
+    w.touch("technical_room_door");
+    w.touch_zone("elec_sys_lever");
+    assert_eq!(w.address().1, 21);
+    w.walk(22);
+    w.wait(12.0);
+    assert_eq!(w.flag("mission_blackout"), "done");
+    // Ishtar again: the poker money.
+    w.talk("ishtar", "course_de_rat");
+    w.talk("ishtar", "miss_sullivan");
+    w.talk("ishtar", "medaillon");
+    w.talk("ishtar", "bas_relief");
+    w.talk("ishtar", "partie_poker");
+    assert!(w.has("money_for_poker"));
+    // The gorilla: the money shown, the paper's password (1, 8, 12).
+    w.use_on_sprite("money_for_poker", "macao_gorilla-guard");
+    w.talk("macao_gorilla-guard", "partie_poker");
+    for mdp in ["mdp_01", "mdp_08", "mdp_12"] {
+        w.talk("macao_gorilla-guard", mdp);
+    }
+    assert!(w.has("winch_code"));
+    // The winches, to the states Atl_PuzzleWinch_Check asks (3, −4, 2).
+    w.talk("ishtar", "partie_poker");
+    assert_eq!(w.address().1, 18);
+    for (winch, target) in [(1, 3), (2, -4), (3, 2)] {
+        loop {
+            let now = num(&w.lua(&format!("atl.puzzle.winch.states[{winch}]")));
+            if now == target {
+                break;
+            }
+            let way = if now < target {
+                "winch_right"
+            } else {
+                "winch_left"
+            };
+            w.empty_hand();
+            w.click_zone(winch, way);
+        }
+    }
+    assert_eq!(w.state("veil"), "up");
+    // The poker room: the three players' subjects, the seat, the game.
+    w.touch_zone("poker_room_in");
+    w.talk("ishtar-poker", "partie_poker");
+    w.touch_zone("poker_seat");
+    w.talk("punter-poker", "parieur");
+    w.talk("fisherman_boss", "patron_pecheur");
+    w.talk("elliot", "elliot");
+    w.talk_open("punter-poker", "commencer_poker");
+    w.play_poker();
+    assert_eq!(w.state("ishtar"), "kidnapped");
+    // Sing like Rain.
+    w.talk("sing_like_rain", "ishtar");
+    w.talk("sing_like_rain", "sing_like_rain");
+    w.talk("sing_like_rain", "medaillon");
+    w.talk("sing_like_rain", "ishtar");
+}
+
 /// The chapters' plays, in order.
-const CHAPTERS: [fn(&mut Walker); 6] = [
-    chapter_1, chapter_2, chapter_3, chapter_4, chapter_5, chapter_6,
+const CHAPTERS: [fn(&mut Walker); 7] = [
+    chapter_1, chapter_2, chapter_3, chapter_4, chapter_5, chapter_6, chapter_7,
 ];
 
 /// A new game played through chapter `n`: the chapters before it set
@@ -1152,4 +1391,9 @@ fn chapter_05() {
 #[test]
 fn chapter_06() {
     play_chapter(6);
+}
+
+#[test]
+fn chapter_07() {
+    play_chapter(7);
 }
