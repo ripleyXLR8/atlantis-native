@@ -158,8 +158,14 @@ fn zone_id(play: &mut Play, name: &str, id: i32) {
 /// The first view of `views` in `scene` that has an active zone `name`.
 fn view_with_zone(play: &mut Play, scene: &str, views: &[i32], name: &str) -> i32 {
     for &v in views {
-        go(play, scene, v);
-        if play.zones().iter().any(|z| z.1 == name.as_bytes()) {
+        // Some views send on to another as they are entered.
+        run(
+            play,
+            &format!("Atl_Address_Go(\"{scene}\", {v}, \"no_fx\")"),
+        );
+        if play.stage().address() == Some((scene.as_bytes().to_vec(), v))
+            && play.zones().iter().any(|z| z.1 == name.as_bytes())
+        {
             return v;
         }
     }
@@ -424,7 +430,9 @@ fn sliding_solution(start: [u8; 16]) -> Vec<usize> {
         }
         u32::try_from(d).expect("small")
     };
-    let mut best: HashMap<[u8; 16], (u32, Option<([u8; 16], usize)>)> = HashMap::new();
+    /// Each board's cost and the board and slot it came from.
+    type Seen = HashMap<[u8; 16], (u32, Option<([u8; 16], usize)>)>;
+    let mut best: Seen = HashMap::new();
     let mut open = BinaryHeap::new();
     best.insert(start, (0, None));
     open.push(std::cmp::Reverse((3 * h(&start), 0u32, start)));
@@ -556,4 +564,226 @@ fn winch() {
     assert_eq!(play.game.zone(b"winch_left").map(|z| z.1), Some(false));
     assert_eq!(play.game.zone(b"poker_room_in").map(|z| z.1), Some(true));
     shot(&play, "a5-puzzle-winch.png");
+}
+
+#[test]
+fn vishnu_chest() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 8);
+    go(&mut play, "ishtar", 20);
+    // Each click turns an arm to its next of six places; 4 4 2 4 opens.
+    for _ in 0..6 {
+        sprite(&mut play, "vishnu_arm_1");
+    }
+    assert_eq!(
+        int(&lua(&mut play, "atl.puzzle.vishnu_chest.arm_state[1]")),
+        1,
+        "round"
+    );
+    for (arm, target) in [(1, 4), (2, 4), (3, 2), (4, 4)] {
+        assert_eq!(
+            lua(
+                &mut play,
+                "Atl_Object_GetState(\"ishtar_palace_chest_lid\")"
+            ),
+            s("closed")
+        );
+        while int(&lua(
+            &mut play,
+            &format!("atl.puzzle.vishnu_chest.arm_state[{arm}]"),
+        )) != target
+        {
+            sprite(&mut play, &format!("vishnu_arm_{arm}"));
+        }
+    }
+    assert_eq!(
+        lua(
+            &mut play,
+            "Atl_Object_GetState(\"ishtar_palace_chest_lid\")"
+        ),
+        s("open")
+    );
+    assert!(anim(&play, "vishnu_arm_1").is_none());
+    shot(&play, "a5-puzzle-vishnu-chest.png");
+}
+
+/// The buttons of a 3 × 5 lights-out grid (`OnClicked`'s neighbours: ±5,
+/// +1 unless at a row's end, −1 unless at its start) that turn every
+/// light off from all on: the first subset found.
+fn light_out_solution() -> Vec<i32> {
+    let toggles = |b: i32| -> u32 {
+        let mut m = 1 << (b - 1);
+        if b - 5 > 0 {
+            m |= 1 << (b - 6);
+        }
+        if b + 5 < 16 {
+            m |= 1 << (b + 4);
+        }
+        if b % 5 != 0 {
+            m |= 1 << b;
+        }
+        if b % 5 != 1 {
+            m |= 1 << (b - 2);
+        }
+        m
+    };
+    (1u32..1 << 15)
+        .map(|set| {
+            let presses: Vec<i32> = (1..=15).filter(|b| set & (1 << (b - 1)) != 0).collect();
+            let lit = presses.iter().fold(0x7fff, |g, &b| g ^ toggles(b));
+            (presses, lit)
+        })
+        .find(|(_, lit)| *lit == 0)
+        .map(|(p, _)| p)
+        .expect("a solution")
+}
+
+#[test]
+fn light_out() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 8);
+    go(&mut play, "ishtar", 18);
+    let presses = light_out_solution();
+    // One press and back: unsolved, as before.
+    zone_id(&mut play, "light_out", presses[0]);
+    zone_id(&mut play, "light_out", presses[0]);
+    assert_eq!(
+        lua(&mut play, "Atl_PuzzleLightOut_Check()"),
+        Value::Bool(false)
+    );
+    for &b in &presses {
+        assert_eq!(
+            lua(&mut play, "Atl_Object_GetState(\"vishnu_statuette\")"),
+            s("closed")
+        );
+        zone_id(&mut play, "light_out", b);
+    }
+    // The statuette opens on the ruby; the buttons go off.
+    assert_eq!(
+        lua(&mut play, "Atl_Object_GetState(\"vishnu_statuette\")"),
+        s("open")
+    );
+    assert_eq!(play.game.zone(b"light_out").map(|z| z.1), Some(false));
+    shot(&play, "a5-puzzle-light-out.png");
+}
+
+#[test]
+fn sudoku() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 8);
+    go(&mut play, "ishtar", 30);
+    // The grid `DoSudoku` (the scripts' own debug shortcut) sets: the
+    // answer.
+    const ANSWER: [i32; 81] = [
+        7, 3, 2, 4, 9, 8, 5, 1, 6, 4, 5, 1, 7, 6, 2, 9, 3, 8, 9, 6, 8, 5, 1, 3, 4, 7, 2, 6, 7, 4,
+        3, 8, 1, 2, 9, 5, 1, 9, 5, 2, 4, 7, 8, 6, 3, 8, 2, 3, 6, 5, 9, 1, 4, 7, 3, 1, 7, 8, 2, 4,
+        6, 5, 9, 5, 8, 9, 1, 3, 6, 7, 2, 4, 2, 4, 6, 9, 7, 5, 3, 8, 1,
+    ];
+    // The given figures have no zone.
+    assert!(!play.zones().iter().any(|z| z.0 == 3 && z.1 == b"sudoku"));
+    for (i, &v) in ANSWER.iter().enumerate() {
+        let case = i32::try_from(i + 1).expect("case");
+        while int(&lua(&mut play, &format!("atl.puzzle.sudoku.grid[{case}]"))) != v {
+            assert_eq!(play.stage().address(), Some((b"ishtar".to_vec(), 30)));
+            zone_id(&mut play, "sudoku", case);
+        }
+    }
+    // Solved: film is0005, then view 27.
+    assert_eq!(
+        lua(&mut play, "Atl_PuzzleSudoku_Check()"),
+        Value::Bool(true)
+    );
+    assert_eq!(play.stage().address(), Some((b"ishtar".to_vec(), 27)));
+}
+
+#[test]
+fn lazer() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 8);
+    // The four slots lit as the story lights them (on_click_ishtar.lua).
+    run(
+        &mut play,
+        "for i = 1, 4 do Atl_Zone_SetActivity(\"gem_slot_\"..i, true) end",
+    );
+    let views: Vec<i32> = (14..=26).collect();
+    let view = view_with_zone(&mut play, "ishtar", &views, "gem_slot_1");
+    let put = |play: &mut Play, stone: &str, slot: i32| {
+        let name = format!("gem_slot_{slot}");
+        if !play.zones().iter().any(|z| z.1 == name.as_bytes()) {
+            view_with_zone(play, "ishtar", &views, &name);
+        }
+        run(play, &format!("Atl_Hero_SetHandledItem(\"{stone}\")"));
+        let id = play
+            .zones()
+            .into_iter()
+            .find(|z| z.1 == name.as_bytes())
+            .map(|z| z.0)
+            .expect("the slot");
+        zone_id(play, &name, id);
+    };
+    // A wrong stone in slot 1, taken back with an empty hand.
+    put(&mut play, "ruby", 1);
+    assert_eq!(lua(&mut play, "atl.puzzle.lazer.slots[1]"), s("ruby"));
+    let id = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1 == b"gem_slot_1")
+        .map(|z| z.0)
+        .expect("slot 1");
+    zone_id(&mut play, "gem_slot_1", id);
+    assert_eq!(lua(&mut play, "atl.hero.handled_item"), s("ruby"));
+    run(&mut play, "Atl_Hero_SetHandledItem(nil)");
+    for (slot, stone) in [
+        (1, "emerald"),
+        (2, "sapphire"),
+        (3, "ruby"),
+        (4, "moon_stone"),
+    ] {
+        assert_eq!(
+            lua(&mut play, "Atl_Flag_Get(\"mission_light_ray\")") == s("done"),
+            false
+        );
+        put(&mut play, stone, slot);
+    }
+    assert_eq!(lua(&mut play, "Atl_PuzzleLazer_Check()"), Value::Bool(true));
+    assert_eq!(
+        lua(&mut play, "Atl_Flag_Get(\"mission_light_ray\")"),
+        s("done")
+    );
+    shot(&play, &format!("a5-puzzle-lazer-{view}.png"));
+}
+
+#[test]
+fn bas_relief() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 8);
+    // Ishtar on the flagstone lights the bas-relief (info_bas_relief).
+    run(&mut play, "Atl_Zone_SetActivity(\"bas_relief\", true)");
+    let view = view_with_zone(
+        &mut play,
+        "ishtar",
+        &(1..=40).collect::<Vec<_>>(),
+        "bas_relief",
+    );
+    // Six wrong presses: the code starts again.
+    for _ in 0..6 {
+        zone_id(&mut play, "bas_relief", 1);
+    }
+    assert_eq!(
+        int(&lua(&mut play, "atl.puzzle.bas_relief.code_counter")),
+        0
+    );
+    for part in [1, 2, 2, 2, 1, 1] {
+        assert_eq!(
+            lua(&mut play, "Atl_Object_GetState(\"ishtar_palace_door_2\")"),
+            s("closed")
+        );
+        zone_id(&mut play, "bas_relief", part);
+    }
+    assert_eq!(
+        lua(&mut play, "Atl_Object_GetState(\"ishtar_palace_door_2\")"),
+        s("open")
+    );
+    assert_eq!(play.game.zone(b"bas_relief").map(|z| z.1), Some(false));
+    shot(&play, &format!("a5-puzzle-bas-relief-{view}.png"));
 }
