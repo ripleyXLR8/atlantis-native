@@ -659,14 +659,19 @@ impl Menus {
         )
     }
 
-    /// @ 0x0041e8b0: `graphic_quality` + " : " + `high` (Native draws in
-    /// 32 bits) [INFERRED: the display format's test is not fully read].
-    fn graphic_label(&self, _config: &Config) -> String {
-        format!(
-            "{} : {}",
-            self.string("graphic_quality"),
-            self.string("high")
-        )
+    /// @ 0x0041e8b0: `graphic_quality` + " : " + `high` (0x0066bdf4) when
+    /// the display's pixel format (@ 0x0048d660) is `x8r8g8b8` (0x96) or
+    /// `a8r8g8b8` (0x9a), else `low` (0x0066be0c). The display follows
+    /// `graphic_quality` (@ 0x00429950: 1 → 0x96, 0 → `r5g6b5` 0x8a), so
+    /// the label is `high` for 1, `low` for 0. Native keeps drawing in 32
+    /// bits (the 16-bit look is [UNKNOWN]).
+    fn graphic_label(&self, config: &Config) -> String {
+        let q = if config.graphic_quality == 1 {
+            "high"
+        } else {
+            "low"
+        };
+        format!("{} : {}", self.string("graphic_quality"), self.string(q))
     }
 
     /// @ 0x0041e8b0: `screen_size` + " 4/3" (0x0066bde4) or " 16/9"
@@ -1022,13 +1027,27 @@ impl Menus {
             LOAD => self.load_click(m, name),
             SAVE => self.save_click(m, name),
             GRAPHIC => {
-                // @ 0x0041edd0: `back` → mode 2; `depth` and `screen_size`
-                // change the display mode (not ported: logged).
-                if name == "back" {
-                    self.request(IN_GAME);
-                    m.closed = true;
-                } else {
-                    log::info!("graphic option {name}: the display mode is not changed");
+                // @ 0x0041edd0: `back` → mode 2; `depth`: `graphic_quality`
+                // 0 when it was 1, else 1 (0x0041ee4d..0x0041ee6d), the
+                // display switched to that format (@ 0x0044d590, not
+                // ported: Native draws in 32 bits), then the page's init
+                // again (@ 0x0041e8b0): its label. `screen_size` changes
+                // the display mode (not ported: logged).
+                match name {
+                    "back" => {
+                        self.request(IN_GAME);
+                        m.closed = true;
+                    }
+                    "depth" => {
+                        config.graphic_quality = i32::from(config.graphic_quality != 1);
+                        self.effects.push(Effect::Config);
+                        m.set_text("depth", self.graphic_label(config));
+                        log::info!(
+                            "graphic_quality {}: the display stays in 32 bits",
+                            config.graphic_quality
+                        );
+                    }
+                    _ => log::info!("graphic option {name}: the display mode is not changed"),
                 }
             }
             SOUND => self.sound_click(m, name, config),

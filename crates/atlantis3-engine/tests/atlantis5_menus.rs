@@ -249,6 +249,18 @@ fn the_option_pages_change_the_configuration() {
     frames(&mut play, 1);
     assert_eq!(play.menus.current(), Some(menus::GRAPHIC));
     let _ = shot(&play, "a5-graphic-page.png");
+    // `depth` (0x0041ee4d..0x0041ee6d): graphic_quality 1 ↔ 0, the label
+    // `high` ↔ `low` (@ 0x0041e8b0).
+    let string = |play: &Play, k: &str| play.menus.strings.get(k).unwrap_or("").to_string();
+    let (high, low) = (string(&play, "high"), string(&play, "low"));
+    assert!(!high.is_empty() && !low.is_empty() && high != low);
+    assert!(element(&play, "depth").0.ends_with(&high));
+    click(&mut play, "depth");
+    assert_eq!(play.stage().config.graphic_quality, 0);
+    assert!(element(&play, "depth").0.ends_with(&low));
+    click(&mut play, "depth");
+    assert_eq!(play.stage().config.graphic_quality, 1);
+    assert!(element(&play, "depth").0.ends_with(&high));
     click(&mut play, "back");
     frames(&mut play, 1);
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
