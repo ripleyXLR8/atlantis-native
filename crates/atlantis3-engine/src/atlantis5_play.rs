@@ -596,6 +596,12 @@ pub struct Stage {
     /// The camera node hangs under that node (from `BoatFx` until
     /// `NoFx`), so its world rotation is boat_q ⊗ its own.
     on_boat: bool,
+    /// The camera node's own rotation as a re-parenting left it (`BoatFx`
+    /// @ 0x0042ccc0, `NoFx` @ 0x0042cd50 keep its world rotation), until
+    /// the next step that rebuilds it from the angles (the mode-0 step
+    /// @ 0x0042cf80 or a turn's step, through the setters @ 0x004444c0 →
+    /// 0x0048a5a0 / 0x0048aa90). `None`: the angles' rotation.
+    cam_override: Option<Quat>,
     /// Persistent sprites: object, priority, seconds played.
     persistent: Vec<(Vec<u8>, i32, f64)>,
     music: [MusicChannel; MUSIC_CHANNELS],
@@ -688,6 +694,7 @@ impl Stage {
             boat: None,
             boat_q: [0.0, 0.0, 0.0, 1.0],
             on_boat: false,
+            cam_override: None,
             persistent: Vec::new(),
             music: Default::default(),
             music_tick: 0.0,
@@ -747,6 +754,9 @@ impl Stage {
         c.q = [0.0, 0.0, 0.0, 1.0];
         c.yaw(fpu.f32(fpu.mul(fpu.mul(-f64::from(self.yaw), pi), inv180)));
         c.pitch(fpu.f32(fpu.mul(fpu.mul(f64::from(self.pitch), pi), inv180)));
+        if let Some(q) = self.cam_override {
+            c.q = q;
+        }
         // Under the boat's node the world rotation (what the draw and the
         // picks read, @ 0x0048a850 relative to the root) is the parent's
         // world rotation times the node's own (@ 0x0048aff0 →
@@ -1378,6 +1388,8 @@ impl Stage {
         }
         match self.mode {
             0 => {
+                // The setters rebuild the node's rotation every step.
+                self.cam_override = None;
                 let pi = f32::from_bits(0x4049_0fdb);
                 let pitch = self.pitch + dt * self.speed[1] * 180.0 / pi;
                 self.set_pitch(pitch);
@@ -1396,6 +1408,7 @@ impl Stage {
                     return true;
                 };
                 let ((pitch, yaw), end) = turn.step(dt);
+                self.cam_override = None;
                 self.set_pitch(pitch);
                 self.set_yaw(yaw);
                 end
@@ -2684,6 +2697,7 @@ impl Stage {
         self.look_turn = None;
         self.boat = None;
         self.on_boat = false;
+        self.cam_override = None;
         self.speed = [0.0; 2];
         for ch in 0..MUSIC_CHANNELS {
             self.music_stop(ch, 0.0);
@@ -2882,16 +2896,27 @@ impl Engine for Stage {
                     // its parent (+0x68 = +0x28 + 0x40: the root, from its
                     // constructor @ 0x0048a3c0) set to the look rotation of
                     // the vector with up (0, −1, 0) (@ 0x0048f7e0); the
-                    // clock +0x24 = 0. (The kept world transform lasts until
-                    // the setters rebuild the camera node's own rotation
-                    // from the angles, which Native always does.)
+                    // clock +0x24 = 0. The re-parenting comes first: the
+                    // camera's own rotation becomes N⁻¹ ⊗ W (N the node's
+                    // rotation at the call, W the camera's world one), and
+                    // then N = L, so until the setters rebuild the camera
+                    // from the angles (the rest of a transition's frames)
+                    // the view is L ⊗ N⁻¹ ⊗ W (play.md § 2). The inverse
+                    // of the unit quaternion N: its conjugate.
+                    let world = self.camera().q;
+                    let n = self.boat_q;
+                    let n_inv = [-n[0], -n[1], -n[2], n[3]];
+                    self.cam_override = Some(quat_mul(&n_inv, &world));
                     self.boat = Some(0.0);
                     self.boat_q = look_rotation(v, &[0.0, -1.0, 0.0]);
                     self.on_boat = true;
                 }
                 CameraFx::NoFx => {
                     // @ 0x0042cd50: +0x20 = 1, +0x24 = 0, the camera node
-                    // back under the root (@ 0x0048ac60 with 1).
+                    // back under the root (@ 0x0048ac60 with 1), keeping
+                    // its world rotation until the next rebuild; the
+                    // controller's node N keeps its last rotation.
+                    self.cam_override = Some(self.camera().q);
                     self.boat = None;
                     self.on_boat = false;
                 }
@@ -4375,9 +4400,24 @@ mod tests {
         s.restore_mode(0);
         s.set_pitch(0.0);
         s.set_yaw(30.0);
-        // NoFx: the camera back under the root.
+        // NoFx: the camera back under the root, its world rotation kept
+        // until the next free step rebuilds it from the angles.
+        let world = s.camera().q;
+        let n = s.boat_q;
         s.call(&Call::CameraActivateFx(CameraFx::NoFx));
         assert!(!s.on_boat && s.boat.is_none());
+        assert_eq!(s.camera().q, world);
+        assert_eq!(s.boat_q, n, "the node keeps its rotation");
+        assert!(s.camera_step(0.0));
         assert_eq!(s.camera().q, still);
+        // BoatFx again: the view L ⊗ N⁻¹ ⊗ W = R(−a) ⊗ q until the next
+        // free step (play.md § 2).
+        s.call(&Call::CameraActivateFx(CameraFx::BoatFx([0.0, 0.0, 1.0])));
+        let n_inv = [-n[0], -n[1], -n[2], n[3]];
+        let want = quat_mul(&n_inv, &still);
+        assert!(s.camera().q.iter().zip(want).all(|(x, y)| (x - y).abs() < 1e-6));
+        assert!(s.camera_step(0.0));
+        let q = s.camera().q;
+        assert!(q.iter().zip(still).all(|(x, y)| (x - y).abs() < 1e-6));
     }
 }
