@@ -566,6 +566,9 @@ pub struct Stage {
     yaw: f32,
     /// Radians.
     pub fov: f32,
+    /// The `zoom_and_fade` transition's fade amount k (the transition's
+    /// +0x0c, 0..1), drawn over the view (@ 0x0042e640); 0 outside it.
+    pub fade: f32,
     yaw_limit: Option<(f32, f32)>,
     pitch_limit: Option<(f32, f32)>,
     /// The mouse look's speeds (+0x0c yaw, +0x08 pitch, degrees per second
@@ -681,6 +684,7 @@ impl Stage {
             pitch: 0.0,
             yaw: 0.0,
             fov: f32::from_bits(0x4049_0fdb) * 76.0 * f32::from_bits(0x3bb6_0b61),
+            fade: 0.0,
             yaw_limit: None,
             pitch_limit: None,
             speed: [0.0; 2],
@@ -1575,6 +1579,9 @@ impl Stage {
             face: FACE,
         });
         r.render(&faces, &cam.matrix(), cam.projection(), out);
+        if self.fade > 0.0 {
+            darken(out, self.fade);
+        }
         self.draw_menu(out);
         self.draw_inventory(out);
         self.draw_dialog(out);
@@ -2698,6 +2705,7 @@ impl Stage {
         self.boat = None;
         self.on_boat = false;
         self.cam_override = None;
+        self.fade = 0.0;
         self.speed = [0.0; 2];
         for ch in 0..MUSIC_CHANNELS {
             self.music_stop(ch, 0.0);
@@ -2990,8 +2998,11 @@ impl Engine for Stage {
                     log::warn!("view {} {view}: {e}", lossy(scene));
                 }
             }
-            Request::TransitionFov { radians, .. } => self.fov = *radians,
-            Request::TransitionEnd => {}
+            Request::TransitionFov { radians, fade } => {
+                self.fov = *radians;
+                self.fade = *fade;
+            }
+            Request::TransitionEnd => self.fade = 0.0,
             Request::DeleteAutosave => {
                 // @ 0x0042fc50: `saves/autoslot` deleted.
                 if let Some(d) = &self.save_dir {
@@ -3200,6 +3211,21 @@ impl Engine for Stage {
 
     fn camera_restore(&mut self, mode: u32) {
         self.restore_mode(mode);
+    }
+}
+
+/// The `zoom_and_fade` transition's fade (@ 0x0042e640, fx 2): a surface
+/// of the display's size filled with 0x7f000000 (@ 0x0048de80) blended
+/// over the view with α = `__ftol`(k · 255.0) (0x00655750) by @ 0x0047a8a4
+/// (32 bits per pixel; MMX, c′ = (c · 256 + (s − c) · α) >> 8 with s = 0
+/// for the colour bytes): c′ = (c · (256 − α)) >> 8 on R, G and B.
+fn darken(out: &mut [u32], k: f32) {
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let a = (f64::from(k) * 255.0) as u32;
+    let keep = 256 - a.min(256);
+    for p in out.iter_mut() {
+        let c = |sh: u32| ((((*p >> sh) & 0xff) * keep) >> 8) << sh;
+        *p = (*p & 0xff00_0000) | c(16) | c(8) | c(0);
     }
 }
 
@@ -4370,6 +4396,32 @@ mod tests {
         assert_eq!(next, [&b"Tick1"[..], b"Stand", b"Tick1"]);
     }
 
+    /// `zoom_and_fade`'s darkening (@ 0x0047a8a4): c′ = (c · (256 −
+    /// ftol(k · 255))) >> 8, black at k = 1; kept from the transition's
+    /// requests until its end.
+    #[test]
+    fn the_transition_fade_darkens_the_view() {
+        let mut px = [0x00ff_8040u32, 0x0001_0203];
+        darken(&mut px, 0.5);
+        // α = ftol(127.5) = 127: 256 − 127 = 129.
+        assert_eq!(
+            px[0],
+            (((255 * 129) >> 8) << 16) | (((0x80 * 129) >> 8) << 8) | ((0x40 * 129) >> 8)
+        );
+        assert_eq!(px[1], 0x0000_0101);
+        let mut px = [0x00ff_ffffu32];
+        darken(&mut px, 1.0);
+        assert_eq!(px[0], 0);
+        let mut s = stage();
+        s.request(&Request::TransitionFov {
+            radians: 1.0,
+            fade: 0.25,
+        });
+        assert_eq!((s.fov, s.fade), (1.0, 0.25));
+        s.request(&Request::TransitionEnd);
+        assert_eq!(s.fade, 0.0);
+    }
+
     #[test]
     fn boat_fx_rocks_the_camera_about_x() {
         let mut s = stage();
@@ -4415,7 +4467,12 @@ mod tests {
         s.call(&Call::CameraActivateFx(CameraFx::BoatFx([0.0, 0.0, 1.0])));
         let n_inv = [-n[0], -n[1], -n[2], n[3]];
         let want = quat_mul(&n_inv, &still);
-        assert!(s.camera().q.iter().zip(want).all(|(x, y)| (x - y).abs() < 1e-6));
+        assert!(s
+            .camera()
+            .q
+            .iter()
+            .zip(want)
+            .all(|(x, y)| (x - y).abs() < 1e-6));
         assert!(s.camera_step(0.0));
         let q = s.camera().q;
         assert!(q.iter().zip(still).all(|(x, y)| (x - y).abs() < 1e-6));

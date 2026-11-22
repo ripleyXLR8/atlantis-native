@@ -384,3 +384,42 @@ fn the_in_game_menu_freezes_the_sprites() {
     assert_eq!(play.game.state(), 4);
     assert!(moved, "stepped again in play");
 }
+
+/// `zoom_and_fade` (@ 0x0042e640, fx 2): the view darkened by
+/// (256 − ftol(k · 255)) / 256 while the transition runs, black at its
+/// view change, no cursor; the view as before once it ends.
+#[test]
+fn zoom_and_fade_darkens_the_view() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    go(&mut play, 8);
+    let mean = |px: &[u32]| -> u64 {
+        px.iter()
+            .map(|p| u64::from((p >> 16) & 0xff) + u64::from((p >> 8) & 0xff) + u64::from(p & 0xff))
+            .sum::<u64>()
+            / px.len() as u64
+    };
+    let before = mean(&shot(&play, "a5-fade-before.png"));
+    assert!(before > 20, "a lit view");
+    assert!(play
+        .game
+        .run_string("return function() Atl_Address_Go(\"zeppelin\", 17, \"zoom_and_fade\") end"));
+    let mut darkest = u64::MAX;
+    let mut cursor = false;
+    for _ in 0..60 {
+        frames(&mut play, 1);
+        if play.game.transition_fx().is_some() {
+            darkest = darkest.min(mean(&shot(&play, "a5-fade.png")));
+            cursor |= play.cursor_drawn();
+        }
+        if !play.game.busy() && play.game.transition_fx().is_none() {
+            break;
+        }
+    }
+    assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 17)));
+    assert!(darkest < 2, "black at the view change: {darkest}");
+    assert!(!cursor, "no cursor during the fade");
+    frames(&mut play, 2);
+    assert_eq!(play.stage().fade, 0.0);
+    assert!(mean(&shot(&play, "a5-fade-after.png")) > 20);
+}
