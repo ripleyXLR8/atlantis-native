@@ -8,7 +8,8 @@
 //! system cursor hidden and kept in the window) and a left click acts on
 //! what is under the screen centre; Escape or Space ends a film, Space a
 //! dialog, a left click a tirade; the right button opens the inventory or
-//! puts the hand's object back; Escape in play opens the in-game menu. The
+//! puts the hand's object back; Escape in play opens the in-game menu; F11
+//! switches between the window and the full screen (the port's own). The
 //! game starts in the main menu; in the menus the mouse moves the game's
 //! cursor. Its `quit_game`, or closing the window, ends the program. The
 //! saves go to the data folder's `atlantis5/saves`. The game's cursors in
@@ -46,6 +47,31 @@ pub fn open(path: &Path) -> Result<(Atlantis5Source, String), String> {
         src.languages().join(", ")
     );
     Ok((src, label))
+}
+
+/// How the game library shows the data at `path`: the game's name, the
+/// year, the medium and the language ("The Secrets of Atlantis : L'Héritage
+/// sacré (2006), DVD, French"); with the DVD's image, "DVD image"; with
+/// an install or the extracted cabinets, "DVD, installed".
+pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError> {
+    use atlantis3_data::atlantis5::Form;
+    let src = Atlantis5Source::open(path)?;
+    let medium = match src.form() {
+        Form::DiscFolder => "DVD",
+        Form::DiscImage => "DVD image",
+        Form::Tree => "DVD, installed",
+    };
+    let lang = language(&src);
+    let mut lang_name = String::new();
+    let mut chars = lang.chars();
+    if let Some(c) = chars.next() {
+        lang_name.extend(c.to_uppercase());
+        lang_name.extend(chars);
+    }
+    Ok(format!(
+        "{} (2006), {medium}, {lang_name}",
+        crate::setup::GameKind::Atlantis5.name()
+    ))
 }
 
 /// The first view's picture (1024 × 576 x8r8g8b8).
@@ -263,6 +289,16 @@ impl ApplicationHandler for A5App {
                     Key::Named(NamedKey::Escape) => self.play.escape(),
                     // Space (0x39): a film or a dialog ends.
                     Key::Named(NamedKey::Space) => self.play.space(),
+                    // The port's own, as in the other games: F11 switches
+                    // between the window and the full screen.
+                    Key::Named(NamedKey::F11) => {
+                        self.fullscreen = !self.fullscreen;
+                        if let Some(w) = &self.window {
+                            w.set_fullscreen(
+                                self.fullscreen.then_some(Fullscreen::Borderless(None)),
+                            );
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -301,9 +337,22 @@ impl ApplicationHandler for A5App {
     }
 }
 
-/// Opens a window and plays a new game from the data at `path`; returns
-/// when the window is closed.
+/// Opens a window and plays the game from the data at `path` (its main
+/// menu first); returns when the window is closed.
 pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
+    let mut el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
+    run_window_on(&mut el, path, fullscreen).map(|_| ())
+}
+
+/// [`run`] on the program's event loop (the game chosen in the game
+/// library, or a folder given to the program): the window opens, the game
+/// plays until its `quit_game` or the window's closing.
+pub fn run_window_on(
+    el: &mut EventLoop<()>,
+    path: &Path,
+    fullscreen: bool,
+) -> Result<crate::a2::Ended, String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     let (src, label) = open(path)?;
     log::info!("{label}");
     let lang = language(&src);
@@ -316,16 +365,16 @@ pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
     let mut play = Play::new(src, &lang, Some(audio))?;
     // The saves (`saves/autoslot`, `slot_<n>`) in the player's data
     // folder; their dates in local time.
-    play.set_save_dir(Some(
-        crate::desktop::data_dir().join("atlantis5").join("saves"),
-    ));
+    play.set_save_dir(Some(saves_dir()));
     play.menus.utc_offset = crate::a2::utc_offset_now;
     play.boot();
-    let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     let mut app = A5App {
         play,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
-        title: "The Secrets of Atlantis (2006) - Atlantis Native".to_string(),
+        title: format!(
+            "{} (2006) - Atlantis Native",
+            crate::setup::GameKind::Atlantis5.name()
+        ),
         fullscreen,
         window: None,
         surface: None,
@@ -334,6 +383,12 @@ pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
         menu_cursor: false,
         _audio: out,
     };
-    el.run_app(&mut app)
-        .map_err(|e| format!("The window failed: {e}"))
+    el.run_app_on_demand(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))?;
+    Ok(crate::a2::Ended::Quit)
+}
+
+/// The player's saves: `atlantis5/saves` in the per-user data folder.
+pub fn saves_dir() -> std::path::PathBuf {
+    crate::desktop::data_dir().join("atlantis5").join("saves")
 }

@@ -110,7 +110,9 @@ English, French, German or Spanish, and the French CD (2001, three CDs);
 other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
 GOG.com's release, in English, French, German, Italian and Spanish, and
 the 2004 CD (English, in progress) (see
-[Atlantis Evolution](#atlantis-evolution)).
+[Atlantis Evolution](#atlantis-evolution)). For The Secrets of Atlantis:
+the French DVD (2006), its drive, files, image or installation (see
+[The Secrets of Atlantis](#the-secrets-of-atlantis)).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -1072,6 +1074,73 @@ in its first two seconds goes back to the library's screen.
 options) are in `atlantis-evolution-2004/` in the per-user data folder;
 until its menus write the player's own, the installation's
 `datas\Atlantis4.cfg` is read. The game's folder is never written.
+
+## The Secrets of Atlantis
+
+*The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,
+2006; in French *The Secrets of Atlantis : L'Héritage sacré*) is the third
+program of Cryo's *Atlantis III* engine, after *Atlantis III* and the
+2004 *Atlantis Evolution*; its story is written in Lua 5.0. Atlantis
+Native plays its French DVD with its *Atlantis III* engine and runs the
+DVD's own scripts (the compiled Lua 5.0 chunks of your copy, loaded as
+they are). The game library shows it as *The Secrets of Atlantis :
+L'Héritage sacré (2006), DVD, French*.
+
+**Status.** It plays from its logos and main menu through the nine
+chapters (the zeppelin, the Empire State Building's floors, Macao,
+Ishtar's palace, Mesopotamia) to the last film and the credits, with its
+dialogs and subtitles, the subject menu, the inventory and its compound
+objects, the examine view, the saves and the autosave, the deaths
+(the game over page, then the last autosave), the music and the twenty
+puzzles (poker included). The whole story is checked by an automated
+walkthrough that plays the DVD's own scripts chapter by chapter, by
+clicks as a player makes them; it has not yet been played through by
+many players: reports are welcome. What is missing is listed below.
+
+**What to point it at.** Any form of the DVD: the DVD's drive, or a
+copy of its files (the folder holding `DATAS.cab` and
+`DATAS_french.cab`), the DVD's image (an `.iso`) or the folder holding
+it, or the folder where the DVD's installer put the game (the one with
+`Datas`). The cabinets are read in place: nothing is unpacked, nothing
+is installed. The DVD's program (`The secrets of Atlantis.exe`) is never
+run nor read beyond its identification. From the command line:
+
+    atlantis-native D:\
+    atlantis-native "C:\Games\soa-fr.iso"
+    atlantis-native --atlantis5 <disc, image or folder> [--fullscreen] [--headless] [--screenshot <file.png>]
+
+**Controls.** The mouse turns the view; a left click acts on what is
+under the screen's centre (the cursor shows a move, an action or a
+look); the right button opens the inventory with an empty hand, or puts
+the hand's object back; on a character, a left click with an empty hand
+opens its subjects; Escape or Space skips a film, Space a dialog, a left
+click a dialog's line; Escape in play opens the menu (save, load,
+options, quit); F11 switches between the window and the full screen
+(`--fullscreen` starts in it).
+
+**Saves.** The saves (`autoslot`, which the chapters and puzzles write,
+and the slots of the save page) are in `atlantis5/saves/` in the
+per-user data folder. The DVD's files are never written.
+
+**What is missing.**
+
+- The logos play without their sound: their sound is the Bink files' own
+  audio track, which Native's Bink decoder does not decode yet (the
+  films of the story have their sound in separate files, which play).
+- The game's own mouse cursors in play are not drawn; the centre of the
+  screen is where a click acts.
+- Two fonts of the game (Lucida Sans Unicode and Lucida Console: the
+  inventory's and the credits' texts) are drawn with Liberation Sans,
+  which has other metrics.
+- The inventory's hover texts and its fade in and out are not drawn.
+- The display options (the resolution and depth of the graphics page)
+  change nothing: the picture is the game's 1024 × 576, scaled to the
+  window.
+- Six sprites of a Mesopotamian temple's engraved prong are missing from
+  the French DVD itself; the scripts run without them, as the original
+  does.
+- Only the French DVD is known; the international DVD's languages are
+  untested. Neither the web version nor Android plays it yet.
 
 ## Command line
 

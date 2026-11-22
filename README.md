@@ -5,9 +5,9 @@
 **Return to Atlantis, on today's machines.**
 
 A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997),
-*Atlantis II* (1999), *Atlantis III: The New World* (2001) and *Atlantis
-Evolution* (2004), written in Rust, for Windows, macOS, Linux and your
-browser.
+*Atlantis II* (1999), *Atlantis III: The New World* (2001), *Atlantis
+Evolution* (2004) and *The Secrets of Atlantis: The Sacred Legacy* (2006),
+written in Rust, for Windows, macOS, Linux and your browser.
 
 [![Build](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml/badge.svg)](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/ripleyXLR8/atlantis-native)](https://github.com/ripleyXLR8/atlantis-native/releases/latest)
@@ -66,6 +66,17 @@ Bink films, the ship's pitching and its eight mini-games run, each
 traced to the original's code and checked piece by piece by automated
 tests. It has not yet been played through from start to end: reports
 are welcome (see [The 2004 CD](docs/GUIDE.md#the-2004-cd-in-progress)).
+
+*The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,
+2006), the last game of Cryo's *Atlantis III* engine, plays from start
+to end from its French DVD (*L'Héritage sacré*) on the desktop: its
+drive, its files, its image or its installation, in the game library as
+*The Secrets of Atlantis : L'Héritage sacré (2006), DVD, French*. The
+DVD's own Lua 5.0 scripts run as they are; the nine chapters, the twenty
+puzzles, the dialogs, the inventory, the saves, the deaths and the
+credits are checked by an automated walkthrough of the whole story. What
+is missing (the logos' sound, the game's own cursors, two fonts) is
+listed in [The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
 
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
@@ -144,7 +155,7 @@ Atlantis Native contains none of them.</sub>
 - ⚙️ **Options menu** (F10, or O): graphics, HD settings and enhancements,
   changed at once while you play.
 - 📚 **Game library**: several editions (GOG.com, CD, DVD, disc
-  images...) of the four games in one list, to choose the one to play at
+  images...) of the five games in one list, to choose the one to play at
   start-up or switch from F10.
 - 🏜️ **Atlantis III**: GOG.com's edition in English, French, German or
   Spanish and the French retail CD, whole, with the original's own menus
@@ -157,7 +168,11 @@ Atlantis Native contains none of them.</sub>
   skips a film (a bug fix: the original has only its skip button); on
   the desktop and in the browser. Its original 2004 CD program is in the game library
   too, as a preview.
-- 🌐 **In the browser**: the four games, read from your own folder; the
+- 🏛️ **The Secrets of Atlantis**: the French DVD (2006), read from the
+  DVD, its files, its image or its installation, nothing unpacked; its
+  own scripts, menus and saves; full screen or windowed (F11); on the
+  desktop.
+- 🌐 **In the browser**: the four first games, read from your own folder; the
   CD editions of the first three also from their disc images (`.iso`,
   `.bin`, `.img`, `.mdf`, `.nrg`), a part at a time.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
@@ -337,7 +352,13 @@ installed folder, which holds all four discs (the CDs are not needed to
 play). Another `Atlantis Evolution.exe` is refused with its size and
 MD5, so that it can be reported and added. The PortMaster build plays the first game only.
 
-The web version plays the four games: see
+For *The Secrets of Atlantis*:
+
+| Release | Languages | What to point it at |
+|---|---|---|
+| The French DVD of Nobilis (2006, *L'Héritage sacré*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `e5c43eb0411d1775e6242fec6d241f6e`, never run) | French | the DVD's drive or a copy of its files (the folder with `DATAS.cab`), its image (`.iso`) or the folder holding it, or the folder where its installer put the game (the one with `Datas`) |
+
+The web version plays the four first games: see
 [The web version](docs/GUIDE.md#the-web-version).
 
 How to get the files from your CD or GOG.com: see
@@ -381,6 +402,11 @@ the folder the 2004 CD's installer filled (a preview), found by the
 game library or given on the command line. See
 [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution).
 
+*The Secrets of Atlantis* (2006) too: its DVD, a copy of its files, its
+image or its installation, found by the game library or given on the
+command line. See
+[The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
+
 ## Controls
 
 | Action | Control |
@@ -398,10 +424,11 @@ game library or given on the command line. See
 On the player screen, click the last row to type a new name, then Enter
 or OK.
 
-Atlantis II, Atlantis III and Atlantis Evolution have controls of their
-own: see [Atlantis II](docs/GUIDE.md#controls),
-[Atlantis III](docs/GUIDE.md#atlantis-iii-controls) and
-[Atlantis Evolution](docs/GUIDE.md#atlantis-evolution-controls) in the
+Atlantis II, Atlantis III, Atlantis Evolution and The Secrets of
+Atlantis have controls of their own: see [Atlantis II](docs/GUIDE.md#controls),
+[Atlantis III](docs/GUIDE.md#atlantis-iii-controls),
+[Atlantis Evolution](docs/GUIDE.md#atlantis-evolution-controls) and
+[The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis) in the
 player's guide.
 
 ## Build from source

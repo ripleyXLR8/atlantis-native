@@ -89,7 +89,12 @@
 //! plays the logos (skipped with `--no-intro`) and the start page without
 //! a window. The game library finds and opens it too, as an edition of
 //! Atlantis Evolution; `--evolution2004 <folder>` opens it directly;
-//! `--atlantis5 <disc, image or folder>` plays Atlantis V from a new game (in development).
+//! `--atlantis5 <disc, image or folder>` plays The Secrets of Atlantis
+//! (Atlantis V, 2006); a folder holding it (its DVD's files, the DVD's
+//! image or a folder holding it, an install), or the image itself, opens
+//! it too, and the game library finds and opens it (its saves in the
+//! `atlantis5/saves` folder of the per-user data folder). The other
+//! games' options but `--fullscreen` are refused in this mode.
 //!
 //! `atlantis-native --list-games` prints the games found on the computer
 //! (every game: what the library's "Find installations" adds) and ends.
@@ -534,6 +539,41 @@ fn main() {
         None => Start::Boot,
     };
 
+    // The Secrets of Atlantis (its DVD, the DVD's image or a folder
+    // holding it, an install): the other games' options refused (but
+    // `--fullscreen`).
+    let a5_path = match args.as_slice() {
+        [d] if atlantis_app::setup::kind_of(Path::new(d))
+            == Some(atlantis_app::setup::GameKind::Atlantis5) =>
+        {
+            Some(d.clone())
+        }
+        _ => None,
+    };
+    if let Some(path) = a5_path {
+        let mut not_a5: Vec<&str> = first_game_flags.clone();
+        not_a5.extend(a2_flags.iter().copied());
+        if force_wide {
+            not_a5.push("--widescreen");
+        } else if force_hd {
+            not_a5.push("--hd");
+        }
+        if original {
+            not_a5.push("--original");
+        }
+        refuse(&not_a5, "The Secrets of Atlantis' mode");
+        install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
+        let run = EventLoop::new()
+            .map_err(|e| format!("No window can be opened: {e}"))
+            .and_then(|mut el| {
+                atlantis_app::a5::run_window_on(&mut el, Path::new(&path), fullscreen)
+            });
+        if let Err(e) = run {
+            error_box(&e);
+            std::process::exit(1);
+        }
+        return;
+    }
     // Atlantis Evolution: the other games' options refused (but
     // `--fullscreen`).
     let a4_dir = match args.as_slice() {
@@ -860,9 +900,13 @@ fn main() {
         let atlantis2 = app.session_mut().and_then(|s| s.take_atlantis2());
         let atlantis3 = app.session_mut().and_then(|s| s.take_atlantis3());
         let atlantis4 = app.session_mut().and_then(|s| s.take_atlantis4());
+        let atlantis5 = app.session_mut().and_then(|s| s.take_atlantis5());
         // The first game's window and sound end here.
         drop(app);
-        let run = if let Some(dir) = atlantis2 {
+        let run = if let Some(dir) = atlantis5 {
+            atlantis_app::watchdog::leave();
+            atlantis_app::a5::run_window_on(&mut el, &dir, fullscreen)
+        } else if let Some(dir) = atlantis2 {
             atlantis_app::watchdog::leave();
             let enhancements = a2_flags_applied(atlantis_app::a2::stored_settings().enhancements);
             atlantis_app::a2::open(

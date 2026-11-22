@@ -118,6 +118,8 @@ pub struct Session {
     atlantis3: Option<PathBuf>,
     /// The same for Atlantis Evolution.
     atlantis4: Option<PathBuf>,
+    /// The same for The Secrets of Atlantis.
+    atlantis5: Option<PathBuf>,
 }
 
 impl Session {
@@ -145,6 +147,7 @@ impl Session {
             atlantis2: None,
             atlantis3: None,
             atlantis4: None,
+            atlantis5: None,
         }
     }
 
@@ -179,10 +182,26 @@ impl Session {
         self.atlantis4.is_some()
     }
 
-    /// Whether Atlantis II, III or Evolution was chosen to play: the event
-    /// loop is to end, the program runs the game's own mode after it.
+    /// The folder of The Secrets of Atlantis chosen to play, if any
+    /// (taken).
+    pub fn take_atlantis5(&mut self) -> Option<PathBuf> {
+        self.atlantis5.take()
+    }
+
+    /// Whether The Secrets of Atlantis was chosen to play: the event loop
+    /// is to end.
+    pub fn wants_atlantis5(&self) -> bool {
+        self.atlantis5.is_some()
+    }
+
+    /// Whether Atlantis II, III, Evolution or The Secrets of Atlantis was
+    /// chosen to play: the event loop is to end, the program runs the
+    /// game's own mode after it.
     pub fn wants_own_mode(&self) -> bool {
-        self.wants_atlantis2() || self.wants_atlantis3() || self.wants_atlantis4()
+        self.wants_atlantis2()
+            || self.wants_atlantis3()
+            || self.wants_atlantis4()
+            || self.wants_atlantis5()
     }
 
     /// Adds `dirs` to the library (those not in it yet), saved.
@@ -363,7 +382,10 @@ impl App {
         let kind = opened.kind();
         match opened {
             Opened::LostTales(game, _) => self.play_game(*game, Some(folder)),
-            Opened::Atlantis2(label) | Opened::Atlantis3(label) | Opened::Atlantis4(label) => {
+            Opened::Atlantis2(label)
+            | Opened::Atlantis3(label)
+            | Opened::Atlantis4(label)
+            | Opened::Atlantis5(label) => {
                 log::info!("game folder {} ({label})", folder.display());
                 self.stop_game();
                 let Some(session) = &mut self.session else {
@@ -372,6 +394,7 @@ impl App {
                 session.launcher = None;
                 session.played(folder);
                 let slot = match kind {
+                    crate::setup::GameKind::Atlantis5 => &mut session.atlantis5,
                     crate::setup::GameKind::Atlantis4 => &mut session.atlantis4,
                     crate::setup::GameKind::Atlantis3 => &mut session.atlantis3,
                     _ => &mut session.atlantis2,
@@ -856,6 +879,58 @@ mod tests {
             app.session_mut().unwrap().take_atlantis4(),
             Some(a4.clone())
         );
+        assert!(!app.session().unwrap().wants_own_mode());
+    }
+
+    /// The Secrets of Atlantis in the game library (`ATLANTIS5_DVD_FR`: the
+    /// folder holding the French DVD's image, its files in `files/` and
+    /// the extracted cabinets in `datas/`): each form found with its name
+    /// and edition, chosen on the screen it is kept for the program to run
+    /// after the event loop (its own window).
+    #[test]
+    fn the_library_plays_atlantis5() {
+        let Some(root) = std::env::var_os("ATLANTIS5_DVD_FR").map(PathBuf::from) else {
+            eprintln!("SKIPPED: ATLANTIS5_DVD_FR is not set");
+            return;
+        };
+        let own = own_data_dir("atlantis5");
+        let d = own.dir.clone();
+        let name = "The Secrets of Atlantis : L'H\u{e9}ritage sacr\u{e9}";
+        for (folder, want) in [
+            (root.clone(), format!("{name} (2006), DVD image, French")),
+            (root.join("files"), format!("{name} (2006), DVD, French")),
+            (
+                root.join("datas"),
+                format!("{name} (2006), DVD, installed, French"),
+            ),
+        ] {
+            assert_eq!(
+                crate::setup::kind_of(&folder),
+                Some(crate::setup::GameKind::Atlantis5),
+                "{}",
+                folder.display()
+            );
+            assert_eq!(crate::a5::label(&folder).unwrap(), want);
+            let e = crate::desktop::describe(&folder);
+            assert!(e.found);
+            assert_eq!(e.label, want);
+        }
+        let found = crate::desktop::first_of_each_game(std::slice::from_ref(&root));
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].1.kind(), crate::setup::GameKind::Atlantis5);
+        let dvd = root.join("files");
+        std::fs::write(d.join("games.txt"), format!("{}\n", dvd.display())).unwrap();
+        let mut app = app_with_library(&d);
+        app.show_launcher(None);
+        let l = app.session().unwrap().launcher().unwrap();
+        assert_eq!(l.entries().len(), 1);
+        assert!(l.entries()[0].found);
+        assert_eq!(l.entries()[0].kind, Some(crate::setup::GameKind::Atlantis5));
+        app.run_launcher_action(LauncherAction::Play(0));
+        let s = app.session().unwrap();
+        assert!(s.launcher().is_none());
+        assert!(s.wants_atlantis5() && s.wants_own_mode() && !s.wants_atlantis4());
+        assert_eq!(app.session_mut().unwrap().take_atlantis5(), Some(dvd));
         assert!(!app.session().unwrap().wants_own_mode());
     }
 

@@ -17,6 +17,7 @@
 | `atlantis4-script` | Atlantis Evolution: its Lua 5.1 scripts (vendored `rilua`) and the engine's bindings |
 | `atlantis4-engine` | Atlantis Evolution: the warp view, the GUI layouts, dialogs, inventory, documents, the menus and the saves, the OpenAL mix, the processor's renderer; see [Atlantis Evolution](#atlantis-evolution) |
 | `atlantis4-gl` | Atlantis Evolution's renderer on the graphics card (OpenGL 3.3, ES 3.0, WebGL 2) |
+| `atlantis5-script` | The Secrets of Atlantis: its Lua 5.0 chunks run on the vendored `rilua` (a 5.0 loader and 5.0's operations), the `Atl_*` C functions as the program checks and converts them, the game manager's states, requests, timers and transitions, the XML saves; see [The Secrets of Atlantis](#the-secrets-of-atlantis) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit (Atlantis II's view in single precision), and presents it) |
 | `atlantis-sdl` | the first game's SDL2 front end (the first game only) for handhelds and PortMaster (the program `atlantis-native-sdl`, built with `--features sdl`): the gamepad as the mouse, the on-screen keyboard, SDL audio; see [The SDL2 front end](#the-sdl2-front-end-handhelds-and-portmaster) |
 
@@ -4669,6 +4670,64 @@ and `a3_web::start_evolution_2004` runs it in *Atlantis III*'s page
 window, its saves and `Atlantis4.cfg` in `localStorage` under
 `atlantis-native/atlantis-evolution-2004/`; the files are read a part
 at a time, as for the other games.
+
+## The Secrets of Atlantis
+
+*The Secrets of Atlantis: The Sacred Legacy* (Nobilis, 2006) is the third
+program of *Atlantis III*'s engine. The French DVD's program is protected
+(TAGES) and is not read: the code is read in the international DVD's
+program, atlantis5-dvd-int-3891200 (`The secrets of Atlantis.exe` of
+3,891,200 bytes, MD5 `3d0f55d33d271f6f5b12250d838a2b83`), and every
+address in the code is that program's. The French DVD's scripts are
+byte for byte what Lua 5.0.3's `luac` makes of the international
+program's script sources, so both programs run the same story.
+
+**Data.** `atlantis3-data::atlantis5::Atlantis5Source` reads the DVD's
+Microsoft cabinets (`DATAS.cab`, `DATAS_<language>.cab`; MSZIP,
+`atlantis-data::cab`) in place, from the drive, a copy, the image or a
+folder holding it, or an unpacked tree. The formats shared with
+*Atlantis III* and the 2004 program (WAM, JP6 panoramas, sprites, MLS
+playlists, `font.txt`, Bink films) are read by the same code; the XML
+texts (string resources, dialogs, film subtitles) by `atlantis5_texts`.
+
+**Scripts.** `atlantis5-script` runs the player's own compiled chunks:
+the vendored `rilua` (a Lua 5.1 VM) loads Lua 5.0 chunks
+(`vendor/rilua/src/vm/undump50.rs`) and runs 5.0's operations that differ
+(see `vendor/rilua/VENDORED.txt`). Each script (a click, a view's
+entry, a timer, the chapter's `InitChapter`) runs as a coroutine that
+waits at the calls the original runs over frames (`Atl_Address_Go`,
+`Atl_Video_Play`, `Atl_Dialog_Play`, an animated look). The game
+manager (`Game`, `CGameManager::Process` @ 0x0042f000) keeps the
+original's states and requests: 1 a chapter, 2 a load, 3 a menu, 4
+play, 7 the end of the game (`Atl_TerminateGame`: the autosave deleted,
+the game ended, the credits), 8 quit. Two faults of `rilua`'s
+incremental collector were found by the walkthrough and fixed in the
+vendored copy and in the bindings: a string found dead in the string
+table is made alive again (PUC-Rio's `luaS_newlstr`), and the bindings'
+raw table writes take the table's back barrier (`luaC_barriert`).
+
+**Engine.** `atlantis3-engine`'s `atlantis5*.rs`: the view
+(`atlantis5_play::Stage`: the panorama, sprites and their players, the
+camera and `BoatFx`, films, music, sounds, dialogs and subtitles, the
+subject menu, the inventory), the menus (`atlantis5_menu`), the poker
+board (`atlantis5_poker`) and the dialogs' faces and fonts
+(`atlantis5_dialog`). The start plays the program's two logos
+(@ 0x0043d320) before the main menu; their sound is the Bink files'
+own audio track, which Native's Bink decoder does not decode, so they
+play silent.
+
+**Tests.** With `ATLANTIS5_DVD_FR` set to the folder holding the DVD's
+image, `files/` the DVD's files and `datas/` the extracted cabinets
+(skipped without): `crates/atlantis5-script/tests/` (a chunk and the
+French scripts against the traces of Lua 5.0.3's own interpreter, the
+game manager without game data), `crates/atlantis3-engine/tests/atlantis5_*.rs`
+(the first view, the menus, dialogs, poker and every puzzle, and `atlantis5_walkthrough.rs`,
+which plays the whole game through the DVD's own scripts by clicks
+(walks over the scenes' WAM move zones, items from the inventory's
+cells, subjects from the subject menu) from a new game to the credits,
+and a game over that loads the autosave; `A5_GC_STRESS` runs the Lua
+collector all the time) and the game library's entry
+(`atlantis-app`'s `the_library_plays_atlantis5`).
 
 ## Tests
 
