@@ -365,6 +365,7 @@ dependencies = [
  "atlantis-data",
  "atlantis2-data",
  "atlantis3-data",
+ "atlantis4-data",
  "log",
  "rilua",
 ]

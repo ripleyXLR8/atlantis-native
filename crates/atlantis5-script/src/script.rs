@@ -47,6 +47,9 @@ pub(crate) struct Shared {
     /// Calls for the game manager (timers, chapter, state requests), in
     /// call order.
     pub manager_calls: Vec<Call>,
+    /// The `LUA_DB` of each `Atl_Save` (taken at the call, as the
+    /// original writes it inside the handler), in call order.
+    pub saved_dbs: Vec<Result<atlantis4_data::xml::Element, String>>,
     /// MSVCRT's `rand` state (`holdrand`), which `lua50.dll`'s
     /// `math.random` uses; 1 until `srand`.
     pub holdrand: u32,
@@ -551,8 +554,18 @@ fn check(state: &LuaState, b: Binding) -> (Checked, Vec<&'static str>) {
                 Rejected("Atl_Camera_ActivateFx: bad number of arguments")
             }
         }
-        // @ 0x00407ac0 [dialogs: next milestone; passed raw]
-        Binding::DialogPlay => Ok_(Call::DialogPlay(args_of(state))),
+        // @ 0x00407ac0: one argument (usage 0x00669fc0), a number
+        // (0x00669f8c), `__ftol` of it; whether the dialog exists
+        // (@ 0x00465fb0) is the engine's.
+        Binding::DialogPlay => {
+            if top != 1 {
+                Rejected("LUA_Dialog_Play: bad number of arguments")
+            } else if !is_number(state, 1) {
+                Rejected("LUA_Dialog_Play: argument 1 is not a NUMBER")
+            } else {
+                Ok_(Call::DialogPlay(to_int(state, 1)))
+            }
+        }
         // @ 0x00408d40
         Binding::DisplayGetScreenSize => {
             if top == 0 {
@@ -842,6 +855,25 @@ fn binding_entry(state: &mut LuaState) -> LuaResult<u32> {
         | Call::TerminateGame => {
             shared.borrow_mut().manager_calls.push(call.clone());
         }
+        Call::Save => {
+            // @ 0x00408fb0 → 0x0043ad90: the save is written inside the
+            // handler; its `LUA_DB` is the table now.
+            let k = str_val(state, b"atl");
+            let g = state.global;
+            let db = match raw_get(state, g, k) {
+                Val::Table(t) => {
+                    let mut root = crate::save::element("LUA_DB");
+                    write_table(state, t, &mut root, 0).map(|()| root)
+                }
+                _ => Err(
+                    "CSerialisableLuaDB :: Serialize -> impossible de recuperer la table : atl"
+                        .into(),
+                ),
+            };
+            let mut sh = shared.borrow_mut();
+            sh.saved_dbs.push(db);
+            sh.manager_calls.push(call.clone());
+        }
         _ => {}
     }
     if let Call::AddressGo { scene, view, fx } = &call {
@@ -1109,6 +1141,7 @@ impl Script {
             engine,
             pending: None,
             manager_calls: Vec::new(),
+            saved_dbs: Vec::new(),
             holdrand: 1,
         }));
         let tasks;
@@ -1190,6 +1223,12 @@ impl Script {
     /// Calls the game manager has to handle, taken in call order.
     pub(crate) fn take_manager_calls(&self) -> Vec<Call> {
         std::mem::take(&mut self.shared.borrow_mut().manager_calls)
+    }
+
+    /// The `LUA_DB` of the oldest `Atl_Save` not yet written.
+    pub(crate) fn take_saved_db(&self) -> Option<Result<atlantis4_data::xml::Element, String>> {
+        let mut sh = self.shared.borrow_mut();
+        (!sh.saved_dbs.is_empty()).then(|| sh.saved_dbs.remove(0))
     }
 
     fn new_task(&mut self, func: Val, what: &[u8]) -> LuaResult<Task> {
@@ -1678,6 +1717,248 @@ impl Script {
     pub fn exec(&mut self, source: &str) -> LuaResult<()> {
         self.lua.exec(source)
     }
+
+    /// The entries `{name, state, priority}` of
+    /// `Atl_Character_GetSubjects(name)` (@ 0x00402540) that it keeps (a
+    /// string, a boolean and a number), in the result's order: what the
+    /// subject menu shows (@ 0x00411a90).
+    pub fn character_subject_list(
+        &mut self,
+        name: &[u8],
+    ) -> Result<Vec<(Vec<u8>, bool, f64)>, String> {
+        let r = self.call_global(
+            b"Atl_Character_GetSubjects",
+            &[Value::Str(name.to_vec())],
+            1,
+        )?;
+        let state = self.lua.state_mut();
+        let Some(Val::Table(t)) = r.first().copied() else {
+            return Err("GetSubjects: the result is not a table".into());
+        };
+        let mut out = Vec::new();
+        let mut i = 1.0;
+        loop {
+            let t_e = match raw_get(state, t, Val::Num(i)) {
+                Val::Nil => return Ok(out),
+                Val::Table(e) => e,
+                _ => return Err(format!("GetSubjects: entry {i} is not a table")),
+            };
+            let s = raw_get(state, t_e, Val::Num(1.0));
+            let b = raw_get(state, t_e, Val::Num(2.0));
+            let p = raw_get(state, t_e, Val::Num(3.0));
+            let priority = match p {
+                Val::Num(x) => Some(x),
+                Val::Str(_) => bytes_of(state, p)
+                    .and_then(|b| String::from_utf8(b).ok())
+                    .and_then(|s| s.trim().parse::<f64>().ok()),
+                _ => None,
+            };
+            if let (true, Val::Bool(on), Some(pr)) =
+                (matches!(s, Val::Str(_) | Val::Num(_)), b, priority)
+            {
+                out.push((bytes_of(state, s).unwrap_or_default(), on, pr));
+            }
+            i += 1.0;
+        }
+    }
+
+    /// Calls the global function `name` with `args` (`lua_pcall`),
+    /// keeping `nresults` results.
+    fn call_global(
+        &mut self,
+        name: &[u8],
+        args: &[Value],
+        nresults: usize,
+    ) -> Result<Vec<Val>, String> {
+        let vals: Vec<Val> = args.iter().map(|a| self.lua_val(a)).collect();
+        let state = self.lua.state_mut();
+        let g = state.global;
+        let k = str_val(state, name);
+        let f = raw_get(state, g, k);
+        let func_pos = state.top;
+        state.ensure_stack(1 + vals.len());
+        state.stack_set(func_pos, f);
+        for (i, v) in vals.iter().enumerate() {
+            state.stack_set(func_pos + 1 + i, *v);
+        }
+        state.top = func_pos + 1 + vals.len();
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let r = state.call_function(func_pos, nresults as i32);
+        let out: Vec<Val> = (0..nresults)
+            .map(|i| state.stack_get(func_pos + i))
+            .collect();
+        state.top = func_pos;
+        r.map_err(|e| format!("{}: {e}", String::from_utf8_lossy(name)))?;
+        Ok(out)
+    }
+
+    /// `return Atl_Address_GetCurrent()` as the load runs it
+    /// (@ 0x0043b210: `lua_tostring(-2)`, `lua_tonumber(-1)`).
+    pub fn address_get_current(&mut self) -> Result<(Vec<u8>, f64), String> {
+        let r = self.call_global(b"Atl_Address_GetCurrent", &[], 2)?;
+        let state = self.lua.state_mut();
+        let scene = bytes_of(state, r[0]).unwrap_or_default();
+        let view = match r[1] {
+            Val::Num(x) => x,
+            v @ Val::Str(_) => bytes_of(state, v)
+                .and_then(|b| String::from_utf8(b).ok())
+                .and_then(|s| s.trim().parse().ok())
+                .unwrap_or(0.0),
+            _ => 0.0,
+        };
+        Ok((scene, view))
+    }
+
+    /// `CSerialisableLuaDB::Serialize` (@ 0x00438920): the global `atl`
+    /// (0x006680e4) written into a `LUA_DB` element (0x0066d950) by
+    /// `WriteTable` (@ 0x00438be0). Each `lua_next` pair is one element
+    /// named after its value (in the handler's order of tests): a table
+    /// `T` (its pairs inside), `lua_isnumber` `N`, `lua_isstring` `S`,
+    /// a boolean `B`, with the value in the attribute `v`; then the key in
+    /// `ik` (`lua_isnumber`: a number) or `sk` (a string). Any other type
+    /// throws (`type de valeur inconnue`, `type de clé inconnue`).
+    /// Strings go through the ANSI code page (`_com_util`'s
+    /// `ConvertStringToBSTR`, @ 0x0062a562): Windows-1252.
+    pub fn lua_db(&mut self) -> Result<atlantis4_data::xml::Element, String> {
+        let Some(atl) = self.global_table(&[b"atl"]) else {
+            return Err(
+                "CSerialisableLuaDB :: Serialize -> impossible de recuperer la table : atl".into(),
+            );
+        };
+        let mut root = crate::save::element("LUA_DB");
+        let state = self.lua.state_mut();
+        write_table(state, atl, &mut root, 0)?;
+        Ok(root)
+    }
+
+    /// `CSerialisableLuaDB::Deserialize` (@ 0x00439270): a new table set
+    /// as the global `atl`, then `ReadTable` (@ 0x004393e0) on the
+    /// children of `LUA_DB` (`./*`): each child's key from `sk` (a string)
+    /// or else `ik` (a number); `T` a new table read the same way, `N` a
+    /// number, `S` a string, `B` a boolean, from `v`.
+    pub fn load_lua_db(&mut self, db: &atlantis4_data::xml::Element) -> Result<(), String> {
+        let state = self.lua.state_mut();
+        let t = new_table(state);
+        let k = str_val(state, b"atl");
+        let g = state.global;
+        raw_set(state, g, k, Val::Table(t)).map_err(|e| e.to_string())?;
+        read_table(state, t, db, 0)
+    }
+}
+
+/// A number as the save writes it (a `VT_R8` attribute: MSXML's text
+/// of it is not read; Lua's `%.14g`, which reads back the same).
+fn save_number(x: f64) -> String {
+    crate::engine::number_text(x)
+}
+
+/// `lua_isnumber` / `lua_tonumber` of a string (5.0's `strtod` in the C
+/// locale, spaces around allowed).
+fn lua_str_number(b: &[u8]) -> Option<f64> {
+    std::str::from_utf8(b).ok()?.trim().parse().ok()
+}
+
+fn read_number(s: &str) -> Option<f64> {
+    s.trim().replace(',', ".").parse().ok()
+}
+
+fn write_table(
+    state: &mut LuaState,
+    t: GcRef<Table>,
+    out: &mut atlantis4_data::xml::Element,
+    depth: usize,
+) -> Result<(), String> {
+    use atlantis4_data::xml::cp1252;
+    if depth > 64 {
+        return Err("CSerialisableLuaDB :: WriteTable -> table too deep".into());
+    }
+    let mut key = Val::Nil;
+    loop {
+        let next = state
+            .gc
+            .tables
+            .get(t)
+            .ok_or("CSerialisableLuaDB :: WriteTable -> no table")?
+            .next(key, &state.gc.string_arena)
+            .map_err(|e| e.to_string())?;
+        let Some((k, v)) = next else {
+            return Ok(());
+        };
+        key = k;
+        let mut e = match v {
+            Val::Table(inner) => {
+                let mut e = crate::save::element("T");
+                write_table(state, inner, &mut e, depth + 1)?;
+                e
+            }
+            Val::Num(x) => crate::save::element_v("N", save_number(x)),
+            Val::Str(_) => {
+                let b = bytes_of(state, v).unwrap_or_default();
+                match lua_str_number(&b) {
+                    Some(x) => crate::save::element_v("N", save_number(x)),
+                    None => crate::save::element_v("S", cp1252(&b)),
+                }
+            }
+            Val::Bool(b) => {
+                crate::save::element_v("B", if b { "True" } else { "False" }.to_string())
+            }
+            _ => return Err("CSerialisableLuaDB :: WriteTable -> type de valeur inconnue".into()),
+        };
+        match k {
+            Val::Num(x) => e.attributes.push(("ik".into(), save_number(x))),
+            Val::Str(_) => {
+                let b = bytes_of(state, k).unwrap_or_default();
+                match lua_str_number(&b) {
+                    Some(x) => e.attributes.push(("ik".into(), save_number(x))),
+                    None => e.attributes.push(("sk".into(), cp1252(&b))),
+                }
+            }
+            _ => return Err("CSerialisableLuaDB :: WriteTable -> type de clé inconnue".into()),
+        }
+        out.children.push(e);
+    }
+}
+
+fn read_table(
+    state: &mut LuaState,
+    t: GcRef<Table>,
+    from: &atlantis4_data::xml::Element,
+    depth: usize,
+) -> Result<(), String> {
+    use atlantis4_data::xml::to_cp1252;
+    if depth > 64 {
+        return Err("CSerialisableLuaDB :: ReadTable -> table too deep".into());
+    }
+    for e in &from.children {
+        let key = if let Some(sk) = e.attr("sk") {
+            Val::Str(state.gc.intern_string(&to_cp1252(sk)))
+        } else if let Some(ik) = e.attr("ik") {
+            Val::Num(read_number(ik).ok_or("CSerialisableLuaDB :: ReadTable -> bad ik")?)
+        } else {
+            return Err("CSerialisableLuaDB :: ReadTable -> no key".into());
+        };
+        let v = e.attr("v");
+        let value = match (e.name.as_str(), v) {
+            ("T", _) => {
+                let inner = new_table(state);
+                read_table(state, inner, e, depth + 1)?;
+                Val::Table(inner)
+            }
+            ("N", Some(v)) => Val::Num(read_number(v).ok_or("CSerialisableLuaDB :: ReadTable -> bad N")?),
+            ("S", Some(v)) => Val::Str(state.gc.intern_string(&to_cp1252(v))),
+            ("B", Some(v)) => Val::Bool(matches!(
+                v.trim().to_ascii_lowercase().as_str(),
+                "true" | "-1" | "1" | "vrai"
+            )),
+            (name, _) => {
+                return Err(format!(
+                    "CSerialisableLuaDB :: ReadTable -> impossible de recuperer l'attribut \"v\" d'un Element <{name}>"
+                ))
+            }
+        };
+        raw_set(state, t, key, value).map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -193,5 +193,6 @@ fn the_font_list() {
     let def = f.font("AtlFont_Default").unwrap();
     assert_eq!((def.face.as_str(), def.height), ("Courier New", 16));
     assert_eq!(f.font("AtlFont_Dialog").unwrap().weight(), 700);
-    assert_eq!(f.fonts.iter().filter(|x| x.antialias).count(), 0);
+    // On unless the block says `Antialias false` (one font does).
+    assert_eq!(f.fonts.iter().filter(|x| !x.antialias).count(), 1);
 }

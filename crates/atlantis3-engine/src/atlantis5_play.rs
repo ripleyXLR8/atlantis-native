@@ -47,6 +47,7 @@ use atlantis2_data::wam::{Wam, Zone};
 use atlantis2_engine::camera::Camera;
 use atlantis2_engine::fpu::Fpu;
 use atlantis2_engine::warp::{A3Raster, Renderer, Variant};
+use atlantis3_data::atlantis5_texts::{Dialogs, KinematicSubtitles};
 use atlantis3_data::evolution2004_mls::Playlist;
 use atlantis3_data::spr::{Bank, Depth, Target};
 use atlantis4_data::vorbis::VorbisStream;
@@ -59,7 +60,8 @@ use crate::atlantis5::{panorama_name, sprite_path, ViewError, FACE, VIEW_HEIGHT,
 use crate::atlantis5_camera::{
     euler_quat, forward, look_at_direction, look_rotation, quat_matrix, quat_mul, Quat, Turn,
 };
-use crate::audio::{Audio, CHANNEL_CINEMA, CHANNEL_MUSIC_2004, CHANNEL_SOUND};
+use crate::atlantis5_dialog::{self as dlg, Act, FilmSubtitles, Fonts, Kind, MenuState, Player};
+use crate::audio::{Audio, CHANNEL_CINEMA, CHANNEL_MUSIC_2004, CHANNEL_SOUND, CHANNEL_VOICE};
 use crate::film2004::{Film, FilmSound};
 use crate::px::Faces;
 
@@ -188,6 +190,10 @@ struct Randomized {
     object: Vec<u8>,
     tick1: f32,
     tick2: f32,
+    /// Held while the object's character faces the player in a dialog
+    /// or its subject menu (@ 0x00443650; back @ 0x00443570)
+    /// [INFERRED: the two calls are not read; held means not drawn from].
+    held: bool,
 }
 
 impl Randomized {
@@ -252,6 +258,50 @@ struct MusicStream {
     done: bool,
 }
 
+/// The voice of a tirade: a type-2 sample (`FSOUND` channel 7,
+/// @ 0x004593d0(path, 0, 2, 0), played at 1.0 @ 0x00459630).
+struct Voice {
+    /// Its length (seconds), for a stage without sound.
+    length: f64,
+    started: f64,
+}
+
+/// `Atl_Dialog_Play`'s run (@ 0x00407ac0).
+struct DialogRun {
+    player: Player,
+    /// The dialog's talkers and their picturing.
+    talkers: Vec<(String, atlantis3_data::atlantis5_texts::Picturing)>,
+    /// The tirades: talker, text.
+    tirades: Vec<(String, String)>,
+    /// The first loop: the 3D talkers turn to face (`facing`), until each
+    /// one's time reaches its length; then `listen` in a loop.
+    facing: bool,
+    /// The objects that were given `facing`.
+    faced: Vec<Vec<u8>>,
+    voice: Option<Voice>,
+    /// The bubble (+0x34) and the 2D talker's film.
+    bubble: Option<Bank>,
+    portrait: Option<Film>,
+    /// The text's height (+0x4c, @ 0x00461800 with `AtlFont_Dialog` and
+    /// 760) and the box.
+    text_h: i32,
+    text: String,
+}
+
+/// The subject menu (`CMenu_Dialog`, mode 9).
+struct SubjectMenu {
+    character: Vec<u8>,
+    state: MenuState,
+    /// The subjects shown: name, enabled.
+    subjects: Vec<(Vec<u8>, bool)>,
+    bubble: Option<Bank>,
+    images: Vec<Option<Bank>>,
+    /// A subject was picked: the game runs its click.
+    picked: Option<Vec<u8>>,
+    /// The menu has ended (its process returned 1).
+    closed: bool,
+}
+
 /// The engine's side of the scripts' calls.
 pub struct Stage {
     src: Arc<dyn FileSource>,
@@ -307,6 +357,24 @@ pub struct Stage {
     /// The sound on FMOD channel 6.
     sound: Option<Vec<u8>>,
     film: Option<(Film, Option<FilmSound>)>,
+    /// The film's subtitles (`kinematic_subtitles.xml`).
+    film_subtitles: Option<FilmSubtitles>,
+    /// The text tables of the language.
+    dialogs: Option<Dialogs>,
+    kinematic: Option<KinematicSubtitles>,
+    pub fonts: Fonts,
+    /// `Atl_Dialog_Play`'s run.
+    dialog: Option<DialogRun>,
+    /// The subject menu (mode 9).
+    menu: Option<SubjectMenu>,
+    /// Left presses and Space presses for the dialog and the menu this
+    /// frame.
+    clicks: usize,
+    space: bool,
+    /// The mouse's position in menus (the screen's pixels).
+    pub mouse: (i32, i32),
+    /// The folder of the player's saves.
+    save_dir: Option<std::path::PathBuf>,
     /// A call the scripts wait for has ended (a film, an animated look).
     wait_ended: bool,
     clock: f64,
@@ -320,6 +388,22 @@ fn lossy(b: &[u8]) -> String {
 
 impl Stage {
     fn new(src: Arc<dyn FileSource>, language: &str, audio: Option<Audio>) -> Stage {
+        let mut st = Stage::bare(src, language, audio);
+        // @ 0x0043d910: `texts/dialog/`, `texts/menu/`, `texts/video/` +
+        // the language + the file.
+        st.dialogs = st
+            .read(&format!("datas/texts/dialog/{language}/dialogs.xml"))
+            .and_then(|d| Dialogs::parse(&d).ok());
+        st.kinematic = st
+            .read(&format!(
+                "datas/texts/video/{language}/kinematic_subtitles.xml"
+            ))
+            .and_then(|d| KinematicSubtitles::parse(&d).ok());
+        st
+    }
+
+    fn bare(src: Arc<dyn FileSource>, language: &str, audio: Option<Audio>) -> Stage {
+        let fonts = Fonts::load(&src, language);
         Stage {
             src,
             language: language.to_string(),
@@ -348,6 +432,16 @@ impl Stage {
             randomized: Vec::new(),
             sound: None,
             film: None,
+            film_subtitles: None,
+            dialogs: None,
+            kinematic: None,
+            fonts,
+            dialog: None,
+            menu: None,
+            clicks: 0,
+            space: false,
+            mouse: (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2),
+            save_dir: None,
             wait_ended: false,
             clock: 0.0,
             trace: Vec::new(),
@@ -882,6 +976,14 @@ impl Stage {
             (Some(a), Some(d)) => FilmSound::open(a, CHANNEL_CINEMA, d, 1.0),
             _ => None,
         };
+        // The film's subtitles (`kinematic_subtitles.xml`, by the film's
+        // name; compared without case [INFERRED]).
+        self.film_subtitles = self.kinematic.as_ref().and_then(|k| {
+            k.films
+                .iter()
+                .find(|f| f.name.eq_ignore_ascii_case(&lossy(name)))
+                .map(|f| FilmSubtitles::new(f.subtitles.clone()))
+        });
         self.film = Some((film, sound));
         true
     }
@@ -902,12 +1004,19 @@ impl Stage {
                 break;
             }
         }
+        // @ 0x0042b0f0: after the film's step, its subtitles.
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let (frame, rate) = (film.frame_num, film.fps().round() as u32);
+        if let Some(fs) = &mut self.film_subtitles {
+            fs.step(frame, rate);
+        }
         if over {
             self.end_film();
         }
     }
 
     fn end_film(&mut self) {
+        self.film_subtitles = None;
         if let Some((_, sound)) = self.film.take() {
             if let (Some(s), Some(a)) = (sound, &self.audio) {
                 s.stop(a);
@@ -1044,6 +1153,9 @@ impl Stage {
                 self.wait_ended = true;
             }
         }
+        // `Atl_Dialog_Play`'s loop: its checks, then the scene's update.
+        self.dialog_update(dt);
+        self.menu_close_step();
         for p in &mut self.persistent {
             p.2 += dt;
         }
@@ -1057,7 +1169,11 @@ impl Stage {
                 continue;
             }
             let object = &self.sprites[i].object;
-            if self.randomized.iter().any(|r| &r.object == object) {
+            if self
+                .randomized
+                .iter()
+                .any(|r| &r.object == object && !r.held)
+            {
                 self.randomize_next(i);
                 i += 1;
             } else {
@@ -1087,6 +1203,7 @@ impl Stage {
                     out[(oy + y) * VIEW_WIDTH + ox + x] = film.xrgb[y * w + x];
                 }
             }
+            self.draw_film_subtitle(out);
             return;
         }
         let Some(v) = &self.view else { return };
@@ -1111,6 +1228,8 @@ impl Stage {
             face: FACE,
         });
         r.render(&faces, &cam.matrix(), cam.projection(), out);
+        self.draw_menu(out);
+        self.draw_dialog(out);
     }
 
     /// The zone under screen point (sx, sy): the first of the view's
@@ -1172,6 +1291,628 @@ impl Stage {
     /// The view's number.
     pub fn view_number(&self) -> Option<i32> {
         self.view.as_ref().map(|v| v.view)
+    }
+}
+
+// -- dialogs, the subject menu, film subtitles, saves ------------------------
+
+impl Stage {
+    /// The sprite of `object` given `animation` in `mode` with the same
+    /// priority (@ 0x00441a90 then @ 0x00441830(file, priority, 0)).
+    fn replace_anim(&mut self, object: &[u8], animation: &[u8], mode: Mode) -> bool {
+        let Some(p) = self
+            .sprites
+            .iter()
+            .find(|s| s.object == object)
+            .map(|s| s.priority)
+        else {
+            return false;
+        };
+        self.add_sprite(object, animation, mode, p, false).is_some()
+    }
+
+    /// Holds or releases the object's randomize record.
+    fn hold_randomized(&mut self, object: &[u8], held: bool) {
+        for r in &mut self.randomized {
+            if r.object == object {
+                r.held = held;
+            }
+        }
+    }
+
+    /// Whether the `facing` sprite of `object` has run its length
+    /// (@ 0x00448c60 the time, @ 0x00448c70 (last − first) / fps); a
+    /// sprite that is no longer there counts as done.
+    fn facing_done(&self, object: &[u8]) -> bool {
+        match self.sprites.iter().find(|s| s.object == object) {
+            Some(s) if s.animation == b"facing" => {
+                let len = f64::from(s.last.wrapping_sub(s.first)) / SPRITE_FPS;
+                s.time >= len
+            }
+            _ => true,
+        }
+    }
+
+    /// `Atl_Dialog_Play(id)` (@ 0x00407ac0): the dialog must exist
+    /// (@ 0x00465fb0: not 0 and in the table). Unless the subject menu is
+    /// open (the manager in state 3 with mode 9), each 3D talker whose
+    /// object has a sprite in the view turns to face (`facing`, the
+    /// player's default mode, the same priority, its randomize record
+    /// held). The call then waits.
+    fn dialog_start(&mut self, id: i32) -> bool {
+        let Some(set) = &self.dialogs else {
+            log::warn!("LUA_Dialog_Play : no dialogs.xml");
+            return false;
+        };
+        let d = u32::try_from(id)
+            .ok()
+            .filter(|&i| i != 0)
+            .and_then(|i| set.dialog(i));
+        let Some(d) = d else {
+            log::info!("LUA_Dialog_Play : Le dialogue {id} n'existe pas.");
+            return false;
+        };
+        let talkers = dlg::talkers(set, d);
+        let tirades: Vec<(String, String)> = d
+            .tirades
+            .iter()
+            .map(|t| (t.talker.clone(), t.text.clone()))
+            .collect();
+        let mut run = DialogRun {
+            player: Player::new(d.id, tirades.len()),
+            talkers,
+            tirades,
+            facing: false,
+            faced: Vec::new(),
+            voice: None,
+            bubble: None,
+            portrait: None,
+            text_h: 0,
+            text: String::new(),
+        };
+        let in_menu = self.menu.is_some();
+        if !in_menu {
+            run.facing = true;
+            let threed: Vec<Vec<u8>> = run
+                .talkers
+                .iter()
+                .filter(|(_, p)| *p == atlantis3_data::atlantis5_texts::Picturing::ThreeD)
+                .map(|(n, _)| n.as_bytes().to_vec())
+                .collect();
+            for o in threed {
+                if self.sprites.iter().any(|s| s.object == o) {
+                    self.hold_randomized(&o, true);
+                    if self.replace_anim(&o, b"facing", Mode::Stop) {
+                        run.faced.push(o);
+                    }
+                }
+            }
+        }
+        self.dialog = Some(run);
+        true
+    }
+
+    /// Whether the tirade's voice still plays (@ 0x00459be0).
+    fn voice_playing(&self) -> bool {
+        let Some(v) = self.dialog.as_ref().and_then(|d| d.voice.as_ref()) else {
+            return false;
+        };
+        match &self.audio {
+            Some(a) => a.is_playing(CHANNEL_VOICE),
+            None => self.clock - v.started < v.length,
+        }
+    }
+
+    /// One frame of the dialog (@ 0x00407ac0's loops): first the facing
+    /// loop (each faced talker done gets `listen` in a loop, mode 3, its
+    /// priority kept; when all are done the player starts), then the
+    /// player's step with the frame's clicks; at its end the faced
+    /// talkers get `unfacing` (their records released) and the call
+    /// returns.
+    fn dialog_update(&mut self, dt: f64) {
+        let Some(run) = &self.dialog else { return };
+        let clicks = std::mem::take(&mut self.clicks) > 0;
+        let space = std::mem::take(&mut self.space);
+        if run.facing {
+            let faced = run.faced.clone();
+            let mut all = true;
+            for o in &faced {
+                let is_facing = self
+                    .sprites
+                    .iter()
+                    .any(|s| &s.object == o && s.animation == b"facing");
+                if !is_facing {
+                    continue;
+                }
+                if self.facing_done(o) {
+                    self.replace_anim(o, b"listen", Mode::Loop);
+                } else {
+                    all = false;
+                }
+            }
+            if all {
+                if let Some(r) = &mut self.dialog {
+                    r.facing = false;
+                }
+            }
+            return;
+        }
+        let playing = self.voice_playing();
+        let Some(run) = &mut self.dialog else { return };
+        let act = run.player.step(dt, clicks, space, playing);
+        match act {
+            Some(Act::Start(k, _)) => self.tirade_start(k),
+            Some(Act::Next(_)) => {
+                let Some(run) = &mut self.dialog else { return };
+                if run.voice.take().is_some() {
+                    if let Some(a) = &self.audio {
+                        a.stop(CHANNEL_VOICE);
+                    }
+                }
+                run.portrait = None;
+                run.bubble = None;
+            }
+            Some(Act::Over) => self.dialog_end(),
+            None => {}
+        }
+        if let Some(run) = &mut self.dialog {
+            if let Some(f) = &mut run.portrait {
+                // The 2D talker's film (the player's +0x14 step, case 2).
+                while f.due(self.clock) {
+                    f.do_frame();
+                    if !f.next_frame() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /// The player's state 0 (@ 0x00432a5c): the voice (`GetFileAttributes`
+    /// gives +0x38), loaded as a type-2 sample and played at 1.0; the
+    /// bubble and the box of the talker's picturing; a 2D talker's film.
+    fn tirade_start(&mut self, k: usize) {
+        let language = self.language.clone();
+        let Some(run) = &self.dialog else { return };
+        let (talker, text) = run.tirades[k].clone();
+        let kind = Kind::of(
+            run.talkers
+                .iter()
+                .find(|(n, _)| *n == talker)
+                .map_or(atlantis3_data::atlantis5_texts::Picturing::None, |t| t.1),
+        );
+        let path = dlg::voice_path(&language, run.player.id, k);
+        let voice = self.read(&path);
+        let has_voice = voice.is_some();
+        let mut v = None;
+        if let Some(data) = voice {
+            match atlantis4_data::audio::decode_vorbis(&data) {
+                Ok(d) => {
+                    #[allow(clippy::cast_precision_loss)]
+                    let length = d.samples.len() as f64
+                        / f64::from(d.channels.max(1))
+                        / f64::from(d.sample_rate.max(1));
+                    if let Some(a) = &self.audio {
+                        a.play(
+                            CHANNEL_VOICE,
+                            d.sample_rate,
+                            u16::from(d.channels),
+                            Arc::new(d.samples),
+                            false,
+                            [1.0; 2],
+                        );
+                    }
+                    v = Some(Voice {
+                        length,
+                        started: self.clock,
+                    });
+                }
+                Err(e) => log::warn!("{path}: {e:?}"),
+            }
+        }
+        let bubble = self
+            .read(&format!("datas/sprites2d/dialog/{}", kind.bubble()))
+            .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok());
+        let portrait = if kind == Kind::TwoD {
+            let file = format!("datas/videos/{talker}.bik");
+            self.read(&file)
+                .and_then(|d| Film::open(&talker, Arc::from(d), Depth::Xrgb8888, self.clock).ok())
+        } else {
+            None
+        };
+        let text_h = self.fonts.text_height("AtlFont_Dialog", &text, 0x2f8);
+        let Some(run) = &mut self.dialog else { return };
+        run.voice = v;
+        run.bubble = bubble;
+        run.portrait = portrait;
+        run.text_h = text_h;
+        run.text = text;
+        run.player.started(kind, has_voice);
+    }
+
+    /// The end of `Atl_Dialog_Play`: the faced talkers' `unfacing` (the
+    /// player's default mode, their records released, @ 0x00443570), and
+    /// the script goes on.
+    fn dialog_end(&mut self) {
+        let Some(run) = self.dialog.take() else {
+            return;
+        };
+        if let (Some(_), Some(a)) = (&run.voice, &self.audio) {
+            a.stop(CHANNEL_VOICE);
+        }
+        for o in &run.faced {
+            if self.sprites.iter().any(|s| &s.object == o) {
+                self.replace_anim(o, b"unfacing", Mode::Stop);
+            }
+            self.hold_randomized(o, false);
+        }
+        self.wait_ended = true;
+    }
+
+    /// Whether a dialog runs.
+    pub fn dialog_running(&self) -> bool {
+        self.dialog.is_some()
+    }
+
+    /// The tirade shown (dialog id, tirade, state), for tests.
+    pub fn dialog_state(&self) -> Option<(u32, usize, u32)> {
+        self.dialog
+            .as_ref()
+            .map(|d| (d.player.id, d.player.tirade, d.player.state))
+    }
+
+    /// The dialog over the view (@ 0x00433910, states 1..3): the 2D
+    /// talker's film in its rectangle with a white frame
+    /// (@ 0x0048e8d0(…, 0xffffff)), the bubble at its place, the text in
+    /// black (`AtlFont_Dialog`, layout 0, 0, 0, 0, 0, 0) on a 760-wide
+    /// surface blitted with its colour key into the 760 × 100 box, moved
+    /// up by the scroll.
+    fn draw_dialog(&self, out: &mut [u32]) {
+        let Some(run) = &self.dialog else { return };
+        if run.facing || !matches!(run.player.state, 1..=3) {
+            return;
+        }
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
+        let kind = run.player.kind;
+        if let Some(f) = &run.portrait {
+            let (l, t, r, b) = dlg::portrait_rect(h);
+            let (fw, fh) = f.size();
+            for y in t..b {
+                for x in l..r {
+                    #[allow(clippy::cast_sign_loss)]
+                    let (sx, sy) = ((x - l) as usize, (y - t) as usize);
+                    if sx < fw && sy < fh && (0..w).contains(&x) && (0..h).contains(&y) {
+                        #[allow(clippy::cast_sign_loss)]
+                        let i = (y * w + x) as usize;
+                        out[i] = f.xrgb[sy * fw + sx];
+                    }
+                }
+            }
+            for x in l..=r {
+                for y in [t, b] {
+                    if (0..w).contains(&x) && (0..h).contains(&y) {
+                        #[allow(clippy::cast_sign_loss)]
+                        let i = (y * w + x) as usize;
+                        out[i] = 0x00ff_ffff;
+                    }
+                }
+            }
+            for y in t..=b {
+                for x in [l, r] {
+                    if (0..w).contains(&x) && (0..h).contains(&y) {
+                        #[allow(clippy::cast_sign_loss)]
+                        let i = (y * w + x) as usize;
+                        out[i] = 0x00ff_ffff;
+                    }
+                }
+            }
+        }
+        if let Some(b) = &run.bubble {
+            let (x, y) = dlg::bubble_at(kind, w, h);
+            let mut t = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
+            b.draw(&mut t, Some(x), y, 0);
+        }
+        let (bx, by, bw, bh) = dlg::text_box(kind, w, h);
+        let scroll = dlg::scroll_px(run.player.time, run.text_h, bh);
+        let lines = self.fonts.lines(
+            "AtlFont_Dialog",
+            &run.text,
+            bw,
+            run.text_h.max(bh) + 1,
+            crate::text::Zone::new(0, 0, 0, 0, 0, 0),
+        );
+        // The text surface (+0x3c): filled with its colour key, white
+        // (@ 0x0047c2d0(surface, 0xffffffff); the key set with
+        // DDCKEY_SRCBLT, the vtable's +0x74), the text drawn in black on
+        // it, then blitted with the key (0x8000, DDBLT_KEYSRC): every
+        // pixel but pure white is copied.
+        #[allow(clippy::cast_sign_loss)]
+        let (uw, uh) = (bw as usize, bh as usize);
+        let mut surf = vec![0x00ff_ffffu32; uw * uh];
+        self.fonts
+            .draw("AtlFont_Dialog", &lines, 0, &mut surf, uw, uh, 0, -scroll);
+        for y in 0..uh {
+            for x in 0..uw {
+                let p = surf[y * uw + x];
+                if p & 0x00ff_ffff == 0x00ff_ffff {
+                    continue;
+                }
+                #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+                let (dx, dy) = (bx + x as i32, by + y as i32);
+                if (0..w).contains(&dx) && (0..h).contains(&dy) {
+                    #[allow(clippy::cast_sign_loss)]
+                    let i = (dy * w + dx) as usize;
+                    out[i] = p & 0x00ff_ffff;
+                }
+            }
+        }
+    }
+
+    /// `Atl_TerminateDialog` (@ 0x00405d30 → 0x0041b770 → the menu's
+    /// +0xc): the subject menu closes (@ 0x00411a70: state 5).
+    fn terminate_dialog(&mut self) {
+        if let Some(m) = &mut self.menu {
+            m.state = MenuState::Closing;
+        }
+    }
+
+    /// The subject menu opens (mode 9, @ 0x00410f80(name), the menu's
+    /// Initialize @ 0x004117f0): the character's sprite turns to face
+    /// (`facing`, its priority kept, its record held), state 0.
+    fn menu_open(&mut self, character: &[u8]) {
+        self.hold_randomized(character, true);
+        self.replace_anim(character, b"facing", Mode::Stop);
+        self.menu = Some(SubjectMenu {
+            character: character.to_vec(),
+            state: MenuState::Facing,
+            subjects: Vec::new(),
+            bubble: None,
+            images: Vec::new(),
+            picked: None,
+            closed: false,
+        });
+    }
+
+    /// The subject menu's character whose subjects it needs now (its
+    /// elements made: after the facing, or again after a subject's
+    /// script, @ 0x00410f90 states 0 and 2).
+    pub fn menu_wants_subjects(&mut self) -> Option<Vec<u8>> {
+        let m = self.menu.as_ref()?;
+        match m.state {
+            MenuState::Facing => {
+                let c = m.character.clone();
+                let facing = self
+                    .sprites
+                    .iter()
+                    .any(|s| s.object == c && s.animation == b"facing");
+                if !facing {
+                    // `CMenu_Dialog :: Process -> Le sprite %s n'existe pas`
+                    log::info!(
+                        "CMenu_Dialog :: Process -> no facing sprite of {}",
+                        lossy(&c)
+                    );
+                    return Some(c);
+                }
+                if self.facing_done(&c) {
+                    self.replace_anim(&c, b"listen", Mode::Loop);
+                    return Some(c);
+                }
+                None
+            }
+            MenuState::Rebuild => Some(m.character.clone()),
+            _ => None,
+        }
+    }
+
+    /// The subject menu's elements (@ 0x00411a90): the subjects of
+    /// `Atl_Character_GetSubjects`, in its order (no sort); the bubble
+    /// `subject_bubble_<n>.spr` at (W · 3 / 5, H / 3); each subject's
+    /// image `sprites2d/dialog/subjects/<name>.spr` (`proxy_subject.spr`
+    /// when missing), drawn at half its alpha when disabled
+    /// (@ 0x00412b60: 0.5), and its 64 × 64 area. No subject: none, and
+    /// the menu stays.
+    pub fn menu_set_subjects(&mut self, subjects: Vec<(Vec<u8>, bool)>) {
+        let Some(m) = &self.menu else { return };
+        let _ = m;
+        let bubble = self
+            .read(&format!(
+                "datas/sprites2d/dialog/{}",
+                dlg::subject_bubble(subjects.len())
+            ))
+            .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok());
+        let images: Vec<Option<Bank>> = subjects
+            .iter()
+            .map(|(name, _)| {
+                self.read(&format!(
+                    "datas/sprites2d/dialog/subjects/{}.spr",
+                    lossy(name)
+                ))
+                .or_else(|| self.read("datas/sprites2d/dialog/proxy_subject.spr"))
+                .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok())
+            })
+            .collect();
+        if let Some(m) = &mut self.menu {
+            m.subjects = subjects;
+            m.bubble = bubble;
+            m.images = images;
+            m.state = MenuState::Open;
+        }
+        self.mouse = (
+            i32::try_from(VIEW_WIDTH).unwrap_or(0) / 2,
+            i32::try_from(VIEW_HEIGHT).unwrap_or(0) / 2,
+        );
+    }
+
+    /// The subject menu's bubble hot spot.
+    fn menu_origin() -> (i32, i32) {
+        #[allow(clippy::cast_possible_truncation)]
+        (
+            (VIEW_WIDTH as u32 * 3 / 5) as i32,
+            (VIEW_HEIGHT as u32 / 3) as i32,
+        )
+    }
+
+    /// The subject under screen point (x, y).
+    pub fn menu_subject_at(&self, x: i32, y: i32) -> Option<usize> {
+        let m = self.menu.as_ref()?;
+        if m.state != MenuState::Open {
+            return None;
+        }
+        let (ox, oy) = Self::menu_origin();
+        dlg::subject_layout(m.subjects.len())
+            .iter()
+            .position(|&(dx, dy)| {
+                let (l, t) = (ox + dx, oy + dy);
+                (l..l + 0x40).contains(&x) && (t..t + 0x40).contains(&y)
+            })
+    }
+
+    /// The menu's position of subject `i` (tests and tools).
+    #[doc(hidden)]
+    pub fn menu_subject_point(&self, i: usize) -> Option<(i32, i32)> {
+        let m = self.menu.as_ref()?;
+        let (ox, oy) = Self::menu_origin();
+        dlg::subject_layout(m.subjects.len())
+            .get(i)
+            .map(|&(dx, dy)| (ox + dx + 32, oy + dy + 32))
+    }
+
+    /// The subjects shown.
+    pub fn menu_subjects(&self) -> Vec<Vec<u8>> {
+        self.menu
+            .as_ref()
+            .map(|m| m.subjects.iter().map(|s| s.0.clone()).collect())
+            .unwrap_or_default()
+    }
+
+    /// A left press in the open menu at the mouse (@ 0x0040d920 then
+    /// @ 0x00410f90 state 1): on a subject, its click (@ 0x00412ba0 →
+    /// 0x004129c0: `click_subject`, state 2, `on_click`); elsewhere the
+    /// menu closes (state 5).
+    pub(crate) fn menu_click(&mut self) {
+        let (x, y) = self.mouse;
+        let hit = self.menu_subject_at(x, y);
+        let Some(m) = &mut self.menu else { return };
+        if m.state != MenuState::Open {
+            return;
+        }
+        match hit {
+            Some(i) => {
+                m.picked = Some(m.subjects[i].0.clone());
+                m.state = MenuState::Rebuild;
+            }
+            None => m.state = MenuState::Closing,
+        }
+    }
+
+    /// A subject picked: (character, subject), taken once.
+    pub fn menu_take_pick(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
+        let m = self.menu.as_mut()?;
+        let s = m.picked.take()?;
+        Some((m.character.clone(), s))
+    }
+
+    /// The closing (@ 0x00410f90 state 5): the elements gone, the
+    /// character's `unfacing` when its sprite is there (@ 0x004414d0), its
+    /// record released; the menu is over.
+    fn menu_close_step(&mut self) {
+        let Some(m) = &self.menu else { return };
+        if m.state != MenuState::Closing {
+            return;
+        }
+        let c = m.character.clone();
+        if self.sprites.iter().any(|s| s.object == c) {
+            self.replace_anim(&c, b"unfacing", Mode::Stop);
+        }
+        self.hold_randomized(&c, false);
+        if let Some(m) = &mut self.menu {
+            m.closed = true;
+        }
+    }
+
+    /// Whether the subject menu has ended; it is dropped then.
+    pub fn menu_take_closed(&mut self) -> bool {
+        if self.menu.as_ref().is_some_and(|m| m.closed) {
+            self.menu = None;
+            return true;
+        }
+        false
+    }
+
+    /// Whether the subject menu is open.
+    pub fn menu_open_now(&self) -> bool {
+        self.menu.is_some()
+    }
+
+    /// The subject menu over the view (@ 0x00411790: not in states 2
+    /// and 5): the bubble, the images (half alpha when disabled).
+    fn draw_menu(&self, out: &mut [u32]) {
+        let Some(m) = &self.menu else { return };
+        if m.state != MenuState::Open {
+            return;
+        }
+        let (ox, oy) = Self::menu_origin();
+        let mut t = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
+        if let Some(b) = &m.bubble {
+            b.draw(&mut t, Some(ox), oy, 0);
+        }
+        for (i, (dx, dy)) in dlg::subject_layout(m.subjects.len())
+            .into_iter()
+            .enumerate()
+        {
+            if let Some(Some(img)) = m.images.get(i) {
+                if m.subjects[i].1 {
+                    img.draw(&mut t, Some(ox + dx), oy + dy, 0);
+                } else {
+                    // `ftol(0.5 × 31)` = 15.
+                    img.draw_trs(&mut t, Some(ox + dx), oy + dy, 0, 15);
+                }
+            }
+        }
+    }
+
+    /// The film's subtitle (@ 0x0042b220): black at the bottom centre,
+    /// then white 2 pixels up and left.
+    fn draw_film_subtitle(&self, out: &mut [u32]) {
+        let Some(text) = self.film_subtitles.as_ref().and_then(|f| f.shown.as_ref()) else {
+            return;
+        };
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
+        let lines = self
+            .fonts
+            .lines("AtlFont_Subtitle", text, w, h, dlg::SUBTITLE_ZONE);
+        self.fonts.draw(
+            "AtlFont_Subtitle",
+            &lines,
+            0,
+            out,
+            VIEW_WIDTH,
+            VIEW_HEIGHT,
+            0,
+            0,
+        );
+        self.fonts.draw(
+            "AtlFont_Subtitle",
+            &lines,
+            0x00ff_ffff,
+            out,
+            VIEW_WIDTH,
+            VIEW_HEIGHT,
+            -2,
+            -2,
+        );
+    }
+
+    /// The film subtitle shown (tests).
+    pub fn film_subtitle(&self) -> Option<String> {
+        self.film_subtitles.as_ref().and_then(|f| f.shown.clone())
+    }
+
+    /// The folder of the player's saves (`saves/`).
+    pub fn set_save_dir(&mut self, dir: Option<std::path::PathBuf>) {
+        self.save_dir = dir;
     }
 }
 
@@ -1258,6 +1999,7 @@ impl Engine for Stage {
                     object: object.clone(),
                     tick1: *tick1,
                     tick2: *tick2,
+                    held: false,
                 });
             }
             Call::SpriteStop { object } => {
@@ -1388,6 +2130,12 @@ impl Engine for Stage {
                     self.sound = None;
                 }
             }
+            Call::DialogPlay(id) => {
+                if self.dialog_start(*id) {
+                    return Reply::Wait;
+                }
+            }
+            Call::TerminateDialog => self.terminate_dialog(),
             Call::Print(b, args) => {
                 let text: Vec<String> = args.iter().map(Value::trace).collect();
                 log::info!("{}: {}", b.name(), text.join(", "));
@@ -1410,12 +2158,106 @@ impl Engine for Stage {
                 }
             }
             Request::TransitionFov { radians, .. } => self.fov = *radians,
-            Request::TransitionEnd | Request::DeleteAutosave => {}
-            Request::SubjectMenu { character } => {
-                // The subject menu is the dialogs' milestone.
-                log::info!("subject menu of {}: not ported yet", lossy(character));
+            Request::TransitionEnd => {}
+            Request::DeleteAutosave => {
+                // @ 0x0042fc50: `saves/autoslot` deleted.
+                if let Some(d) = &self.save_dir {
+                    let _ = std::fs::remove_file(d.join(atlantis5_script::save::AUTOSLOT));
+                }
+            }
+            Request::SubjectMenu { character } => self.menu_open(character),
+        }
+    }
+
+    /// `CAMERA` (@ 0x00437920: `pitch`, `pitch_min`, `pitch_max`,
+    /// `pitch_limited`, `yaw`, `yaw_min`, `yaw_max`, `yaw_limited`),
+    /// `SOUND` (@ 0x0043a4f0: a `PLAYLIST` with `channel` and `name` for
+    /// each of the 5 channels playing a list) and `PERSISTANT_SPRITES`
+    /// (@ 0x00439f10: a `PS` with `name` and `time` each). The camera
+    /// mover's section (`CAMERA_MOVER`: its speeds and `BoatFx`) is not
+    /// written.
+    fn save_sections(&mut self) -> Vec<atlantis4_data::xml::Element> {
+        use atlantis5_script::save::{attr_bool, attr_f32, element};
+        let mut cam = element("CAMERA");
+        let (pmin, pmax) = self.pitch_limit.unwrap_or((0.0, 0.0));
+        let (ymin, ymax) = self.yaw_limit.unwrap_or((0.0, 0.0));
+        attr_f32(&mut cam, "pitch", self.pitch);
+        attr_f32(&mut cam, "pitch_min", pmin);
+        attr_f32(&mut cam, "pitch_max", pmax);
+        attr_bool(&mut cam, "pitch_limited", self.pitch_limit.is_some());
+        attr_f32(&mut cam, "yaw", self.yaw);
+        attr_f32(&mut cam, "yaw_min", ymin);
+        attr_f32(&mut cam, "yaw_max", ymax);
+        attr_bool(&mut cam, "yaw_limited", self.yaw_limit.is_some());
+        let mut sound = element("SOUND");
+        for (ch, m) in self.music.iter().enumerate() {
+            if m.list.is_none() {
+                continue;
+            }
+            let mut p = element("PLAYLIST");
+            p.attributes.push(("channel".into(), ch.to_string()));
+            p.attributes
+                .push(("name".into(), atlantis4_data::xml::cp1252(&m.name)));
+            sound.children.push(p);
+        }
+        let mut ps = element("PERSISTANT_SPRITES");
+        for (object, _, time) in &self.persistent {
+            let mut e = element("PS");
+            e.attributes
+                .push(("name".into(), atlantis4_data::xml::cp1252(object)));
+            #[allow(clippy::cast_possible_truncation)]
+            attr_f32(&mut e, "time", *time as f32);
+            ps.children.push(e);
+        }
+        vec![cam, sound, ps]
+    }
+
+    fn load_sections(&mut self, root: &atlantis4_data::xml::Element) {
+        use atlantis5_script::save::{get_bool, get_f64};
+        #[allow(clippy::cast_possible_truncation)]
+        if let Some(c) = root.child("CAMERA") {
+            let f = |n: &str| get_f64(c, n).unwrap_or(0.0) as f32;
+            self.pitch_limit = get_bool(c, "pitch_limited")
+                .unwrap_or(false)
+                .then(|| (f("pitch_min"), f("pitch_max")));
+            self.yaw_limit = get_bool(c, "yaw_limited")
+                .unwrap_or(false)
+                .then(|| (f("yaw_min"), f("yaw_max")));
+            self.pitch = f("pitch");
+            self.yaw = f("yaw");
+        }
+        if let Some(ps) = root.child("PERSISTANT_SPRITES") {
+            self.persistent = ps
+                .children_named("PS")
+                .filter_map(|e| {
+                    let name = atlantis4_data::xml::to_cp1252(e.attr("name")?);
+                    Some((name, 0, get_f64(e, "time").unwrap_or(0.0)))
+                })
+                .collect();
+        }
+        if let Some(snd) = root.child("SOUND") {
+            for ch in 0..MUSIC_CHANNELS {
+                self.music_stop(ch, 0.0);
+            }
+            for p in snd.children_named("PLAYLIST") {
+                #[allow(clippy::cast_possible_truncation)]
+                let ch = get_f64(p, "channel").unwrap_or(-1.0) as i32;
+                if let Some(name) = p.attr("name") {
+                    self.music_play(ch, &atlantis4_data::xml::to_cp1252(name));
+                }
             }
         }
+    }
+
+    fn write_save(&mut self, name: &str, data: &[u8]) -> bool {
+        let Some(d) = &self.save_dir else {
+            return false;
+        };
+        std::fs::create_dir_all(d).is_ok() && std::fs::write(d.join(name), data).is_ok()
+    }
+
+    fn read_save(&mut self, name: &str) -> Option<Vec<u8>> {
+        std::fs::read(self.save_dir.as_ref()?.join(name)).ok()
     }
 
     fn event(&mut self, e: &Event<'_>) {
@@ -1553,9 +2395,16 @@ impl Play {
                 st.look(dx, dy, dtf);
             }
         }
+        // A dialog takes the frame's clicks (`Atl_Dialog_Play`'s loop).
+        if self.stage.borrow().dialog_running() {
+            self.stage.borrow_mut().clicks += clicks;
+        }
         self.stage.borrow_mut().update(dt, play);
         if std::mem::take(&mut self.stage.borrow_mut().wait_ended) {
             self.game.finish_wait();
+        }
+        if self.game.state() == 3 && !self.game.busy() {
+            self.menu_frame(clicks);
         }
         if play {
             for _ in 0..clicks {
@@ -1621,6 +2470,51 @@ impl Play {
             }
         }
         self.stage.borrow_mut().cursor = cursor;
+    }
+
+    /// State 3 (@ 0x0042f000 → @ 0x0041b780): the menu's process. The
+    /// subject menu (mode 9) is ported; another mode (the inventory 8,
+    /// the death panel 10 of `Atl_GameOver`, the examine view 11, poker
+    /// 12, the game's menus) is not, and ends at once (logged), so the
+    /// manager takes its next request.
+    fn menu_frame(&mut self, clicks: usize) {
+        if !self.stage.borrow().menu_open_now() {
+            log::info!("menu of state 3: not ported, closed");
+            self.game.menu_closed();
+            return;
+        }
+        let wants = self.stage.borrow_mut().menu_wants_subjects();
+        if let Some(c) = wants {
+            let list = match self.game.script().character_subject_list(&c) {
+                Ok(l) => l.into_iter().map(|(n, on, _)| (n, on)).collect(),
+                Err(e) => {
+                    log::warn!("{e}");
+                    Vec::new()
+                }
+            };
+            self.stage.borrow_mut().menu_set_subjects(list);
+        }
+        for _ in 0..clicks {
+            self.stage.borrow_mut().menu_click();
+            let pick = self.stage.borrow_mut().menu_take_pick();
+            if let Some((c, s)) = pick {
+                self.game.click_subject(&c, &s);
+                break;
+            }
+        }
+        if self.stage.borrow_mut().menu_take_closed() {
+            self.game.menu_closed();
+        }
+    }
+
+    /// The mouse at (x, y) on the 1024 × 576 picture (menus).
+    pub fn mouse_at(&mut self, x: i32, y: i32) {
+        self.stage.borrow_mut().mouse = (x, y);
+    }
+
+    /// The folder of the player's saves.
+    pub fn set_save_dir(&mut self, dir: Option<std::path::PathBuf>) {
+        self.stage.borrow_mut().set_save_dir(dir);
     }
 
     /// What the last pick found under the centre.
@@ -1752,6 +2646,17 @@ impl Play {
         let mut s = self.stage.borrow_mut();
         if s.film.is_some() {
             s.end_film();
+        }
+    }
+
+    /// Space (DirectInput 0x39): a dialog ends (@ 0x00432a0f: the player's
+    /// +0x39), a film too.
+    pub fn space(&mut self) {
+        let dialog = self.stage.borrow().dialog_running();
+        if dialog {
+            self.stage.borrow_mut().space = true;
+        } else {
+            self.skip();
         }
     }
 
@@ -1949,6 +2854,7 @@ mod tests {
             object: b"barman".to_vec(),
             tick1: 10.0,
             tick2: 25.0,
+            held: false,
         };
         let mut seed = 1;
         let next: Vec<&[u8]> = (0..4).map(|_| r.choose(&mut seed)).collect();
@@ -1957,6 +2863,7 @@ mod tests {
             object: b"gorilla".to_vec(),
             tick1: 20.0,
             tick2: 0.0,
+            held: false,
         };
         let mut seed = 1;
         let next: Vec<&[u8]> = (0..3).map(|_| r.choose(&mut seed)).collect();

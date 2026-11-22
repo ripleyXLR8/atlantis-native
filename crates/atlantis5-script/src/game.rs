@@ -336,9 +336,12 @@ impl Game {
                 match self.script.character_subjects(object) {
                     Ok(0) => {}
                     Ok(_) => {
+                        // @ 0x00430464..: mode 9, @ 0x00410f80(name),
+                        // then state 3 (@ 0x0042fb90).
                         self.request(&Request::SubjectMenu {
                             character: object.to_vec(),
                         });
+                        self.open_menu();
                         return true;
                     }
                     Err(e) => {
@@ -356,7 +359,8 @@ impl Game {
     /// A subject picked in a subject menu (@ 0x00401c40): the
     /// `click_subject` event and the scene's `on_click`.
     pub fn click_subject(&mut self, character: &[u8], subject: &[u8]) -> bool {
-        if self.busy() || self.state != 4 {
+        // The subject menu runs in state 3 (@ 0x004129c0).
+        if self.busy() || (self.state != 4 && self.state != 3) {
             return false;
         }
         self.script.set_click_subject(character, subject);
@@ -455,6 +459,7 @@ impl Game {
                     }
                 }
                 Call::Load => self.queue.push_back(2),
+                Call::Save => self.save(),
                 Call::TerminateGame => self.queue.push_back(7),
                 _ => {}
             }
@@ -691,6 +696,137 @@ impl Game {
         }
     }
 
+    /// A menu opens: state 3 (@ 0x0042fb90(3)), the state left kept for
+    /// the return (@ 0x0042ef30 takes it when no request is queued).
+    pub fn open_menu(&mut self) {
+        if self.state != 3 {
+            self.note(format!("game manager: state {} -> 3", self.state));
+            self.previous = self.state;
+            self.state = 3;
+        }
+    }
+
+    /// The menu of state 3 has ended (its process returned 1,
+    /// @ 0x0042f000 case 3 falling into case 0): the next request.
+    pub fn menu_closed(&mut self) {
+        if self.state == 3 {
+            self.next_request();
+        }
+    }
+
+    /// `Atl_Save` (@ 0x00408fb0 → 0x0043ad90): `saves/autoslot`, an
+    /// `ATL_FILE` with `LUA_DB` (taken at the call), the engine's
+    /// sections, then `CALLBACK_SHOOTER_MANAGER` (@ 0x00436f20): one
+    /// `CALLBACK_SHOOTER` per timer with `name`, `duration` and
+    /// `remaining_time` (floats), `repeat` (a `VT_I4`), holding one
+    /// `CALLBACK` with the handler's `name` (`OnTimeOut`, 0x0066b004).
+    /// The configuration's section is not written (Native keeps the
+    /// options elsewhere).
+    fn save(&mut self) {
+        use crate::save;
+        let db = match self.script.take_saved_db() {
+            Some(Ok(db)) => db,
+            Some(Err(e)) => {
+                self.lua_error(&e);
+                return;
+            }
+            None => return,
+        };
+        let mut root = save::element(save::ROOT);
+        root.attributes.push(("type".into(), save::TYPE.into()));
+        root.children.push(db);
+        let sections = self.engine.borrow_mut().save_sections();
+        root.children.extend(sections);
+        let mut manager = save::element("CALLBACK_SHOOTER_MANAGER");
+        for (name, t) in &self.timers {
+            let mut c = save::element("CALLBACK_SHOOTER");
+            c.attributes
+                .push(("name".into(), atlantis4_data::xml::cp1252(name)));
+            #[allow(clippy::cast_possible_truncation)]
+            {
+                save::attr_f32(&mut c, "duration", t.duration as f32);
+                let remaining = t.duration - (self.clock - t.start);
+                save::attr_f32(&mut c, "remaining_time", remaining as f32);
+            }
+            c.attributes.push(("repeat".into(), t.repeat.to_string()));
+            let mut cb = save::element("CALLBACK");
+            cb.attributes.push(("name".into(), "OnTimeOut".into()));
+            c.children.push(cb);
+            manager.children.push(c);
+        }
+        root.children.push(manager);
+        let text = save::to_text(&root);
+        if !self
+            .engine
+            .borrow_mut()
+            .write_save(save::AUTOSLOT, text.as_bytes())
+        {
+            self.note("Atl_Save: the save could not be written".into());
+        }
+    }
+
+    /// State 2 (@ 0x0042f000): `saves/autoslot` (missing: `Atl_Load usage
+    /// : Le fichier %s introuvable`), read by @ 0x0043b210: `atlantis.lua`
+    /// run again, `LUA_DB` made the global `atl`, the engine's sections,
+    /// the timers (`CALLBACK_SHOOTER_MANAGER`, each started with its
+    /// remaining time), then `return Atl_Address_GetCurrent()` and a
+    /// `no_fx` transition there (@ 0x0042d8d0(0), 0x0042d8e0).
+    fn load(&mut self) {
+        use crate::save;
+        let Some(data) = self.engine.borrow_mut().read_save(save::AUTOSLOT) else {
+            self.note(format!(
+                "Atl_Load usage : Le fichier saves/{} introuvable",
+                save::AUTOSLOT
+            ));
+            return;
+        };
+        let Some(root) = save::parse(&data) else {
+            self.note("CSaveFileReader :: Read -> not an ATL_FILE".into());
+            return;
+        };
+        let path = Self::scripts_path(b"atlantis.lua");
+        if self.push_file(&path, false) {
+            self.run();
+        }
+        match root.child("LUA_DB") {
+            Some(db) => {
+                if let Err(e) = self.script.load_lua_db(db) {
+                    self.lua_error(&e);
+                }
+            }
+            None => self.note(
+                "CSerialisableLuaDB :: Deserialize -> Grappe de donnée <LUA_DB> manquante".into(),
+            ),
+        }
+        self.engine.borrow_mut().load_sections(&root);
+        self.timers.clear();
+        if let Some(m) = root.child("CALLBACK_SHOOTER_MANAGER") {
+            for c in m.children_named("CALLBACK_SHOOTER") {
+                let Some(name) = c.attr("name") else { continue };
+                let duration = save::get_f64(c, "duration").unwrap_or(0.0);
+                let remaining = save::get_f64(c, "remaining_time").unwrap_or(duration);
+                #[allow(clippy::cast_possible_truncation)]
+                let repeat = save::get_f64(c, "repeat").unwrap_or(-1.0) as i32;
+                self.timers.insert(
+                    atlantis4_data::xml::to_cp1252(name),
+                    Timer {
+                        duration: f64::from(duration as f32),
+                        start: self.clock - (duration - remaining),
+                        repeat,
+                    },
+                );
+            }
+        }
+        match self.script.address_get_current() {
+            Ok((scene, view)) => {
+                #[allow(clippy::cast_possible_truncation)]
+                let view = view as i32;
+                self.start_transition(scene, view, Fx::NoFx);
+            }
+            Err(e) => self.lua_error(&e),
+        }
+    }
+
     /// State 1: `return InitChapter` called with the scripts' folder and
     /// the chapter (nil for 0), then the next request.
     fn init_chapter(&mut self) {
@@ -816,9 +952,13 @@ impl Game {
                 }
                 self.timers();
             }
+            2 => {
+                self.load();
+                self.next_request();
+            }
             s => {
-                // 2 (load), 3 (menus, game over), 7 (end of a game):
-                // the next milestones.
+                // 3: a menu, driven by the engine's side (`open_menu`,
+                // `menu_closed`); 7 (end of a game): not ported.
                 let _ = s;
             }
         }

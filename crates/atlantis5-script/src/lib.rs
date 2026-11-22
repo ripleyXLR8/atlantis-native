@@ -26,6 +26,7 @@
 pub mod engine;
 pub mod game;
 pub mod record;
+pub mod save;
 pub mod script;
 
 pub use engine::{

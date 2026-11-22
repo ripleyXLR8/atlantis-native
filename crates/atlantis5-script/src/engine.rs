@@ -354,8 +354,11 @@ pub enum Call {
         radians: f32,
     },
     CameraActivateFx(CameraFx),
-    /// `Atl_Dialog_Play(...)` (dialogs are the next milestone): raw.
-    DialogPlay(Vec<Value>),
+    /// `Atl_Dialog_Play(id)` (@ 0x00407ac0; `__ftol` of the number). The
+    /// engine checks that the dialog exists (@ 0x00465fb0: not 0, and in
+    /// the table; else `LUA_Dialog_Play : Le dialogue %d n'existe pas`,
+    /// 0x00669f5c, and nothing) and plays it, the script waiting.
+    DialogPlay(i32),
     DisplayGetScreenSize,
     /// `Atl_Music_Play(playlist, channel)`.
     MusicPlay {
@@ -496,6 +499,29 @@ pub trait Engine {
 
     /// Something to log or trace.
     fn event(&mut self, _event: &Event<'_>) {}
+
+    /// The engine's sections of a save, in the writer's order after
+    /// `LUA_DB` (@ 0x0043ad90: `CAMERA_MOVER`, `CAMERA`, `SOUND`,
+    /// `PERSISTANT_SPRITES`).
+    fn save_sections(&mut self) -> Vec<atlantis4_data::xml::Element> {
+        Vec::new()
+    }
+
+    /// Restores the engine's sections of a save (@ 0x0043b210: camera
+    /// mover, camera, then after the timers the persistent sprites and
+    /// the sound).
+    fn load_sections(&mut self, _root: &atlantis4_data::xml::Element) {}
+
+    /// Writes the save file `saves/<name>` of the player; false when it
+    /// could not be written.
+    fn write_save(&mut self, _name: &str, _data: &[u8]) -> bool {
+        false
+    }
+
+    /// Reads the save file `saves/<name>`.
+    fn read_save(&mut self, _name: &str) -> Option<Vec<u8>> {
+        None
+    }
 
     /// `centring`'s set-up (@ 0x0042d610, fx 1): the camera's mode kept
     /// (returned; the transition's +0x98); with a zone under the centre

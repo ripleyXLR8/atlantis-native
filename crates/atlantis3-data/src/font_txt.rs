@@ -41,8 +41,10 @@ pub struct FontDef {
     /// The character set's name, see [`FontDef::charset`].
     pub charset_name: String,
     /// *Atlantis V*'s `Antialias` key: the word lower-cased equal to
-    /// `true` (atlantis5-dvd-int-3891200 @ 0x004610e8..0x004611f8). Its
-    /// effect on the drawing is the text manager's [UNKNOWN].
+    /// `true` (atlantis5-dvd-int-3891200 @ 0x004610e8..0x004611f8); on
+    /// when the block has no such key (0x00460a88). The font is made with
+    /// `lfQuality` 4 (`ANTIALIASED_QUALITY`) when on, 3
+    /// (`NONANTIALIASED_QUALITY`) when off (@ 0x0045fa40).
     pub antialias: bool,
 }
 
@@ -171,9 +173,13 @@ impl FontTxt {
             if line.first() == Some(&b'\'') || Reader::new(line).word() != b"[Font]" {
                 continue;
             }
+            // The block's defaults (@ 0x004608dc..0x00460a88): `FW_NORMAL`,
+            // `DEFAULT_CHARSET`, and `Antialias` on (the byte +0x48 set to
+            // 1 at 0x00460a88).
             let mut f = FontDef {
                 weight_name: "FW_NORMAL".into(),
                 charset_name: "DEFAULT_CHARSET".into(),
+                antialias: true,
                 ..FontDef::default()
             };
             while !file.at_end() {
@@ -220,9 +226,13 @@ impl FontTxt {
             if line.first() == Some(&b'\'') || quoted_word(line).0 != b"[Font]" {
                 continue;
             }
+            // The block's defaults (@ 0x004608dc..0x00460a88): `FW_NORMAL`,
+            // `DEFAULT_CHARSET`, and `Antialias` on (the byte +0x48 set to
+            // 1 at 0x00460a88).
             let mut f = FontDef {
                 weight_name: "FW_NORMAL".into(),
                 charset_name: "DEFAULT_CHARSET".into(),
+                antialias: true,
                 ..FontDef::default()
             };
             while !file.at_end() {
@@ -308,9 +318,12 @@ Name\tAtlantis.ttf\r\nType\tArial\r\nHeight\t21\r\nWidth\t0\r\n' x\r\nItalic\tTR
     fn fonts_atlantis5() {
         let t = FontTxt::parse_atlantis5(
             b"[Font]\r\nNameID\tA \r\nType\t\"Courier New\"\r\nHeight\t16\r\nAntialias TRUE\r\n[EndFont]\r\n\
-[Font]\r\nNameID A\r\nType arial\r\n[EndFont]\r\n",
+[Font]\r\nNameID A\r\nType arial\r\n[EndFont]\r\n[Font]\r\nNameID B\r\nAntialias false\r\n[EndFont]\r\n\
+[Font]\r\nNameID C\r\n[EndFont]\r\n",
         );
-        assert_eq!(t.fonts.len(), 1);
+        assert_eq!(t.fonts.len(), 3);
+        assert!(!t.font("B").unwrap().antialias);
+        assert!(t.font("C").unwrap().antialias);
         let a = &t.fonts[0];
         assert_eq!(
             (a.id.as_str(), a.face.as_str(), a.height),
