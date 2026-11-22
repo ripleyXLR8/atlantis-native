@@ -640,7 +640,7 @@ pub struct Stage {
     /// The mouse's position in menus (the screen's pixels).
     pub mouse: (i32, i32),
     /// The folder of the player's saves.
-    save_dir: Option<std::path::PathBuf>,
+    saves: Option<Rc<dyn crate::atlantis5_saves::SaveFiles>>,
     /// `CConfiguration` (the option pages, the save's `CONFIGURATION`).
     pub config: Config,
     /// The sound's music level b (0x0066efc4, @ 0x0045a640): set from the
@@ -741,7 +741,7 @@ impl Stage {
             clicks: 0,
             space: false,
             mouse: (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2),
-            save_dir: None,
+            saves: None,
             config: Config::default(),
             music_level: Config::default().music,
             music_applied: Config::default().music,
@@ -3069,9 +3069,9 @@ impl Stage {
         self.film_subtitles.as_ref().and_then(|f| f.shown.clone())
     }
 
-    /// The folder of the player's saves (`saves/`).
-    pub fn set_save_dir(&mut self, dir: Option<std::path::PathBuf>) {
-        self.save_dir = dir;
+    /// The player's saves (`saves/`).
+    pub fn set_saves(&mut self, saves: Option<Rc<dyn crate::atlantis5_saves::SaveFiles>>) {
+        self.saves = saves;
     }
 }
 
@@ -3361,8 +3361,8 @@ impl Engine for Stage {
             Request::TransitionEnd => self.fade = 0.0,
             Request::DeleteAutosave => {
                 // @ 0x0042fc50: `saves/autoslot` deleted.
-                if let Some(d) = &self.save_dir {
-                    let _ = std::fs::remove_file(d.join(atlantis5_script::save::AUTOSLOT));
+                if let Some(d) = &self.saves {
+                    d.remove(atlantis5_script::save::AUTOSLOT);
                 }
             }
             Request::SubjectMenu { character } => self.menu_open(character),
@@ -3497,14 +3497,11 @@ impl Engine for Stage {
     }
 
     fn write_save(&mut self, name: &str, data: &[u8]) -> bool {
-        let Some(d) = &self.save_dir else {
-            return false;
-        };
-        std::fs::create_dir_all(d).is_ok() && std::fs::write(d.join(name), data).is_ok()
+        self.saves.as_ref().is_some_and(|d| d.write(name, data))
     }
 
     fn read_save(&mut self, name: &str) -> Option<Vec<u8>> {
-        std::fs::read(self.save_dir.as_ref()?.join(name)).ok()
+        self.saves.as_ref()?.read(name)
     }
 
     fn event(&mut self, e: &Event<'_>) {
@@ -4163,7 +4160,7 @@ impl Play {
 
     /// What a menu asked.
     fn menu_effect(&mut self, e: Effect) {
-        let dir = self.stage.borrow().save_dir.clone();
+        let dir = self.stage.borrow().saves.clone();
         match e {
             Effect::NewGame => {
                 self.poker = None;
@@ -4177,18 +4174,12 @@ impl Play {
             Effect::Request(r) => self.game.queue_request(r),
             Effect::Delete(file) => {
                 if let Some(d) = dir {
-                    let p = d.join(file);
-                    if p.is_file() {
-                        let _ = std::fs::remove_file(p);
-                    }
+                    d.remove(&file);
                 }
             }
             Effect::Copy { from, to } => {
                 if let Some(d) = dir {
-                    let (f, t) = (d.join(from), d.join(to));
-                    if f.is_file() {
-                        let _ = std::fs::copy(f, t);
-                    }
+                    d.copy(&from, &to);
                 }
             }
             Effect::EndGame => {
@@ -4313,8 +4304,17 @@ impl Play {
 
     /// The folder of the player's saves.
     pub fn set_save_dir(&mut self, dir: Option<std::path::PathBuf>) {
-        self.menus.save_dir.clone_from(&dir);
-        self.stage.borrow_mut().set_save_dir(dir);
+        self.set_saves(dir.map(|d| {
+            Rc::new(crate::atlantis5_saves::DirSaves(d))
+                as Rc<dyn crate::atlantis5_saves::SaveFiles>
+        }));
+    }
+
+    /// The player's saves wherever they are kept (the web build's
+    /// storage).
+    pub fn set_saves(&mut self, saves: Option<Rc<dyn crate::atlantis5_saves::SaveFiles>>) {
+        self.menus.saves.clone_from(&saves);
+        self.stage.borrow_mut().set_saves(saves);
     }
 
     /// What the last pick found under the centre.

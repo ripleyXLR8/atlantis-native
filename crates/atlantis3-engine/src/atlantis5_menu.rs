@@ -38,7 +38,6 @@
 //!   own (each menu's @ address is on its builder below).
 
 use std::collections::VecDeque;
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use atlantis3_data::atlantis5_texts::StringResources;
@@ -341,8 +340,8 @@ pub struct Menus {
     examine_item: Vec<u8>,
     pub mouse: (i32, i32),
     clicks: usize,
-    /// The folder of the saves.
-    pub save_dir: Option<PathBuf>,
+    /// The saves (a folder, the browser's storage).
+    pub saves: Option<std::rc::Rc<dyn crate::atlantis5_saves::SaveFiles>>,
     /// The local time zone's offset from UTC (seconds) for the save
     /// pages' dates (`FileTimeToLocalFileTime`).
     pub utc_offset: fn() -> i64,
@@ -374,7 +373,7 @@ impl Menus {
             examine_item: Vec::new(),
             mouse: (W / 2, H / 2),
             clicks: 0,
-            save_dir: None,
+            saves: None,
             utc_offset: no_offset,
             effects: Vec::new(),
         }
@@ -497,9 +496,7 @@ impl Menus {
 
     /// The saves' file `name` exists.
     fn save_exists(&self, name: &str) -> bool {
-        self.save_dir
-            .as_ref()
-            .is_some_and(|d| d.join(name).is_file())
+        self.saves.as_ref().is_some_and(|d| d.exists(name))
     }
 
     // -- the menus -----------------------------------------------------------
@@ -620,18 +617,9 @@ impl Menus {
         let empty = self.string("empty");
         for i in 0..10usize {
             let file = format!("slot_{i}");
-            let tail = match self
-                .save_dir
-                .as_ref()
-                .and_then(|d| std::fs::metadata(d.join(&file)).ok())
-            {
+            let tail = match self.saves.as_ref().and_then(|d| d.modified(&file)) {
                 None => empty.clone(),
-                Some(md) => {
-                    let secs = md
-                        .modified()
-                        .ok()
-                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                        .map_or(0, |d| i64::try_from(d.as_secs()).unwrap_or(0));
+                Some(secs) => {
                     let (y, mo, d, h, mi, s) = civil(secs + (self.utc_offset)());
                     format!("{d:02}/{mo:02}/{y} ({h:02}:{mi:02}:{s:02})")
                 }

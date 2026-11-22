@@ -187,6 +187,8 @@ pub struct Atlantis5Source {
     languages: Vec<String>,
     /// The program beside the data, when there is one.
     exe: Option<Arc<dyn FileSource>>,
+    /// The disc's cabinets, when the data are read from them.
+    cabs: Option<Arc<CabFiles>>,
 }
 
 impl Atlantis5Source {
@@ -198,7 +200,21 @@ impl Atlantis5Source {
             let img = DiscImage::open(path).ok_or(OpenError::NotTheGame)?;
             return Self::from_disc(Arc::new(img), Form::DiscImage);
         }
-        let dir: Arc<dyn FileSource> = Arc::new(StdDir::new(path));
+        match Self::from_folder(Arc::new(StdDir::new(path))) {
+            Err(OpenError::NotTheGame) => {}
+            r => return r,
+        }
+        if let Some(set) = DiscSet::open_folder(path) {
+            if set.size(DATA_CAB).is_some() {
+                return Self::from_disc(Arc::new(set), Form::DiscImage);
+            }
+        }
+        Err(OpenError::NotTheGame)
+    }
+
+    /// The data in folder `dir` (the disc's root or a copy of it, an
+    /// install, the extracted cabinets, or `Datas` itself; not an image).
+    pub fn from_folder(dir: Arc<dyn FileSource>) -> Result<Atlantis5Source, OpenError> {
         if dir.size(DATA_CAB).is_some() {
             return Self::from_disc(dir, Form::DiscFolder);
         }
@@ -207,11 +223,6 @@ impl Atlantis5Source {
         }
         if dir.has_dir("scenes") && dir.has_dir("warps") && dir.has_dir("texts") {
             return Self::from_tree(dir, "", None);
-        }
-        if let Some(set) = DiscSet::open_folder(path) {
-            if set.size(DATA_CAB).is_some() {
-                return Self::from_disc(Arc::new(set), Form::DiscImage);
-            }
         }
         Err(OpenError::NotTheGame)
     }
@@ -255,9 +266,12 @@ impl Atlantis5Source {
                 Err(e) => log::warn!("{n}: {e}"),
             }
         }
-        let files: Arc<dyn FileSource> = Arc::new(CabFiles::new(cabs));
+        let cabs = Arc::new(CabFiles::new(cabs));
+        let files: Arc<dyn FileSource> = cabs.clone();
         let exe = src.size(EXE_NAME).is_some().then_some(src);
-        Self::new(files, "datas/", form, exe)
+        let mut s = Self::new(files, "datas/", form, exe)?;
+        s.cabs = Some(cabs);
+        Ok(s)
     }
 
     /// An unpacked tree: `inner`'s `prefix` holds `scenes/`, `warps/`, ...
@@ -282,6 +296,7 @@ impl Atlantis5Source {
             form,
             languages: Vec::new(),
             exe,
+            cabs: None,
         };
         // The languages: the folders of `texts/menu/` (each language's
         // cabinet brings its `string_resources.xml` there).
@@ -316,6 +331,30 @@ impl Atlantis5Source {
     pub fn build(&self) -> Option<Result<&'static Build, ExeError>> {
         let exe = self.exe.as_ref()?.read(EXE_NAME)?;
         Some(identify(&exe))
+    }
+
+    /// From the disc's cabinets: decodes the cabinet's folder holding
+    /// `name` toward it, at most about `budget` bytes further
+    /// ([`CabFiles::warm`]); true once it is reached, at once for the
+    /// unpacked tree or a name not in the cabinets. The web build reads
+    /// its start's films so, a step per frame.
+    pub fn warm(&self, name: &str, budget: u64) -> bool {
+        self.warm_progress(name, budget)
+            .is_none_or(|(at, to)| at >= to)
+    }
+
+    /// [`Atlantis5Source::warm`] with how far: (the cabinet's folder
+    /// decoded up to, the file's offset in it); `None` when nothing is to
+    /// be decoded.
+    pub fn warm_progress(&self, name: &str, budget: u64) -> Option<(u64, u64)> {
+        self.cabs.as_ref()?.warm_progress(&self.map(name), budget)
+    }
+
+    /// From the disc's cabinets: decodes about `budget` bytes more of
+    /// a folder not yet decoded to its end ([`CabFiles::warm_next`]);
+    /// false once none is left (at once for the unpacked tree).
+    pub fn warm_next(&self, budget: u64) -> bool {
+        self.cabs.as_ref().is_some_and(|c| c.warm_next(budget))
     }
 
     /// Where `name` is in the inner source.

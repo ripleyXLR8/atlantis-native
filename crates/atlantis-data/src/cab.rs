@@ -641,6 +641,54 @@ impl Cabinet {
         (out.len() == len).then_some(out)
     }
 
+    /// Decodes folder `k` toward its uncompressed offset `target`, at
+    /// most about `budget` bytes further than the decoding has gone; how
+    /// far it has gone then (at least `target` once reached, a stored
+    /// folder at once).
+    fn warm_folder(&self, k: usize, target: u64, budget: u64) -> Option<u64> {
+        let folder = self.folders.get(k)?;
+        if folder.compression == 0 {
+            return Some(target);
+        }
+        // How far the decoding has gone: the last block decoded, or the
+        // furthest checkpoint (a read from there needs nothing before it).
+        let (reached, raw) = {
+            let st = folder.state.lock().unwrap();
+            let last = st
+                .last
+                .as_ref()
+                .and_then(|(i, _, _)| st.blocks.get(*i))
+                .map_or(0, Block::end);
+            let kept = st
+                .checkpoints
+                .keys()
+                .max()
+                .and_then(|&b| st.blocks.get(b))
+                .map_or(0, |b| b.start);
+            // The next block header to walk: where the decoding reads on.
+            let raw = if st.blocks.is_empty() {
+                folder.first_data
+            } else {
+                st.next_at
+            };
+            (last.max(kept), raw)
+        };
+        if reached > target {
+            return Some(reached);
+        }
+        // The cabinet's part after the one being read, asked ahead (the
+        // web build reads it in the background, so that the next steps
+        // find it there instead of waiting for it).
+        let ahead = (raw / CHUNK + 1) * CHUNK;
+        if ahead < self.size {
+            self.src
+                .read_ahead(&self.path, ahead, CHUNK.min(self.size - ahead) as usize);
+        }
+        let next = target.min(reached.saturating_add(budget));
+        self.read_folder(k, next, 1)?;
+        Some(next)
+    }
+
     /// `len` bytes at `offset` of file `index` (of [`Cabinet::files`]).
     pub fn read_file_at(&self, index: usize, offset: u64, len: usize) -> Option<Vec<u8>> {
         let f = self.files.get(index)?;
@@ -746,6 +794,61 @@ impl CabFiles {
 
     pub fn cabinets(&self) -> &[Cabinet] {
         &self.cabinets
+    }
+
+    /// Decodes the folder holding `name` toward the file's start, at most
+    /// about `budget` bytes further than its decoding has gone, so that
+    /// reading it later does not decode the whole folder before it at
+    /// once (the web build's start, a step per frame). True once the
+    /// decoding has reached it (or it needs none); `None` for a name
+    /// not in the cabinets.
+    pub fn warm(&self, name: &str, budget: u64) -> Option<bool> {
+        self.warm_progress(name, budget).map(|(at, to)| at >= to)
+    }
+
+    /// [`CabFiles::warm`] with how far: (the folder decoded up to, the
+    /// file's offset in it).
+    pub fn warm_progress(&self, name: &str, budget: u64) -> Option<(u64, u64)> {
+        let (c, i) = *self.index.get(&key(name))?;
+        let cab = &self.cabinets[c];
+        let f = &cab.files[i];
+        let to = u64::from(f.offset);
+        if f.size == 0 {
+            return Some((to, to));
+        }
+        let at = cab.warm_folder(usize::from(f.folder), to, budget)?;
+        Some((at, to))
+    }
+
+    /// Decodes about `budget` bytes more of the first folder not yet
+    /// decoded to its end, the smallest folders first: a later read
+    /// anywhere in them then starts from a checkpoint near it. False once
+    /// every folder has been (the web build, between frames).
+    pub fn warm_next(&self, budget: u64) -> bool {
+        let mut folders: Vec<(u64, usize, usize)> = Vec::new();
+        for (c, cab) in self.cabinets.iter().enumerate() {
+            let mut ends = vec![0u64; cab.folders.len()];
+            for f in &cab.files {
+                let e = u64::from(f.offset) + u64::from(f.size);
+                let end = &mut ends[usize::from(f.folder)];
+                *end = (*end).max(e);
+            }
+            for (k, end) in ends.into_iter().enumerate() {
+                if end > 0 {
+                    folders.push((end, c, k));
+                }
+            }
+        }
+        folders.sort_unstable();
+        for (end, c, k) in folders {
+            match self.cabinets[c].warm_folder(k, end - 1, budget) {
+                Some(at) if at >= end - 1 => {}
+                Some(_) => return true,
+                // A folder that cannot be read: left to the game's reads.
+                None => {}
+            }
+        }
+        false
     }
 }
 
@@ -934,6 +1037,31 @@ mod tests {
         // Cut at the damaged checkpoint, which was written again.
         assert_eq!(std::fs::read(&file).unwrap().len(), n);
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn warm_reaches_the_file_by_steps() {
+        let a: Vec<u8> = (0..300_000u32).map(|i| (i * 7 % 251) as u8).collect();
+        let b = b"the file after".to_vec();
+        let cab = build(&[("a.bin", &a), ("b.bin", &b)], 4096, true);
+        let files = files(cab);
+        let mut steps = 0;
+        while !files.warm("b.bin", 50_000).unwrap() {
+            steps += 1;
+            assert!(steps < 20);
+        }
+        assert!(steps >= 5);
+        assert_eq!(files.read("b.bin").unwrap(), b);
+        assert_eq!(files.warm("b.bin", 1), Some(true));
+        assert_eq!(files.warm("none", 1), None);
+        // The folder whole, by steps.
+        let mut steps = 0;
+        while files.warm_next(100_000) {
+            steps += 1;
+            assert!(steps < 20);
+        }
+        assert!(!files.warm_next(100_000));
+        assert_eq!(files.read_at("a.bin", 1000, 10).unwrap(), &a[1000..1010]);
     }
 
     #[test]
