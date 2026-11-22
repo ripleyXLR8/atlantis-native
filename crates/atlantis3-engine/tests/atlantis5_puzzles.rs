@@ -109,10 +109,17 @@ fn go(play: &mut Play, scene: &str, view: i32) {
 
 /// A click with the centre on the sprite of `object`.
 fn sprite(play: &mut Play, object: &str) {
-    assert!(
-        play.aim_at_sprite(object.as_bytes()),
-        "{object} under the centre"
-    );
+    // A sprite still at the start of its animation may cover nothing yet:
+    // the player waits for it.
+    let mut aimed = play.aim_at_sprite(object.as_bytes());
+    for _ in 0..10 {
+        if aimed {
+            break;
+        }
+        frames(play, 10);
+        aimed = play.aim_at_sprite(object.as_bytes());
+    }
+    assert!(aimed, "{object} under the centre");
     play.click();
     settle(play);
 }
@@ -739,9 +746,9 @@ fn lazer() {
         (3, "ruby"),
         (4, "moon_stone"),
     ] {
-        assert_eq!(
-            lua(&mut play, "Atl_Flag_Get(\"mission_light_ray\")") == s("done"),
-            false
+        assert_ne!(
+            lua(&mut play, "Atl_Flag_Get(\"mission_light_ray\")"),
+            s("done")
         );
         put(&mut play, stone, slot);
     }
@@ -786,4 +793,294 @@ fn bas_relief() {
     );
     assert_eq!(play.game.zone(b"bas_relief").map(|z| z.1), Some(false));
     shot(&play, &format!("a5-puzzle-bas-relief-{view}.png"));
+}
+
+/// The trap's buttons to press, from step 4 up, until steps 2..=10 are
+/// up: a breadth-first walk of `Atl_PuzzleTrap_OnClick`'s rule (a button
+/// can be pressed only while its step is up; it goes down and turns its
+/// `actions` over; with 4..=10 all up, step 1 comes up, which the script
+/// asserts was down).
+fn trap_solution() -> Vec<usize> {
+    const ACTIONS: [&[usize]; 11] = [
+        &[],
+        &[2, 3],
+        &[3, 6, 9],
+        &[5, 8],
+        &[6, 8, 10],
+        &[3, 9],
+        &[2, 4, 7],
+        &[3, 10],
+        &[4, 5, 7],
+        &[4, 10],
+        &[2, 5, 9],
+    ];
+    let up = |s: u16, i: usize| s & (1 << i) != 0;
+    let start: u16 = 1 << 4;
+    let goal = |s: u16| (2..=10).all(|i| up(s, i));
+    let mut prev = std::collections::HashMap::from([(start, (start, 0))]);
+    let mut queue = std::collections::VecDeque::from([start]);
+    while let Some(s) = queue.pop_front() {
+        if goal(s) {
+            let mut out = Vec::new();
+            let mut x = s;
+            while x != start {
+                let (p, b) = prev[&x];
+                out.push(b);
+                x = p;
+            }
+            out.reverse();
+            return out;
+        }
+        for b in (1..=10).filter(|&b| up(s, b)) {
+            let mut t = s & !(1 << b);
+            if b == 1 {
+                t |= (1 << 2) | (1 << 3);
+            } else {
+                for &a in ACTIONS[b] {
+                    t ^= 1 << a;
+                }
+                if (4..=10).all(|i| up(t, i)) {
+                    if up(t, 1) {
+                        continue;
+                    }
+                    t |= 1 << 1;
+                }
+            }
+            if let std::collections::hash_map::Entry::Vacant(e) = prev.entry(t) {
+                e.insert((s, b));
+                queue.push_back(t);
+            }
+        }
+    }
+    panic!("no solution");
+}
+
+#[test]
+fn trap() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 9);
+    go(&mut play, "mesopotamie", 23);
+    // The ring pulled thrice: step 4 comes up (on_click_mesopotamie.lua).
+    run(&mut play, "Atl_PuzzleTrap_Activate()");
+    let presses = trap_solution();
+    for &b in &presses {
+        assert_eq!(
+            lua(&mut play, "Atl_PuzzleTrap_IsSolved()"),
+            Value::Bool(false)
+        );
+        sprite(&mut play, &format!("trap_button_{b}"));
+    }
+    assert_eq!(
+        lua(&mut play, "Atl_PuzzleTrap_IsSolved()"),
+        Value::Bool(true)
+    );
+    assert_eq!(play.game.zone(b"trap_upstairs").map(|z| z.1), Some(true));
+    shot(&play, "a5-puzzle-trap.png");
+}
+
+fn hand(play: &mut Play) -> Value {
+    lua(play, "atl.hero.handled_item")
+}
+
+#[test]
+fn stone_cutting() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 9);
+    go(&mut play, "mesopotamie", 8);
+    // A rough stone (`gross_stone_heap` gives `stone1_1`) on the bench.
+    run(&mut play, "Atl_Hero_SetHandledItem(\"stone1_1\")");
+    zone(&mut play, "cut_zone");
+    assert_eq!(hand(&mut play), Value::Nil);
+    // Cut twice with the sculptor's tools: size 3; taken: `stone1_3`.
+    for _ in 0..2 {
+        run(&mut play, "Atl_Hero_SetHandledItem(\"sculptor_tools\")");
+        sprite(&mut play, "gross_stone");
+    }
+    assert_eq!(int(&lua(&mut play, "atl.puzzle.stone_cut.size")), 3);
+    run(&mut play, "Atl_Hero_SetHandledItem(nil)");
+    sprite(&mut play, "gross_stone");
+    assert_eq!(hand(&mut play), s("stone1_3"));
+    shot(&play, "a5-puzzle-stone-cutting.png");
+    // Cut too far: at size 9 the stone breaks (dialog 74), the bench free.
+    zone(&mut play, "cut_zone");
+    for _ in 0..6 {
+        run(&mut play, "Atl_Hero_SetHandledItem(\"sculptor_tools\")");
+        sprite(&mut play, "gross_stone");
+    }
+    assert_eq!(
+        int(&lua(&mut play, "Atl_PuzzleStoneCutting_GetNumStone()")),
+        0
+    );
+    assert!(anim(&play, "gross_stone").is_none());
+    assert_eq!(play.game.zone(b"cut_zone").map(|z| z.1), Some(true));
+}
+
+#[test]
+fn stone_painting() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 9);
+    go(&mut play, "mesopotamie", 17);
+    // A stone of the wrong size does not go in (dialog 31).
+    run(&mut play, "Atl_Hero_SetHandledItem(\"stone1_4\")");
+    zone(&mut play, "marduk_stone_1");
+    assert_eq!(hand(&mut play), s("stone1_4"));
+    // The cut stones (sizes 3, 5, 8, 8) in their holes, then the paints
+    // the blender makes (`paint<n>_<colour>`): db, lo, lb, do.
+    for (n, size) in [(1, 3), (2, 5), (3, 8), (4, 8)] {
+        run(
+            &mut play,
+            &format!("Atl_Hero_SetHandledItem(\"stone{n}_{size}\")"),
+        );
+        zone(&mut play, &format!("marduk_stone_{n}"));
+        assert_eq!(hand(&mut play), Value::Nil);
+    }
+    for (n, colour) in [(1, "db"), (2, "lo"), (3, "lb"), (4, "do")] {
+        assert_eq!(
+            lua(&mut play, "Atl_PuzzleStonePainting_Check()"),
+            Value::Bool(false)
+        );
+        run(
+            &mut play,
+            &format!("Atl_Hero_SetHandledItem(\"paint{n}_{colour}\")"),
+        );
+        sprite(&mut play, &format!("marduk_stone_{n}"));
+    }
+    assert_eq!(
+        lua(&mut play, "Atl_PuzzleStonePainting_Check()"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        lua(&mut play, "atl.objects.marduk_stone_1.warp_reachable[1]"),
+        Value::Nil,
+        "the stones are done"
+    );
+    shot(&play, "a5-puzzle-stone-painting.png");
+}
+
+#[test]
+fn blender() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 9);
+    go(&mut play, "mesopotamie", 9);
+    // Neither fed nor lit: the main valve gives nothing.
+    sprite(&mut play, "nisir_main_valve");
+    assert_eq!(lua(&mut play, "atl.puzzle.blender.state"), s("ready"));
+    // Fed with the refined madder, lit with the matches.
+    run(&mut play, "Atl_Hero_SetHandledItem(\"refined_garance\")");
+    zone(&mut play, "blender_input");
+    run(&mut play, "Atl_Hero_SetHandledItem(\"match_box\")");
+    zone(&mut play, "blender_light_zone");
+    run(&mut play, "Atl_Hero_SetHandledItem(nil)");
+    // Each valve pair gives one paint: both open light orange, the left
+    // dark orange, the right light blue, none dark blue.
+    let mut left = false;
+    let mut right = false;
+    for (l, r, sprite_name, colour) in [
+        (true, true, "paint_light_orange", "lo"),
+        (true, false, "paint_dark_orange", "do"),
+        (false, true, "paint_light_blue", "lb"),
+        (false, false, "paint_dark_blue", "db"),
+    ] {
+        if l != left {
+            sprite(&mut play, "nisir_left_valve");
+            left = l;
+        }
+        if r != right {
+            sprite(&mut play, "nisir_right_valve");
+            right = r;
+        }
+        sprite(&mut play, "nisir_main_valve");
+        sprite(&mut play, sprite_name);
+        let held = hand(&mut play);
+        let Value::Str(h) = &held else {
+            panic!("{held:?}")
+        };
+        assert!(
+            h.ends_with(colour.as_bytes()),
+            "{}",
+            String::from_utf8_lossy(h)
+        );
+        // Into the inventory (the right button, ArrangeHandledObject).
+        play.right_click();
+        settle(&mut play);
+        assert_eq!(hand(&mut play), Value::Nil);
+    }
+    for p in 1..=4 {
+        assert_eq!(
+            lua(
+                &mut play,
+                &format!("Atl_Hero_HasItemPrefixed(\"paint{p}_\")")
+            ),
+            Value::Bool(true)
+        );
+    }
+    // A fifth: too much paint (dialog 67), nothing made.
+    sprite(&mut play, "nisir_main_valve");
+    assert_eq!(lua(&mut play, "atl.puzzle.blender.state"), s("ready"));
+    shot(&play, "a5-puzzle-blender.png");
+}
+
+#[test]
+fn gridlock() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 9);
+    go(&mut play, "mesopotamie", 19);
+    // The Atlantean crystal on the door (gridlock_reset, lit by the story)
+    // sets the cars and lights the zones they can move by.
+    let reset = |play: &mut Play| {
+        run(
+            play,
+            "Atl_Zone_SetActivity(\"gridlock_reset\", true) \
+             Atl_Hero_SetHandledItem(\"atlantean_cristal\")",
+        );
+        zone(play, "gridlock_reset");
+        // A second on, the crystal comes back to the hand (the timer
+        // `gridlock_crystal`); the right button puts it away.
+        frames(play, 40);
+        settle(play);
+        assert_eq!(hand(play), s("atlantean_cristal"));
+        play.right_click();
+        settle(play);
+        assert_eq!(hand(play), Value::Nil);
+    };
+    reset(&mut play);
+    let start = lua(&mut play, "atl.puzzle.gridlock.cars.eb[1]");
+    zone_id(&mut play, "gridlock_3", 3);
+    assert_ne!(
+        lua(&mut play, "atl.puzzle.gridlock.cars.eb[1]"),
+        start,
+        "eb moved"
+    );
+    reset(&mut play);
+    assert_eq!(
+        lua(&mut play, "atl.puzzle.gridlock.cars.eb[1]"),
+        start,
+        "set again"
+    );
+    // A line found by a breadth-first walk of the script's own rules under
+    // the reference Lua 5.0.3 (the zones it lights are the moves); the
+    // last click takes `ea` out by zone 18.
+    let line = [
+        3, 17, 11, 22, 15, 8, 9, 21, 14, 15, 19, 13, 7, 20, 14, 32, 27, 22, 21, 20, 27, 28, 32, 33,
+        34, 27, 20, 13, 2, 35, 28, 21, 14, 9, 20, 15, 26, 21, 28, 22, 16, 10, 15, 16, 29, 24, 17,
+        18,
+    ];
+    for z in line {
+        assert_eq!(
+            lua(&mut play, "Atl_PuzzleGridlock_IsSolved()"),
+            Value::Bool(false)
+        );
+        zone_id(&mut play, &format!("gridlock_{z}"), z);
+    }
+    assert_eq!(
+        lua(&mut play, "Atl_PuzzleGridlock_IsSolved()"),
+        Value::Bool(true)
+    );
+    // `opening`, which the display turns to `open`.
+    assert_eq!(
+        lua(&mut play, "Atl_Object_GetState(\"gridlock_door\")"),
+        s("open")
+    );
+    assert_eq!(play.game.zone(b"trap_room_in").map(|z| z.1), Some(true));
+    shot(&play, "a5-puzzle-gridlock.png");
 }
