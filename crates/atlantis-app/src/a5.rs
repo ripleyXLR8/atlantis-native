@@ -12,8 +12,8 @@
 //! switches between the window and the full screen (the port's own). The
 //! game starts in the main menu; in the menus the mouse moves the game's
 //! cursor. Its `quit_game`, or closing the window, ends the program. The
-//! saves go to the data folder's `atlantis5/saves`. The game's cursors in
-//! play are not drawn yet.
+//! saves go to the data folder's `atlantis5/saves`. In play the game draws
+//! its own cursor at the screen centre (the system cursor stays hidden).
 
 use std::num::NonZeroU32;
 use std::path::Path;

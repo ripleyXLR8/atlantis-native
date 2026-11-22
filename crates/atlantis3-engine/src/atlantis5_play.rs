@@ -217,6 +217,207 @@ impl Randomized {
     }
 }
 
+/// The cursor types (+0x88 of the game's cursor, @ 0x0042bfd0): the
+/// pictures `cursor_move`, `cursor_info`, `cursor_object`,
+/// `cursor_character`, `cursor_aim` (0x0066cad0..0x0066cae0); 5 is none.
+pub const CURSOR_FILES: [&str; 5] = [
+    "cursor_move",
+    "cursor_info",
+    "cursor_object",
+    "cursor_character",
+    "cursor_aim",
+];
+/// The aim, the cursor with nothing under the screen centre (@ 0x0042f390).
+pub const CURSOR_AIM: i32 = 4;
+/// The followers' pictures (0x0066cae4..0x0066caf0) and the names given
+/// to `Atl_Hero_HasFollower` (@ 0x0042c780: 0x0066cb84, 0x0066cb8c,
+/// 0x0066cba0).
+pub const FOLLOWERS: [&str; 3] = ["ishtar", "ishtar_mesopotamy", "sing_like_rain"];
+
+/// The game's cursor in play (the game's +0x44; ctor @ 0x0042ba10, its
+/// pictures loaded @ 0x0042bb10 on entering state 4 or 6 and freed
+/// @ 0x0042bf30 on leaving it, @ 0x0042fb90) [CONFIRMED-STATIC]:
+/// - +0x38..+0x48 the five cursors, `sprites2d/gui/<name>.spr` (path
+///   16); +0x4c..+0x54 the three followers' pictures, same folder;
+/// - +0x64 the hand's object, `sprites2d/objects_icon/<item>.spr`
+///   (path 18), from `atl.hero.handled_item` at each update
+///   (@ 0x0042c030);
+/// - +0x68 its player (@ 0x00448c30: 15 frames a second, +0x08 the
+///   double 15.0); a new type (@ 0x0042bfd0, only while loaded, only when
+///   it differs) restarts it on the frames 0..count−1 in mode 3, a loop;
+/// - +0x88 the type (5 at first: none), +0x8c loaded, +0x8d the
+///   crosshair option (the options page writes it, @ 0x0041d0b0).
+pub struct PlayCursor {
+    cursors: [Option<Bank>; 5],
+    followers: [Option<Bank>; 3],
+    /// +0x64: the hand's object picture and its file name in its folder.
+    hand: Option<(String, Bank)>,
+    /// +0x88.
+    kind: i32,
+    /// The player's time (+0x00, seconds) and frame (+0x18).
+    time: f64,
+    frame: u32,
+    /// +0x8c.
+    loaded: bool,
+    /// `Atl_Hero_HasFollower` for each follower, as last asked.
+    shown_followers: [bool; 3],
+    /// An item whose picture is missing (logged once).
+    missing: Option<String>,
+}
+
+impl PlayCursor {
+    fn new(src: &dyn FileSource) -> PlayCursor {
+        let spr = |name: &str| {
+            let path = format!("datas/sprites2d/gui/{name}.spr");
+            let bank = src
+                .read(&path)
+                .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok());
+            if bank.is_none() {
+                log::warn!("{path}: missing, the cursor not drawn");
+            }
+            bank
+        };
+        PlayCursor {
+            cursors: CURSOR_FILES.map(spr),
+            followers: FOLLOWERS.map(spr),
+            hand: None,
+            kind: 5,
+            time: 0.0,
+            frame: 0,
+            loaded: false,
+            shown_followers: [false; 3],
+            missing: None,
+        }
+    }
+
+    /// The type (+0x88): 0..=4, or 5 (none).
+    pub fn kind(&self) -> i32 {
+        self.kind
+    }
+
+    /// The frame of the cursor's picture (+0x80, the player's +0x18).
+    pub fn frame(&self) -> u32 {
+        self.frame
+    }
+
+    /// The hand's object picture's file name (in its folder), if any.
+    pub fn hand(&self) -> Option<&str> {
+        self.hand.as_ref().map(|h| h.0.as_str())
+    }
+
+    /// @ 0x0042bfd0(kind): only while loaded and only a new type; a type
+    /// below 5 restarts the player (@ 0x00448d00: time 0, the frame the
+    /// first) on 0..count−1 (@ 0x00448cc0, the count @ 0x00463370) in
+    /// mode 3 (@ 0x00448ce0) [CONFIRMED-STATIC].
+    fn set_kind(&mut self, kind: i32) {
+        if !self.loaded || self.kind == kind {
+            return;
+        }
+        self.kind = kind;
+        if kind < 5 {
+            self.time = 0.0;
+            self.frame = 0;
+        }
+    }
+
+    /// The frame count of the current type's picture.
+    fn count(&self) -> u32 {
+        usize::try_from(self.kind)
+            .ok()
+            .and_then(|k| self.cursors.get(k)?.as_ref())
+            .map_or(0, |b| u32::try_from(b.len()).unwrap_or(u32::MAX))
+    }
+
+    /// @ 0x0042c030(dt), while loaded: the hand's object first — with
+    /// `hand` (`atl.hero.handled_item`, @ 0x00403ee0) empty its picture is
+    /// freed; else, with none, `objects_icon/` + `hand` + `.spr` is
+    /// loaded; with one whose name (the path less the folder's length,
+    /// @ 0x00455dc0) is neither `hand` + `.spr` nor `proxy_object.spr`
+    /// (0x0066bb60), it is freed and the new one loaded. A missing file
+    /// throws in the original (@ 0x00463ac0: `C2DSpriteManager ::
+    /// AddSprite`; its catch is not read): Native logs it and shows no
+    /// object. Then, with a type below 5, the player's step
+    /// (@ 0x00448d20, mode 3: frame = ⌊t · 15⌋ mod count).
+    fn update(&mut self, dt: f64, hand: &[u8], src: &dyn FileSource) {
+        if !self.loaded {
+            return;
+        }
+        if hand.is_empty() {
+            self.hand = None;
+        } else {
+            let want = format!("{}.spr", lossy(hand));
+            let keep = self
+                .hand
+                .as_ref()
+                .is_some_and(|(name, _)| *name == want || name == "proxy_object.spr");
+            if !keep {
+                self.hand = None;
+                let path = format!("datas/sprites2d/objects_icon/{want}");
+                match src
+                    .read(&path)
+                    .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok())
+                {
+                    Some(b) => self.hand = Some((want, b)),
+                    None => {
+                        if self.missing.as_deref() != Some(&want) {
+                            log::warn!(
+                                "{path}: missing (the original throws), no hand object drawn"
+                            );
+                            self.missing = Some(want);
+                        }
+                    }
+                }
+            }
+        }
+        if self.kind < 5 {
+            self.time += dt;
+            let last = self.count().wrapping_sub(1);
+            self.frame = player_frame(Mode::Loop, 0, last, self.time).0;
+        }
+    }
+
+    /// @ 0x0042c660, while loaded [CONFIRMED-STATIC]: with a type below
+    /// 5, the centre of the display (its width and height halved,
+    /// @ 0x0044d1b0 +0x0c / +0x10); the cursor's picture at its frame with
+    /// its hot spot there (@ 0x00463d20, scale 1: `AFF_SPR`), except the
+    /// aim (type 4) when both the crosshair option is off and the hand is
+    /// empty; the hand's object, frame 0, at (x + 5, y + 30). Then, from
+    /// x = 10, each follower `Atl_Hero_HasFollower` says is there: its
+    /// picture, frame 0, at (x, 10), and x += 10 + its width (`GET_SPRT`
+    /// @ 0x00463300).
+    pub fn draw(&self, out: &mut [u32], crosshair: bool) {
+        if !self.loaded {
+            return;
+        }
+        let mut t = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let (cx, cy) = ((VIEW_WIDTH >> 1) as i32, (VIEW_HEIGHT >> 1) as i32);
+        if self.kind < 5 {
+            if self.kind != CURSOR_AIM || crosshair || self.hand.is_some() {
+                if let Some(b) = usize::try_from(self.kind)
+                    .ok()
+                    .and_then(|k| self.cursors[k].as_ref())
+                {
+                    b.draw(&mut t, Some(cx), cy, self.frame as usize);
+                }
+            }
+            if let Some((_, b)) = &self.hand {
+                b.draw(&mut t, Some(cx + 5), cy + 30, 0);
+            }
+        }
+        let mut x = 10;
+        for (shown, b) in self.shown_followers.iter().zip(&self.followers) {
+            if !*shown {
+                continue;
+            }
+            if let Some(b) = b {
+                b.draw(&mut t, Some(x), 10, 0);
+                x += 10 + b.info(0).map_or(0, |i| i32::from(i.w));
+            }
+        }
+    }
+}
+
 /// `atl.zones[name]` (type, active), as the game reads it.
 type ZoneLookup<'a> = dyn FnMut(&[u8]) -> Option<(i32, bool)> + 'a;
 
@@ -1403,7 +1604,7 @@ impl Stage {
             .filter(|&i| i != 0)
             .and_then(|i| set.dialog(i));
         let Some(d) = d else {
-            log::info!("LUA_Dialog_Play : Le dialogue {id} n'existe pas.");
+            log::info!("LUA_Dialog_Play: no dialog {id}");
             return false;
         };
         let talkers = dlg::talkers(set, d);
@@ -2708,6 +2909,8 @@ pub struct Play {
     logos: Vec<&'static str>,
     /// Whether the start's logos play (the application's state 0).
     in_logos: bool,
+    /// The game's cursor in play.
+    pub cursor: PlayCursor,
 }
 
 /// The logos the program plays at its start, in order (@ 0x0043d320
@@ -2769,6 +2972,7 @@ impl Play {
         let menus = Menus::new(src.clone(), language);
         let stage = Rc::new(RefCell::new(Stage::new(src.clone(), language, audio)));
         let game = Game::new(stage.clone()).map_err(|e| e.to_string())?;
+        let cursor = PlayCursor::new(&*src);
         Ok(Play {
             game,
             stage,
@@ -2781,6 +2985,7 @@ impl Play {
             src,
             logos: Vec::new(),
             in_logos: false,
+            cursor,
         })
     }
 
@@ -2961,6 +3166,83 @@ impl Play {
         self.game.update(dt);
         if self.game.state() == 4 && !self.game.busy() {
             self.pick();
+        }
+        self.cursor_frame(dt);
+    }
+
+    /// The game's cursor this frame. Loaded in state 4 (@ 0x0042fb90:
+    /// @ 0x0042bb10 on entering it, @ 0x0042bf30 on leaving it). A play
+    /// frame (@ 0x0042f000) gives it the pick's type (@ 0x0042bfd0, the
+    /// aim when nothing is under the centre, 0x0042f390) and its update
+    /// (@ 0x0042c030, 0x0042f3a3); so does each frame of an animated
+    /// `Atl_Camera_LookAt` (@ 0x00406f00: the update only); a transition's
+    /// loop (@ 0x00405390) does not update it. `Atl_Hero_HasFollower` is
+    /// asked for the three followers where the cursor is drawn
+    /// (@ 0x0042c780 from @ 0x0042c660): here, after the frame's scripts.
+    fn cursor_frame(&mut self, dt: f64) {
+        let in_play = self.game.state() == 4;
+        if in_play != self.cursor.loaded {
+            self.cursor.loaded = in_play;
+            if !in_play {
+                self.cursor.hand = None;
+            }
+        }
+        if !in_play {
+            return;
+        }
+        let looking = self.stage.borrow().look_turn.is_some();
+        let playing = !self.game.busy();
+        if playing || looking {
+            if playing {
+                let kind = self.stage.borrow().cursor.unwrap_or(CURSOR_AIM);
+                self.cursor.set_kind(kind);
+            }
+            let hand = match self.game.script().handled_item() {
+                Ok(h) => h,
+                Err(e) => {
+                    log::warn!("{e}");
+                    Vec::new()
+                }
+            };
+            self.cursor.update(dt, &hand, &*self.src);
+        }
+        if self.cursor_drawn() {
+            for (i, name) in FOLLOWERS.iter().enumerate() {
+                // `lua_pcall`'s error message is a string: true for
+                // `lua_toboolean` (@ 0x0042c7d1).
+                self.cursor.shown_followers[i] = match self.game.script().one_shot(
+                    "return Atl_Hero_HasFollower",
+                    Some(&[Value::Str(name.as_bytes().to_vec())]),
+                    1,
+                ) {
+                    Ok(v) => !matches!(v.first(), None | Some(Value::Nil | Value::Bool(false))),
+                    Err(e) => {
+                        log::warn!("{e}");
+                        true
+                    }
+                };
+            }
+        }
+    }
+
+    /// Whether this frame's picture has the game's cursor (@ 0x0042c660's
+    /// callers): state 4's display (@ 0x0042f780, the view then the
+    /// cursor); an animated `Atl_Camera_LookAt`'s loop (@ 0x00406f00);
+    /// a transition's loop (@ 0x0042e640) with `no_fx` or `centring`
+    /// (`zoom_and_fade` draws its fade instead). Not during a film or a
+    /// dialog (their loops draw their own picture) nor in a menu
+    /// (state 3).
+    pub fn cursor_drawn(&self) -> bool {
+        if !self.cursor.loaded || self.game.state() != 4 {
+            return false;
+        }
+        let st = self.stage.borrow();
+        if st.film_playing() || st.dialog_running() {
+            return false;
+        }
+        match self.game.transition_fx() {
+            Some(fx) => fx != atlantis5_script::Fx::ZoomAndFade,
+            None => !self.game.busy() || st.look_turn.is_some(),
         }
     }
 
@@ -3479,6 +3761,9 @@ impl Play {
     pub fn render(&self, out: &mut [u32]) {
         let st = self.stage.borrow();
         st.render(out);
+        if self.cursor_drawn() {
+            self.cursor.draw(out, st.config.crosshair);
+        }
         if self.game.state() != 3 {
             return;
         }

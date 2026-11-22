@@ -2007,7 +2007,8 @@ impl Script {
     /// `T` (its pairs inside), `lua_isnumber` `N`, `lua_isstring` `S`,
     /// a boolean `B`, with the value in the attribute `v`; then the key in
     /// `ik` (`lua_isnumber`: a number) or `sk` (a string). Any other type
-    /// throws (`type de valeur inconnue`, `type de clé inconnue`).
+    /// throws (the program's "unknown value type" and "unknown key type"
+    /// messages).
     /// Strings go through the ANSI code page (`_com_util`'s
     /// `ConvertStringToBSTR`, @ 0x0062a562): Windows-1252.
     pub fn lua_db(&mut self) -> Result<atlantis4_data::xml::Element, String> {
@@ -2093,7 +2094,7 @@ fn write_table(
             Val::Bool(b) => {
                 crate::save::element_v("B", if b { "True" } else { "False" }.to_string())
             }
-            _ => return Err("CSerialisableLuaDB :: WriteTable -> type de valeur inconnue".into()),
+            _ => return Err("CSerialisableLuaDB :: WriteTable: a value of an unknown type".into()),
         };
         match k {
             Val::Num(x) => e.attributes.push(("ik".into(), save_number(x))),
@@ -2104,7 +2105,7 @@ fn write_table(
                     None => e.attributes.push(("sk".into(), cp1252(&b))),
                 }
             }
-            _ => return Err("CSerialisableLuaDB :: WriteTable -> type de clé inconnue".into()),
+            _ => return Err("CSerialisableLuaDB :: WriteTable: a key of an unknown type".into()),
         }
         out.children.push(e);
     }

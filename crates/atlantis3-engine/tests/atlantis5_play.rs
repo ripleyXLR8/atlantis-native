@@ -247,3 +247,108 @@ fn the_zeppelins_clocks_and_its_randomized_gorilla() {
     }
     shot(&play, "a5-zeppelin-17.png");
 }
+
+/// The pixels the game's cursor changes on the picture: the picture with
+/// it against the view alone, as (x, y).
+fn cursor_pixels(play: &Play, name: &str) -> Vec<(usize, usize)> {
+    let with = shot(play, name);
+    let mut view = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    play.stage().render(&mut view);
+    (0..VIEW_WIDTH * VIEW_HEIGHT)
+        .filter(|&i| with[i] != view[i])
+        .map(|i| (i % VIEW_WIDTH, i / VIEW_WIDTH))
+        .collect()
+}
+
+/// The game's cursor in play (@ 0x0042bfd0, 0x0042c030, 0x0042c660): the
+/// pick's type at the screen centre, animated at 15 frames a second, the
+/// hand's object below it, the aim hidden by the crosshair option with an
+/// empty hand, a follower's picture at the top left.
+#[test]
+fn the_play_cursor_shows_the_pick_the_hand_and_the_followers() {
+    use atlantis3_engine::atlantis5_play::CURSOR_AIM;
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    assert!(play.cursor_drawn());
+    let (cx, cy) = (VIEW_WIDTH / 2, VIEW_HEIGHT / 2);
+    let near = |p: &[(usize, usize)], x: usize, y: usize, r: usize| {
+        p.iter()
+            .filter(|&&(px, py)| px.abs_diff(x) < r && py.abs_diff(y) < r)
+            .count()
+    };
+
+    // Nothing under the centre: the aim (type 4), drawn with the
+    // crosshair option only.
+    let aim = [
+        (-60.0, 0.0),
+        (60.0, 0.0),
+        (-60.0, 90.0),
+        (-60.0, 180.0),
+        (60.0, 180.0),
+    ]
+    .into_iter()
+    .find(|&(p, y)| {
+        play.look_angles(p, y);
+        frames(&mut play, 1);
+        play.cursor.kind() == CURSOR_AIM
+    });
+    assert!(aim.is_some(), "an angle with nothing under the centre");
+    assert!(near(&cursor_pixels(&play, "a5-cursor-aim.png"), cx, cy, 48) > 0);
+    play.stage_mut().config.crosshair = false;
+    assert!(cursor_pixels(&play, "a5-cursor-aim-off.png").is_empty());
+    play.stage_mut().config.crosshair = true;
+
+    // A move zone under the centre: `cursor_move` (type 0), restarted
+    // on its first frame, then looping at 15 frames a second.
+    let zone = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1.is_empty())
+        .map(|z| z.0)
+        .expect("a move zone");
+    assert!(play.aim_at_zone(zone));
+    frames(&mut play, 1);
+    assert_eq!(play.cursor.kind(), 0);
+    assert_eq!(play.cursor.frame(), 0, "1/30 s: still the first frame");
+    let px = cursor_pixels(&play, "a5-cursor-move.png");
+    assert!(near(&px, cx, cy, 48) > 50, "the cursor at the centre");
+    assert_eq!(near(&px, cx, cy, 100), px.len(), "nothing else");
+    frames(&mut play, 14);
+    // 15/30 s: ⌊0.5 · 15⌋ = 7 of cursor_move's 20 frames.
+    assert_eq!(play.cursor.frame(), 7);
+
+    // An object in the hand: its picture (`objects_icon/coin.spr`) at
+    // (x + 5, y + 30).
+    play.game
+        .script()
+        .exec("atl.hero.handled_item = \"coin\"")
+        .expect("lua");
+    frames(&mut play, 1);
+    assert_eq!(play.cursor.hand(), Some("coin.spr"));
+    let px = cursor_pixels(&play, "a5-cursor-hand.png");
+    assert!(
+        near(&px, cx + 5, cy + 30, 40) > 50,
+        "the coin below the centre"
+    );
+    play.game
+        .script()
+        .exec("atl.hero.handled_item = nil")
+        .expect("lua");
+    frames(&mut play, 1);
+    assert_eq!(play.cursor.hand(), None);
+
+    // A follower: its picture at (10, 10).
+    play.game
+        .script()
+        .exec("Atl_Hero_AddFollower(\"sing_like_rain\")")
+        .expect("lua");
+    frames(&mut play, 1);
+    let px = cursor_pixels(&play, "a5-cursor-follower.png");
+    assert!(near(&px, 40, 40, 40) > 50, "the follower at the top left");
+
+    // A menu (state 3): no game cursor.
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 3);
+    assert!(!play.cursor_drawn());
+}

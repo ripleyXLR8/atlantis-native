@@ -155,6 +155,12 @@ impl Game {
         !self.runs.is_empty() || !self.transitions.is_empty()
     }
 
+    /// The effect of the innermost `Atl_Address_Go` transition running
+    /// (the loop @ 0x00405390 that draws the frames), none outside one.
+    pub fn transition_fx(&self) -> Option<Fx> {
+        self.transitions.last().map(|t| t.fx)
+    }
+
     /// Whether requests wait in the manager's queue (+0x2c).
     pub fn requests_pending(&self) -> bool {
         !self.queue.is_empty()
@@ -904,9 +910,7 @@ impl Game {
     pub fn load_file(&mut self, file: &str) -> bool {
         use crate::save;
         let Some(data) = self.engine.borrow_mut().read_save(file) else {
-            self.note(format!(
-                "Atl_Load usage : Le fichier saves/{file} introuvable"
-            ));
+            self.note(format!("Atl_Load: the file saves/{file} is missing"));
             return false;
         };
         let Some(root) = save::parse(&data) else {
@@ -923,9 +927,7 @@ impl Game {
                     self.lua_error(&e);
                 }
             }
-            None => self.note(
-                "CSerialisableLuaDB :: Deserialize -> Grappe de donnée <LUA_DB> manquante".into(),
-            ),
+            None => self.note("CSerialisableLuaDB :: Deserialize: no <LUA_DB> element".into()),
         }
         self.engine.borrow_mut().load_sections(&root);
         self.timers.clear();

@@ -442,3 +442,33 @@ fn the_logos_play_before_the_main_menu() {
     assert_eq!(play.menus.current(), Some(menus::MAIN));
     assert!(!play.logos_playing());
 }
+
+/// The menus' cursor (`menu/cursor.spr`, @ 0x0040d9d0 drawn last) is on
+/// the picture where the mouse is, and follows it; nothing else changes.
+#[test]
+fn the_menu_cursor_is_drawn_at_the_mouse() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("menu-cursor");
+    let mut play = booted(&d, &dir);
+    assert_eq!(play.menus.current(), Some(menus::MAIN));
+    play.mouse_at(700, 450);
+    frames(&mut play, 1);
+    let a = shot(&play, "a5-menu-cursor-a.png");
+    play.mouse_at(900, 100);
+    frames(&mut play, 1);
+    let b = shot(&play, "a5-menu-cursor-b.png");
+    let changed: Vec<(usize, usize)> = (0..VIEW_HEIGHT * VIEW_WIDTH)
+        .filter(|&i| a[i] != b[i])
+        .map(|i| (i % VIEW_WIDTH, i / VIEW_WIDTH))
+        .collect();
+    let near = |x: usize, y: usize| {
+        changed
+            .iter()
+            .filter(|&&(px, py)| px.abs_diff(x) < 64 && py.abs_diff(y) < 64)
+            .count()
+    };
+    let (at_a, at_b) = (near(700, 450), near(900, 100));
+    assert!(at_a > 20 && at_b > 20, "{at_a} {at_b}");
+    assert_eq!(at_a + at_b, changed.len(), "only the cursor moved");
+    let _ = std::fs::remove_dir_all(&dir);
+}
