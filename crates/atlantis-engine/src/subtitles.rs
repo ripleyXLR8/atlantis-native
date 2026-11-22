@@ -286,72 +286,10 @@ pub fn player_font(code_page: TextCodePage) -> Option<(&'static str, &'static st
     }
 }
 
-/// The folders a system keeps its fonts in: `%WINDIR%\Fonts` on Windows,
-/// the font folders of macOS and of the Linux desktops (one level of their
-/// sub-folders is searched too).
 #[cfg(not(target_arch = "wasm32"))]
-fn system_font_dirs() -> Vec<std::path::PathBuf> {
-    use std::path::PathBuf;
-    let mut dirs = Vec::new();
-    if cfg!(windows) {
-        for var in ["WINDIR", "SystemRoot"] {
-            if let Some(w) = std::env::var_os(var) {
-                dirs.push(PathBuf::from(w).join("Fonts"));
-            }
-        }
-    } else {
-        let home = std::env::var_os("HOME").map(PathBuf::from);
-        if cfg!(target_os = "macos") {
-            dirs.extend(
-                [
-                    "/Library/Fonts",
-                    "/Library/Fonts/Microsoft",
-                    "/System/Library/Fonts",
-                ]
-                .map(PathBuf::from),
-            );
-            dirs.extend(home.iter().map(|h| h.join("Library/Fonts")));
-        } else {
-            dirs.extend(
-                home.iter()
-                    .flat_map(|h| [h.join(".local/share/fonts"), h.join(".fonts")]),
-            );
-            dirs.extend(["/usr/local/share/fonts", "/usr/share/fonts"].map(PathBuf::from));
-        }
-    }
-    dirs
-}
-
-/// The file `name` (any case) in `dirs` or one level below them, read.
+pub use atlantis_data::system_fonts::font_in;
 #[cfg(not(target_arch = "wasm32"))]
-pub fn font_in(dirs: &[std::path::PathBuf], name: &str) -> Option<Vec<u8>> {
-    let find = |dir: &std::path::Path| -> Option<std::path::PathBuf> {
-        std::fs::read_dir(dir)
-            .ok()?
-            .flatten()
-            .map(|e| e.path())
-            .find(|p| {
-                p.is_file()
-                    && p.file_name()
-                        .and_then(|n| n.to_str())
-                        .is_some_and(|n| n.eq_ignore_ascii_case(name))
-            })
-    };
-    for dir in dirs {
-        let mut at = find(dir);
-        if at.is_none() {
-            let subs = std::fs::read_dir(dir).into_iter().flatten().flatten();
-            at = subs
-                .map(|e| e.path())
-                .filter(|p| p.is_dir())
-                .find_map(|p| find(&p));
-        }
-        if let Some(p) = at {
-            return std::fs::read(p).ok();
-        }
-    }
-    None
-}
+use atlantis_data::system_fonts::system_font_dirs;
 
 /// The system's copy of the player's font of a release in `code_page`
 /// ([`player_font`]), for the Japanese release only (whose program names

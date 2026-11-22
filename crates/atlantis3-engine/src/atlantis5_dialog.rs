@@ -14,9 +14,12 @@
 //!   metrics: `arial` with Liberation Sans, `Courier New` with Liberation
 //!   Mono, Bold for a `Weight` nearer `FW_BOLD` than `FW_NORMAL` (the
 //!   faces Windows has are 400 and 700). `Lucida sans unicode` and
-//!   `lucida console` have no free metric twin: Liberation Sans stands in
-//!   (a known deviation, logged). Italic is not drawn (no font of the
-//!   French file asks for it).
+//!   `lucida console` have no free metric twin: Native draws them with
+//!   the system's own files when it has them (`l_10646.ttf`,
+//!   `lucon.ttf`, Windows' fonts folder), which have no bold style, so a
+//!   bold weight is emboldened as GDI simulates it; else Liberation Sans
+//!   stands in (a known deviation, logged). Italic is not drawn: every
+//!   font of the French file says `Italic false`.
 //! - The dialog player (`CDialogPlayer` step @ 0x004329a0, drawing
 //!   @ 0x00433910), driven by `Atl_Dialog_Play` (@ 0x00407ac0): see
 //!   [`Player`].
@@ -43,7 +46,15 @@ static FACES: [&[u8]; 4] = [
     include_bytes!("../../../assets/fonts/LiberationMono-Bold.ttf"),
 ];
 
-/// The shipped face that draws a `font.txt` font.
+/// The system's files of the faces Native ships no twin of, in
+/// [`Face`]'s order after the shipped ones: Lucida Sans Unicode and
+/// Lucida Console as Windows installs them.
+pub const SYSTEM_FACES: [(&str, &str); 2] = [
+    ("lucida sans unicode", "l_10646.ttf"),
+    ("lucida console", "lucon.ttf"),
+];
+
+/// The face that draws a `font.txt` font.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Face {
     /// Liberation Sans (Arial's metrics).
@@ -54,6 +65,10 @@ pub enum Face {
     Mono,
     /// Liberation Mono Bold (Courier New Bold's).
     MonoBold,
+    /// The system's Lucida Sans Unicode (`l_10646.ttf`).
+    LucidaSans,
+    /// The system's Lucida Console (`lucon.ttf`).
+    LucidaConsole,
 }
 
 impl Face {
@@ -78,6 +93,16 @@ impl Face {
         matches!(face.to_ascii_lowercase().as_str(), "arial" | "courier new")
     }
 
+    /// The system face named `face` (any case), when it is one Native
+    /// looks for.
+    fn system(face: &str) -> Option<Face> {
+        match face.to_ascii_lowercase().as_str() {
+            "lucida sans unicode" => Some(Face::LucidaSans),
+            "lucida console" => Some(Face::LucidaConsole),
+            _ => None,
+        }
+    }
+
     fn index(self) -> usize {
         self as usize
     }
@@ -88,41 +113,88 @@ pub struct Fonts {
     defs: Vec<FontDef>,
     glyphs: Vec<Option<Glyphs>>,
     fonts: Vec<Option<ab_glyph::FontVec>>,
-    cache: std::cell::RefCell<HashMap<(Face, i32), GdiFont>>,
+    cache: std::cell::RefCell<HashMap<(Face, i32, bool), GdiFont>>,
 }
 
 impl Fonts {
-    /// `fonts/<language>/font.txt` (`CTextManager` @ 0x004601f0).
+    /// `fonts/<language>/font.txt` (`CTextManager` @ 0x004601f0), the
+    /// system's Lucida faces from its fonts folder.
     pub fn load(src: &Arc<dyn FileSource>, language: &str) -> Fonts {
-        let defs = src
+        Fonts::load_with(
+            src,
+            language,
+            &atlantis_data::system_fonts::system_font_file,
+        )
+    }
+
+    /// [`Fonts::load`] with the system's font files given by `system`
+    /// (a file name → its bytes).
+    pub fn load_with(
+        src: &Arc<dyn FileSource>,
+        language: &str,
+        system: &dyn Fn(&str) -> Option<Vec<u8>>,
+    ) -> Fonts {
+        let defs: Vec<FontDef> = src
             .read(&format!("datas/fonts/{language}/font.txt"))
             .map(|d| FontTxt::parse_atlantis5(&d).fonts)
             .unwrap_or_default();
+        let mut files: Vec<Option<Vec<u8>>> = FACES.iter().map(|f| Some(f.to_vec())).collect();
+        for (name, file) in SYSTEM_FACES {
+            // Only looked for when the file asks for the face.
+            let asked = defs.iter().any(|d| d.face.eq_ignore_ascii_case(name));
+            files.push(asked.then(|| system(file)).flatten());
+        }
+        let fonts: Vec<Option<ab_glyph::FontVec>> = files
+            .iter()
+            .map(|f| {
+                f.as_ref()
+                    .and_then(|f| ab_glyph::FontVec::try_from_vec(f.clone()).ok())
+            })
+            .collect();
         for d in &defs {
-            if !Face::twin_of(&d.face) {
-                log::info!(
-                    "font.txt: {} asks for {:?}, which has no shipped twin: Liberation Sans stands in",
+            if Face::twin_of(&d.face) {
+                continue;
+            }
+            match Face::system(&d.face) {
+                Some(f) if fonts[f.index()].is_some() => log::info!(
+                    "font.txt: {} asks for {:?}: the system's {}",
+                    d.id,
+                    d.face,
+                    SYSTEM_FACES[f.index() - FACES.len()].1
+                ),
+                _ => log::info!(
+                    "font.txt: {} asks for {:?}, which has no shipped twin and is not installed: Liberation Sans stands in",
                     d.id,
                     d.face
-                );
+                ),
             }
         }
         Fonts {
             defs,
-            glyphs: FACES.iter().map(|f| Glyphs::new(f.to_vec())).collect(),
-            fonts: FACES
-                .iter()
-                .map(|f| ab_glyph::FontVec::try_from_vec(f.to_vec()).ok())
-                .collect(),
+            glyphs: files.into_iter().map(|f| f.and_then(Glyphs::new)).collect(),
+            fonts,
             cache: std::cell::RefCell::new(HashMap::new()),
         }
     }
 
-    /// The shipped face that draws the font `id` (Liberation Sans for an
-    /// unknown id).
+    /// The face that draws the font `id` (Liberation Sans for an unknown
+    /// id): the system's Lucida face when the file names it and the
+    /// system has it, else [`Face::of`].
     pub fn face(&self, id: &str) -> Face {
-        self.def(id)
-            .map_or(Face::Sans, |d| Face::of(&d.face, d.weight()))
+        let Some(d) = self.def(id) else {
+            return Face::Sans;
+        };
+        match Face::system(&d.face) {
+            Some(f) if self.fonts[f.index()].is_some() => f,
+            _ => Face::of(&d.face, d.weight()),
+        }
+    }
+
+    /// Whether the font `id` is a bold weight of a face that has no bold
+    /// style (the system's Lucida faces): GDI emboldens it itself.
+    pub fn simulated_bold(&self, id: &str) -> bool {
+        matches!(self.face(id), Face::LucidaSans | Face::LucidaConsole)
+            && self.def(id).is_some_and(|d| d.weight() > 550)
     }
 
     /// The font of `id` (the first with that id: @ 0x00461375).
@@ -134,12 +206,13 @@ impl Fonts {
     pub fn gdi(&self, id: &str) -> Option<GdiFont> {
         let h = self.def(id)?.height;
         let face = self.face(id);
+        let bold = self.simulated_bold(id);
         let font = self.fonts[face.index()].as_ref()?;
         Some(
             self.cache
                 .borrow_mut()
-                .entry((face, h))
-                .or_insert_with(|| gdi_of(font, h))
+                .entry((face, h, bold))
+                .or_insert_with(|| gdi_of(font, h, bold))
                 .clone(),
         )
     }
@@ -198,6 +271,18 @@ impl Fonts {
         // The coverage first (white on black), then the colour.
         let mut cover = vec![0u32; w * h];
         glyphs.draw(&g, &moved, 0x00ff_ffff, &mut cover, w, h);
+        if self.simulated_bold(id) {
+            // GDI's emboldening: the glyph again one pixel to the right
+            // [INFERRED: GDI's simulated bold, not measured here].
+            let right: Vec<Line> = moved
+                .iter()
+                .map(|l| Line {
+                    x: l.x + 1,
+                    ..l.clone()
+                })
+                .collect();
+            glyphs.draw(&g, &right, 0x00ff_ffff, &mut cover, w, h);
+        }
         let (r, gg, b) = ((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
         for (px, c) in out.iter_mut().zip(&cover) {
             let a = (c >> 16) & 0xff;
@@ -225,8 +310,10 @@ impl Fonts {
 /// GDI's measures of a face at a positive `lfHeight` (the cell height),
 /// from the font's own metrics: the line step is the height, the ascent
 /// the font's scaled ascent, each byte's A, B, C from its bearing, width
-/// and advance.
-fn gdi_of(font: &ab_glyph::FontVec, height: i32) -> GdiFont {
+/// and advance. A `simulated_bold` face is one pixel wider per character
+/// (its B and the average width + 1) [INFERRED: GDI's emboldening of a
+/// TrueType face without a bold style].
+fn gdi_of(font: &ab_glyph::FontVec, height: i32, simulated_bold: bool) -> GdiFont {
     use ab_glyph::{Font, ScaleFont};
     #[allow(clippy::cast_precision_loss)]
     let scale = ab_glyph::PxScale::from(height as f32);
@@ -252,7 +339,8 @@ fn gdi_of(font: &ab_glyph::FontVec, height: i32) -> GdiFont {
             total += adv;
             count += 1;
         }
-        abc.push((a, bb, adv - a - bb));
+        let bb = bb + i32::from(simulated_bold);
+        abc.push((a, bb, adv + i32::from(simulated_bold) - a - bb));
     }
     #[allow(clippy::cast_possible_truncation)]
     let ascent = sf.ascent().round() as i32;
@@ -260,7 +348,8 @@ fn gdi_of(font: &ab_glyph::FontVec, height: i32) -> GdiFont {
         height,
         tm_height: height,
         ascent,
-        ave_char_width: if count > 0 { total / count } else { height / 2 },
+        ave_char_width: if count > 0 { total / count } else { height / 2 }
+            + i32::from(simulated_bold),
         charset: 0,
         abc,
     }
@@ -678,6 +767,92 @@ pub const SUBTITLE_ZONE: Zone = Zone::new(0, 0, 0, 0, 2, 1);
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A `font.txt` with the inventory's and the credits' Lucida fonts,
+    /// a Lucida Console and an Arial.
+    fn lucida_fonts(system: &dyn Fn(&str) -> Option<Vec<u8>>) -> Fonts {
+        let txt = "[Font]\r\nNameID\tAtlFont_Inventory\r\nName\tAtlantis.ttf\r\nType\t\"Lucida sans unicode\"\r\nHeight\t15\r\nWeight\tFW_NORMAL\r\nItalic\tfalse\r\n[EndFont]\r\n\
+[Font]\r\nNameID\tAtlFont_Credit\r\nName\tAtlantis.ttf\r\nType\t\"Lucida sans unicode\"\r\nHeight\t15\r\nWeight\tFW_BOLD\r\nItalic\tfalse\r\n[EndFont]\r\n\
+[Font]\r\nNameID\tAtlFont_Console\r\nName\tAtlantis.ttf\r\nType\t\"lucida console\"\r\nHeight\t12\r\nItalic\tfalse\r\n[EndFont]\r\n\
+[Font]\r\nNameID\tAtlFont_Titre\r\nName\tAtlantis.ttf\r\nType\tArial\r\nHeight\t15\r\nItalic\tfalse\r\n[EndFont]\r\n";
+        let mut m = atlantis_data::MemFiles::new();
+        m.insert("datas/fonts/french/font.txt", txt.as_bytes().to_vec());
+        let src: Arc<dyn FileSource> = Arc::new(m);
+        Fonts::load_with(&src, "french", system)
+    }
+
+    #[test]
+    fn the_systems_lucida_faces() {
+        // Without them: Liberation Sans stands in, bold from its file.
+        let f = lucida_fonts(&|_| None);
+        assert_eq!(f.face("AtlFont_Inventory"), Face::Sans);
+        assert_eq!(f.face("AtlFont_Credit"), Face::SansBold);
+        assert_eq!(f.face("AtlFont_Console"), Face::Sans);
+        assert!(!f.simulated_bold("AtlFont_Credit"));
+        // With them (a monospaced file standing for both here: the
+        // system's files are never shipped): those faces, from those
+        // files; Arial keeps its twin.
+        let asked = std::cell::RefCell::new(Vec::new());
+        let f = lucida_fonts(&|name| {
+            asked.borrow_mut().push(name.to_string());
+            Some(FACES[2].to_vec())
+        });
+        assert_eq!(*asked.borrow(), ["l_10646.ttf", "lucon.ttf"]);
+        assert_eq!(f.face("AtlFont_Inventory"), Face::LucidaSans);
+        assert_eq!(f.face("AtlFont_Console"), Face::LucidaConsole);
+        assert_eq!(f.face("AtlFont_Titre"), Face::Sans);
+        let g = f.gdi("AtlFont_Inventory").unwrap();
+        let adv = |g: &GdiFont, c: u8| {
+            let (a, b, cc) = g.abc[usize::from(c)];
+            a + b + cc
+        };
+        assert_eq!(adv(&g, b'i'), adv(&g, b'm'), "the given file's glyphs");
+        // FW_BOLD of a face without a bold style: emboldened, one pixel
+        // wider a character, drawn twice.
+        assert!(f.simulated_bold("AtlFont_Credit"));
+        assert!(!f.simulated_bold("AtlFont_Inventory"));
+        let b = f.gdi("AtlFont_Credit").unwrap();
+        for c in *b"aW " {
+            assert_eq!(adv(&b, c), adv(&g, c) + 1);
+        }
+        let draw = |id: &str| {
+            let lines = f.lines(id, "Atlantis", 200, 20, Zone::new(0, 0, 0, 0, 0, 0));
+            let mut px = vec![0u32; 200 * 20];
+            f.draw(id, &lines, 0x00ff_ffff, &mut px, 200, 20, 0, 0);
+            px.iter().filter(|&&p| p & 0xff > 128).count()
+        };
+        assert!(draw("AtlFont_Credit") > draw("AtlFont_Inventory"));
+    }
+
+    /// The real files, when `ATLANTIS_SYSTEM_FONTS` names a folder holding
+    /// them (a Windows fonts folder): they load and draw, their cell the
+    /// `Height` (the hhea ascent − descent, equal to their OS/2 win
+    /// ascent + descent, which GDI's positive `lfHeight` takes).
+    #[test]
+    fn the_real_lucida_files() {
+        let Some(dir) = std::env::var_os("ATLANTIS_SYSTEM_FONTS") else {
+            eprintln!("SKIPPED: ATLANTIS_SYSTEM_FONTS is not set");
+            return;
+        };
+        let dirs = [std::path::PathBuf::from(dir)];
+        let f = lucida_fonts(&|name| atlantis_data::system_fonts::font_in(&dirs, name));
+        assert_eq!(f.face("AtlFont_Inventory"), Face::LucidaSans);
+        assert_eq!(f.face("AtlFont_Console"), Face::LucidaConsole);
+        for id in ["AtlFont_Inventory", "AtlFont_Credit", "AtlFont_Console"] {
+            let g = f.gdi(id).unwrap();
+            assert_eq!(g.tm_height, f.def(id).unwrap().height);
+            let lines = f.lines(
+                id,
+                "Pi\u{e8}ce de monnaie",
+                300,
+                20,
+                Zone::new(0, 0, 0, 0, 0, 0),
+            );
+            let mut px = vec![0u32; 300 * 20];
+            f.draw(id, &lines, 0x00ff_ffff, &mut px, 300, 20, 0, 0);
+            assert!(px.iter().filter(|&&p| p & 0xff > 128).count() > 50, "{id}");
+        }
+    }
 
     #[test]
     fn lip_sync_windows() {

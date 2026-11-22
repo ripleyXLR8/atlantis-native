@@ -20,6 +20,7 @@ pub mod sprite;
 pub mod sprite_anim;
 pub mod sprite_blend;
 pub mod sprite_list;
+pub mod system_fonts;
 pub mod text;
 pub mod wam;
 

@@ -1122,17 +1122,21 @@ options, quit); F11 switches between the window and the full screen
 and the slots of the save page) are in `atlantis5/saves/` in the
 per-user data folder. The DVD's files are never written.
 
+**Starting from the DVD.** The cabinets are compressed as long streams:
+the first start from the DVD reads about 460 MB before the logos (some
+seconds on a fast drive, longer on a slow one) and more on the way to
+the first view. Native keeps index files of what it decoded
+(`atlantis5/cabinets/` in the per-user data folder, about 26 MB), so the
+next starts read only a few MB. Deleting that folder is safe: the next
+start is slow again. An installed copy or the DVD's image on a hard disk
+is fast from the first start.
+
 **What is missing.**
 
-- The logos play without their sound: their sound is the Bink files' own
-  audio track, which Native's Bink decoder does not decode yet (the
-  films of the story have their sound in separate files, which play).
-- The game's own mouse cursors in play are not drawn; the centre of the
-  screen is where a click acts.
 - Two fonts of the game (Lucida Sans Unicode and Lucida Console: the
-  inventory's and the credits' texts) are drawn with Liberation Sans,
-  which has other metrics.
-- The inventory's hover texts and its fade in and out are not drawn.
+  inventory's and the credits' texts) are the system's own on Windows;
+  where they are not installed (usually macOS and Linux) Liberation Sans
+  stands in, which has other metrics.
 - The display options (the resolution and depth of the graphics page)
   change nothing: the picture is the game's 1024 × 576, scaled to the
   window.
