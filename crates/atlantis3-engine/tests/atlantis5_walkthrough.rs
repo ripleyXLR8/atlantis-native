@@ -1042,8 +1042,51 @@ fn chapter_5(w: &mut Walker) {
     w.touch_zone("lift_floor_14");
 }
 
+/// Chapter 6, floor 28 (`chapter_06.lua`, `on_click_etage28.lua`): the
+/// secretary opens Bugsy's office; Bugsy's chessboard won gives the
+/// medallion and his talk on Atlantis, the heroes, Elliot; Miss
+/// Pennington leads to Miss Sullivan, Sing like Rain and the Hindenburg,
+/// which open the way out of floor 14 (chapter 7).
+fn chapter_6(w: &mut Walker) {
+    w.talk("bugsy_secretary", "bugsy");
+    w.talk("bugsy", "bugsy");
+    assert_eq!(w.flag("chessboard_game"), "playing");
+    // The line of `atlantis5_puzzles.rs` (a breadth-first walk of the
+    // scripts' rules under the reference Lua 5.0.3).
+    for sq in [11, 7, 3, 9, 15, 19, 25, 19, 13, 17, 21, 17, 11, 7, 3, 9, 5] {
+        w.empty_hand();
+        assert!(w.click_sprite_here("player_pawn"), "the pawn");
+        assert_eq!(w.hand(), "player_pawn");
+        let name = format!("chess_white_box_{sq}");
+        let id = w
+            .play
+            .zones()
+            .into_iter()
+            .find(|z| z.1 == name.as_bytes())
+            .map(|z| z.0)
+            .unwrap_or_else(|| panic!("{name} lit"));
+        w.click_zone(id, &name);
+    }
+    assert_eq!(w.flag("chessboard_game"), "won");
+    w.talk("bugsy", "medaillon");
+    assert!(w.has("medallion"));
+    w.talk("bugsy", "medaillon");
+    w.talk("bugsy", "atlantide");
+    w.talk("bugsy", "atlantide");
+    w.talk("bugsy", "elliot");
+    w.talk("bugsy", "heros");
+    w.talk("bugsy", "bugsy");
+    w.talk("bugsy", "miss_pennington");
+    w.talk("bugsy_secretary", "miss_sullivan");
+    w.talk("bugsy_secretary", "sing_like_rain");
+    w.talk("bugsy_secretary", "hindenburg");
+    w.touch_zone("floor14_out");
+}
+
 /// The chapters' plays, in order.
-const CHAPTERS: [fn(&mut Walker); 5] = [chapter_1, chapter_2, chapter_3, chapter_4, chapter_5];
+const CHAPTERS: [fn(&mut Walker); 6] = [
+    chapter_1, chapter_2, chapter_3, chapter_4, chapter_5, chapter_6,
+];
 
 /// A new game played through chapter `n`: the chapters before it set
 /// what it needs (the characters' subjects, the flags), as in the game.
@@ -1104,4 +1147,9 @@ fn chapter_04() {
 #[test]
 fn chapter_05() {
     play_chapter(5);
+}
+
+#[test]
+fn chapter_06() {
+    play_chapter(6);
 }
