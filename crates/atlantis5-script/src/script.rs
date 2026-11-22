@@ -851,6 +851,7 @@ fn binding_entry(state: &mut LuaState) -> LuaResult<u32> {
         | Call::TimerSetDuration { .. }
         | Call::InitChapter(_)
         | Call::GameOver(_)
+        | Call::ExamineItem(_)
         | Call::Load
         | Call::TerminateGame => {
             shared.borrow_mut().manager_calls.push(call.clone());
@@ -1223,6 +1224,15 @@ impl Script {
     /// Calls the game manager has to handle, taken in call order.
     pub(crate) fn take_manager_calls(&self) -> Vec<Call> {
         std::mem::take(&mut self.shared.borrow_mut().manager_calls)
+    }
+
+    /// Takes the `LUA_DB` now, as the next one [`Script::take_saved_db`]
+    /// gives (the save menu's save, outside any script).
+    pub(crate) fn save_db_now(&mut self) -> Result<(), String> {
+        let db = self.lua_db();
+        let ok = db.as_ref().map(|_| ()).map_err(Clone::clone);
+        self.shared.borrow_mut().saved_dbs.push(db);
+        ok
     }
 
     /// The `LUA_DB` of the oldest `Atl_Save` not yet written.

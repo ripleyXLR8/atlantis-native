@@ -52,6 +52,8 @@ struct Channel {
     gain: [f32; 2],
     /// Source frames played since the channel started.
     played: u64,
+    /// Held in place (FMOD's `FSOUND_SetPaused` on that channel).
+    held: bool,
 }
 
 #[derive(Debug, Default)]
@@ -162,6 +164,13 @@ impl Audio {
         }
     }
 
+    /// Holds one channel in place, or lets it go on.
+    pub fn set_held(&self, channel: usize, held: bool) {
+        if let Some(Some(c)) = self.lock().channels.get_mut(channel) {
+            c.held = held;
+        }
+    }
+
     /// Silences the output while the game is held (its channels keep
     /// their place).
     pub fn set_paused(&self, paused: bool) {
@@ -178,6 +187,9 @@ impl Audio {
         }
         for slot in m.channels.iter_mut() {
             let Some(c) = slot else { continue };
+            if c.held {
+                continue;
+            }
             let ch = usize::from(c.channels);
             let step = f64::from(c.rate) / f64::from(rate);
             for frame in out.chunks_mut(channels) {

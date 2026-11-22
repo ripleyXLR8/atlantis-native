@@ -91,6 +91,8 @@ fn anim(play: &Play, object: &str) -> Option<String> {
 fn the_first_film_shows_its_subtitles() {
     let Some(d) = dvd() else { return };
     let mut play = new_play(&d);
+    // The subtitles shown (the control page's `subtitle`).
+    play.stage_mut().config.subtitles = true;
     play.new_game();
     frames(&mut play, 3);
     assert!(play.stage().film_playing(), "cine01 plays");
@@ -108,6 +110,20 @@ fn the_first_film_shows_its_subtitles() {
         }
     }
     assert_eq!(seen.len(), 9, "the 9 subtitles of cine01 in turn");
+}
+
+#[test]
+fn without_the_subtitle_option_a_film_shows_none() {
+    let Some(d) = dvd() else { return };
+    let mut play = new_play(&d);
+    assert!(!play.stage().config.subtitles);
+    play.new_game();
+    frames(&mut play, 3);
+    assert!(play.stage().film_playing(), "cine01 plays");
+    for _ in 0..150 {
+        frames(&mut play, 1);
+        assert_eq!(play.stage().film_subtitle(), None);
+    }
 }
 
 #[test]
@@ -345,7 +361,13 @@ fn the_inventory_takes_and_puts_back() {
         play.stage().inventory_items()[slot].as_deref(),
         Some(&b"coin"[..])
     );
-    // The right button closes it.
+    // On a cell the grid takes the right press (event 3): the coin has
+    // no detailed picture, nothing happens.
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    // Off the cells the right button closes it.
+    play.mouse_at(500, 100);
     play.right_press();
     frames(&mut play, 1);
     assert!(!play.stage().inventory_open_now());

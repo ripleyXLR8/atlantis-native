@@ -496,6 +496,9 @@ impl Game {
                 Call::Load => self.queue.push_back(2),
                 Call::Save => self.save(),
                 Call::TerminateGame => self.queue.push_back(7),
+                // @ 0x00405d70: mode 11 asked of the menus, then state 3
+                // at once (@ 0x0042fb90(3)).
+                Call::ExamineItem(_) => self.open_menu(),
                 _ => {}
             }
         }
@@ -741,6 +744,27 @@ impl Game {
         }
     }
 
+    /// A request queued (@ 0x0045f3a0 on the manager's deque): the
+    /// menus' `resume` 4 (@ 0x0041ad60), the main menu's quit 8, the
+    /// in-game menu's exit 3.
+    pub fn queue_request(&mut self, r: u32) {
+        self.queue.push_back(r);
+    }
+
+    /// The game ended (@ 0x0042ffd0, its manager's part): the requests
+    /// dropped, the states, +0x38, +0x3c and the flags +0x54, +0x55
+    /// cleared, the timers cleared (@ 0x004359d0). The scripts still
+    /// running are dropped with it (the original runs none from a menu).
+    pub fn end_game(&mut self) {
+        self.queue.clear();
+        self.state = 0;
+        self.previous = 0;
+        self.runs.clear();
+        self.transitions.clear();
+        self.timers.clear();
+        self.timer_walk = None;
+    }
+
     /// The menu of state 3 has ended (its process returned 1,
     /// @ 0x0042f000 case 3 falling into case 0): the next request.
     pub fn menu_closed(&mut self) {
@@ -758,6 +782,19 @@ impl Game {
     /// The configuration's section is not written (Native keeps the
     /// options elsewhere).
     fn save(&mut self) {
+        self.save_as(crate::save::AUTOSLOT);
+    }
+
+    /// The save written to `saves/<file>` (the save menu's
+    /// `CSaveFileWriter` @ 0x0043ad90 on `slot_<n>`, @ 0x004272b0; the
+    /// database taken now, as `Atl_Save` does it at its call).
+    pub fn save_now(&mut self, file: &str) {
+        // An error is reported by `save_as`, which takes it.
+        let _ = self.script.save_db_now();
+        self.save_as(file);
+    }
+
+    fn save_as(&mut self, file: &str) {
         use crate::save;
         let db = match self.script.take_saved_db() {
             Some(Ok(db)) => db,
@@ -791,11 +828,7 @@ impl Game {
         }
         root.children.push(manager);
         let text = save::to_text(&root);
-        if !self
-            .engine
-            .borrow_mut()
-            .write_save(save::AUTOSLOT, text.as_bytes())
-        {
+        if !self.engine.borrow_mut().write_save(file, text.as_bytes()) {
             self.note("Atl_Save: the save could not be written".into());
         }
     }
@@ -807,17 +840,25 @@ impl Game {
     /// remaining time), then `return Atl_Address_GetCurrent()` and a
     /// `no_fx` transition there (@ 0x0042d8d0(0), 0x0042d8e0).
     fn load(&mut self) {
+        self.load_file(crate::save::AUTOSLOT);
+    }
+
+    /// `saves/<file>` read by @ 0x0043b210 (the load state's `autoslot`,
+    /// the main menu's `rescue_game` @ 0x00428ea0, the load menu's
+    /// `slot_<n>` @ 0x00418960); at its end the reader queues the
+    /// requests 5 (the transition, here [`Game`]'s own) and 4
+    /// (0x0043b6f4..0x0043b7c1). False when the file is missing.
+    pub fn load_file(&mut self, file: &str) -> bool {
         use crate::save;
-        let Some(data) = self.engine.borrow_mut().read_save(save::AUTOSLOT) else {
+        let Some(data) = self.engine.borrow_mut().read_save(file) else {
             self.note(format!(
-                "Atl_Load usage : Le fichier saves/{} introuvable",
-                save::AUTOSLOT
+                "Atl_Load usage : Le fichier saves/{file} introuvable"
             ));
-            return;
+            return false;
         };
         let Some(root) = save::parse(&data) else {
             self.note("CSaveFileReader :: Read -> not an ATL_FILE".into());
-            return;
+            return false;
         };
         let path = Self::scripts_path(b"atlantis.lua");
         if self.push_file(&path, false) {
@@ -860,6 +901,8 @@ impl Game {
             }
             Err(e) => self.lua_error(&e),
         }
+        self.queue.push_back(4);
+        true
     }
 
     /// State 1: `return InitChapter` called with the scripts' folder and

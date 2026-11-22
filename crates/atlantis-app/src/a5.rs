@@ -7,11 +7,12 @@
 //! As in the original, the mouse turns the view (its relative moves, the
 //! system cursor hidden and kept in the window) and a left click acts on
 //! what is under the screen centre; Escape or Space ends a film, Space a
-//! dialog, a left click a tirade; the right button puts the hand's object
-//! back; in the subject menu the system cursor picks a subject. Escape out
-//! of a film, or closing the window, ends the game. The autosave goes to
-//! the data folder's `atlantis5/saves`. The inventory, the game's menus
-//! and its own cursors are not ported yet.
+//! dialog, a left click a tirade; the right button opens the inventory or
+//! puts the hand's object back; Escape in play opens the in-game menu. The
+//! game starts in the main menu; in the menus the mouse moves the game's
+//! cursor. Its `quit_game`, or closing the window, ends the program. The
+//! saves go to the data folder's `atlantis5/saves`. The game's cursors in
+//! play are not drawn yet.
 
 use std::num::NonZeroU32;
 use std::path::Path;
@@ -120,7 +121,7 @@ struct A5App {
     /// Whether the window has the focus (the mouse's moves turn the view
     /// only then).
     focused: bool,
-    /// Whether the system cursor is shown for a menu.
+    /// Whether the mouse is free for a menu.
     menu_cursor: bool,
     _audio: Option<cpal::Stream>,
 }
@@ -173,18 +174,21 @@ impl A5App {
         let _ = buf.present();
     }
 
-    fn frame(&mut self) {
+    fn frame(&mut self, el: &ActiveEventLoop) {
         let now = Instant::now();
         let dt = now.duration_since(self.last).as_secs_f64().min(0.25);
         self.last = now;
         self.play.update(dt);
-        // A menu shows the system cursor and frees it; play hides and
-        // holds it (the game's own cursor pictures are not drawn).
+        if self.play.quit_requested() {
+            el.exit();
+            return;
+        }
+        // A menu frees the mouse (the game draws its cursor); play holds
+        // it. The system cursor stays hidden (ShowCursor(0), @ 0x0043c200).
         let menu = self.play.in_menu();
         if menu != self.menu_cursor {
             self.menu_cursor = menu;
             if let Some(w) = &self.window {
-                w.set_cursor_visible(menu);
                 if menu {
                     let _ = w.set_cursor_grab(CursorGrabMode::None);
                 } else if w.set_cursor_grab(CursorGrabMode::Locked).is_err() {
@@ -255,13 +259,8 @@ impl ApplicationHandler for A5App {
             WindowEvent::CloseRequested => el.exit(),
             WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
                 match event.logical_key {
-                    Key::Named(NamedKey::Escape) => {
-                        if self.play.stage().film_playing() {
-                            self.play.skip();
-                        } else {
-                            el.exit();
-                        }
-                    }
+                    // Escape (DIK 1): a film ends, or the in-game menu.
+                    Key::Named(NamedKey::Escape) => self.play.escape(),
                     // Space (0x39): a film or a dialog ends.
                     Key::Named(NamedKey::Space) => self.play.space(),
                     _ => {}
@@ -296,7 +295,7 @@ impl ApplicationHandler for A5App {
                     );
                 }
             }
-            WindowEvent::RedrawRequested => self.frame(),
+            WindowEvent::RedrawRequested => self.frame(el),
             _ => {}
         }
     }
@@ -315,11 +314,13 @@ pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
     };
     let src: Arc<dyn atlantis_data::FileSource> = Arc::new(src);
     let mut play = Play::new(src, &lang, Some(audio))?;
-    // The saves (`saves/autoslot`) in the player's data folder.
+    // The saves (`saves/autoslot`, `slot_<n>`) in the player's data
+    // folder; their dates in local time.
     play.set_save_dir(Some(
         crate::desktop::data_dir().join("atlantis5").join("saves"),
     ));
-    play.new_game();
+    play.menus.utc_offset = crate::a2::utc_offset_now;
+    play.boot();
     let el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
     let mut app = A5App {
         play,
