@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Atlantis Native</title>
-<meta name="description" content="Play Atlantis: The Lost Tales (Cryo, 1997), Atlantis II (Cryo, 1999), Atlantis III (Cryo, 2001) and Atlantis Evolution (2004) in your browser with your own copy of the game.">
+<meta name="description" content="Play Atlantis: The Lost Tales (Cryo, 1997), Atlantis II (Cryo, 1999), Atlantis III (Cryo, 2001), Atlantis Evolution (2004) and The Secrets of Atlantis (2006) in your browser with your own copy of the game.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Atlantis Native">
-<meta property="og:title" content="Atlantis Native: The Lost Tales, Atlantis II, Atlantis III and Atlantis Evolution in your browser">
-<meta property="og:description" content="Play Atlantis: The Lost Tales (Cryo, 1997), Atlantis II (Cryo, 1999), Atlantis III (Cryo, 2001) and Atlantis Evolution (2004) in your browser with your own copy of the game.">
+<meta property="og:title" content="Atlantis Native: The Lost Tales, Atlantis II, Atlantis III, Atlantis Evolution and The Secrets of Atlantis in your browser">
+<meta property="og:description" content="Play Atlantis: The Lost Tales (Cryo, 1997), Atlantis II (Cryo, 1999), Atlantis III (Cryo, 2001), Atlantis Evolution (2004) and The Secrets of Atlantis (2006) in your browser with your own copy of the game.">
 <meta property="og:url" content="https://ripleyxlr8.github.io/atlantis-native/">
 <meta property="og:image" content="https://ripleyxlr8.github.io/atlantis-native/emblem.png">
 <link rel="icon" href="favicon.png">
@@ -162,11 +162,12 @@
   /* The keys beside the frame while playing, when the game leaves them
      room (it sets body.show-keys: fit_canvas in lib.rs). */
   .keys { display: none; }
-  /* (each game's keys: body.game-a1, game-a2, game-a3 or game-a4, set by the page) */
+  /* (each game's keys: body.game-a1, game-a2, game-a3, game-a4 or game-a5, set by the page) */
   body.show-keys:not(.landing).game-a1 .keys.a1,
   body.show-keys:not(.landing).game-a2 .keys.a2,
   body.show-keys:not(.landing).game-a3 .keys.a3,
-  body.show-keys:not(.landing).game-a4 .keys.a4 {
+  body.show-keys:not(.landing).game-a4 .keys.a4,
+  body.show-keys:not(.landing).game-a5 .keys.a5 {
     display: block; position: fixed; top: 50%; transform: translateY(-50%); z-index: 2;
     width: 168px; color: var(--muted); font-size: 13px; line-height: 1.35;
   }
@@ -286,11 +287,27 @@
     <dt><kbd>F11</kbd> or <kbd>Alt</kbd>+<kbd>Enter</kbd></dt><dd>full screen</dd>
   </dl>
 </aside>
+<aside class="keys left a5">
+  <h2 class="gold">Explore</h2>
+  <dl>
+    <dt><kbd>Mouse</kbd></dt><dd>look around (a click takes the mouse); moves the pointer in the menus</dd>
+    <dt><kbd>Left click</kbd></dt><dd>acts on what is under the centre: go, take, use, talk; the next line</dd>
+    <dt><kbd>Right click</kbd></dt><dd>the inventory, or puts the object in hand back</dd>
+  </dl>
+</aside>
+<aside class="keys right a5">
+  <h2 class="gold">Menus</h2>
+  <dl>
+    <dt><kbd>Esc</kbd></dt><dd>the game's menu (save, load, options, quit); skips a film</dd>
+    <dt><kbd>Space</kbd></dt><dd>skips a film or a dialog</dd>
+    <dt><kbd>F11</kbd></dt><dd>full screen</dd>
+  </dl>
+</aside>
 <main id="pick">
   <h1 class="logo">Atlantis</h1>
   <div class="tagline">
     <svg class="spear" viewBox="0 0 120 40"><use href="#spear"/></svg>
-    <span class="gold">The Lost Tales · Atlantis II · Atlantis III · Evolution</span>
+    <span class="gold">The Lost Tales · Atlantis II · Atlantis III · Evolution · The Secrets of Atlantis</span>
     <svg class="spear right" viewBox="0 0 120 40"><use href="#spear"/></svg>
   </div>
   <div class="tablet">
@@ -299,8 +316,9 @@
        called to save the world; in the Hoggar, an archaeologist opens the
        way to other worlds; in 1904, a voyage at sea leads to a hidden
        world. <em>Atlantis Native</em> is a new engine for
-       Cryo's adventures of 1997, 1999 and 2001 and for <i>Atlantis
-       Evolution</i> (2004): the four games whole, faithful to the
+       Cryo's adventures of 1997, 1999 and 2001, for <i>Atlantis
+       Evolution</i> (2004) and <i>The Secrets of Atlantis</i> (2006): the
+       five games whole, faithful to the
        originals, playable here.</p>
     <p>It does not include the games themselves: their pictures, videos,
        voices and music belong to their publisher, so it plays them from
@@ -371,12 +389,25 @@
           installer's archives.</li>
     </ul>
     </section>
+    <section>
+    <h2 class="gold">The Secrets of Atlantis</h2>
+    <ul>
+      <li><em>DVD</em> (French, 2006): the DVD's image (<code>.iso</code>,
+          choose it below or the folder holding it), the DVD drive or a
+          copy of the disc (the folder holding <code>DATAS.cab</code> and
+          <code>DATAS_french.cab</code>), or the folder where the game is
+          installed (the one holding <code>Datas</code>). The image is read
+          a part at a time; the first start reads about 450 MB of it
+          before the logos. Other editions are untested.</li>
+    </ul>
+    </section>
     </div>
     <div class="choose">
       <label class="menu-item"><svg class="sun" viewBox="0 0 40 40"><use href="#sun"/></svg><span class="gold">Choose your game folder</span>
         <input type="file" id="dir" webkitdirectory></label>
       <label class="small images-pick">or choose the CD image files of
-        <i>Atlantis: The Lost Tales</i>
+        <i>Atlantis: The Lost Tales</i>, or the DVD image of
+        <i>The Secrets of Atlantis</i>
         <input type="file" id="images" multiple accept=".iso,.bin,.img,.mdf,.nrg"></label>
     </div>
     <p id="status"></p>
@@ -398,7 +429,7 @@
   </nav>
   <span class="cryo" id="version">Atlantis Native</span>
   <span class="legal">Free software under the GPL. <i>Atlantis: The Lost Tales</i>,
-    <i>Atlantis II</i> and <i>Atlantis III</i> © Microids (Cryo Interactive Entertainment), <i>Atlantis Evolution</i> © Microids; this project is not
+    <i>Atlantis II</i> and <i>Atlantis III</i> © Microids (Cryo Interactive Entertainment), <i>Atlantis Evolution</i> © Microids, <i>The Secrets of Atlantis</i> © Nobilis; this project is not
     affiliated with them.</span>
 </footer>
 <script type="module">
@@ -413,6 +444,8 @@
   window.atlantis3 = { state: () => JSON.parse(atlantis3_state() || "null"), test: atlantis3_test };
   // Atlantis Evolution's.
   window.atlantis4 = { state: () => JSON.parse(atl.atlantis4_state() || "null"), test: atl.atlantis4_test };
+  // The Secrets of Atlantis's.
+  window.atlantis5 = { state: () => JSON.parse(atl.atlantis5_state() || "null"), test: atl.atlantis5_test };
   // The engine's own version and commit (as in the F10 menu).
   document.getElementById("version").textContent = version();
   // Opens the game of the picked files; for Cryo's DVD, `language` is the
@@ -429,7 +462,7 @@
     await new Promise((r) => requestAnimationFrame(() => setTimeout(r, 0)));
     try {
       const started = await start(files, language, game, paths, a4lang);
-      document.body.classList.add({ atlantis2: "game-a2", atlantis3: "game-a3", atlantis4: "game-a4", atlantis4cd: "game-a3" }[started] || "game-a1");
+      document.body.classList.add({ atlantis2: "game-a2", atlantis3: "game-a3", atlantis4: "game-a4", atlantis4cd: "game-a3", atlantis5: "game-a5" }[started] || "game-a1");
       document.body.classList.remove("landing");
       // Atlantis II or III quit from its menu: the page again.
       window.atlantisQuit = () => location.reload();

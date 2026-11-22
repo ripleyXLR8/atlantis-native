@@ -255,7 +255,7 @@ whatever the counts say.
 
 The web page, **https://ripleyxlr8.github.io/atlantis-native/** (or the
 `atlantis-native-web.zip` of the nightly release, served over HTTP),
-plays the four games in Chrome, Edge, Firefox or Safari on a computer
+plays the games in Chrome, Edge, Firefox or Safari on a computer
 with a mouse and a keyboard. Atlantis II has been tried in Edge, Chrome
 and Firefox. Atlantis III (GOG.com and the French CD) and Atlantis
 Evolution (GOG.com and the 2004 CD) have been tried in Firefox from the
@@ -322,6 +322,24 @@ What to pick:
   `Atlantis4.cfg` are kept in the browser under
   `atlantis-native/atlantis-evolution-2004/`; its controls are the
   desktop's (see [The 2004 CD](#the-2004-cd-in-progress)).
+- *The Secrets of Atlantis*, the French DVD: the DVD's image (an
+  `.iso`: pick it with *or choose the CD image files* under the folder
+  button, or pick the folder holding it), the DVD drive or a copy of the
+  disc (the folder holding `DATAS.cab` and `DATAS_french.cab`), or the
+  folder where the game is installed (the one holding `Datas`). The
+  image is read a part at a time, never whole. The browser cannot keep
+  the desktop's index of the cabinets (see
+  [Starting from the DVD](#the-secrets-of-atlantis)): each start from
+  the DVD reads about 450 MB of it before the logos (a bar on a black
+  screen; about 18 s in Edge from an image on a hard disk), and while
+  the game runs the page reads the rest of the cabinets a little every
+  frame, so that a place deep in them is quick once that is done; until
+  then the first visit of such a place may stop the page for a moment.
+  Its saves are kept in the browser under `atlantis-native/atlantis5/`
+  (about 190 KB each: the browser's storage of a site, about 5 MB,
+  holds some twenty). Its controls are the desktop's (see
+  [The Secrets of Atlantis](#the-secrets-of-atlantis)): a click in play
+  takes the mouse, a menu lets it go.
 - A folder holding more than one game: the page asks which one to play.
 
 The sound starts with the first click or key (browsers allow sound only
@@ -1144,7 +1162,9 @@ is fast from the first start.
   the French DVD itself; the scripts run without them, as the original
   does.
 - Only the French DVD is known; the international DVD's languages are
-  untested. Neither the web version nor Android plays it yet.
+  untested. Android does not play it yet; the web version does (see
+  [The web version](#the-web-version)), tried in Edge from the DVD's
+  image to the main menu, a new game's first view and its autosave.
 
 ## Command line
 

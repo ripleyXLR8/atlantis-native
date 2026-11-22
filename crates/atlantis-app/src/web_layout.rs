@@ -326,6 +326,45 @@ pub fn a4cd_install(paths: &[&str]) -> Option<String> {
         .map(str::to_string)
 }
 
+/// *The Secrets of Atlantis*'s data among `paths`, as a folder: the
+/// shallowest holding the DVD's `datas.cab` (a copy of the disc), an
+/// install or the extracted cabinets (`datas/texts/menu/<language>/
+/// string_resources.xml` beside `datas/scenes` and `datas/warps`), or
+/// `Datas` itself (the same without `datas/`)
+/// ([`atlantis3_data::atlantis5::Atlantis5Source::from_folder`]). The
+/// DVD's image is found by reading it, not from the paths.
+pub fn a5_folder(paths: &[&str]) -> Option<String> {
+    const TEXTS: &str = "texts/menu/";
+    const STRINGS: &str = "/string_resources.xml";
+    let mut found: Vec<String> = Vec::new();
+    for p in paths {
+        if let Some(dir) = p.strip_suffix("datas.cab") {
+            if dir.is_empty() || dir.ends_with('/') {
+                found.push(dir.to_string());
+            }
+            continue;
+        }
+        let Some(i) = p.find(TEXTS) else { continue };
+        let (dir, rest) = (&p[..i], &p[i + TEXTS.len()..]);
+        if !(dir.is_empty() || dir.ends_with('/'))
+            || !rest.ends_with(STRINGS)
+            || rest[..rest.len() - STRINGS.len()].contains('/')
+        {
+            continue;
+        }
+        // `<folder>/datas/` or `Datas` itself.
+        if has_folder(paths, dir, "scenes") && has_folder(paths, dir, "warps") {
+            let top = dir
+                .strip_suffix("datas/")
+                .filter(|t| t.is_empty() || t.ends_with('/'));
+            found.push(top.unwrap_or(dir).to_string());
+        }
+    }
+    found
+        .into_iter()
+        .min_by_key(|dir| (depth(dir), dir.to_string()))
+}
+
 /// The entries of folder `dir` (lower case, `""` the top) among the
 /// files `paths` (lower-case paths below a folder): its files and its
 /// folders, each once, in name order, as the desktop's `StdDir` lists a
@@ -734,6 +773,50 @@ mod tests {
         );
         assert_eq!(picked(&["photos/a.jpg"]), Picked::None);
         assert_eq!(top_names(CD, "atlantis 2/")[0], "atlantis2.exe");
+    }
+
+    /// The Secrets of Atlantis: a copy of the DVD, an install, the
+    /// extracted cabinets, `Datas` itself; the shallowest.
+    #[test]
+    fn atlantis5_folders() {
+        assert_eq!(
+            a5_folder(&["dvd/datas.cab", "dvd/datas_french.cab", "dvd/setup.exe"]),
+            Some("dvd/".to_string())
+        );
+        assert_eq!(a5_folder(&["datas.cab"]), Some(String::new()));
+        let tree = [
+            "soa/the secrets of atlantis.exe",
+            "soa/datas/scenes/zeppelin.wam",
+            "soa/datas/warps/ze0003.jp6",
+            "soa/datas/texts/menu/french/string_resources.xml",
+            "soa/datas/texts/menu/string_resources.xsd",
+        ];
+        assert_eq!(a5_folder(&tree), Some("soa/".to_string()));
+        let datas = [
+            "datas/scenes/zeppelin.wam",
+            "datas/warps/ze0003.jp6",
+            "datas/texts/menu/german/string_resources.xml",
+        ];
+        assert_eq!(a5_folder(&datas), Some(String::new()));
+        let itself = [
+            "x/scenes/zeppelin.wam",
+            "x/warps/ze0003.jp6",
+            "x/texts/menu/german/string_resources.xml",
+        ];
+        assert_eq!(a5_folder(&itself), Some("x/".to_string()));
+        assert_eq!(
+            a5_folder(&["a/b/datas.cab", "c/datas.cab"]),
+            Some("c/".to_string())
+        );
+        // No warps: not the game; a cabinet of another name neither.
+        assert_eq!(
+            a5_folder(&[
+                "g/datas/scenes/a.wam",
+                "g/datas/texts/menu/french/string_resources.xml"
+            ]),
+            None
+        );
+        assert_eq!(a5_folder(&["g/mydatas.cab", "soa-fr.iso"]), None);
     }
 
     #[test]

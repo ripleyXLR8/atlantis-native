@@ -4690,6 +4690,24 @@ folder holding it, or an unpacked tree. The formats shared with
 playlists, `font.txt`, Bink films) are read by the same code; the XML
 texts (string resources, dialogs, film subtitles) by `atlantis5_texts`.
 
+**The web build.** `atlantis-app::a5_web` runs `Play` in the page as
+`a5` does in a window; `web.rs` finds the game among the picked files
+(`web_layout::a5_folder`: a copy of the disc, an install or `Datas`
+itself, by the paths; the DVD's image by reading the picked images for
+`DATAS.cab`). An MSZIP folder is one deflate stream, so the page,
+which has no index folder, decodes the films' folder up to the logos
+before the game starts, a step per frame (`CabFiles::warm_progress`,
+about 450 MB, 18 s in headless Edge from an image on a WSL disk), then
+every folder to its end, the smallest first, 3 ms per frame
+(`CabFiles::warm_next`), the cabinet's next MiB asked ahead
+(`FileSource::read_ahead`) and the step skipped while it is on its way
+(`web::reads_pending`), so that no frame waits for the disc. The saves
+go through `atlantis5_saves::SaveFiles` (the desktop's `DirSaves`, the
+page's `localStorage` with a `<name>.time` key for the load page's
+dates); the sound through `audio_out::web_out`, mixed ahead as Atlantis
+Evolution's. `window.atlantis5.state()` / `.test("click <element>")`
+are the end-to-end runs' aids.
+
 **Scripts.** `atlantis5-script` runs the player's own compiled chunks:
 the vendored `rilua` (a Lua 5.1 VM) loads Lua 5.0 chunks
 (`vendor/rilua/src/vm/undump50.rs`) and runs 5.0's operations that differ
