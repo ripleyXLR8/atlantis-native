@@ -57,9 +57,12 @@ struct Walker {
     cell0: Option<(i32, i32)>,
     right_button: Option<(i32, i32)>,
     steps: usize,
-    /// Named move zones the walks do not take (they lead out of the
-    /// scene).
+    /// Prefixes of the named move zones the walks do not take (they lead
+    /// out of the scene: the lifts, the stairways).
     avoid: Vec<String>,
+    /// Moves the scripts send to another view now: (scene, the zone's
+    /// view, the view entered).
+    redirects: Vec<(String, i32, i32)>,
 }
 
 impl Walker {
@@ -74,7 +77,8 @@ impl Walker {
             cell0: None,
             right_button: None,
             steps: 0,
-            avoid: Vec::new(),
+            avoid: vec!["lift_".into(), "stairway_".into()],
+            redirects: Vec::new(),
         }
     }
 
@@ -249,7 +253,7 @@ impl Walker {
                 out.push((value, name));
                 continue;
             }
-            if tier == 0 || self.avoid.contains(&name) {
+            if tier == 0 || self.avoid.iter().any(|a| name.starts_with(a.as_str())) {
                 continue;
             }
             match self.play.game.zone(name.as_bytes()) {
@@ -282,13 +286,19 @@ impl Walker {
         while let Some(v) = queue.pop_front() {
             let path = seen[&v].clone();
             for (to, name) in self.moves(scene, v, tier) {
-                if seen.contains_key(&to) {
+                // A move the scripts send elsewhere lands there.
+                let lands = self
+                    .redirects
+                    .iter()
+                    .find(|r| r.0 == scene && r.1 == to && name.is_empty())
+                    .map_or(to, |r| r.2);
+                if seen.contains_key(&lands) {
                     continue;
                 }
                 let mut p = path.clone();
                 p.push((to, name));
-                seen.insert(to, p);
-                queue.push_back(to);
+                seen.insert(lands, p);
+                queue.push_back(lands);
             }
         }
         seen
@@ -354,6 +364,12 @@ impl Walker {
             assert_eq!(s2, scene, "a move out of {scene} {here}");
         }
         panic!("not at {view}: {:?}", self.address());
+    }
+
+    /// Clicks this view's move zone without a name toward `to` (the view's
+    /// script may send elsewhere).
+    fn click_move(&mut self, to: i32) {
+        self.click_zone(to, "");
     }
 
     /// The views of the current scene holding a zone named `name`.
@@ -694,6 +710,13 @@ impl Walker {
         vec![self.address().1]
     }
 
+    /// The zone `name` (a lift, a stairway, an exit) clicked with an
+    /// empty hand to go to `scene`.
+    fn go_to(&mut self, name: &str, scene: &str) {
+        self.touch_zone(name);
+        assert_eq!(self.address().0, scene, "{name} leads to {scene}");
+    }
+
     /// The sprite of `object` clicked with an empty hand.
     fn touch(&mut self, object: &str) {
         self.sprite_with(object, Some(""));
@@ -827,12 +850,171 @@ fn chapter_3(w: &mut Walker) {
     w.touch_zone("lift_floor_18");
 }
 
-fn play_chapter(n: u32, body: fn(&mut Walker)) {
+/// The shortest presses from `from` to `to` with the steps `moves`
+/// (kept within 0..=max, as `Atl_PuzzleLanskyChest_OnButtonActivated`
+/// keeps them).
+fn presses(from: i32, to: i32, max: i32, moves: &[i32]) -> Vec<i32> {
+    let idx = |x: i32| usize::try_from(x).expect("in range");
+    let mut prev = vec![None; idx(max + 1)];
+    let mut queue = VecDeque::from([from]);
+    prev[idx(from)] = Some((from, 0));
+    while let Some(x) = queue.pop_front() {
+        if x == to {
+            break;
+        }
+        for &m in moves {
+            let y = x + m;
+            if (0..=max).contains(&y) && prev[idx(y)].is_none() {
+                prev[idx(y)] = Some((x, m));
+                queue.push_back(y);
+            }
+        }
+    }
+    let mut out = Vec::new();
+    let mut x = to;
+    while x != from {
+        let (p, m) = prev[idx(x)].expect("reachable");
+        out.push(m);
+        x = p;
+    }
+    out.reverse();
+    out
+}
+
+/// Chapter 4, floors 18, 19 and 12 (`chapter_04.lua`, the floors'
+/// `on_click`): the den mother's bugsy subject makes the guys suspect;
+/// Garbo's gorilla, nice once the hostess's name is known, sends to Susan,
+/// whose story stuns the den mother and tells of Lansky's door. The
+/// magazine frees Ellen's hairpin; the den mother taken to the hospital
+/// leaves her box (the lift board key); the hairpin opens Lansky's office
+/// (the chest's engine room key, the painting's lift code). With the
+/// three, the lift to floor −2 starts chapter 5.
+fn chapter_4(w: &mut Walker) {
+    // Floor 18: Ellen's name, Ellen, the den mother.
+    w.touch_zone("ellen_name");
+    assert_eq!(w.flag("ellen_name_seen"), "true");
+    w.talk("ellen-attached_hairs", "ascenseur");
+    w.talk("ellen-attached_hairs", "secretaire_ellen");
+    w.talk("den_mother", "ascenseur");
+    w.talk("den_mother", "bugsy");
+    assert_eq!(w.flag("suspect_guys"), "true");
+    // Floor 19: Cineworld's secretary (the magazine), Garbo's gorilla.
+    w.go_to("stairway_floor_19", "etage19");
+    w.talk("cineworld_secretary", "secretaire_ellen");
+    w.touch("cineworld_magazine");
+    w.talk("garbo_gorilla", "vedette");
+    w.talk("garbo_gorilla", "receptionniste");
+    assert_eq!(w.flag("require_hostess_name"), "true");
+    // The ground floor: the hostess's name.
+    w.go_to("stairway_floor_18", "etage18");
+    w.go_to("lift_floor_0", "etage0");
+    w.talk("hostess", "drague");
+    assert_eq!(w.flag("know_hostess_name"), "true");
+    w.go_to("lift_floor_18", "etage18");
+    w.go_to("stairway_floor_19", "etage19");
+    w.talk("garbo_gorilla", "receptionniste");
+    w.talk("garbo_gorilla", "agresseurs");
+    // Floor 12: Susan.
+    w.go_to("lift_floor_12", "etage12");
+    w.talk("susan", "agresseurs");
+    assert_eq!(w.state("den_mother"), "stunted");
+    // Floor 18: Ellen's hairpin, the den mother to the hospital, her box.
+    w.go_to("lift_floor_19", "etage19");
+    w.go_to("stairway_floor_18", "etage18");
+    w.use_on_sprite("cineworld_magazine", "ellen-attached_hairs");
+    w.touch("hairpin");
+    // The den mother away, the moves toward her office's view 6 lead to
+    // view 19 (on_click_etage18.lua); its inner room shows her stunned,
+    // and Ellen gets the subject.
+    w.redirects.push(("etage18".into(), 6, 19));
+    w.walk(17);
+    w.talk("ellen-detached_hairs", "cheftaine");
+    assert_eq!(w.state("den_mother"), "at_the_hospital");
+    w.touch("den_mother_notepad");
+    w.walk(18);
+    for wheel in 1..=5 {
+        let code = w.lua_str(&format!("tostring(atl.puzzle.dmbox.combination[{wheel}])"));
+        let _ = code;
+    }
+    solve_den_mother_box(w);
+    w.touch("lift_board_key");
+    assert!(w.has("lift_board_key"));
+    // Floor 12: Lansky's office, the jacket, the chest, the painting.
+    w.go_to("stairway_floor_19", "etage19");
+    w.go_to("lift_floor_12", "etage12");
+    w.use_on_zone("hairpin", "lansky_desk_in");
+    w.touch_zone("lansky_jacket");
+    solve_lansky_chest(w);
+    w.touch("engine_room_key");
+    w.touch("floor12_painting");
+    w.touch_zone("floor12_ventilation");
+    assert!(w.has("floor12_lift_code"));
+    // Floor 19: the lift to floor −2.
+    w.go_to("lift_floor_19", "etage19");
+    w.touch_zone("lift_floor_-2");
+}
+
+/// The den mother's box (view 18 of floor 18): each wheel's click turns
+/// it one step, modulo 9 (`Atl_PuzzleDenMotherBox_OnClick`), to the
+/// code `Atl_PuzzleDenMotherBox_Init` set.
+fn solve_den_mother_box(w: &mut Walker) {
+    for wheel in 1..=5 {
+        let code = num(&w.lua(&format!("atl.puzzle.dmbox.combination[{wheel}]")));
+        let now = num(&w.lua(&format!("atl.puzzle.dmbox.state[{wheel}]")));
+        for _ in 0..(code - now).rem_euclid(9) {
+            w.touch(&format!("den_mother_box_number_{wheel}"));
+        }
+    }
+    assert_eq!(w.lua("Atl_PuzzleDenMotherBox_Check()"), Value::Bool(true));
+}
+
+/// Lansky's chest (view 10 of floor 12): the zones' numbers are the
+/// moves (7 → +7, 8 → −7, 5 → +5, 6 → −5) to the values
+/// `Atl_PuzzleLanskyChest_Check` asks.
+fn solve_lansky_chest(w: &mut Walker) {
+    w.walk(10);
+    for metal in ["gold", "silver", "copper"] {
+        let target = num(&w.lua(&format!("atl.puzzle.lansky_chest.combinaison.{metal}")));
+        let max = num(&w.lua(&format!("atl.puzzle.lansky_chest.max.{metal}")));
+        let now = num(&w.lua(&format!("atl.puzzle.lansky_chest.state.{metal}")));
+        for m in presses(now, target, max, &[7, -7, 5, -5]) {
+            let id = match m {
+                7 => 7,
+                -7 => 8,
+                5 => 5,
+                _ => 6,
+            };
+            w.empty_hand();
+            w.click_zone(id, metal);
+        }
+    }
+    assert_eq!(w.lua("Atl_PuzzleLanskyChest_Check()"), Value::Bool(true));
+}
+
+fn num(v: &Value) -> i32 {
+    match v {
+        #[allow(clippy::cast_possible_truncation)]
+        Value::Num(x) => *x as i32,
+        _ => panic!("not a number: {v:?}"),
+    }
+}
+
+/// The chapters' plays, in order.
+const CHAPTERS: [fn(&mut Walker); 4] = [chapter_1, chapter_2, chapter_3, chapter_4];
+
+/// A new game played through chapter `n`: the chapters before it set
+/// what it needs (the characters' subjects, the flags), as in the game.
+fn play_chapter(n: usize) {
     let Some(d) = dvd() else { return };
-    let mut w = Walker::chapter(&d, n);
-    body(&mut w);
-    assert_eq!(w.chapter_now(), n + 1, "chapter {n} ends in the next");
-    eprintln!("chapter {n}: {} clicks", w.steps);
+    let mut w = Walker::new_game(&d);
+    for (i, body) in CHAPTERS.iter().enumerate().take(n) {
+        let c = u32::try_from(i + 1).expect("chapter");
+        assert_eq!(w.chapter_now(), c);
+        let before = w.steps;
+        body(&mut w);
+        assert_eq!(w.chapter_now(), c + 1, "chapter {c} ends in the next");
+        eprintln!("chapter {c}: {} clicks", w.steps - before);
+    }
 }
 
 #[test]
@@ -858,15 +1040,20 @@ fn dump_scenes() {
 
 #[test]
 fn chapter_01() {
-    play_chapter(1, chapter_1);
+    play_chapter(1);
 }
 
 #[test]
 fn chapter_02() {
-    play_chapter(2, chapter_2);
+    play_chapter(2);
 }
 
 #[test]
 fn chapter_03() {
-    play_chapter(3, chapter_3);
+    play_chapter(3);
+}
+
+#[test]
+fn chapter_04() {
+    play_chapter(4);
 }
