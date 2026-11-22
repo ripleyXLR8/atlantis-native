@@ -47,6 +47,10 @@ struct Run {
     enter_view: bool,
     /// The chapter run of state 1 (the next request is taken when it ends).
     chapter: bool,
+    /// An error in this run is not caught below `CAtlantis5::MainLoop`
+    /// (`InitChapter`, a new game's files, the event step's
+    /// `Atl_Hero_ArrangeHandledObject`): it ends the program.
+    fatal: bool,
 }
 
 /// `Atl_Address_Go`'s transition (the step @ 0x0042d900 on the object
@@ -200,7 +204,7 @@ impl Game {
         p
     }
 
-    fn push_file(&mut self, path: &[u8], enter_view: bool) -> bool {
+    fn push_file(&mut self, path: &[u8], enter_view: bool, fatal: bool) -> bool {
         match self.script.file_task(path) {
             Some(task) => {
                 self.runs.push(Run {
@@ -209,6 +213,7 @@ impl Game {
                     block: None,
                     enter_view,
                     chapter: false,
+                    fatal,
                 });
                 true
             }
@@ -225,10 +230,15 @@ impl Game {
             self.note(format!("CreateAtlantisDatabase: {e}"));
         }
         // Each file runs to its end before the next (EvaluateScriptFile).
+        // An error in either is caught @ 0x0042feda / 0x0042ff5e, logged
+        // and rethrown as `Exit Game` (0x0066cdcc): fatal.
         for name in [&b"atlantis.lua"[..], b"on_new_game.lua"] {
             let path = Self::scripts_path(name);
-            if self.push_file(&path, false) {
+            if self.push_file(&path, false, true) {
                 self.run();
+            }
+            if self.state == 8 {
+                return;
             }
         }
         self.state = 0;
@@ -251,6 +261,32 @@ impl Game {
             block: None,
             enter_view: false,
             chapter: false,
+            fatal: false,
+        });
+        self.run();
+        true
+    }
+
+    /// The event step's `return Atl_Hero_ArrangeHandledObject`
+    /// (0x0066ce60, @ 0x004300d0 / 0x004305f0, outside state 4's try): as
+    /// [`Game::run_string`], but an error in it ends the program.
+    pub fn run_arrange_handled_object(&mut self) -> bool {
+        if self.busy() {
+            return false;
+        }
+        let Some((task, args)) = self
+            .script
+            .string_task("return Atl_Hero_ArrangeHandledObject", Vec::new())
+        else {
+            return false;
+        };
+        self.runs.push(Run {
+            task,
+            args: Some(args),
+            block: None,
+            enter_view: false,
+            chapter: false,
+            fatal: true,
         });
         self.run();
         true
@@ -283,6 +319,7 @@ impl Game {
             block: None,
             enter_view: false,
             chapter: false,
+            fatal: false,
         });
         self.run();
         true
@@ -295,7 +332,7 @@ impl Game {
         name.extend_from_slice(&scene);
         name.extend_from_slice(b".lua");
         let path = Self::scripts_path(&name);
-        if self.push_file(&path, false) {
+        if self.push_file(&path, false, false) {
             self.run();
         }
     }
@@ -568,15 +605,25 @@ impl Game {
                     self.end_run();
                 }
                 Outcome::Error(m) => {
-                    // The original throws (EvaluateScriptFile @ 0x00454410,
-                    // Process @ 0x0042f000 for the chapter) and the game
-                    // stops; Native reports it and ends that run.
+                    // The original throws (EvaluateScriptFile @ 0x00454410).
+                    // Most runs are caught where they start (a scene's
+                    // on_click @ 0x0042fa35, on_enter_view in the
+                    // transition @ 0x0042dd99..., a save's read
+                    // @ 0x0043b884): logged, the game goes on, as here.
+                    // `InitChapter`, a new game's files and the event
+                    // step's `Atl_Hero_ArrangeHandledObject` reach
+                    // `CAtlantis5::MainLoop`'s catch (@ 0x0043d456), which
+                    // logs and calls exit(0): the program ends.
                     let site = if what.starts_with(b"./") {
                         crate::engine::ErrorSite::File(what.clone())
                     } else {
                         crate::engine::ErrorSite::String(what.clone())
                     };
                     self.event(&Event::Error(site, &m));
+                    if self.runs.last().is_some_and(|r| r.fatal) {
+                        self.exit_on_error();
+                        return;
+                    }
                     self.end_run();
                 }
                 Outcome::Waiting(Pending::Engine(_)) => {
@@ -656,7 +703,7 @@ impl Game {
         name.extend_from_slice(&scene);
         name.extend_from_slice(b".lua");
         let path = Self::scripts_path(&name);
-        if self.push_file(&path, true) {
+        if self.push_file(&path, true, false) {
             self.run();
         } else if let Some(t) = self.transitions.last_mut() {
             t.entering = false;
@@ -765,6 +812,19 @@ impl Game {
             }
             self.run();
         }
+    }
+
+    /// `CAtlantis5::MainLoop`'s catch (@ 0x0043d320 → 0x0043d456): `--->
+    /// ATLINT::CException non attrapée...` and the message logged, then
+    /// exit(0) (@ 0x004896d0), no message box: the runs dropped and the
+    /// quit state 8 taken at once.
+    fn exit_on_error(&mut self) {
+        self.note("an uncaught script error: the program ends (MainLoop's catch)".into());
+        self.runs.clear();
+        self.transitions.clear();
+        self.queue.clear();
+        self.previous = self.state;
+        self.state = 8;
     }
 
     /// The next request (@ 0x0042ef30 + 0x0042fb90).
@@ -918,7 +978,7 @@ impl Game {
             return false;
         };
         let path = Self::scripts_path(b"atlantis.lua");
-        if self.push_file(&path, false) {
+        if self.push_file(&path, false, false) {
             self.run();
         }
         match root.child("LUA_DB") {
@@ -981,6 +1041,9 @@ impl Game {
                     block: None,
                     enter_view: false,
                     chapter: true,
+                    // State 1's `return InitChapter` (@ 0x0042f000, whose
+                    // only try is state 4's): not caught below MainLoop.
+                    fatal: true,
                 });
                 self.run();
             }

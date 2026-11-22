@@ -4217,7 +4217,7 @@ impl Play {
         }
         match self.game.script().handled_item() {
             Ok(h) if !h.is_empty() => {
-                self.game.run_string("return Atl_Hero_ArrangeHandledObject");
+                self.game.run_arrange_handled_object();
             }
             Ok(_) => {
                 // Mode 8, state 3 (@ 0x004305d0).

@@ -376,3 +376,67 @@ fn terminate_game_ends_the_game_on_the_credits() {
     let p = probe.borrow();
     assert_eq!(p.requests, [Request::DeleteAutosave, Request::GameEnded]);
 }
+
+/// The error policy (MainLoop's catch @ 0x0043d456 → exit(0)): an error in
+/// `InitChapter`, in a new game's `atlantis.lua` / `on_new_game.lua` or in
+/// the event step's `Atl_Hero_ArrangeHandledObject` ends the program (the
+/// quit state 8); one in a scene's `on_click` is logged and the game goes
+/// on.
+#[test]
+fn uncaught_errors_end_the_program() {
+    let with = |name: &str, src: &str| -> Vec<(String, String)> {
+        BASE.iter()
+            .map(|(n, s)| {
+                let s = if *n == name { src } else { *s };
+                ((*n).to_string(), s.to_string())
+            })
+            .collect()
+    };
+    let start = |files: &[(String, String)]| {
+        let f: Vec<(&str, &str)> = files
+            .iter()
+            .map(|(a, b)| (a.as_str(), b.as_str()))
+            .collect();
+        let (mut g, p) = game(&f);
+        g.new_game();
+        settle(&mut g, 5);
+        (g, p)
+    };
+    // InitChapter.
+    let (g, p) = start(&with(
+        "atlantis.lua",
+        "require \"lib/util.lua\" function InitChapter(Path, Chapter) error(\"chapter\") end",
+    ));
+    assert_eq!(p.borrow().errors.len(), 1);
+    assert_eq!(g.state(), 8, "InitChapter's error ends the program");
+    // on_new_game.lua.
+    let (g, p) = start(&with(
+        "on_new_game.lua",
+        "Atl_InitChapter(2) error(\"new\")",
+    ));
+    assert_eq!(p.borrow().errors.len(), 1);
+    assert_eq!(g.state(), 8, "a new game's error ends the program");
+    // Atl_Hero_ArrangeHandledObject.
+    let (mut g, p) = start(&with(
+        "atlantis.lua",
+        "require \"lib/util.lua\" \
+         function InitChapter(Path, Chapter) Atl_Address_Go(\"deck\", 1, \"no_fx\") end \
+         function Atl_Hero_ArrangeHandledObject() error(\"arrange\") end",
+    ));
+    assert_eq!(g.state(), 4);
+    assert!(p.borrow().errors.is_empty(), "{:?}", p.borrow().errors);
+    assert!(g.run_arrange_handled_object());
+    assert_eq!(p.borrow().errors.len(), 1);
+    assert_eq!(g.state(), 8);
+    // The same error from another string: logged, the game goes on.
+    let (mut g, p) = start(&with(
+        "atlantis.lua",
+        "require \"lib/util.lua\" \
+         function InitChapter(Path, Chapter) Atl_Address_Go(\"deck\", 1, \"no_fx\") end \
+         function F() error(\"other\") end",
+    ));
+    assert!(g.run_string("return F"));
+    assert_eq!(p.borrow().errors.len(), 1);
+    assert_eq!(g.state(), 4);
+    assert!(!g.busy());
+}
