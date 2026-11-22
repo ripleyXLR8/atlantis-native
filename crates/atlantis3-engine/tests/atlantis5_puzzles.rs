@@ -424,6 +424,32 @@ fn chessboard_lost() {
     );
 }
 
+/// `GetShortestPath(p, p)`, asked when the pawn moves onto the scarab's
+/// square (the lit squares do not exclude it): the breadth-first loop
+/// never meets `End` and adds an empty level per turn until Lua 5.0.3
+/// raises `table overflow` at its `MAXBITS` of 24 (the 2^25th level);
+/// without that limit rilua's 5.1 one (26) let it grow past 6 GB. It
+/// takes about 4 GB and 15 s, so it runs on demand (`--ignored`).
+#[test]
+#[ignore = "about 4 GB of memory"]
+fn chessboard_path_to_the_same_square_overflows() {
+    let Some(d) = dvd() else { return };
+    let mut play = chessboard_start(&d);
+    run(
+        &mut play,
+        "chess_ok, chess_err = pcall(Atl_PuzzleChessboard_GetShortestPath, 13, 13)",
+    );
+    assert_eq!(lua(&mut play, "chess_ok"), Value::Bool(false));
+    let Value::Str(e) = lua(&mut play, "chess_err") else {
+        panic!("an error message")
+    };
+    assert!(
+        String::from_utf8_lossy(&e).ends_with("table overflow"),
+        "{}",
+        String::from_utf8_lossy(&e)
+    );
+}
+
 /// A move list (the slots, 0..16, whose piece goes into the hole) that
 /// orders a 4 × 4 sliding puzzle: weighted A* on the Manhattan distance
 /// (not the shortest, found fast). `slots[i]` is the piece of slot i, 16

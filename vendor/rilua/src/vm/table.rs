@@ -114,7 +114,7 @@ fn ceil_log2(n: usize) -> u8 {
 ///
 /// Limits the array part to `2^MAXBITS` entries. Matches PUC-Rio's
 /// `MAXBITS` which defaults to `LUAI_BITSINT - 2` (26 on 32-bit).
-const MAXBITS: u8 = 26;
+pub const MAXBITS: u8 = 26;
 
 /// Maximum array part size: `2^MAXBITS`.
 const MAXASIZE: usize = 1 << MAXBITS;
@@ -154,6 +154,9 @@ pub struct Table {
     /// Set by gettm() when a metamethod is NOT found; cleared to 0 on
     /// any rawset where the key starts with `__`.
     flags: u8,
+    /// This table's `MAXBITS` (at most [`MAXBITS`]): Lua 5.0.3 builds
+    /// with 24 where 5.1 has 26 (Native patch 7).
+    max_bits: u8,
 }
 
 impl Table {
@@ -166,7 +169,15 @@ impl Table {
             log2_size: 0,
             metatable: None,
             flags: 0,
+            max_bits: MAXBITS,
         }
+    }
+
+    /// Sets the largest hash part (`2^bits` nodes) and the largest integer
+    /// key counted for the array part, as `MAXBITS` does in PUC-Rio's
+    /// ltable.c; clamped to [`MAXBITS`].
+    pub fn set_max_bits(&mut self, bits: u8) {
+        self.max_bits = bits.min(MAXBITS);
     }
 
     /// Creates a table with pre-allocated array and hash parts.
@@ -184,6 +195,7 @@ impl Table {
                 log2_size: 0,
                 metatable: None,
                 flags: 0,
+                max_bits: MAXBITS,
             }
         } else {
             let log2 = ceil_log2(hash_size);
@@ -199,6 +211,7 @@ impl Table {
                 log2_size: log2,
                 metatable: None,
                 flags: 0,
+                max_bits: MAXBITS,
             }
         }
     }
@@ -412,11 +425,11 @@ impl Table {
     /// If `key` is a positive integer in `[1, MAXASIZE]`, increment the
     /// corresponding bucket in `nums` and return 1. Otherwise return 0.
     /// Bucket `i` counts keys in the range `(2^(i-1), 2^i]`.
-    fn count_int(key: &Val, nums: &mut [u32; MAXBITS as usize + 1]) -> u32 {
+    fn count_int(key: &Val, nums: &mut [u32; MAXBITS as usize + 1], max_bits: u8) -> u32 {
         if let Val::Num(n) = key
             && let Some(k) = number_to_int_key(*n)
             && k >= 1
-            && (k as usize) <= MAXASIZE
+            && (k as usize) <= MAXASIZE.min(1usize << max_bits)
         {
             nums[ceil_log2(k as usize) as usize] += 1;
             return 1;
@@ -432,7 +445,7 @@ impl Table {
     fn num_use_array(&self, nums: &mut [u32; MAXBITS as usize + 1]) -> u32 {
         let mut ause: u32 = 0;
         let mut i: usize = 1; // 1-based array index
-        for lg in 0..=MAXBITS {
+        for lg in 0..=self.max_bits {
             let ttlg = 1usize << lg;
             let lim = ttlg.min(self.array.len());
             if i > lim {
@@ -461,7 +474,7 @@ impl Table {
         let mut total_use: u32 = 0;
         for node in self.nodes.iter().rev() {
             if !node.value.is_nil() {
-                *na_size += Self::count_int(&node.key, nums);
+                *na_size += Self::count_int(&node.key, nums, self.max_bits);
                 total_use += 1;
             }
         }
@@ -512,7 +525,7 @@ impl Table {
         total_use += self.num_use_hash(&mut nums, &mut na_size);
 
         // Phase 3: count the new key being inserted.
-        na_size += Self::count_int(ek, &mut nums);
+        na_size += Self::count_int(ek, &mut nums, self.max_bits);
         total_use += 1;
 
         // Phase 4: compute optimal array size.
@@ -549,7 +562,7 @@ impl Table {
             old
         } else {
             let log2 = ceil_log2(new_hash_size);
-            if log2 > MAXBITS {
+            if log2 > self.max_bits {
                 return Err(runtime_error("table overflow"));
             }
             let actual_size = 1u32 << log2;

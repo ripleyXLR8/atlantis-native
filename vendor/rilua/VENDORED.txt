@@ -66,3 +66,13 @@ PATCHES
    string value" under a busy collector). Reproducer: the walkthrough of
    crates/atlantis3-engine/tests/atlantis5_walkthrough.rs with
    A5_GC_STRESS set.
+
+7. src/vm/table.rs, src/vm/state.rs: a table's `MAXBITS` per state.
+   `Gc::table_max_bits` (26, Lua 5.1's) is given to every table
+   `alloc_table` makes; a Lua 5.0.3 state sets 24, Lua 5.0.3's ltable.c
+   value when `BITS_INT` > 26, so its hash part overflows at 2^24 nodes
+   and keys past 2^24 are not counted for the array part. Atlantis V's
+   chessboard asks `GetShortestPath(p, p)`, whose loop only ends on
+   that `table overflow` (the 2^25th level); with 26 it grew past 6 GB.
+   Reproducer: crates/atlantis3-engine/tests/atlantis5_puzzles.rs
+   `chessboard_path_to_the_same_square_overflows` (run with --ignored).

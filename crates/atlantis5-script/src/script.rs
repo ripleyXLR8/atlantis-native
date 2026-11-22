@@ -1154,6 +1154,11 @@ impl Script {
         let tasks;
         {
             let state = lua.state_mut();
+            // Lua 5.0.3's ltable.c: `MAXBITS` is 24 when `BITS_INT` > 26
+            // (5.1 has 26), so a table's hash part overflows at 2^24 nodes
+            // and keys past 2^24 never go to the array part. Set before any
+            // table is made.
+            state.gc.table_max_bits = 24;
             rilua::stdlib::open_libs_selective(
                 state,
                 StdLib::BASE
