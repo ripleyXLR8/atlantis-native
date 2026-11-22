@@ -643,6 +643,21 @@ pub struct Stage {
     save_dir: Option<std::path::PathBuf>,
     /// `CConfiguration` (the option pages, the save's `CONFIGURATION`).
     pub config: Config,
+    /// The sound's music level b (0x0066efc4, @ 0x0045a640): set from the
+    /// configuration's music (the sound page @ 0x00421370, the
+    /// configuration applied @ 0x004299e0), faded by the holders below.
+    music_level: f32,
+    /// The configuration's music last given to the level.
+    music_applied: f32,
+    /// The music level's fade (flag 0x0068e746, @ 0x0045a5e0): start
+    /// (0x0068e750), target (0x0068e754), elapsed (0x0068e748), time
+    /// (0x0068e74c).
+    music_fade: Option<LevelFade>,
+    /// The holders of the half music level (0x0068e710, @ 0x0045caf0 /
+    /// 0x0045cb20).
+    duck_count: u32,
+    /// The film playing is `Atl_Video_Play`'s (it holds the level).
+    film_ducks: bool,
     /// Menus the scripts asked for: `Atl_GameOver`'s death panel with its
     /// text's key (@ 0x00405b70: @ 0x00410d00, mode 10), `Atl_ExamineItem`'s
     /// examine view with its item (@ 0x00405d70: @ 0x004137b0, mode 11).
@@ -719,6 +734,11 @@ impl Stage {
             mouse: (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2),
             save_dir: None,
             config: Config::default(),
+            music_level: Config::default().music,
+            music_applied: Config::default().music,
+            music_fade: None,
+            duck_count: 0,
+            film_ducks: false,
             menu_requests: Vec::new(),
             wait_ended: false,
             clock: 0.0,
@@ -1119,7 +1139,7 @@ impl Stage {
                 CHANNEL_MUSIC_2004 + ch,
                 dec.rate(),
                 dec.channels() as u16,
-                c.volume * self.config.master * self.config.music,
+                c.volume * self.config.master * self.music_level,
             );
         }
         c.stream = Some(MusicStream {
@@ -1152,12 +1172,71 @@ impl Stage {
         }
     }
 
-    /// The music part of the update @ 0x00459fd0: fades (one step per
+    /// The music level b now (tests).
+    pub fn music_level(&self) -> f32 {
+        self.music_level
+    }
+
+    /// The music level's fade to `target` (clamped to [0, 1]) over `time`
+    /// seconds from the level now (@ 0x0045a5e0).
+    fn music_level_fade(&mut self, target: f32, time: f32) {
+        self.music_fade = Some(LevelFade {
+            start: self.music_level,
+            target: target.clamp(0.0, 1.0),
+            elapsed: 0.0,
+            time,
+        });
+    }
+
+    /// A holder of the half music level (@ 0x0045caf0(0.5)): the first
+    /// fades the level to level · f over 1 s.
+    fn music_duck(&mut self, f: f32) {
+        if self.duck_count == 0 {
+            self.music_level_fade(self.music_level * f, 1.0);
+        }
+        self.duck_count += 1;
+    }
+
+    /// A holder's release (@ 0x0045cb20 with the configuration's music,
+    /// @ 0x004295e0): the last fades the level back over 1 s. (The
+    /// original's counter is not kept from going below 0; Native's is.)
+    fn music_unduck(&mut self) {
+        if self.duck_count == 0 {
+            return;
+        }
+        self.duck_count -= 1;
+        if self.duck_count == 0 {
+            self.music_level_fade(self.config.music, 1.0);
+        }
+    }
+
+    /// The music part of the update @ 0x00459fd0: the music level's fade
+    /// (step 2: elapsed += dt, level = start + (target − start) ·
+    /// min(elapsed / time, 1)), the channels' fades (step 3: one step per
     /// 1/15 s here [INFERRED: the original steps once per call, which is
-    /// once per frame]), then the next track when one ended.
+    /// once per frame]), then the next track when one ended (step 4).
     fn music_update(&mut self, dt: f64) {
+        // The configuration's music given to the level when it changes
+        // (the sound page, a configuration applied: @ 0x0045a640).
+        if self.config.music != self.music_applied {
+            self.music_applied = self.config.music;
+            self.music_level = self.config.music;
+        }
+        if let Some(f) = &mut self.music_fade {
+            #[allow(clippy::cast_possible_truncation)]
+            {
+                f.elapsed += dt as f32;
+            }
+            let k = f.elapsed / f.time;
+            if k < 1.0 {
+                self.music_level = f.start + k * (f.target - f.start);
+            } else {
+                self.music_level = f.start + (f.target - f.start);
+                self.music_fade = None;
+            }
+        }
         // Streams fed ahead of the output.
-        let master_music = self.config.master * self.config.music;
+        let master_music = self.config.master * self.music_level;
         if let Some(audio) = self.audio.clone() {
             for (ch, c) in self.music.iter_mut().enumerate() {
                 let Some(s) = &mut c.stream else { continue };
@@ -1184,7 +1263,7 @@ impl Stage {
                     s.pushed += n as u64;
                 }
                 // @ 0x0045a640: each channel at master × its volume ×
-                // music.
+                // the music level.
                 let g = c.volume * master_music;
                 audio.set_gain(CHANNEL_MUSIC_2004 + ch, [g; 2]);
             }
@@ -1348,6 +1427,9 @@ impl Stage {
 
     fn end_film(&mut self) {
         self.film_subtitles = None;
+        if std::mem::take(&mut self.film_ducks) {
+            self.music_unduck();
+        }
         // `BinkClose` (@ 0x00456c77, from the player's close) ends its
         // sound.
         if std::mem::take(&mut self.film_bink_sound) {
@@ -2000,6 +2082,7 @@ impl Stage {
         let Some(run) = self.dialog.take() else {
             return;
         };
+        self.music_unduck();
         if let (Some(_), Some(a)) = (&run.voice, &self.audio) {
             a.stop(CHANNEL_VOICE);
         }
@@ -2126,6 +2209,8 @@ impl Stage {
     /// Initialize @ 0x004117f0): the character's sprite turns to face
     /// (`facing`, its priority kept, its record held), state 0.
     fn menu_open(&mut self, character: &[u8]) {
+        // The menu's start holds the half music level (@ 0x0041197e).
+        self.music_duck(0.5);
         self.hold_randomized(character, true);
         self.replace_anim(character, b"facing", Mode::Stop);
         self.menu = Some(SubjectMenu {
@@ -2291,6 +2376,12 @@ impl Stage {
             self.replace_anim(&c, b"unfacing", Mode::Stop);
         }
         self.hold_randomized(&c, false);
+        if let Some(m) = &mut self.menu {
+            if !m.closed {
+                // Released by the menu's process (@ 0x004114c5).
+                self.music_unduck();
+            }
+        }
         if let Some(m) = &mut self.menu {
             m.closed = true;
         }
@@ -2706,6 +2797,12 @@ impl Stage {
         self.on_boat = false;
         self.cam_override = None;
         self.fade = 0.0;
+        // The holders gone with the scene: the level back to the
+        // configuration's at once.
+        self.duck_count = 0;
+        self.film_ducks = false;
+        self.music_fade = None;
+        self.music_level = self.config.music;
         self.speed = [0.0; 2];
         for ch in 0..MUSIC_CHANNELS {
             self.music_stop(ch, 0.0);
@@ -2761,6 +2858,11 @@ impl Engine for Stage {
                     log::info!("film {} in a rectangle: drawn full", lossy(name));
                 }
                 if self.video_play(name) {
+                    // `Atl_Video_Play` holds the half music level
+                    // (@ 0x0040ce21) until the film's end (@ 0x0040d0bd);
+                    // the start's logos (another loop) do not.
+                    self.film_ducks = true;
+                    self.music_duck(0.5);
                     return Reply::Wait;
                 }
             }
@@ -2973,6 +3075,9 @@ impl Engine for Stage {
             }
             Call::DialogPlay(id) => {
                 if self.dialog_start(*id) {
+                    // `Atl_Dialog_Play` holds the half music level
+                    // (@ 0x00407c51) until its end (@ 0x00408586).
+                    self.music_duck(0.5);
                     return Reply::Wait;
                 }
             }
@@ -3227,6 +3332,15 @@ fn darken(out: &mut [u32], k: f32) {
         let c = |sh: u32| ((((*p >> sh) & 0xff) * keep) >> 8) << sh;
         *p = (*p & 0xff00_0000) | c(16) | c(8) | c(0);
     }
+}
+
+/// The music level's fade (@ 0x0045a5e0, stepped @ 0x00459fd0).
+#[derive(Clone, Copy, Debug)]
+struct LevelFade {
+    start: f32,
+    target: f32,
+    elapsed: f32,
+    time: f32,
 }
 
 /// What the last pick found under the screen centre (the manager's +0x38
@@ -4420,6 +4534,39 @@ mod tests {
         assert_eq!((s.fov, s.fade), (1.0, 0.25));
         s.request(&Request::TransitionEnd);
         assert_eq!(s.fade, 0.0);
+    }
+
+    /// The half music level (@ 0x0045caf0 / 0x0045cb20): the first holder
+    /// fades it to half over 1 s, the last release back to the
+    /// configuration's music over 1 s; nested holders change nothing.
+    #[test]
+    fn the_music_level_ducks_under_its_holders() {
+        let mut s = stage();
+        s.config.music = 0.8;
+        s.music_update(0.0);
+        assert!((s.music_level() - 0.8).abs() < 1e-6);
+        s.music_duck(0.5);
+        s.music_update(0.5);
+        assert!((s.music_level() - 0.6).abs() < 1e-6);
+        s.music_duck(0.5);
+        s.music_update(0.5);
+        assert!((s.music_level() - 0.4).abs() < 1e-6);
+        s.music_update(0.5);
+        assert!((s.music_level() - 0.4).abs() < 1e-6, "the fade over");
+        s.music_unduck();
+        s.music_update(1.0);
+        assert!((s.music_level() - 0.4).abs() < 1e-6, "one holder left");
+        s.music_unduck();
+        s.music_update(0.25);
+        assert!((s.music_level() - 0.5).abs() < 1e-6);
+        s.music_update(2.0);
+        assert!((s.music_level() - 0.8).abs() < 1e-6);
+        s.music_unduck();
+        assert_eq!(s.duck_count, 0);
+        // The sound page's change reaches the level.
+        s.config.music = 0.3;
+        s.music_update(0.0);
+        assert!((s.music_level() - 0.3).abs() < 1e-6);
     }
 
     #[test]

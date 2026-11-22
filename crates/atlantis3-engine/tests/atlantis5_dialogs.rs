@@ -176,6 +176,16 @@ fn the_gorillas_subject_menu_and_dialog() {
     }
     assert!(play.stage().dialog_state().is_none(), "dialog 1 is over");
     assert!(tirades.len() > 1, "{tirades:?}");
+    // The subject menu and the dialog held the music at about half its
+    // level (@ 0x0045caf0: the first holder fades to the level then × 0.5,
+    // so a holder taken while the level comes back aims a little lower);
+    // the menu still holds it.
+    let music = play.stage().config.music;
+    let level = play.stage().music_level();
+    assert!(
+        (level - music * 0.5).abs() < 0.02 * music,
+        "{level} {music}"
+    );
     // The menu is made again with the new subjects; `gorille` disabled.
     frames(&mut play, 2);
     let mut subjects = play.stage().menu_subjects();
@@ -195,6 +205,9 @@ fn the_gorillas_subject_menu_and_dialog() {
     assert!(!play.stage().menu_open_now());
     assert_eq!(play.game.state(), 4);
     assert_eq!(anim(&play, "gorilla").as_deref(), Some("unfacing"));
+    // Released: back to the option's level over 1 s (@ 0x0045cb20).
+    frames(&mut play, 40);
+    assert!((play.stage().music_level() - music).abs() < 1e-4);
 }
 
 #[test]
