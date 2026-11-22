@@ -2049,10 +2049,17 @@ fn save_number(x: f64) -> String {
     crate::engine::number_text(x)
 }
 
-/// `lua_isnumber` / `lua_tonumber` of a string (5.0's `strtod` in the C
-/// locale, spaces around allowed).
+/// `lua_isnumber` / `lua_tonumber` of a string: 5.0.3's `luaO_str2d`,
+/// `strtod` then only C `isspace` characters after it. lua50.dll imports
+/// `strtod` from MSVCRT.dll, which reads no `inf`, `infinity` or `nan`
+/// (Rust's parser does), so those stay strings.
 fn lua_str_number(b: &[u8]) -> Option<f64> {
-    std::str::from_utf8(b).ok()?.trim().parse().ok()
+    let c_space = |c: char| matches!(c, ' ' | '\t' | '\n' | '\x0b' | '\x0c' | '\r');
+    let t = std::str::from_utf8(b).ok()?.trim_matches(c_space);
+    if t.bytes().any(|c| c.is_ascii_alphabetic() && !matches!(c, b'e' | b'E')) {
+        return None;
+    }
+    t.parse().ok()
 }
 
 fn read_number(s: &str) -> Option<f64> {
@@ -2160,6 +2167,15 @@ fn read_table(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_save_reads_numbers_as_msvcrt_strtod_does() {
+        assert_eq!(super::lua_str_number(b" 12.5 "), Some(12.5));
+        assert_eq!(super::lua_str_number(b"-1e3\r\n"), Some(-1000.0));
+        for s in [&b"inf"[..], b"-Infinity", b"nan", b"NaN", b"0x10", b"", b"1 2"] {
+            assert_eq!(super::lua_str_number(s), None, "{}", String::from_utf8_lossy(s));
+        }
+    }
+
     use super::*;
 
     #[test]
