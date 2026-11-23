@@ -91,6 +91,25 @@ fn raw_get(state: &LuaState, table: GcRef<Table>, key: Val) -> Val {
         .map_or(Val::Nil, |t| t.get(key, &state.gc.string_arena))
 }
 
+/// `call_function` with `lua_pcall`'s unwinding: on an error, the call
+/// stack (`ci`, `base`) is put back as it was and the upvalues the failed
+/// call opened on the stack are closed, so the next call that reuses
+/// those slots starts clean (rilua's `call_function` leaves the frames
+/// that raised the error in place).
+fn protected_call(state: &mut LuaState, func_pos: usize, nresults: i32) -> LuaResult<()> {
+    let (saved_base, saved_ci) = (state.base, state.ci);
+    let r = state.call_function(func_pos, nresults);
+    if r.is_err() {
+        state.ci = saved_ci;
+        state.base = saved_base;
+        if state.ci < MAXCALLS {
+            state.ci_overflow = false;
+        }
+        state.close_upvalues(func_pos);
+    }
+    r
+}
+
 fn new_table(state: &mut LuaState) -> GcRef<Table> {
     state.gc.alloc_table(Table::new())
 }
@@ -1312,7 +1331,7 @@ impl Script {
         state.ensure_stack(1);
         state.stack_set(func_pos, Val::Function(f.gc_ref()));
         state.top = func_pos + 1;
-        let r = state.call_function(func_pos, 1);
+        let r = protected_call(state, func_pos, 1);
         let v = state.stack_get(func_pos);
         state.top = func_pos;
         if r.is_err() || !matches!(v, Val::Function(_)) {
@@ -1379,17 +1398,14 @@ impl Script {
             .load_bytes(source.as_bytes(), "=one_shot_func")
             .map_err(|e| format!("{source}: {e}"))?;
         let func_pos = state.top;
-        let (saved_base, saved_ci) = (state.base, state.ci);
         state.ensure_stack(1);
         state.stack_set(func_pos, Val::Function(f.gc_ref()));
         state.top = func_pos + 1;
         let first = if args.is_some() { 1 } else { nresults };
         #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
-        let r = state.call_function(func_pos, first as i32);
+        let r = protected_call(state, func_pos, first as i32);
         if let Err(e) = r {
             state.top = func_pos;
-            state.base = saved_base;
-            state.ci = saved_ci;
             return Err(format!("{source}: {e}"));
         }
         if args.is_some() {
@@ -1401,11 +1417,9 @@ impl Script {
             }
             state.top = func_pos + 1 + vals.len();
             #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
-            let r = state.call_function(func_pos, nresults as i32);
+            let r = protected_call(state, func_pos, nresults as i32);
             if let Err(e) = r {
                 state.top = func_pos;
-                state.base = saved_base;
-                state.ci = saved_ci;
                 return Err(format!("{source}: {e}"));
             }
         }
@@ -1738,7 +1752,7 @@ impl Script {
         state.stack_set(func_pos, f);
         state.stack_set(func_pos + 1, arg);
         state.top = func_pos + 2;
-        let r = state.call_function(func_pos, 1);
+        let r = protected_call(state, func_pos, 1);
         let v = state.stack_get(func_pos);
         state.top = func_pos;
         if let Err(e) = r {
@@ -1904,7 +1918,7 @@ impl Script {
         }
         state.top = func_pos + 1 + vals.len();
         #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
-        let r = state.call_function(func_pos, nresults as i32);
+        let r = protected_call(state, func_pos, nresults as i32);
         let out: Vec<Val> = (0..nresults)
             .map(|i| state.stack_get(func_pos + i))
             .collect();
@@ -2060,7 +2074,9 @@ fn save_number(x: f64) -> String {
 fn lua_str_number(b: &[u8]) -> Option<f64> {
     let c_space = |c: char| matches!(c, ' ' | '\t' | '\n' | '\x0b' | '\x0c' | '\r');
     let t = std::str::from_utf8(b).ok()?.trim_matches(c_space);
-    if t.bytes().any(|c| c.is_ascii_alphabetic() && !matches!(c, b'e' | b'E')) {
+    if t.bytes()
+        .any(|c| c.is_ascii_alphabetic() && !matches!(c, b'e' | b'E'))
+    {
         return None;
     }
     t.parse().ok()
@@ -2175,8 +2191,21 @@ mod tests {
     fn a_save_reads_numbers_as_msvcrt_strtod_does() {
         assert_eq!(super::lua_str_number(b" 12.5 "), Some(12.5));
         assert_eq!(super::lua_str_number(b"-1e3\r\n"), Some(-1000.0));
-        for s in [&b"inf"[..], b"-Infinity", b"nan", b"NaN", b"0x10", b"", b"1 2"] {
-            assert_eq!(super::lua_str_number(s), None, "{}", String::from_utf8_lossy(s));
+        for s in [
+            &b"inf"[..],
+            b"-Infinity",
+            b"nan",
+            b"NaN",
+            b"0x10",
+            b"",
+            b"1 2",
+        ] {
+            assert_eq!(
+                super::lua_str_number(s),
+                None,
+                "{}",
+                String::from_utf8_lossy(s)
+            );
         }
     }
 
@@ -2188,6 +2217,49 @@ mod tests {
         let mut h = 1;
         let v: Vec<u32> = (0..4).map(|_| msvcrt_rand(&mut h)).collect();
         assert_eq!(v, [41, 18467, 6334, 26500]);
+    }
+
+    struct Quiet;
+
+    impl Engine for Quiet {
+        fn read_script(&mut self, _path: &[u8]) -> Option<Vec<u8>> {
+            None
+        }
+
+        fn call(&mut self, _call: &crate::engine::Call) -> crate::engine::Reply {
+            crate::engine::Reply::Done
+        }
+    }
+
+    #[test]
+    fn a_failed_engine_side_call_unwinds_the_call_stack() {
+        let mut s = Script::new(Rc::new(RefCell::new(Quiet))).expect("state");
+        // A closure made in the failing frame keeps the value it captured
+        // once a later call reuses that frame's stack slots.
+        s.exec(
+            "function deep(n) if n == 0 then local x = 1 error('boom') end \
+             return deep(n - 1) end \
+             function Atl_Character_GetSubjects(name) \
+             local kept = 42; keep = function() return kept end; deep(5) end \
+             function Atl_Address_GetCurrent() deep(3) end",
+        )
+        .expect("exec");
+        let (ci, base) = {
+            let st = s.lua.state_mut();
+            (st.ci, st.base)
+        };
+        for _ in 0..3 {
+            assert!(s.character_subjects(b"kim").is_err());
+            assert!(s.character_subject_list(b"kim").is_err());
+            assert!(s.address_get_current().is_err());
+            assert!(s.one_shot("deep(2)", None, 0).is_err());
+            let st = s.lua.state_mut();
+            assert_eq!((st.ci, st.base), (ci, base));
+        }
+        s.exec("filler = (function(a, b, c, d) return a end)(0, 0, 0, 0)")
+            .expect("exec");
+        s.exec("assert(keep() == 42)")
+            .expect("the captured value is kept");
     }
 
     #[test]
