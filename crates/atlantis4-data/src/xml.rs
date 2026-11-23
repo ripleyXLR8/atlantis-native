@@ -283,6 +283,21 @@ impl Parser<'_> {
                 text.push_str(&text_of(&self.s[start..self.at - 3], true));
                 continue;
             }
+            if self.utf8 && self.starts(b"<!--") {
+                // One item only, so a CDATA section right after it is
+                // still read as text above, and the white space after it
+                // stays text.
+                self.skip_past(b"-->", "unterminated comment")?;
+                continue;
+            }
+            if self.utf8 && self.starts(b"<?") {
+                self.skip_past(b"?>", "unterminated declaration")?;
+                continue;
+            }
+            if self.utf8 && self.starts(b"<!") {
+                self.skip_past(b">", "unterminated markup")?;
+                continue;
+            }
             if self.starts(b"<!--") || self.starts(b"<?") || self.starts(b"<!") {
                 self.skip_misc()?;
                 continue;
@@ -418,6 +433,15 @@ mod tests {
         assert_eq!(els[0].text, "A > B &amp; <i>");
         assert_eq!(els[1].text, "a & b c");
         assert!(parse_utf8(b"<S><![CDATA[open</S>").is_err());
+        // After a comment or a processing instruction too, and the white
+        // space after a comment stays text.
+        let els = parse_utf8(
+            b"<S><!-- note --><![CDATA[a > b]]></S><T><?pi x?><![CDATA[c]]></T><U>a<!-- n --> b</U>",
+        )
+        .unwrap();
+        assert_eq!(els[0].text, "a > b");
+        assert_eq!(els[1].text, "c");
+        assert_eq!(els[2].text, "a b");
     }
 
     #[test]
