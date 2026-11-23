@@ -34,8 +34,9 @@ use atlantis3_engine::atlantis5_play::Play;
 use atlantis3_engine::audio::Audio;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
+use winit::event::StartCause;
 use winit::event::{DeviceEvent, DeviceId, ElementState, MouseButton, WindowEvent};
-use winit::event_loop::{ActiveEventLoop, EventLoop};
+use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{Key, NamedKey};
 use winit::window::{CursorGrabMode, Fullscreen, Window, WindowId};
 
@@ -218,6 +219,10 @@ fn start(src: Arc<Atlantis5Source>, lang: String, audio: Audio) -> Start {
     }
 }
 
+/// A frame's time: one screen refresh, as the original's `Flip(DDFLIP_WAIT)`
+/// (play.md § 6), at 60 Hz, the common refresh [INFERRED there].
+const FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
+
 /// The decoding's step before the game starts (uncompressed bytes).
 const WARM_STEP: u64 = 4 << 20;
 
@@ -230,6 +235,8 @@ struct A5App {
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
     last: Instant,
+    /// When the next frame is due ([`FRAME`] after the last one's).
+    next_frame: Instant,
     /// Whether the window has the focus (the mouse's moves turn the view
     /// only then).
     focused: bool,
@@ -378,6 +385,7 @@ impl A5App {
     }
 
     fn frame(&mut self, el: &ActiveEventLoop) {
+        self.next_frame = (self.next_frame + FRAME).max(Instant::now());
         if !self.ready(el) {
             self.present();
             return;
@@ -448,6 +456,7 @@ impl ApplicationHandler for A5App {
             Ok(w) => Rc::new(w),
             Err(e) => {
                 log::error!("no window: {e}");
+                self.error = Some(format!("The window could not be opened: {e}"));
                 el.exit();
                 return;
             }
@@ -458,6 +467,7 @@ impl ApplicationHandler for A5App {
             Ok(s) => self.surface = Some(s),
             Err(e) => {
                 log::error!("no picture in the window: {e}");
+                self.error = Some(format!("The window cannot show the game: {e}"));
                 el.exit();
                 return;
             }
@@ -486,23 +496,38 @@ impl ApplicationHandler for A5App {
         }
     }
 
-    fn about_to_wait(&mut self, _el: &ActiveEventLoop) {
+    /// A frame at each [`FRAME`] (the original's frame ends with
+    /// `Flip(DDFLIP_WAIT)`: one per screen refresh); in between the
+    /// program sleeps instead of drawing again at once.
+    fn new_events(&mut self, _el: &ActiveEventLoop, cause: StartCause) {
+        if let StartCause::ResumeTimeReached { .. } = cause {
+            if let Some(w) = &self.window {
+                w.request_redraw();
+            }
+        }
+    }
+
+    fn about_to_wait(&mut self, el: &ActiveEventLoop) {
         // Android: the activity is being destroyed.
         #[cfg(target_os = "android")]
         if crate::android::destroyed() {
-            _el.exit();
+            el.exit();
             return;
         }
         // Android: Back (Escape), which reaches the app outside winit.
         #[cfg(target_os = "android")]
         if let Some(id) = self.window.as_ref().map(|w| w.id()) {
             for e in crate::android::mode_typed() {
-                self.window_event(_el, id, e);
+                self.window_event(el, id, e);
             }
         }
-        if let Some(w) = &self.window {
-            w.request_redraw();
+        // Android in the background (no window): the game waits.
+        #[cfg(target_os = "android")]
+        if self.window.is_none() {
+            el.set_control_flow(ControlFlow::Wait);
+            return;
         }
+        el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -640,6 +665,7 @@ pub fn run_source_on(
         window: None,
         surface: None,
         last: Instant::now(),
+        next_frame: Instant::now(),
         focused: false,
         menu_cursor: false,
         _audio: out,

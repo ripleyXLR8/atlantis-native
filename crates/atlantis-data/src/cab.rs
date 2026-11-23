@@ -33,7 +33,7 @@
 //! read per header and per block made 35,584).
 
 use std::collections::{HashMap, VecDeque};
-use std::io::{Seek, SeekFrom, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -249,8 +249,10 @@ impl Cabinet {
             .min()
             .unwrap_or(size)
             .min(size);
+        // A file list past the end (a copy cut short, a damaged header).
+        let len = end.checked_sub(files_at).ok_or(t.clone())?;
         let list = src
-            .read_at(path, files_at, (end - files_at) as usize)
+            .read_at(path, files_at, usize::try_from(len).map_err(|_| t.clone())?)
             .ok_or(t.clone())?;
         let mut files = Vec::with_capacity(n_files);
         let mut o = 0usize;
@@ -437,21 +439,28 @@ impl Cabinet {
                 good = next;
             }
         }
+        // The file is never cut in place: another instance of the game may
+        // be adding to it (a record it is writing reads as damaged here).
+        // What is kept goes to a file of this process's, renamed over the
+        // index; a writer still holding the old file then adds to that one
+        // alone. Records are appended (O_APPEND), so two writers of one
+        // file never overwrite each other; at worst the loader stops at a
+        // record out of order and the cache is shorter.
         let opened = std::fs::create_dir_all(dir).and_then(|()| {
-            let mut f = std::fs::OpenOptions::new()
-                .create(true)
-                .truncate(false)
-                .read(true)
-                .write(true)
-                .open(&path)?;
-            if good == 0 {
-                f.set_len(0)?;
-                f.write_all(&header)?;
-            } else {
-                f.set_len(good as u64)?;
+            if good == 0 || good < old.len() {
+                let keep = if good == 0 { &header[..] } else { &old[..good] };
+                let tmp = path.with_extension(format!("idx.{}.tmp", process_tag()));
+                let written =
+                    std::fs::write(&tmp, keep).and_then(|()| std::fs::rename(&tmp, &path));
+                if let Err(e) = written {
+                    let _ = std::fs::remove_file(&tmp);
+                    return Err(e);
+                }
             }
-            f.seek(SeekFrom::End(0))?;
-            Ok(f)
+            std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&path)
         });
         match opened {
             Ok(file) => {
@@ -696,6 +705,18 @@ impl Cabinet {
             return None;
         }
         self.read_folder(usize::from(f.folder), u64::from(f.offset) + offset, len)
+    }
+}
+
+/// This process's number, for its temporary files (none on the web).
+fn process_tag() -> u32 {
+    #[cfg(not(target_family = "wasm"))]
+    {
+        std::process::id()
+    }
+    #[cfg(target_family = "wasm")]
+    {
+        0
     }
 }
 
@@ -970,6 +991,30 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_file_list_past_the_end_is_truncated() {
+        let cab = build(&[("a.txt", b"abc")], 100, false);
+        // The header and the folder table only: coffFiles (44) lies past
+        // the end.
+        for cut in [36, 40, 44] {
+            let mut m = MemFiles::new();
+            m.insert("x.cab", cab[..cut].to_vec());
+            assert!(matches!(
+                Cabinet::open(Arc::new(m), "x.cab"),
+                Err(CabError::Truncated)
+            ));
+        }
+        // A corrupt coffFiles far beyond the file.
+        let mut bad = cab.clone();
+        bad[16..20].copy_from_slice(&0x7fff_0000u32.to_le_bytes());
+        let mut m = MemFiles::new();
+        m.insert("x.cab", bad);
+        assert!(matches!(
+            Cabinet::open(Arc::new(m), "x.cab"),
+            Err(CabError::Truncated)
+        ));
+    }
+
     /// A source that counts the bytes read.
     struct Counted(MemFiles, std::sync::atomic::AtomicU64);
 
@@ -1036,6 +1081,65 @@ mod tests {
         assert_eq!(f.read("big.bin").unwrap(), a);
         // Cut at the damaged checkpoint, which was written again.
         assert_eq!(std::fs::read(&file).unwrap().len(), n);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A second instance opening the index while the first one is in the
+    /// middle of a record does not cut the file under the first one: what
+    /// the first adds afterwards cannot leave a hole in the index.
+    #[test]
+    fn a_second_instance_never_cuts_a_live_index() {
+        let a: Vec<u8> = (0..1_228_800u32).map(|i| (i * 13 % 241) as u8).collect();
+        let cab = build(&[("big.bin", &a)], 4096, true);
+        let base =
+            std::env::var_os("ATLANTIS_NATIVE_DATA").map_or_else(std::env::temp_dir, PathBuf::from);
+        let dir = base.join(format!("an-cab-live-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let open = || {
+            let mut m = MemFiles::new();
+            m.insert("x.cab", cab.clone());
+            let mut c = Cabinet::open(Arc::new(m), "x.cab").unwrap();
+            c.use_index_dir(Some(dir.clone()));
+            CabFiles::new(vec![c])
+        };
+        let f = open();
+        assert_eq!(f.read("big.bin").unwrap(), a);
+        drop(f);
+        let file = std::fs::read_dir(&dir)
+            .unwrap()
+            .flatten()
+            .next()
+            .unwrap()
+            .path();
+        let whole = std::fs::read(&file).unwrap();
+        // The first instance, its file open at the end, half-way through
+        // a record.
+        let mut first = std::fs::OpenOptions::new().write(true).open(&file).unwrap();
+        std::io::Seek::seek(&mut first, std::io::SeekFrom::End(0)).unwrap();
+        let mut rec = Vec::new();
+        push_record(&mut rec, b'C', &[7u8; 64]);
+        first.write_all(&rec[..20]).unwrap();
+        // The second instance opens the folder's index.
+        let g = open();
+        assert_eq!(g.read_at("big.bin", 0, 10).unwrap(), a[..10]);
+        // The first one ends its record and adds another.
+        first.write_all(&rec[20..]).unwrap();
+        first.write_all(&rec).unwrap();
+        drop(first);
+        drop(g);
+        // The index reads to its end (no hole), with the records it had.
+        let mut m = MemFiles::new();
+        m.insert("x.cab", cab.clone());
+        let c = Cabinet::open(Arc::new(m), "x.cab").unwrap();
+        let mut at = c.index_header(&c.folders[0], 0).len();
+        let now = std::fs::read(&file).unwrap();
+        assert!(now.starts_with(&whole));
+        while at < now.len() {
+            match index_record(&now, at) {
+                Some((_, _, next)) => at = next,
+                None => panic!("a damaged record at {at} of {}", now.len()),
+            }
+        }
         let _ = std::fs::remove_dir_all(&dir);
     }
 

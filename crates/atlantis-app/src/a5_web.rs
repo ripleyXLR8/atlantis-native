@@ -48,6 +48,9 @@ use winit::window::{Window, WindowId};
 use crate::a2_web;
 use crate::gl_present::GlPresenter;
 
+/// How long after a refused pointer lock a click asks for it again.
+const LOCK_RETRY: std::time::Duration = std::time::Duration::from_secs(2);
+
 /// The game's name in the page.
 const NAME: &str = "The Secrets of Atlantis";
 
@@ -150,7 +153,7 @@ pub fn start(src: Atlantis5Source, store: Rc<dyn SaveStore>) -> Result<(), JsVal
         clock: 0.0,
         menu: false,
         lock_asked: None,
-        lock_refused: false,
+        lock_refused: None,
         motion_acc: (0.0, 0.0),
         cursor: None,
         state_in: 0,
@@ -183,7 +186,10 @@ struct A5App {
     /// Whether a menu is up (the pointer is free).
     menu: bool,
     lock_asked: Option<Instant>,
-    lock_refused: bool,
+    /// When a lock request was last taken as refused: a click asks again
+    /// once [`LOCK_RETRY`] has passed (a browser refuses for a moment
+    /// after the player left the lock with Escape).
+    lock_refused: Option<Instant>,
     /// The fractions of the pointer-lock motion not yet sent.
     motion_acc: (f64, f64),
     /// The page's pointer at the last move (canvas pixels).
@@ -219,6 +225,7 @@ impl A5App {
     fn locked(&mut self) -> bool {
         if a2_web::pointer_locked() {
             self.lock_asked = None;
+            self.lock_refused = None;
             return true;
         }
         if self
@@ -226,12 +233,20 @@ impl A5App {
             .is_some_and(|t| t.elapsed() >= a2_web::LOCK_GRACE)
         {
             self.lock_asked = None;
-            if !self.lock_refused {
+            if self.lock_refused.is_none() {
                 log::info!("pointer lock refused: the page's pointer turns the view");
             }
-            self.lock_refused = true;
+            self.lock_refused = Some(Instant::now());
         }
         false
+    }
+
+    /// Whether a click may ask for the pointer lock now.
+    fn may_ask_lock(&mut self) -> bool {
+        !self.menu
+            && !self.locked()
+            && self.lock_asked.is_none()
+            && self.lock_refused.is_none_or(|t| t.elapsed() >= LOCK_RETRY)
     }
 
     /// The picture's place in the canvas (x, y, width, height): 16:9,
@@ -524,7 +539,7 @@ impl ApplicationHandler for A5App {
                 button: MouseButton::Left,
                 ..
             } => {
-                if !self.menu && !self.locked() && !self.lock_refused && self.lock_asked.is_none() {
+                if self.may_ask_lock() {
                     if let Some(w) = &self.window {
                         self.lock_asked = Some(Instant::now());
                         a2_web::request_lock(w);

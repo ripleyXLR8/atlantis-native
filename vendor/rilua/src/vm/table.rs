@@ -333,6 +333,17 @@ impl Table {
         strings: &Arena<LuaString>,
     ) -> LuaResult<()> {
         if min_size > self.array.len() {
+            if self.lua50 {
+                // A 5.1 SETLIST on a Lua 5.0 table (5.1 source run in a 5.0
+                // state): 5.0's `resize` at the current node count (its
+                // `firstfree` is a node index, which 5.1's would overrun).
+                let lsize = if self.nodes.len() <= 1 {
+                    0
+                } else {
+                    self.nodes.len().trailing_zeros() as usize
+                };
+                return self.resize50(min_size, lsize, strings);
+            }
             let hash_size = self.nodes.len();
             return self.resize(min_size, hash_size, strings);
         }
@@ -2297,6 +2308,39 @@ mod tests {
 
     fn sets(keys: &[&'static str]) -> Vec<(&'static str, bool)> {
         keys.iter().map(|&k| (k, true)).collect()
+    }
+
+    #[test]
+    fn lua50_setlist_grows_the_array_of_a_table_with_hash_keys() {
+        // `{n = 1, f()}` compiled as 5.1 in a 5.0 state: NEWTABLE (0, 1),
+        // the hash key, then 5.1's SETLIST growing the array.
+        let mut arena = Arena::new();
+        let mut strs = StringTable::new();
+        for hash in [0, 1, 2, 4] {
+            let mut t = Table::with_sizes(0, hash);
+            t.set_max_bits(24);
+            t.set_lua50(true);
+            let keys: Vec<Val> = ["n", "m", "o"]
+                .iter()
+                .map(|k| Val::Str(intern_str(&mut arena, &mut strs, k.as_bytes())))
+                .collect();
+            for k in &keys {
+                assert!(t.raw_set(*k, Val::Num(1.0), &arena).is_ok());
+            }
+            for len in [1usize, 3, 40] {
+                assert!(t.ensure_array_capacity(len, &arena).is_ok());
+                for i in 1..=len {
+                    assert!(
+                        t.raw_set(Val::Num(i as f64), Val::Bool(true), &arena)
+                            .is_ok()
+                    );
+                }
+                for k in &keys {
+                    assert_eq!(t.get(*k, &arena), Val::Num(1.0));
+                }
+                assert_eq!(t.get(Val::Num(len as f64), &arena), Val::Bool(true));
+            }
+        }
     }
 
     #[test]

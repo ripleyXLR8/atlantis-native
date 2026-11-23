@@ -243,6 +243,135 @@ fn space_ends_a_dialog_and_its_talkers_turn_back() {
     assert!(!play.game.busy());
 }
 
+/// At about 10 frames a second (a frame longer than a `facing` frame,
+/// 1/15 s) the talker still turns, then listens: the subject menu's and
+/// the dialog's checks find `facing` done instead of the sprites' step
+/// removing it in between.
+#[test]
+fn at_a_low_frame_rate_the_talker_faces_then_listens() {
+    let Some(d) = dvd() else { return };
+    for dt in [0.1, 0.09, 0.11, 0.125] {
+        let mut play = to_first_view(&d, None);
+        go(&mut play, 17);
+        assert!(play.aim_at_sprite(b"gorilla"));
+        play.click();
+        play.update(dt);
+        assert!(play.stage().menu_open_now());
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
+        for _ in 0..100 {
+            play.update(dt);
+            if !play.stage().menu_subjects().is_empty() {
+                break;
+            }
+        }
+        assert_eq!(play.stage().menu_subjects(), [b"gorille".to_vec()]);
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"), "dt {dt}");
+        // Closed: `unfacing`, then a dialog from a script faces again.
+        play.mouse_at(5, 5);
+        play.click();
+        for _ in 0..40 {
+            play.update(dt);
+        }
+        assert!(!play.stage().menu_open_now());
+        assert!(play
+            .game
+            .run_string("return function() Atl_Dialog_Play(1) end"));
+        play.update(dt);
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
+        for _ in 0..100 {
+            play.update(dt);
+            if anim(&play, "gorilla").as_deref() != Some("facing") {
+                break;
+            }
+        }
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"), "dt {dt}");
+        assert!(play.stage().dialog_state().is_some());
+    }
+}
+
+/// `Atl_TerminateDialog` asks the subject menu's state 5, which its
+/// process runs once at its next frame (@ 0x00410f90): a script that goes
+/// on with a call that waits (`on_click_macao.lua`'s
+/// `Atl_Camera_LookAt(..., true)`) holds it until it ends; then the
+/// character turns back once, its `unfacing` played through.
+#[test]
+fn terminate_dialog_turns_the_character_back_once() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"));
+    assert!(play.game.run_string(
+        "return function() Atl_TerminateDialog() Atl_Camera_LookAt(-10, -31, true) end"
+    ));
+    frames(&mut play, 1);
+    assert!(play.game.busy(), "the look waits");
+    let mut waited = 0;
+    while play.game.busy() && waited < 300 {
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"));
+        frames(&mut play, 1);
+        waited += 1;
+    }
+    assert!(waited > 3, "{waited} frames");
+    let mut frames_seen = Vec::new();
+    for _ in 0..30 {
+        frames(&mut play, 1);
+        let s = play.stage().sprites();
+        match s.iter().find(|s| s.0 == "gorilla") {
+            Some((_, a, i)) if a == "unfacing" => frames_seen.push(*i),
+            _ if !frames_seen.is_empty() => break,
+            _ => {}
+        }
+    }
+    assert!(!play.stage().menu_open_now());
+    assert_eq!(play.game.state(), 4);
+    assert!(
+        frames_seen.windows(2).all(|w| w[0] <= w[1]) && frames_seen.last() > frames_seen.first(),
+        "unfacing played through: {frames_seen:?}"
+    );
+}
+
+/// The subject menu made again after a subject's script puts the mouse
+/// at the screen's centre (its state 2, @ 0x00410f90): the cursor drawn
+/// goes there too, where the next click is tested.
+#[test]
+fn the_rebuilt_subject_menu_moves_the_drawn_cursor_too() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+    assert_eq!(play.menus.mouse, centre);
+    let (x, y) = play.stage().menu_subject_point(0).expect("subject 0");
+    play.mouse_at(x, y);
+    play.click();
+    frames(&mut play, 2);
+    assert!(play.stage().dialog_state().is_some());
+    play.space();
+    for _ in 0..30 {
+        frames(&mut play, 1);
+        if play.stage().menu_subjects().len() == 3 {
+            break;
+        }
+    }
+    assert_eq!(play.stage().menu_subjects().len(), 3, "made again");
+    assert_eq!(play.menus.mouse, centre);
+}
+
 #[test]
 fn the_autosave_is_written_and_loaded() {
     let Some(d) = dvd() else { return };

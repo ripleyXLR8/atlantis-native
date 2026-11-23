@@ -943,7 +943,15 @@ impl Menus {
         menu.layout(fonts, self);
         menu.measure(fonts);
         menu.hover(mouse);
+        // The original takes a frame's events in turn (@ 0x0040d920), but
+        // at the screen's refresh two presses never share a frame: the one
+        // that closes the menu is its last. A long Native frame holding
+        // several drops those after it (a double click would click the
+        // same button twice: two new games, two save pages).
         for _ in 0..clicks {
+            if menu.closed {
+                break;
+            }
             match menu.press() {
                 Press::Clicked(name) => self.handle(&mut menu, name, config, fonts),
                 Press::Taken => {}
@@ -954,6 +962,9 @@ impl Menus {
             }
         }
         for name in menu.animate(dt, mouse) {
+            if menu.closed {
+                break;
+            }
             self.handle(&mut menu, name, config, fonts);
         }
         if let Some(c) = &mut menu.credits {

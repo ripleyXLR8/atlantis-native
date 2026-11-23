@@ -1737,7 +1737,6 @@ impl Stage {
         }
         // `Atl_Dialog_Play`'s loop: its checks, then the scene's update.
         self.dialog_update(dt);
-        self.menu_close_step();
         // A randomized sprite's missing file throws out of the sprites'
         // step; `CGameManager::Process`'s catch (@ 0x0042f3c6) logs it
         // (`CGameManager :: Process -> %s`, 0x0066cc4c) and goes on after
@@ -1775,6 +1774,9 @@ impl Stage {
                 if !self.randomize_next(i) {
                     return false;
                 }
+                i += 1;
+            } else if self.facing_awaited(i) {
+                // Kept on its last frame for the next frame's check.
                 i += 1;
             } else {
                 let s = self.sprites.remove(i);
@@ -1996,6 +1998,32 @@ impl Stage {
                 r.held = held;
             }
         }
+    }
+
+    /// Whether sprite `i` is a `facing` sprite that the dialog's facing
+    /// loop or the subject menu's state 0 still waits on. The original
+    /// checks the sprite's time against (last − first) / fps before the
+    /// sprites' step of each frame, and the step removes it once the time
+    /// passes (last − first + 1) / fps: at the screen's refresh (a frame
+    /// every 1/60 s or so, play.md § 6) a check always lands in that
+    /// 1/15 s window and swaps in `listen`. A frame longer than 1/15 s
+    /// could step over the window and remove the talker for the whole
+    /// dialog; such a sprite is kept, ended, on its last frame, so the
+    /// next frame's check finds it done, as at the full frame rate.
+    fn facing_awaited(&self, i: usize) -> bool {
+        let s = &self.sprites[i];
+        if s.animation != b"facing" {
+            return false;
+        }
+        let dialog = self
+            .dialog
+            .as_ref()
+            .is_some_and(|d| d.facing && d.faced.contains(&s.object));
+        let menu = self
+            .menu
+            .as_ref()
+            .is_some_and(|m| m.state == MenuState::Facing && m.character == s.object);
+        dialog || menu
     }
 
     /// Whether the `facing` sprite of `object` has run its length
@@ -2606,10 +2634,14 @@ impl Stage {
 
     /// The closing (@ 0x00410f90 state 5): the elements gone, the
     /// character's `unfacing` when its sprite is there (@ 0x004414d0), its
-    /// record released; the menu is over.
-    fn menu_close_step(&mut self) {
+    /// record released; the menu is over. Run by the menu's process, so
+    /// once, at the first menu frame after `Atl_TerminateDialog` or the
+    /// click elsewhere (a script that goes on after `Atl_TerminateDialog`
+    /// holds the menus' frame until it ends, as its calls run inside the
+    /// original's handler).
+    pub(crate) fn menu_close_step(&mut self) {
         let Some(m) = &self.menu else { return };
-        if m.state != MenuState::Closing {
+        if m.state != MenuState::Closing || m.closed {
             return;
         }
         let c = m.character.clone();
@@ -4053,6 +4085,18 @@ impl Play {
             self.menus_frame(clicks, dt);
             return;
         }
+        // The menu's process (@ 0x00410f90): state 5 (asked by a click
+        // elsewhere or `Atl_TerminateDialog` since its last frame) ends it.
+        self.stage.borrow_mut().menu_close_step();
+        if self.stage.borrow_mut().menu_take_closed() {
+            // A mode queued meanwhile (`Atl_PuzzlePoker_Start` from a
+            // subject's script): the manager stays in state 3 and opens it
+            // at the next frame (@ 0x0041b780).
+            if !self.menus.active() {
+                self.game.menu_closed();
+            }
+            return;
+        }
         let wants = self.stage.borrow_mut().menu_wants_subjects();
         if let Some(c) = wants {
             let list = match self.game.script().character_subject_list(&c) {
@@ -4063,6 +4107,7 @@ impl Play {
                 }
             };
             self.stage.borrow_mut().menu_set_subjects(list);
+            self.cursor_to_stage_mouse();
         }
         for _ in 0..clicks {
             self.stage.borrow_mut().menu_click();
@@ -4070,14 +4115,6 @@ impl Play {
             if let Some((c, s)) = pick {
                 self.game.click_subject(&c, &s);
                 break;
-            }
-        }
-        if self.stage.borrow_mut().menu_take_closed() {
-            // A mode queued meanwhile (`Atl_PuzzlePoker_Start` from a
-            // subject's script): the manager stays in state 3 and opens it
-            // at the next frame (@ 0x0041b780).
-            if !self.menus.active() {
-                self.game.menu_closed();
             }
         }
     }
@@ -4131,6 +4168,7 @@ impl Play {
             let (size, items) = self.game.script().inventory();
             let hand = self.game.script().handled_item().unwrap_or_default();
             self.stage.borrow_mut().inventory_open(size, items, hand);
+            self.cursor_to_stage_mouse();
             self.inventory_hand_name();
             return;
         }
@@ -4153,7 +4191,17 @@ impl Play {
                 self.stage.borrow_mut().hold_sound(true);
             }
         }
+        // A save page's slot not written: its autosave copy is left as it
+        // was too, so the slot and its `autoslot_<n>` stay a pair.
+        let mut save_failed = false;
         for e in self.menus.take_effects() {
+            if save_failed && matches!(e, Effect::Delete(_) | Effect::Copy { .. }) {
+                continue;
+            }
+            if let Effect::Save(file) = &e {
+                save_failed = !self.game.save_now(file);
+                continue;
+            }
             self.menu_effect(e);
         }
         if ended.is_some() {
@@ -4177,7 +4225,9 @@ impl Play {
             Effect::Load(file) => {
                 self.game.load_file(&file);
             }
-            Effect::Save(file) => self.game.save_now(&file),
+            Effect::Save(file) => {
+                let _ = self.game.save_now(&file);
+            }
             Effect::Request(r) => self.game.queue_request(r),
             Effect::Delete(file) => {
                 if let Some(d) = dir {
@@ -4224,6 +4274,7 @@ impl Play {
                 self.stage
                     .borrow_mut()
                     .inventory_open(size, items, Vec::new());
+                self.cursor_to_stage_mouse();
                 self.inventory_hand_name();
             }
             Err(e) => log::warn!("{e}"),
@@ -4306,6 +4357,15 @@ impl Play {
     /// The mouse at (x, y) on the 1024 × 576 picture (menus).
     pub fn mouse_at(&mut self, x: i32, y: i32) {
         self.stage.borrow_mut().mouse = (x, y);
+        self.menus.mouse_at(x, y);
+    }
+
+    /// The drawn cursor moved where the stage put the mouse: a mode's
+    /// initialize puts it at the screen's centre (menus.md: the subject
+    /// menu's state 2, the inventory's open), where both the hit tests
+    /// and the cursor then are.
+    fn cursor_to_stage_mouse(&mut self) {
+        let (x, y) = self.stage.borrow().mouse;
         self.menus.mouse_at(x, y);
     }
 

@@ -51,6 +51,10 @@ struct Run {
     /// (`InitChapter`, a new game's files, the event step's
     /// `Atl_Hero_ArrangeHandledObject`): it ends the program.
     fatal: bool,
+    /// An `Atl_Address_Go` this run reached where it could not stop
+    /// (under `dofile`, `require` or `pcall`): its transition starts when
+    /// the run ends.
+    deferred: Option<Pending>,
 }
 
 /// `Atl_Address_Go`'s transition (the step @ 0x0042d900 on the object
@@ -208,6 +212,7 @@ impl Game {
         match self.script.file_task(path) {
             Some(task) => {
                 self.runs.push(Run {
+                    deferred: None,
                     task,
                     args: None,
                     block: None,
@@ -256,6 +261,7 @@ impl Game {
             return false;
         };
         self.runs.push(Run {
+            deferred: None,
             task,
             args: Some(args),
             block: None,
@@ -281,6 +287,7 @@ impl Game {
             return false;
         };
         self.runs.push(Run {
+            deferred: None,
             task,
             args: Some(args),
             block: None,
@@ -314,6 +321,7 @@ impl Game {
             },
         };
         self.runs.push(Run {
+            deferred: None,
             task,
             args: Some(args),
             block: None,
@@ -597,7 +605,13 @@ impl Game {
             let args = top.args.take().unwrap_or_default();
             let what = task.what.clone();
             self.event(&Event::Run(&what));
+            let depth = self.runs.len();
             let outcome = self.script.resume(&task, &args);
+            if let Some(p) = self.script.take_deferred() {
+                if let Some(r) = self.runs.get_mut(depth - 1) {
+                    r.deferred = Some(p);
+                }
+            }
             self.manager_calls();
             match outcome {
                 Outcome::Finished => {
@@ -657,6 +671,9 @@ impl Game {
         }
         if run.chapter {
             self.next_request();
+        }
+        if let Some(Pending::Transition { scene, view, fx }) = run.deferred {
+            self.start_transition(scene, view, fx);
         }
     }
 
@@ -820,11 +837,18 @@ impl Game {
     /// quit state 8 taken at once.
     fn exit_on_error(&mut self) {
         self.note("an uncaught script error: the program ends (MainLoop's catch)".into());
-        self.runs.clear();
+        self.drop_runs();
         self.transitions.clear();
         self.queue.clear();
         self.previous = self.state;
         self.state = 8;
+    }
+
+    /// Drops every run, waiting or not, and their tasks with them.
+    fn drop_runs(&mut self) {
+        for run in self.runs.drain(..) {
+            self.script.drop_task(&run.task);
+        }
     }
 
     /// The next request (@ 0x0042ef30 + 0x0042fb90).
@@ -862,7 +886,7 @@ impl Game {
         self.queue.clear();
         self.state = 0;
         self.previous = 0;
-        self.runs.clear();
+        self.drop_runs();
         self.transitions.clear();
         self.timers.clear();
         self.timer_walk = None;
@@ -901,27 +925,28 @@ impl Game {
     /// The configuration's section is not written (Native keeps the
     /// options elsewhere).
     fn save(&mut self) {
-        self.save_as(crate::save::AUTOSLOT);
+        let _ = self.save_as(crate::save::AUTOSLOT);
     }
 
     /// The save written to `saves/<file>` (the save menu's
     /// `CSaveFileWriter` @ 0x0043ad90 on `slot_<n>`, @ 0x004272b0; the
     /// database taken now, as `Atl_Save` does it at its call).
-    pub fn save_now(&mut self, file: &str) {
+    /// False when the save could not be made or written.
+    pub fn save_now(&mut self, file: &str) -> bool {
         // An error is reported by `save_as`, which takes it.
         let _ = self.script.save_db_now();
-        self.save_as(file);
+        self.save_as(file)
     }
 
-    fn save_as(&mut self, file: &str) {
+    fn save_as(&mut self, file: &str) -> bool {
         use crate::save;
         let db = match self.script.take_saved_db() {
             Some(Ok(db)) => db,
             Some(Err(e)) => {
                 self.lua_error(&e);
-                return;
+                return false;
             }
-            None => return,
+            None => return false,
         };
         let mut root = save::element(save::ROOT);
         root.attributes.push(("type".into(), save::TYPE.into()));
@@ -949,7 +974,9 @@ impl Game {
         let text = save::to_text(&root);
         if !self.engine.borrow_mut().write_save(file, text.as_bytes()) {
             self.note("Atl_Save: the save could not be written".into());
+            return false;
         }
+        true
     }
 
     /// State 2 (@ 0x0042f000): `saves/autoslot` (missing: `Atl_Load usage
@@ -1036,6 +1063,7 @@ impl Game {
         {
             Some((task, args)) => {
                 self.runs.push(Run {
+                    deferred: None,
                     task,
                     args: Some(args),
                     block: None,
