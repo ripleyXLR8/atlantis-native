@@ -517,6 +517,37 @@ fn a_frame_s_mouse_moves_turn_the_camera_once() {
     assert!((s - want).abs() < 1e-3, "{s} against {want}");
 }
 
+/// State 4's frame ends with a second sprite pick when one was found
+/// (@ 0x0042f000 case 4, 0x0042f464..0x0042f471: +0x3c read after the
+/// sound, @ 0x00430b70 again, which clears it first): a sprite the
+/// sprites' step removed is not the next frame's click target.
+#[test]
+fn a_sprite_that_ends_is_not_the_next_click_target() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    go(&mut play, 4);
+    assert!(play.aim_at_sprite(b"coin"), "the coin under the centre");
+    frames(&mut play, 1);
+    assert!(matches!(play.hover(), Some(Hover::Sprite(o, _)) if o == b"coin"));
+    let coin = |play: &Play| play.stage().sprites().into_iter().find(|s| s.0 == "coin");
+    let animation = coin(&play).expect("the coin's sprite").1;
+    assert!(play.game.run_string(&format!(
+        "return function() Atl_Sprite_Play(\"coin\", \"{animation}\", \"stop\") end"
+    )));
+    for _ in 0..60 {
+        frames(&mut play, 1);
+        if coin(&play).is_none() {
+            break;
+        }
+    }
+    assert!(coin(&play).is_none(), "the coin's sprite ended");
+    assert!(
+        !matches!(play.hover(), Some(Hover::Sprite(o, _)) if o == b"coin"),
+        "{:?}",
+        play.hover()
+    );
+}
+
 /// `Atl_Video_Play` (both forms, before the open @ 0x0042aa90: also when
 /// the film is missing) and `Atl_Dialog_Play` (once the id is valid) zero
 /// the camera controller's look speeds and damping clock (@ 0x0042cd80 on

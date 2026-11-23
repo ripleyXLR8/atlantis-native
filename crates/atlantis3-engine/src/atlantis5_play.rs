@@ -4114,6 +4114,19 @@ impl Play {
         // The scene's update and the sound last (@ 0x0042f000 case 4:
         // after the events, the timers, the pick and the cursor).
         self.stage.borrow_mut().update_scene(dt, scene);
+        // Then, on the normal path and after the catch alike
+        // (0x0042f464..0x0042f471), a sprite found by the pick (+0x3c)
+        // is picked again (@ 0x00430b70, which clears +0x3c first) on the
+        // frames the step just made: the next frame's clicks
+        // (@ 0x004300d0) never aim at a sprite gone or moved away.
+        if self.game.state() == 4
+            && !self.game.busy()
+            && matches!(self.hover, Some(Hover::Sprite(..)))
+        {
+            if let Some(cursor) = self.pick_sprite() {
+                self.stage.borrow_mut().cursor = Some(cursor);
+            }
+        }
     }
 
     /// The modes the scripts asked (`Atl_GameOver`, `Atl_ExamineItem`,
@@ -4240,18 +4253,23 @@ impl Play {
             self.hover = Some(Hover::Zone(id, name));
             return;
         }
-        let hit = st.sprite_at_centre();
-        let view = st.view_number().unwrap_or(0);
         drop(st);
-        self.hover = None;
-        let mut cursor = None;
-        if let Some((object, animation)) = hit {
-            if let Some(c) = self.game.sprite_cursor(&object, view) {
-                cursor = Some(c);
-                self.hover = Some(Hover::Sprite(object, animation));
-            }
-        }
+        let cursor = self.pick_sprite();
         self.stage.borrow_mut().cursor = cursor;
+    }
+
+    /// The sprite pick (@ 0x00430b70): the hover cleared, then the
+    /// sprite under the centre that is a target; its cursor type.
+    fn pick_sprite(&mut self) -> Option<i32> {
+        let (hit, view) = {
+            let st = self.stage.borrow();
+            (st.sprite_at_centre(), st.view_number().unwrap_or(0))
+        };
+        self.hover = None;
+        let (object, animation) = hit?;
+        let c = self.game.sprite_cursor(&object, view)?;
+        self.hover = Some(Hover::Sprite(object, animation));
+        Some(c)
     }
 
     /// State 3 (@ 0x0042f000 → @ 0x0041b780): the menu's process. The
