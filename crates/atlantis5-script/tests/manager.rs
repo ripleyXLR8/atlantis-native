@@ -18,6 +18,7 @@ struct Probe {
     rejected: Vec<String>,
     seen: Vec<Call>,
     wait: bool,
+    saves: HashMap<String, Vec<u8>>,
 }
 
 impl Engine for Probe {
@@ -39,6 +40,15 @@ impl Engine for Probe {
 
     fn request(&mut self, r: &Request) {
         self.requests.push(r.clone());
+    }
+
+    fn write_save(&mut self, name: &str, data: &[u8]) -> bool {
+        self.saves.insert(name.to_string(), data.to_vec());
+        true
+    }
+
+    fn read_save(&mut self, name: &str) -> Option<Vec<u8>> {
+        self.saves.get(name).cloned()
     }
 
     fn event(&mut self, e: &Event<'_>) {
@@ -523,3 +533,89 @@ fn a_handler_s_set_duration_applies_one_period_late() {
     }
     assert_eq!(ticks, [4, 8, 20, 32]);
 }
+
+#[test]
+fn the_load_state_ends_the_game_before_the_read() {
+    let mut files = BASE.to_vec();
+    let atlantis = format!(
+        "{} function Atl_Address_GetCurrent() return \"deck\", 1 end",
+        files[0].1
+    );
+    files[0] = ("atlantis.lua", &atlantis);
+    let (mut g, probe) = game(&files);
+    g.new_game();
+    settle(&mut g, 5);
+    assert_eq!(g.state(), 4);
+    assert!(probe.borrow().saves.contains_key("autoslot"), "the chapter saved");
+    probe.borrow_mut().requests.clear();
+    // A request queued after Atl_Load: state 2 ends the game first
+    // (@ 0x0042f000 case 2 → 0x0042ffd0, which empties the queue), so it
+    // is dropped; the reader then queues play.
+    assert!(g.run_string(
+        "return function() Atl_Timer_Create(\"gone\", 100) Atl_Load() Atl_TerminateGame() end"
+    ));
+    settle(&mut g, 5);
+    assert_eq!(g.state(), 4);
+    assert!(g.timer_names().is_empty(), "{:?}", g.timer_names());
+    let p = probe.borrow();
+    let reset = p
+        .requests
+        .iter()
+        .position(|r| *r == Request::GameReset)
+        .expect("the game ended before the read");
+    let view = p
+        .requests
+        .iter()
+        .position(|r| matches!(r, Request::LoadView { .. }))
+        .expect("the saved view loaded");
+    assert!(reset < view);
+    assert!(!p.requests.contains(&Request::GameEnded));
+}
+
+#[test]
+fn the_chapter_runs_in_the_next_state_and_clears_its_number_after() {
+    let mut files = BASE.to_vec();
+    files[0] = (
+        "atlantis.lua",
+        "function InitChapter(Path, Chapter) CHS = (CHS or \"\") .. tostring(Chapter) .. \",\" \
+           if Chapter == 2 then Atl_InitChapter(5) end \
+           Atl_Video_Play(\"intro\") end",
+    );
+    let (mut g, probe) = game(&files);
+    probe.borrow_mut().wait = true;
+    g.new_game();
+    settle(&mut g, 2);
+    // @ 0x0042f000 case 1: the next request (4) is taken before the call.
+    assert!(g.waiting_for_engine());
+    assert_eq!(g.state(), 4);
+    g.finish_wait();
+    probe.borrow_mut().wait = false;
+    settle(&mut g, 5);
+    // +0x50 = 0 after the call: the nested Atl_InitChapter(5) lost its 5.
+    assert_eq!(
+        g.script().global(b"CHS"),
+        Value::Str(b"2,nil,".to_vec())
+    );
+    assert_eq!(g.state(), 4);
+}
+
+#[test]
+fn play_walks_the_timers_before_it_takes_a_request() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then N = (N or 0) + 1 \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"due\", 0, 1) Atl_InitChapter(3) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"go"));
+    // @ 0x0042f000 case 4: the timers (@ 0x00435a70), then the request,
+    // in the same frame.
+    g.update(0.02);
+    assert_eq!(g.script().global(b"N"), Value::Num(1.0));
+    assert_eq!(g.state(), 1);
+}
+

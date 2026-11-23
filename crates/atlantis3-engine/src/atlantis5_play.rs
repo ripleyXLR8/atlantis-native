@@ -3411,6 +3411,11 @@ impl Engine for Stage {
                 self.config.reset_for_new_session();
                 self.menu_requests.push((menus::CREDITS, Vec::new()));
             }
+            Request::GameReset => {
+                // @ 0x0042ffd0's engine part before state 2's read.
+                self.end_game();
+                self.config.reset_for_new_session();
+            }
         }
     }
 

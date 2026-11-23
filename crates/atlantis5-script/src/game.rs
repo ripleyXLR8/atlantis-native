@@ -12,8 +12,9 @@
 //!   (+0x04..+0x2c); `Atl_InitChapter(n)` stores n and queues 1 then 4,
 //!   `Atl_GameOver` queues 3 (unless in 3), `Atl_Load` 2,
 //!   `Atl_TerminateGame` 7. The next request is taken (@ 0x0042ef30,
-//!   set @ 0x0042fb90) when state 1 ends, in state 0, and in state 4 at
-//!   the start of a frame when the queue is not empty.
+//!   set @ 0x0042fb90) when state 1 starts (before `InitChapter` runs),
+//!   in state 0, and in state 4 after the frame's events and timers when
+//!   the queue is not empty.
 //! - A new game (@ 0x0042fc50): the autosave `autoslot` is deleted, the
 //!   `atl` database made (@ 0x00401010), then `atlantis.lua` and
 //!   `on_new_game.lua` run.
@@ -45,7 +46,7 @@ struct Run {
     /// The `on_enter_view` run of a transition (the transition goes on
     /// when it ends).
     enter_view: bool,
-    /// The chapter run of state 1 (the next request is taken when it ends).
+    /// The chapter run of state 1 (+0x50 is cleared when it ends).
     chapter: bool,
     /// An error in this run is not caught below `CAtlantis5::MainLoop`
     /// (`InitChapter`, a new game's files, the event step's
@@ -670,7 +671,9 @@ impl Game {
             self.continue_transition(0.0);
         }
         if run.chapter {
-            self.next_request();
+            // @ 0x0042f000 case 1: +0x50 = 0 once `InitChapter` has
+            // returned without an error.
+            self.chapter = 0;
         }
         if let Some(Pending::Transition { scene, view, fx }) = run.deferred {
             self.start_transition(scene, view, fx);
@@ -980,27 +983,45 @@ impl Game {
     }
 
     /// State 2 (@ 0x0042f000): `saves/autoslot` (missing: `Atl_Load usage
-    /// : Le fichier %s introuvable`), read by @ 0x0043b210: `atlantis.lua`
-    /// run again, `LUA_DB` made the global `atl`, the engine's sections,
-    /// the timers (`CALLBACK_SHOOTER_MANAGER`, each started with its
-    /// remaining time), then `return Atl_Address_GetCurrent()` and a
-    /// `no_fx` transition there (@ 0x0042d8d0(0), 0x0042d8e0).
+    /// : Le fichier %s introuvable`); when it is there the game is ended
+    /// first (@ 0x0042ffd0: the queue emptied, the states, timers, scene,
+    /// camera controller, sounds and configuration reset; the manager's
+    /// part here, the engine's in [`Request::GameReset`]), then the file
+    /// read by @ 0x0043b210: `atlantis.lua` run again, `LUA_DB` made the
+    /// global `atl`, the engine's sections, the timers
+    /// (`CALLBACK_SHOOTER_MANAGER`, each started with its remaining time),
+    /// then `return Atl_Address_GetCurrent()` and a `no_fx` transition
+    /// there (@ 0x0042d8d0(0), 0x0042d8e0). The menus' loads
+    /// (@ 0x00428ea0, 0x00418960) call the reader without ending the
+    /// game.
     fn load(&mut self) {
-        self.load_file(crate::save::AUTOSLOT);
+        let file = crate::save::AUTOSLOT;
+        let Some(data) = self.engine.borrow_mut().read_save(file) else {
+            self.note(format!("Atl_Load: the file saves/{file} is missing"));
+            return;
+        };
+        self.end_game();
+        self.request(&Request::GameReset);
+        self.read_save(&data);
     }
 
-    /// `saves/<file>` read by @ 0x0043b210 (the load state's `autoslot`,
-    /// the main menu's `rescue_game` @ 0x00428ea0, the load menu's
-    /// `slot_<n>` @ 0x00418960); at its end the reader queues the
-    /// requests 5 (the transition, here [`Game`]'s own) and 4
-    /// (0x0043b6f4..0x0043b7c1). False when the file is missing.
+    /// `saves/<file>` read by @ 0x0043b210 (the main menu's
+    /// `rescue_game` @ 0x00428ea0, the load menu's `slot_<n>`
+    /// @ 0x00418960); at its end the reader queues the requests 5 (the
+    /// transition, here [`Game`]'s own) and 4 (0x0043b6f4..0x0043b7c1).
+    /// False when the file is missing.
     pub fn load_file(&mut self, file: &str) -> bool {
-        use crate::save;
         let Some(data) = self.engine.borrow_mut().read_save(file) else {
             self.note(format!("Atl_Load: the file saves/{file} is missing"));
             return false;
         };
-        let Some(root) = save::parse(&data) else {
+        self.read_save(&data)
+    }
+
+    /// The reader @ 0x0043b210 on a save's bytes.
+    fn read_save(&mut self, data: &[u8]) -> bool {
+        use crate::save;
+        let Some(root) = save::parse(data) else {
             self.note("CSaveFileReader :: Read -> not an ATL_FILE".into());
             return false;
         };
@@ -1047,15 +1068,19 @@ impl Game {
         true
     }
 
-    /// State 1: `return InitChapter` called with the scripts' folder and
-    /// the chapter (nil for 0), then the next request.
+    /// State 1 (@ 0x0042f000 case 1): the next request taken first
+    /// (@ 0x0042ef30, 0x0042fb90: normally 4, so the chapter's script runs
+    /// in play's state), then `return InitChapter` called with the
+    /// scripts' folder and the chapter (+0x50, nil for 0); +0x50 is set to
+    /// 0 after the call returns (so an `Atl_InitChapter(n)` made inside it
+    /// loses its n: the next state 1 reloads the current chapter).
     fn init_chapter(&mut self) {
         let chapter = if self.chapter == 0 {
             Value::Nil
         } else {
             Value::Num(f64::from(self.chapter))
         };
-        self.chapter = 0;
+        self.next_request();
         let path = Value::Str(SCRIPTS_DIR.to_vec());
         match self
             .script
@@ -1075,7 +1100,7 @@ impl Game {
                 });
                 self.run();
             }
-            None => self.next_request(),
+            None => self.chapter = 0,
         }
     }
 
@@ -1173,17 +1198,20 @@ impl Game {
             0 => self.next_request(),
             1 => self.init_chapter(),
             4 => {
-                // A walk of the timers that waited for a handler ends in
-                // the frame the handler ended in.
-                if self.timer_walk.is_some() {
-                    self.timers();
+                // @ 0x0042f000 case 4: the camera, the events
+                // (@ 0x004300d0), the timers (@ 0x00435a70), and only then
+                // a queued request (+0x2c) taken (@ 0x0042fb90), in the
+                // same frame. A walk of the timers that waited for a
+                // handler ends in the frame the handler ended in (the
+                // original is inside the handler meanwhile), and the
+                // request follows it.
+                self.timers();
+                if self.timer_walk.is_some() || self.busy() {
                     return;
                 }
                 if !self.queue.is_empty() {
                     self.next_request();
-                    return;
                 }
-                self.timers();
             }
             2 => {
                 self.load();
