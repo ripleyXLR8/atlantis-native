@@ -223,6 +223,16 @@ fn wait_until(next_frame: Instant, redraw_pending: bool, now: Instant) -> Instan
     }
 }
 
+/// The next frame's time after a frame run at `now`: [`FRAME`] after the
+/// last one's, not before `now` (fell behind: no catching up) and never
+/// past `now` + [`FRAME`]. Every redraw runs a frame, the system's own too
+/// (a live resize, an expose); without the bound, each one that comes
+/// before its time moved the schedule a further frame ahead, and after a
+/// burst of them the game stood still until that time came.
+fn next_frame_after(next_frame: Instant, now: Instant) -> Instant {
+    (next_frame + FRAME).clamp(now, now + FRAME)
+}
+
 /// The decoding's step before the game starts (uncompressed bytes).
 const WARM_STEP: u64 = 4 << 20;
 
@@ -332,7 +342,7 @@ impl A5App {
 
     fn frame(&mut self, el: &ActiveEventLoop) {
         self.redraw_pending = false;
-        self.next_frame = (self.next_frame + FRAME).max(Instant::now());
+        self.next_frame = next_frame_after(self.next_frame, Instant::now());
         if !self.ready(el) {
             self.present();
             return;
@@ -662,6 +672,21 @@ mod tests {
             assert!(ox + dw <= ww && oy + dh <= wh, "{ww}x{wh}");
             assert!(buf.iter().all(|&p| p != 0xdead_beef), "{ww}x{wh}");
         }
+    }
+
+    #[test]
+    fn system_redraws_do_not_push_the_next_frame_away() {
+        let now = Instant::now();
+        // A live resize: 200 redraws in the same instant.
+        let mut next = now;
+        for _ in 0..200 {
+            next = next_frame_after(next, now);
+        }
+        assert_eq!(next, now + FRAME);
+        // On time: a frame after the last; late: from now.
+        assert_eq!(next_frame_after(now, now + FRAME / 2), now + FRAME);
+        let late = now + FRAME * 5;
+        assert_eq!(next_frame_after(now, late), late);
     }
 
     #[test]
