@@ -768,8 +768,12 @@ impl Stage {
     }
 
     /// The pitch setter @ 0x004447a0: clamped to the limits when set
-    /// (+0x125), else `fmod(angle, 360)`.
+    /// (+0x125), else `fmod(angle, 360)`. Both setters then rebuild the
+    /// camera node's rotation from the angles (0x00444806..0x004448b2),
+    /// which ends a rotation kept by `Atl_Camera_ActivateFx`'s
+    /// re-parenting (play.md § 2).
     fn set_pitch(&mut self, p: f32) {
+        self.cam_override = None;
         self.pitch = match self.pitch_limit {
             Some((lo, hi)) => p.min(hi).max(lo),
             None => libm::fmodf(p, 360.0),
@@ -778,6 +782,7 @@ impl Stage {
 
     /// The yaw setter @ 0x004448c0 (limits +0x114/+0x118, flag +0x124).
     fn set_yaw(&mut self, y: f32) {
+        self.cam_override = None;
         self.yaw = match self.yaw_limit {
             Some((lo, hi)) => y.min(hi).max(lo),
             None => libm::fmodf(y, 360.0),
@@ -4761,6 +4766,26 @@ mod tests {
 
     fn stage() -> Stage {
         Stage::new(Arc::new(NoFiles), "french", None)
+    }
+
+    #[test]
+    fn a_look_at_after_no_fx_shows_its_angles_at_once() {
+        let mut s = stage();
+        s.set_yaw(0.0);
+        // `Atl_Camera_ActivateFx("NoFx")` keeps the camera's rotation
+        // (@ 0x0042cd50) until the setters rebuild it: the 2-argument
+        // `Atl_Camera_LookAt` (@ 0x00406f00) calls them (@ 0x004447a0,
+        // @ 0x004448c0), so the next picture has its angles.
+        s.call(&Call::CameraActivateFx(CameraFx::NoFx));
+        s.call(&Call::CameraLookAt {
+            pitch: 0.0,
+            yaw: 270.0,
+            animated: false,
+        });
+        let mut want = stage();
+        want.set_pitch(0.0);
+        want.set_yaw(270.0);
+        assert_eq!(s.camera().q, want.camera().q);
     }
 
     #[test]
