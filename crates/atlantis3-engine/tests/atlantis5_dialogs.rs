@@ -169,7 +169,10 @@ fn the_gorillas_subject_menu_and_dialog() {
     frames(&mut play, 1);
     let mut view = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
     play.stage().render(&mut view);
-    assert!(shot(&play, "a5-dialog-1b.png") == view, "only the dialog's frame");
+    assert!(
+        shot(&play, "a5-dialog-1b.png") == view,
+        "only the dialog's frame"
+    );
     // The voices end in turn (no sound: their lengths), each tirade
     // following; a click ends a tirade at once.
     let mut tirades = vec![0];
