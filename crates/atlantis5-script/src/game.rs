@@ -1069,6 +1069,8 @@ impl Game {
         root.children.push(db);
         // The engine's sections as they were at the call.
         root.children.extend(saved.sections);
+        // @ 0x00436f20: the element only when the map holds a timer (its
+        // size +0xc tested around the element's making and its append).
         let mut manager = save::element("CALLBACK_SHOOTER_MANAGER");
         for (name, t) in &self.timers {
             let mut c = save::element("CALLBACK_SHOOTER");
@@ -1089,7 +1091,9 @@ impl Game {
             c.children.push(cb);
             manager.children.push(c);
         }
-        root.children.push(manager);
+        if !self.timers.is_empty() {
+            root.children.push(manager);
+        }
         let text = save::to_text(&root);
         if !self.engine.borrow_mut().write_save(file, text.as_bytes()) {
             self.note("Atl_Save: the save could not be written".into());

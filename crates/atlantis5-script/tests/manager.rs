@@ -770,3 +770,17 @@ fn a_menu_pauses_the_timers() {
         "{text}"
     );
 }
+
+#[test]
+fn a_save_without_timers_has_no_timer_section() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    assert!(g.timer_names().is_empty());
+    // @ 0x00436f20: CALLBACK_SHOOTER_MANAGER only with a timer.
+    let text = saved_text(&probe);
+    assert!(!text.contains("CALLBACK_SHOOTER_MANAGER"), "{text}");
+    assert!(g.run_string("return function() Atl_Timer_Create(\"t\", 5) Atl_Save() end"));
+    let text = saved_text(&probe);
+    assert!(text.contains("<CALLBACK_SHOOTER_MANAGER>"), "{text}");
+}
