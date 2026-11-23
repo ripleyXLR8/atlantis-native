@@ -14,7 +14,7 @@ use rilua::vm::gc::arena::GcRef;
 use rilua::vm::state::{LuaState, LuaThread, ThreadStatus, MAXCALLS};
 use rilua::vm::table::Table;
 use rilua::vm::value::{Userdata, Val};
-use rilua::{Lua, LuaApiMut, LuaError, LuaResult, RuntimeError};
+use rilua::{Lua, LuaApi, LuaApiMut, LuaError, LuaResult, RuntimeError};
 
 use crate::engine::{
     Binding, Call, CameraFx, Engine, ErrorSite, Event, Fx, Limit, PlayType, Reply, Semantic, Value,
@@ -70,6 +70,19 @@ pub(crate) struct SavedGame {
 }
 
 const SHARED_KEY: &[u8] = b"atlantis5-script.shared";
+
+/// The most memory Atlantis V's Lua state may hold, in rilua's count of
+/// its objects (see [`Script::new`]). 768 MiB of that count is about
+/// 1.5 GB of the process's memory (the chessboard's runaway measured at
+/// 1.9 bytes a counted byte), what the original's 32-bit heap could hold;
+/// normal play counts under 20 MiB (the walkthrough and the puzzles). The
+/// web build, whose whole module (the game's films and pictures included)
+/// has 4 GB, stops at half that.
+#[cfg(not(target_arch = "wasm32"))]
+pub const LUA_MEMORY_LIMIT: usize = 768 << 20;
+/// See above: the web build's bound.
+#[cfg(target_arch = "wasm32")]
+pub const LUA_MEMORY_LIMIT: usize = 384 << 20;
 
 fn runtime_error(message: String) -> LuaError {
     LuaError::Runtime(RuntimeError::new(message))
@@ -1205,6 +1218,16 @@ impl Script {
             // walks tables in 5.0.3's order, the order the game's save
             // writes its LUA_DB in.
             state.gc.table_lua50 = true;
+            // The original is a 32-bit program without the large-address
+            // flag (PE characteristics 0x010e): 2 GB of address space, its
+            // image, DLLs, Direct3D and data in it, so its Lua heap could
+            // not pass about 1.5 GB, and a runaway such as the
+            // chessboard's `GetShortestPath(p, p)` (puzzles.md § 3) ends
+            // on Lua's `not enough memory` there [INFERRED]. The same
+            // bound here turns it into a Lua error, which the script's
+            // caller logs (scripts.md § 9), instead of the allocator's
+            // abort; normal play stays far below it.
+            state.gc.set_alloc_limit(LUA_MEMORY_LIMIT);
             rilua::stdlib::open_libs_selective(
                 state,
                 StdLib::BASE
@@ -1395,6 +1418,21 @@ impl Script {
         self.new_task(Val::Function(f.gc_ref()), source.as_bytes())
             .ok()
     }
+    /// The memory the Lua state holds now (rilua's count) and its bound
+    /// ([`LUA_MEMORY_LIMIT`]).
+    #[doc(hidden)]
+    pub fn lua_memory(&self) -> (usize, usize) {
+        let gc = &self.lua.state().gc.gc_state;
+        (gc.total_bytes, gc.alloc_limit)
+    }
+
+    /// Another bound for the Lua state's memory (tests: a runaway met at
+    /// a smaller size).
+    #[doc(hidden)]
+    pub fn set_lua_memory_limit(&mut self, limit: usize) {
+        self.lua.state_mut().gc.set_alloc_limit(limit);
+    }
+
     /// The collector's pace (tests: a small pause and a large step make
     /// it collect all the time, to find a missing barrier).
     #[doc(hidden)]

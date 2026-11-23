@@ -35,4 +35,6 @@ pub use engine::{
 };
 pub use game::Game;
 pub use rilua;
-pub use script::{sound_path, EngineRef, Outcome, Pending, Script, Task, SCRIPTS_DIR};
+pub use script::{
+    sound_path, EngineRef, Outcome, Pending, Script, Task, LUA_MEMORY_LIMIT, SCRIPTS_DIR,
+};

@@ -1497,10 +1497,27 @@ impl LuaState {
             self.gc_step_auto()?;
         }
         // Check allocation limit (used by T.totalmem for OOM testing).
-        if self.gc.gc_state.total_bytes > self.gc.gc_state.alloc_limit {
+        if self.over_alloc_limit()? {
             return Err(LuaError::Memory);
         }
         Ok(())
+    }
+
+    /// Whether the allocation limit is passed once the garbage is gone
+    /// (Native patch 10): over the limit, a full collection runs first, as
+    /// Lua 5.0's collector (a full one each time its threshold is met)
+    /// frees the garbage of a run a memory error ended before anything
+    /// more is refused. Without it the count stayed over the limit until
+    /// incremental steps swept the garbage, and every allocation after
+    /// the error failed too.
+    pub fn over_alloc_limit(&mut self) -> LuaResult<bool> {
+        if self.gc.gc_state.total_bytes <= self.gc.gc_state.alloc_limit {
+            return Ok(false);
+        }
+        if !self.gc.gc_state.gc_running {
+            self.full_gc()?;
+        }
+        Ok(self.gc.gc_state.total_bytes > self.gc.gc_state.alloc_limit)
     }
 
     /// Runs an automatic incremental GC step based on current parameters.
