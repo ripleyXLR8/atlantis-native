@@ -4283,6 +4283,7 @@ impl Play {
         // A save page's slot not written: its autosave copy is left as it
         // was too, so the slot and its `autoslot_<n>` stay a pair.
         let mut save_failed = false;
+        let mut load_failed = false;
         for e in self.menus.take_effects() {
             if save_failed && matches!(e, Effect::Delete(_) | Effect::Copy { .. }) {
                 continue;
@@ -4291,7 +4292,22 @@ impl Play {
                 save_failed = !self.game.save_now(file);
                 continue;
             }
+            if let Effect::Load(file) = &e {
+                load_failed = !self.game.load_file(file);
+                continue;
+            }
             self.menu_effect(e);
+        }
+        if let (true, Some(mode)) = (load_failed, ended) {
+            // A save that exists but cannot be read (empty, cut short,
+            // not an `ATL_FILE`): nothing is queued, and with the menu
+            // closed the manager would go round states 0 and 3 with no
+            // menu. The original closes the page after its reader
+            // whatever the read did (0x00418c29) and leaves the menus with
+            // no mode; Native opens the page again.
+            log::warn!("the save could not be read: its page again");
+            self.menus.request(mode);
+            return;
         }
         if ended.is_some() {
             if self.sound_held {
