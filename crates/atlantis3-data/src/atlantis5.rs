@@ -464,9 +464,12 @@ pub fn text_paths(language: &str) -> [String; 3] {
 }
 
 /// Whether `dir` looks like the game in any of its forms (for the
-/// launcher's folder check).
+/// launcher's folder check): its cabinets, an image of them or its
+/// `Datas` tree, even when they cannot be read (`DATAS.cab` cut short, no
+/// language's data): such a folder is the game's, and the player is told
+/// what is wrong with it rather than that it is not the game.
 pub fn holds_atlantis5(dir: &Path) -> bool {
-    Atlantis5Source::open(dir).is_ok()
+    !matches!(Atlantis5Source::open(dir), Err(OpenError::NotTheGame))
 }
 
 #[cfg(test)]
