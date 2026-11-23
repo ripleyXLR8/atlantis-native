@@ -1202,8 +1202,6 @@ folder.
 - Six sprites of a Mesopotamian temple's engraved prong are missing from
   the French DVD itself; the scripts run without them, as the original
   does.
-- The two logos play silent: their sound is the Bink films' own audio
-  track, which Atlantis Native's Bink decoder does not decode.
 - Only the French DVD has been tried. The international DVD has the
   same layout (`DATAS.cab` and one `DATAS_<language>.cab` per language),
   which is read, but it has not been tried. Android does not play it

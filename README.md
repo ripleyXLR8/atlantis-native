@@ -77,7 +77,7 @@ French*; on the desktop the DVD can be copied to the computer once
 the hard disk. The DVD's own Lua 5.0 scripts run as they are; the nine
 chapters, the twenty puzzles, the dialogs, the inventory, the saves, the
 deaths and the credits are checked by an automated walkthrough of the
-whole story. What is missing (the logos' sound, two fonts) is listed in
+whole story. What is missing (two fonts when Windows' own are not installed) is listed in
 [The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
 
 It is the original game, **pixel for pixel and sample for sample**: the
