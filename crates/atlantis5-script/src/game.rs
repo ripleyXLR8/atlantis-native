@@ -102,9 +102,9 @@ struct Timer {
 struct TimerWalk {
     /// The timer whose handler runs.
     name: Vec<u8>,
-    /// Its remaining time at the step (@ 0x00468060 with the step's
-    /// +0x10, which the handler does not change).
-    remaining: f64,
+    /// Its time run at the step: the step's +0x10 (@ 0x00468120) − its
+    /// start +0x28, which the handler does not change.
+    elapsed: f64,
 }
 
 /// The game.
@@ -1085,6 +1085,7 @@ impl Game {
     /// runs its `OnTimeOut` handler (@ 0x00405ae0: the `timer` event, the
     /// scene's `on_click`), then the repeats (+0x44) go down when positive
     /// and, when not 0, the timer starts again (0x004354bf..0x004354cc:
+    /// remaining taken again with the duration after the handler, then
     /// 0x004680c0(remaining), start = now − remaining, so the overshoot
     /// lengthens the next period). After the step the walk erases the
     /// timer when its +0x44 is 0 (0x00435aef → 0x00435ea0), whether it
@@ -1092,7 +1093,7 @@ impl Game {
     fn timers(&mut self) {
         let mut after: Option<Vec<u8>> = None;
         if let Some(walk) = self.timer_walk.take() {
-            self.end_timer_step(&walk.name, Some(walk.remaining));
+            self.end_timer_step(&walk.name, Some(walk.elapsed));
             after = Some(walk.name);
         }
         loop {
@@ -1108,14 +1109,14 @@ impl Game {
                 return;
             };
             let t = &self.timers[&name];
-            let remaining = t.duration - (self.clock - t.start);
-            if remaining <= 0.0 {
+            let elapsed = self.clock - t.start;
+            if t.duration - elapsed <= 0.0 {
                 self.timer_event(&name);
                 if self.busy() {
-                    self.timer_walk = Some(TimerWalk { name, remaining });
+                    self.timer_walk = Some(TimerWalk { name, elapsed });
                     return;
                 }
-                self.end_timer_step(&name, Some(remaining));
+                self.end_timer_step(&name, Some(elapsed));
             } else {
                 self.end_timer_step(&name, None);
             }
@@ -1123,21 +1124,29 @@ impl Game {
         }
     }
 
-    /// The end of a timer's step: after its handler (`ran` = its
-    /// remaining time at the step), the repeats and the restart; then the
-    /// walk's erase when +0x44 is 0.
+    /// The end of a timer's step: after its handler (`ran` = its time
+    /// run at the step), the repeats and the restart; then the walk's
+    /// erase when +0x44 is 0.
+    ///
+    /// The restart calls @ 0x00468060 a second time after the handler
+    /// loop (0x004354bf), so the remaining time is taken with the
+    /// duration as the handler left it (`Atl_Timer_SetDuration`,
+    /// @ 0x004680a0, writes +0x30 only) and the step's +0x10; then
+    /// @ 0x004680c0 sets start = now − remaining. A handler that changes
+    /// its own timer's duration thus gets one more period of the time run
+    /// at the step (about the old duration) before the new one applies.
     fn end_timer_step(&mut self, name: &[u8], ran: Option<f64>) {
         let clock = self.clock;
         let Some(t) = self.timers.get_mut(name) else {
             // Destroyed by its handler.
             return;
         };
-        if let Some(remaining) = ran {
+        if let Some(elapsed) = ran {
             if t.repeat > 0 {
                 t.repeat -= 1;
             }
             if t.repeat != 0 {
-                t.start = clock - remaining;
+                t.start = clock - (t.duration - elapsed);
             }
         }
         if t.repeat == 0 {

@@ -490,3 +490,36 @@ fn ending_the_game_frees_the_runs_that_wait() {
     g.end_game();
     assert_eq!(g.script().task_count(), 0);
 }
+
+#[test]
+fn a_handler_s_set_duration_applies_one_period_late() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    // Quarter seconds keep the clock exact.
+    for _ in 0..5 {
+        g.update(0.25);
+    }
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then N = (N or 0) + 1 Atl_Timer_SetDuration(\"s\", 3) \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"s\", 1) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"make"));
+    // 0.25 s frames. Up at 1 s; the handler sets 3 s. The restart
+    // (@ 0x004353d0's second 0x00468060, then 0x004680c0) reads the new
+    // duration with the step's elapsed time: remaining = 3 − 1, start =
+    // now − 2, so the next end is 1 s later (the old period); the 3 s
+    // apply from then on.
+    let mut ticks = Vec::new();
+    for frame in 1..=40 {
+        g.update(0.25);
+        if let Value::Num(n) = g.script().global(b"N") {
+            if ticks.len() < n as usize {
+                ticks.push(frame);
+            }
+        }
+    }
+    assert_eq!(ticks, [4, 8, 20, 32]);
+}
