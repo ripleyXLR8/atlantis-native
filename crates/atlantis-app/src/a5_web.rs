@@ -48,9 +48,6 @@ use winit::window::{Window, WindowId};
 use crate::a2_web;
 use crate::gl_present::GlPresenter;
 
-/// How long after a refused pointer lock a click asks for it again.
-const LOCK_RETRY: std::time::Duration = std::time::Duration::from_secs(2);
-
 /// The game's name in the page.
 const NAME: &str = "The Secrets of Atlantis";
 
@@ -187,7 +184,7 @@ struct A5App {
     menu: bool,
     lock_asked: Option<Instant>,
     /// When a lock request was last taken as refused: a click asks again
-    /// once [`LOCK_RETRY`] has passed (a browser refuses for a moment
+    /// once [`a2_web::LOCK_RETRY`] has passed (a browser refuses for a moment
     /// after the player left the lock with Escape).
     lock_refused: Option<Instant>,
     /// The fractions of the pointer-lock motion not yet sent.
@@ -246,7 +243,9 @@ impl A5App {
         !self.menu
             && !self.locked()
             && self.lock_asked.is_none()
-            && self.lock_refused.is_none_or(|t| t.elapsed() >= LOCK_RETRY)
+            && self
+                .lock_refused
+                .is_none_or(|t| t.elapsed() >= a2_web::LOCK_RETRY)
     }
 
     /// The picture's place in the canvas (x, y, width, height): 16:9,
