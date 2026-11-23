@@ -530,6 +530,8 @@ fn the_logos_play_before_the_main_menu() {
             if seen.last() != Some(&n) {
                 seen.push(n);
             }
+            // @ 0x0043d6a0: stretched into (0, 0, width − 1, height − 1).
+            assert_eq!(play.stage().film_dest(), [0, 0, 1023, 575]);
         }
         if play.menus.current() == Some(menus::MAIN) {
             break;

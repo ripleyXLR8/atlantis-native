@@ -672,6 +672,12 @@ pub struct Stage {
     /// blended with `oldpaper.tga`) and the film's rectangle (left, top,
     /// right, bottom).
     film_paper: Option<(Vec<u32>, [i32; 4])>,
+    /// The rectangle (left, top, right, bottom; right and bottom
+    /// excluded, a `RECT`) a film without paper is stretched into: the
+    /// display's (0, 0, 1024, 576) for `Atl_Video_Play`'s 1-argument form
+    /// (0x0040d24d..0x0040d2f3), one less each way for the start's logos
+    /// (@ 0x0043d6a0: width − 1, height − 1).
+    film_dest: [i32; 4],
     /// Menus the scripts asked for: `Atl_GameOver`'s death panel with its
     /// text's key (@ 0x00405b70: @ 0x00410d00, mode 10), `Atl_ExamineItem`'s
     /// examine view with its item (@ 0x00405d70: @ 0x004137b0, mode 11).
@@ -756,6 +762,7 @@ impl Stage {
             film_ducks: false,
             music_muted: false,
             film_paper: None,
+            film_dest: FULL_RECT,
             menu_requests: Vec::new(),
             wait_ended: false,
             clock: 0.0,
@@ -1429,6 +1436,7 @@ impl Stage {
                 self.film_bink_sound = true;
             }
         }
+        self.film_dest = FULL_RECT;
         let voice = format!("datas/sounds/video/{}/{}.ogg", self.language, lossy(name));
         let sound = match (&self.audio, self.read(&voice)) {
             // @ 0x00459630(name, 1.0): FMOD channel 7 at `ftol`(voice ×
@@ -1853,37 +1861,18 @@ impl Stage {
         out.fill(0);
         if let Some((film, _)) = &self.film {
             let (w, h) = film.size();
-            if let Some((back, [l, t, r, b])) = &self.film_paper {
-                // The 5-argument form's frame: `back` blitted whole, then
-                // the film's frame `Blt` into the rectangle (@ 0x00456da0:
-                // stretched, 1:1 for the scripts' calls; nearest here, the
-                // filter [UNKNOWN: DirectDraw's]).
+            // The film's draw (@ 0x00456da0): its frame `Blt` from a
+            // surface of its own size into the player's rectangle (+0x08):
+            // stretched (1:1 for the scripts' films, which have their
+            // rectangle's size; the logos, 720 × 405 and 800 × 450, fill
+            // the picture). Nearest here, the filter [UNKNOWN:
+            // DirectDraw's].
+            if let Some((back, rect)) = &self.film_paper {
+                // The 5-argument form's frame: `back` blitted whole first.
                 out.copy_from_slice(back);
-                let (rw, rh) = (r - l, b - t);
-                #[allow(
-                    clippy::cast_possible_wrap,
-                    clippy::cast_sign_loss,
-                    clippy::cast_possible_truncation
-                )]
-                if rw > 0 && rh > 0 {
-                    for y in (*t).max(0)..(*b).min(VIEW_HEIGHT as i32) {
-                        let sy = ((y - t) as usize * h) / rh as usize;
-                        for x in (*l).max(0)..(*r).min(VIEW_WIDTH as i32) {
-                            let sx = ((x - l) as usize * w) / rw as usize;
-                            out[y as usize * VIEW_WIDTH + x as usize] = film.xrgb[sy * w + sx];
-                        }
-                    }
-                }
+                stretch_into(out, &film.xrgb, w, h, *rect);
             } else {
-                let (ox, oy) = (
-                    VIEW_WIDTH.saturating_sub(w) / 2,
-                    VIEW_HEIGHT.saturating_sub(h) / 2,
-                );
-                for y in 0..h.min(VIEW_HEIGHT) {
-                    for x in 0..w.min(VIEW_WIDTH) {
-                        out[(oy + y) * VIEW_WIDTH + ox + x] = film.xrgb[y * w + x];
-                    }
-                }
+                stretch_into(out, &film.xrgb, w, h, self.film_dest);
             }
             self.draw_film_subtitle(out);
             return;
@@ -1899,6 +1888,17 @@ impl Stage {
             self.draw_inventory(out);
         }
         self.draw_dialog(out);
+    }
+
+    /// The start's logos (@ 0x0043d6a0): the film's rectangle is
+    /// (0, 0, width − 1, height − 1) of the display.
+    fn logo_rect(&mut self) {
+        self.film_dest = [0, 0, FULL_RECT[2] - 1, FULL_RECT[3] - 1];
+    }
+
+    /// The film's rectangle without paper (tests).
+    pub fn film_dest(&self) -> [i32; 4] {
+        self.film_dest
     }
 
     /// The 5-argument film's `back` (@ 0x0040c990, its first loop frame):
@@ -3686,6 +3686,32 @@ impl Engine for Stage {
 /// over the view with α = `__ftol`(k · 255.0) (0x00655750) by @ 0x0047a8a4
 /// (32 bits per pixel; MMX, c′ = (c · 256 + (s − c) · α) >> 8 with s = 0
 /// for the colour bytes): c′ = (c · (256 − α)) >> 8 on R, G and B.
+/// The display's rectangle (left, top, right, bottom).
+#[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+const FULL_RECT: [i32; 4] = [0, 0, VIEW_WIDTH as i32, VIEW_HEIGHT as i32];
+
+/// A `w` × `h` picture stretched into `rect` (left, top, right, bottom;
+/// right and bottom excluded) of the 1024 × 576 picture, nearest pixel,
+/// clipped to the picture.
+fn stretch_into(out: &mut [u32], src: &[u32], w: usize, h: usize, [l, t, r, b]: [i32; 4]) {
+    let (rw, rh) = (r - l, b - t);
+    if rw <= 0 || rh <= 0 || w == 0 || h == 0 {
+        return;
+    }
+    #[allow(
+        clippy::cast_possible_wrap,
+        clippy::cast_sign_loss,
+        clippy::cast_possible_truncation
+    )]
+    for y in t.max(0)..b.min(VIEW_HEIGHT as i32) {
+        let sy = ((y - t) as usize * h) / rh as usize;
+        for x in l.max(0)..r.min(VIEW_WIDTH as i32) {
+            let sx = ((x - l) as usize * w) / rw as usize;
+            out[y as usize * VIEW_WIDTH + x as usize] = src[sy * w + sx];
+        }
+    }
+}
+
 fn darken(out: &mut [u32], k: f32) {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let a = (f64::from(k) * 255.0) as u32;
@@ -3904,7 +3930,9 @@ impl Play {
     /// The next logo, or the main menu once they have played.
     fn next_logo(&mut self) {
         while let Some(name) = self.logos.pop() {
-            if self.stage.borrow_mut().video_play(name.as_bytes()) {
+            let mut st = self.stage.borrow_mut();
+            if st.video_play(name.as_bytes()) {
+                st.logo_rect();
                 return;
             }
         }
@@ -4805,6 +4833,26 @@ mod tests {
 
     fn stage() -> Stage {
         Stage::new(Arc::new(NoFiles), "french", None)
+    }
+
+    #[test]
+    fn a_film_is_stretched_into_its_rectangle() {
+        // A 2 × 2 film into the logos' rectangle: each source pixel fills
+        // a quarter of (0, 0, 1023, 575); the last column and row stay.
+        let src = [1, 2, 3, 4];
+        let mut out = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        stretch_into(&mut out, &src, 2, 2, [0, 0, 1023, 575]);
+        let at = |x: usize, y: usize| out[y * VIEW_WIDTH + x];
+        assert_eq!(
+            (at(0, 0), at(510, 286), at(512, 0), at(0, 288), at(1022, 574)),
+            (1, 1, 2, 3, 4)
+        );
+        assert_eq!((at(1023, 0), at(0, 575)), (0, 0));
+        // 1:1 into the display's rectangle.
+        let src: Vec<u32> = (0..VIEW_WIDTH * VIEW_HEIGHT).map(|i| i as u32).collect();
+        let mut out = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        stretch_into(&mut out, &src, VIEW_WIDTH, VIEW_HEIGHT, FULL_RECT);
+        assert_eq!(out, src);
     }
 
     #[test]
