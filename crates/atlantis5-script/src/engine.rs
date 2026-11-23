@@ -161,7 +161,10 @@ pub enum Value {
     Other(&'static str),
 }
 
-/// Lua 5.0's `tostring` of a number (`LUA_NUMBER_FMT` "%.14g").
+/// Lua 5.0's `tostring` of a number (`LUA_NUMBER_FMT` "%.14g"), as
+/// lua50.dll prints it with MSVCRT.dll's `sprintf`: 14 significant
+/// digits, the exponent form from an exponent of 14 (or below -4) with
+/// at least three exponent digits (`1e+014`), `-0` for negative zero.
 pub fn number_text(x: f64) -> String {
     if x.is_nan() {
         return "nan".into();
@@ -169,7 +172,9 @@ pub fn number_text(x: f64) -> String {
     if x.is_infinite() {
         return if x > 0.0 { "inf".into() } else { "-inf".into() };
     }
-    if x == x.trunc() && x.abs() < 1e15 {
+    // Whole numbers below 10^14 have at most 14 digits: printed as they
+    // are. Negative zero goes to the general form, which keeps its sign.
+    if x == x.trunc() && x.abs() < 1e14 && !(x == 0.0 && x.is_sign_negative()) {
         #[allow(clippy::cast_possible_truncation)]
         return format!("{}", x as i64);
     }
@@ -180,7 +185,7 @@ pub fn number_text(x: f64) -> String {
     if !(-4..14).contains(&exp) {
         let mant = mant.trim_end_matches('0').trim_end_matches('.');
         let sign = if exp < 0 { '-' } else { '+' };
-        return format!("{mant}e{sign}{:02}", exp.abs());
+        return format!("{mant}e{sign}{:03}", exp.abs());
     }
     #[allow(clippy::cast_sign_loss)]
     let decimals = (13 - exp).max(0) as usize;
@@ -545,4 +550,31 @@ pub trait Engine {
     /// 0 → @ 0x0042caa0, the free mode with its speeds 0; 1 →
     /// @ 0x0042cab0).
     fn camera_restore(&mut self, _mode: u32) {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::number_text;
+
+    #[test]
+    fn numbers_print_as_msvcrt_sprintf_14g() {
+        for (x, s) in [
+            (0.0, "0"),
+            (-0.0, "-0"),
+            (-2.0, "-2"),
+            (1.5, "1.5"),
+            (0.1, "0.1"),
+            (1.0 / 3.0, "0.33333333333333"),
+            (99_999_999_999_999.0, "99999999999999"),
+            (1e14, "1e+014"),
+            (123_456_789_012_346.0, "1.2345678901235e+014"),
+            (999_999_999_999_999.0, "1e+015"),
+            (1e15, "1e+015"),
+            (1e100, "1e+100"),
+            (1e-5, "1e-005"),
+            (0.0001, "0.0001"),
+        ] {
+            assert_eq!(number_text(x), s, "{x:e}");
+        }
+    }
 }
