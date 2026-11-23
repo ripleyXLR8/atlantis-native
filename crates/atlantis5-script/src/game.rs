@@ -92,8 +92,83 @@ struct Timer {
     duration: f64,
     /// +0x28: the start (@ 0x004680c0: now − its argument).
     start: f64,
+    /// +0x10: the time of its last update: its start (@ 0x004680c0) and
+    /// each step of the walk (@ 0x00468120). The remaining time is taken
+    /// at it, not at the call that asks (a save writes the remaining time
+    /// of the last walk, @ 0x00436f20 → 0x00468060).
+    last: f64,
+    /// +0x18: the start of a pause (@ 0x004681f0: now); −1.0 (none) when
+    /// not paused (@ 0x004681b0 tests it).
+    pause_start: Option<f64>,
+    /// +0x20: the time paused before the current pause (@ 0x00468200).
+    paused: f64,
     /// +0x44: the repeats left; -1 for ever.
     repeat: i32,
+}
+
+impl Timer {
+    /// A timer made by the list (@ 0x00435770: paused at once,
+    /// @ 0x004681f0, when the manager's +0x10 is set), its duration set
+    /// (@ 0x004680a0), then started with `ran` seconds already run
+    /// (@ 0x004680c0: 0 for `Atl_Timer_Create`, duration − remaining_time
+    /// for a save's, @ 0x00437210).
+    fn new(now: f64, duration: f64, repeat: i32, manager_paused: bool, ran: f64) -> Self {
+        let mut t = Self {
+            duration,
+            start: now,
+            last: now,
+            pause_start: None,
+            paused: 0.0,
+            repeat,
+        };
+        if manager_paused {
+            t.pause_start = Some(now);
+        }
+        t.start_at(now, ran);
+        t
+    }
+
+    /// @ 0x004680c0(x): start = now − x, +0x10 = now; a paused timer's
+    /// pause starts again now with none run (+0x18 = +0x10, +0x20 = 0),
+    /// else no pause.
+    fn start_at(&mut self, now: f64, x: f64) {
+        self.start = now - x;
+        self.last = now;
+        self.paused = 0.0;
+        if self.pause_start.is_some() {
+            self.pause_start = Some(self.last);
+        }
+    }
+
+    /// The time paused (@ 0x004681d0): +0x20, plus +0x10 − +0x18 while
+    /// paused.
+    fn paused_time(&self) -> f64 {
+        match self.pause_start {
+            Some(p) => self.paused + self.last - p,
+            None => self.paused,
+        }
+    }
+
+    /// The remaining time (@ 0x00468060): duration − ((+0x10 − start) −
+    /// paused).
+    fn remaining(&self) -> f64 {
+        self.duration - ((self.last - self.start) - self.paused_time())
+    }
+
+    /// @ 0x004681f0: +0x18 = now.
+    fn pause(&mut self, now: f64) {
+        self.pause_start = Some(now);
+    }
+
+    /// @ 0x00468200: +0x20 += now − +0x18, +0x18 = −1.0. The original
+    /// adds now + 1 to a timer that is not paused; the manager's flag
+    /// keeps every timer paused while it is set, so that does not happen
+    /// here and is not reproduced.
+    fn resume(&mut self, now: f64) {
+        if let Some(p) = self.pause_start.take() {
+            self.paused += now - p;
+        }
+    }
 }
 
 /// A walk of the timers (@ 0x00435a70) whose `timer` handler waits (a
@@ -101,11 +176,9 @@ struct Timer {
 /// goes on after it, from the next name.
 #[derive(Clone, Debug)]
 struct TimerWalk {
-    /// The timer whose handler runs.
+    /// The timer whose handler runs (its +0x10, the step's time, is not
+    /// changed by the handler).
     name: Vec<u8>,
-    /// Its time run at the step: the step's +0x10 (@ 0x00468120) − its
-    /// start +0x28, which the handler does not change.
-    elapsed: f64,
 }
 
 /// The game.
@@ -123,6 +196,10 @@ pub struct Game {
     timers: BTreeMap<Vec<u8>, Timer>,
     /// The walk of the timers that waits for a handler.
     timer_walk: Option<TimerWalk>,
+    /// The timer manager's +0x10: its timers paused (@ 0x00435b70, by the
+    /// menus' frame when a mode opens; @ 0x00435bd0 resumes them at the
+    /// menus' end).
+    timers_paused: bool,
     /// The game clock (seconds).
     clock: f64,
     /// The camera's field of view as the engine last set it (radians),
@@ -144,6 +221,7 @@ impl Game {
             transitions: Vec::new(),
             timers: BTreeMap::new(),
             timer_walk: None,
+            timers_paused: false,
             clock: 0.0,
             fov: 0.0,
         })
@@ -548,14 +626,11 @@ impl Game {
                         ));
                     } else {
                         // @ 0x0040c39c..0x0040c3a2: 0x004680c0(0.0),
-                        // the start is now.
+                        // the start is now; paused from the start while
+                        // a menu is up (@ 0x00435770).
                         self.timers.insert(
                             name,
-                            Timer {
-                                duration,
-                                start: self.clock,
-                                repeat,
-                            },
+                            Timer::new(self.clock, duration, repeat, self.timers_paused, 0.0),
                         );
                     }
                 }
@@ -861,7 +936,35 @@ impl Game {
             self.note(format!("game manager: state {} -> {next}", self.state));
             self.previous = self.state;
             self.state = next;
+            if next == 3 {
+                self.pause_timers();
+            }
         }
+    }
+
+    /// The menus' frame (@ 0x0041b780) when a mode opens: the timers
+    /// paused (@ 0x00435b70: each timer's @ 0x004681f0, then the
+    /// manager's +0x10 = 1) unless they are already. Native pauses them
+    /// when state 3 is taken, the frame before the mode's first.
+    fn pause_timers(&mut self) {
+        if self.timers_paused {
+            return;
+        }
+        for t in self.timers.values_mut() {
+            t.pause(self.clock);
+        }
+        self.timers_paused = true;
+    }
+
+    /// The menus' end (@ 0x0041b780, a mode's process returned 1 with
+    /// none queued): the timers resumed (@ 0x00435bd0: each timer's
+    /// @ 0x00468200, then +0x10 = 0), so the time in the menus is not
+    /// counted.
+    fn resume_timers(&mut self) {
+        for t in self.timers.values_mut() {
+            t.resume(self.clock);
+        }
+        self.timers_paused = false;
     }
 
     /// A menu opens: state 3 (@ 0x0042fb90(3)), the state left kept for
@@ -871,6 +974,7 @@ impl Game {
             self.note(format!("game manager: state {} -> 3", self.state));
             self.previous = self.state;
             self.state = 3;
+            self.pause_timers();
         }
     }
 
@@ -911,11 +1015,17 @@ impl Game {
         self.next_request();
     }
 
-    /// The menu of state 3 has ended (its process returned 1,
-    /// @ 0x0042f000 case 3 falling into case 0): the next request.
+    /// The menu of state 3 has ended (its process returned 1 with no
+    /// mode queued, @ 0x0041b780; @ 0x0042f000 case 3 falling into case
+    /// 0): the timers resumed (@ 0x00435bd0), then the next request.
     pub fn menu_closed(&mut self) {
+        self.resume_timers();
         if self.state == 3 {
             self.next_request();
+            if self.state == 3 {
+                // Another menu follows: its mode pauses them again.
+                self.pause_timers();
+            }
         }
     }
 
@@ -967,7 +1077,10 @@ impl Game {
             #[allow(clippy::cast_possible_truncation)]
             {
                 save::attr_f32(&mut c, "duration", t.duration as f32);
-                let remaining = t.duration - (self.clock - t.start);
+                // @ 0x00468060, at the timer's last update (+0x10):
+                // the time of a film, a dialog or a transition the
+                // handler waits in since the last walk is not counted.
+                let remaining = t.remaining();
                 save::attr_f32(&mut c, "remaining_time", remaining as f32);
             }
             c.attributes.push(("repeat".into(), t.repeat.to_string()));
@@ -1049,13 +1162,18 @@ impl Game {
                 let remaining = save::get_f64(c, "remaining_time").unwrap_or(duration);
                 #[allow(clippy::cast_possible_truncation)]
                 let repeat = save::get_f64(c, "repeat").unwrap_or(-1.0) as i32;
+                // @ 0x00437210: made by the list (@ 0x00435770, paused
+                // when a menu is up), then 0x004680c0(duration −
+                // remaining_time) (0x0043743c..0x0043744f).
                 self.timers.insert(
                     atlantis4_data::xml::to_cp1252(name),
-                    Timer {
-                        duration: f64::from(duration as f32),
-                        start: self.clock - (duration - remaining),
+                    Timer::new(
+                        self.clock,
+                        f64::from(duration as f32),
                         repeat,
-                    },
+                        self.timers_paused,
+                        duration - remaining,
+                    ),
                 );
             }
         }
@@ -1121,7 +1239,7 @@ impl Game {
     fn timers(&mut self) {
         let mut after: Option<Vec<u8>> = None;
         if let Some(walk) = self.timer_walk.take() {
-            self.end_timer_step(&walk.name, Some(walk.elapsed));
+            self.end_timer_step(&walk.name, true);
             after = Some(walk.name);
         }
         loop {
@@ -1136,24 +1254,26 @@ impl Game {
             let Some(name) = next else {
                 return;
             };
-            let t = &self.timers[&name];
-            let elapsed = self.clock - t.start;
-            if t.duration - elapsed <= 0.0 {
+            let clock = self.clock;
+            let t = self.timers.get_mut(&name).expect("a timer of the map");
+            // @ 0x00468120: +0x10 = now.
+            t.last = clock;
+            if t.remaining() <= 0.0 {
                 self.timer_event(&name);
                 if self.busy() {
-                    self.timer_walk = Some(TimerWalk { name, elapsed });
+                    self.timer_walk = Some(TimerWalk { name });
                     return;
                 }
-                self.end_timer_step(&name, Some(elapsed));
+                self.end_timer_step(&name, true);
             } else {
-                self.end_timer_step(&name, None);
+                self.end_timer_step(&name, false);
             }
             after = Some(name);
         }
     }
 
-    /// The end of a timer's step: after its handler (`ran` = its time
-    /// run at the step), the repeats and the restart; then the walk's
+    /// The end of a timer's step: after its handler (`ran`: its time was
+    /// up and the handler ran), the repeats and the restart; then the walk's
     /// erase when +0x44 is 0.
     ///
     /// The restart calls @ 0x00468060 a second time after the handler
@@ -1163,18 +1283,21 @@ impl Game {
     /// @ 0x004680c0 sets start = now − remaining. A handler that changes
     /// its own timer's duration thus gets one more period of the time run
     /// at the step (about the old duration) before the new one applies.
-    fn end_timer_step(&mut self, name: &[u8], ran: Option<f64>) {
+    fn end_timer_step(&mut self, name: &[u8], ran: bool) {
         let clock = self.clock;
         let Some(t) = self.timers.get_mut(name) else {
             // Destroyed by its handler.
             return;
         };
-        if let Some(elapsed) = ran {
+        if ran {
             if t.repeat > 0 {
                 t.repeat -= 1;
             }
             if t.repeat != 0 {
-                t.start = clock - (t.duration - elapsed);
+                // The remaining time at the step's +0x10 with the
+                // handler's duration, then 0x004680c0(remaining).
+                let remaining = t.remaining();
+                t.start_at(clock, remaining);
             }
         }
         if t.repeat == 0 {

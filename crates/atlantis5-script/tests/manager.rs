@@ -644,3 +644,129 @@ fn atl_save_takes_the_engine_s_sections_at_the_call() {
     let calls = format!("calls=\"{}\"", before + 1);
     assert!(text.contains(&calls), "{calls} in {text}");
 }
+
+/// The chapter of [`BASE`] with two timers made before its film.
+fn timed_chapter() -> Vec<(&'static str, String)> {
+    BASE.iter()
+        .map(|(n, s)| {
+            let s = if *n == "atlantis.lua" {
+                "require \"lib/util.lua\" \
+                 function InitChapter(Path, Chapter) Atl_Timer_Create(\"lightning\", 25) \
+                   Atl_Timer_Create(\"fountains\", 19) Atl_Video_Play(\"intro\") \
+                   Atl_Address_Go(\"deck\", 1, \"no_fx\") Atl_Save() end \
+                 function Atl_Address_GetCurrent() return \"deck\", 1 end"
+                    .to_string()
+            } else {
+                (*s).to_string()
+            };
+            (*n, s)
+        })
+        .collect()
+}
+
+fn saved_text(probe: &Rc<RefCell<Probe>>) -> String {
+    String::from_utf8(probe.borrow().saves["autoslot"].clone()).expect("text")
+}
+
+#[test]
+fn a_save_after_a_film_keeps_the_timers_whole() {
+    let files = timed_chapter();
+    let files: Vec<(&str, &str)> = files.iter().map(|(n, s)| (*n, s.as_str())).collect();
+    let (mut g, probe) = game(&files);
+    probe.borrow_mut().wait = true;
+    g.new_game();
+    // 10 s of film: the chapter's handler waits inside Atl_Video_Play,
+    // where no walk updates the timers' +0x10.
+    settle(&mut g, 500);
+    assert!(g.waiting_for_engine());
+    g.finish_wait();
+    probe.borrow_mut().wait = false;
+    settle(&mut g, 3);
+    assert_eq!(g.state(), 4);
+    // @ 0x00436f20 → 0x00468060 at +0x10: the remaining time of the
+    // timers' creation.
+    let text = saved_text(&probe);
+    assert!(
+        text.contains("name=\"lightning\" duration=\"25\" remaining_time=\"25\""),
+        "{text}"
+    );
+    assert!(
+        text.contains("name=\"fountains\" duration=\"19\" remaining_time=\"19\""),
+        "{text}"
+    );
+    // Read back: 19 s from the load, not 9.
+    assert!(g.run_string("return function() Atl_Load() end"));
+    settle(&mut g, 3);
+    assert_eq!(g.state(), 4);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "if atl.event.type == \"timer\" then FIRED = atl.event.timer.name end".to_string(),
+    );
+    for _ in 0..(18 * 50) {
+        g.update(0.02);
+    }
+    assert_eq!(g.script().global(b"FIRED"), Value::Nil, "not before 19 s");
+    for _ in 0..(2 * 50) {
+        g.update(0.02);
+    }
+    assert_eq!(
+        g.script().global(b"FIRED"),
+        Value::Str(b"fountains".to_vec())
+    );
+}
+
+#[test]
+fn a_menu_pauses_the_timers() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    // Quarter seconds keep the clock exact.
+    for _ in 0..5 {
+        g.update(0.25);
+    }
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then N = (N or 0) + 1 \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"t\", 2) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"make"));
+    g.update(0.25);
+    // A menu after 0.25 s: @ 0x0041b780 pauses the timers (@ 0x00435b70)
+    // when its mode opens and resumes them (@ 0x00435bd0) at its end.
+    g.open_menu();
+    for _ in 0..40 {
+        g.update(0.25);
+    }
+    assert_eq!(g.script().global(b"N"), Value::Nil);
+    // A save from the menu writes the time left at the pause.
+    probe.borrow_mut().saves.clear();
+    assert!(g.save_now("slot_0"));
+    let text = String::from_utf8(probe.borrow().saves["slot_0"].clone()).expect("text");
+    assert!(text.contains("remaining_time=\"1.75\""), "{text}");
+    g.menu_closed();
+    assert_eq!(g.state(), 4);
+    let mut frames = 0;
+    while g.script().global(b"N") == Value::Nil {
+        g.update(0.25);
+        frames += 1;
+        assert!(frames < 20);
+    }
+    assert_eq!(frames, 7, "1.75 s after the menu");
+    // A timer made while the menus are up starts paused (@ 0x00435770).
+    g.open_menu();
+    assert!(g.run_string("return function() Atl_Timer_Create(\"m\", 1, 1) end"));
+    for _ in 0..20 {
+        g.update(0.25);
+    }
+    g.menu_closed();
+    // One walk (+0x10 = now) after the menu: 0.25 s run.
+    g.update(0.25);
+    probe.borrow_mut().saves.clear();
+    assert!(g.save_now("slot_1"));
+    let text = String::from_utf8(probe.borrow().saves["slot_1"].clone()).expect("text");
+    assert!(
+        text.contains("name=\"m\" duration=\"1\" remaining_time=\"0.75\""),
+        "{text}"
+    );
+}
