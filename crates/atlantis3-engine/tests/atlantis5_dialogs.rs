@@ -289,6 +289,55 @@ fn at_a_low_frame_rate_the_talker_faces_then_listens() {
     }
 }
 
+/// `Atl_TerminateDialog` asks the subject menu's state 5, which its
+/// process runs once at its next frame (@ 0x00410f90): a script that goes
+/// on with a call that waits (`on_click_macao.lua`'s
+/// `Atl_Camera_LookAt(..., true)`) holds it until it ends; then the
+/// character turns back once, its `unfacing` played through.
+#[test]
+fn terminate_dialog_turns_the_character_back_once() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"));
+    assert!(play.game.run_string(
+        "return function() Atl_TerminateDialog() Atl_Camera_LookAt(-10, -31, true) end"
+    ));
+    frames(&mut play, 1);
+    assert!(play.game.busy(), "the look waits");
+    let mut waited = 0;
+    while play.game.busy() && waited < 300 {
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"));
+        frames(&mut play, 1);
+        waited += 1;
+    }
+    assert!(waited > 3, "{waited} frames");
+    let mut frames_seen = Vec::new();
+    for _ in 0..30 {
+        frames(&mut play, 1);
+        let s = play.stage().sprites();
+        match s.iter().find(|s| s.0 == "gorilla") {
+            Some((_, a, i)) if a == "unfacing" => frames_seen.push(*i),
+            _ if !frames_seen.is_empty() => break,
+            _ => {}
+        }
+    }
+    assert!(!play.stage().menu_open_now());
+    assert_eq!(play.game.state(), 4);
+    assert!(
+        frames_seen.windows(2).all(|w| w[0] <= w[1]) && frames_seen.last() > frames_seen.first(),
+        "unfacing played through: {frames_seen:?}"
+    );
+}
+
 #[test]
 fn the_autosave_is_written_and_loaded() {
     let Some(d) = dvd() else { return };

@@ -1737,7 +1737,6 @@ impl Stage {
         }
         // `Atl_Dialog_Play`'s loop: its checks, then the scene's update.
         self.dialog_update(dt);
-        self.menu_close_step();
         // A randomized sprite's missing file throws out of the sprites'
         // step; `CGameManager::Process`'s catch (@ 0x0042f3c6) logs it
         // (`CGameManager :: Process -> %s`, 0x0066cc4c) and goes on after
@@ -2635,10 +2634,14 @@ impl Stage {
 
     /// The closing (@ 0x00410f90 state 5): the elements gone, the
     /// character's `unfacing` when its sprite is there (@ 0x004414d0), its
-    /// record released; the menu is over.
-    fn menu_close_step(&mut self) {
+    /// record released; the menu is over. Run by the menu's process, so
+    /// once, at the first menu frame after `Atl_TerminateDialog` or the
+    /// click elsewhere (a script that goes on after `Atl_TerminateDialog`
+    /// holds the menus' frame until it ends, as its calls run inside the
+    /// original's handler).
+    pub(crate) fn menu_close_step(&mut self) {
         let Some(m) = &self.menu else { return };
-        if m.state != MenuState::Closing {
+        if m.state != MenuState::Closing || m.closed {
             return;
         }
         let c = m.character.clone();
@@ -4082,6 +4085,18 @@ impl Play {
             self.menus_frame(clicks, dt);
             return;
         }
+        // The menu's process (@ 0x00410f90): state 5 (asked by a click
+        // elsewhere or `Atl_TerminateDialog` since its last frame) ends it.
+        self.stage.borrow_mut().menu_close_step();
+        if self.stage.borrow_mut().menu_take_closed() {
+            // A mode queued meanwhile (`Atl_PuzzlePoker_Start` from a
+            // subject's script): the manager stays in state 3 and opens it
+            // at the next frame (@ 0x0041b780).
+            if !self.menus.active() {
+                self.game.menu_closed();
+            }
+            return;
+        }
         let wants = self.stage.borrow_mut().menu_wants_subjects();
         if let Some(c) = wants {
             let list = match self.game.script().character_subject_list(&c) {
@@ -4099,14 +4114,6 @@ impl Play {
             if let Some((c, s)) = pick {
                 self.game.click_subject(&c, &s);
                 break;
-            }
-        }
-        if self.stage.borrow_mut().menu_take_closed() {
-            // A mode queued meanwhile (`Atl_PuzzlePoker_Start` from a
-            // subject's script): the manager stays in state 3 and opens it
-            // at the next frame (@ 0x0041b780).
-            if !self.menus.active() {
-                self.game.menu_closed();
             }
         }
     }
