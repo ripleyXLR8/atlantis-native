@@ -581,3 +581,25 @@ fn the_logos_sound_plays() {
     assert_eq!(play.menus.current(), Some(menus::MAIN));
 }
 
+/// A menu opens with the mouse at the screen's centre and no button hot:
+/// the buttons' hit test runs on a mouse move only (@ 0x004523e0), so a
+/// press before any move clicks nothing, even on the button under the
+/// centre (the in-game menu's `option_control`).
+#[test]
+fn a_press_before_any_move_clicks_nothing() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("still-mouse");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    play.click();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    // A move, then the press: the button under the mouse is clicked.
+    assert!(play.click_menu("option_control"));
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::CONTROL));
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -3839,8 +3839,11 @@ impl Play {
             self.menus.point_of(name, &st.fonts)
         };
         let Some((x, y)) = p else { return false };
+        // A move onto the button first (the hover is tested on moves
+        // only): from beside it, then onto it; then the press.
+        self.mouse_at(x + 1, y);
+        self.update(0.0);
         self.mouse_at(x, y);
-        // The move first (the hover), then the press.
         self.update(0.0);
         self.click();
         true

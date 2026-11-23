@@ -339,6 +339,10 @@ pub struct Menus {
     /// The examine view's item (@ 0x004137b0).
     examine_item: Vec<u8>,
     pub mouse: (i32, i32),
+    /// Where the menu's last hover test was made: the buttons' hit test
+    /// runs on a mouse move only (@ 0x004523e0, event kind 2), so a menu
+    /// just opened has no button under a still mouse.
+    last_mouse: (i32, i32),
     clicks: usize,
     /// The saves (a folder, the browser's storage).
     pub saves: Option<std::rc::Rc<dyn crate::atlantis5_saves::SaveFiles>>,
@@ -372,6 +376,7 @@ impl Menus {
             death_text: String::new(),
             examine_item: Vec::new(),
             mouse: (W / 2, H / 2),
+            last_mouse: (W / 2, H / 2),
             clicks: 0,
             saves: None,
             utc_offset: no_offset,
@@ -915,7 +920,11 @@ impl Menus {
             match self.build(mode, config) {
                 Some(m) => {
                     self.menu = Some(m);
+                    // The mode opens with the mouse at the screen's centre
+                    // and its elements shown (@ 0x00452530: +0x40 = 0;
+                    // @ 0x0044ec50: +0x8c = 0): no move yet.
                     self.mouse = (W / 2, H / 2);
+                    self.last_mouse = self.mouse;
                     if mode == DEATH {
                         // @ 0x00410bd0: the music stopped with a 0.5 s
                         // fade, `death_theme` on channel 4.
@@ -942,7 +951,15 @@ impl Menus {
         let mouse = self.mouse;
         menu.layout(fonts, self);
         menu.measure(fonts);
-        menu.hover(mouse);
+        // The hit test on a move only (@ 0x004523e0 tests on an event of
+        // kind 2 and keeps the result in +0x40; the text button
+        // @ 0x0044eb60 turns 1 on a move with it, the sprite button
+        // @ 0x0044f0e0 likewise): a press under a still mouse finds no
+        // button hot.
+        if mouse != self.last_mouse {
+            menu.hover(mouse);
+            self.last_mouse = mouse;
+        }
         // The original takes a frame's events in turn (@ 0x0040d920), but
         // at the screen's refresh two presses never share a frame: the one
         // that closes the menu is its last. A long Native frame holding
@@ -1355,7 +1372,15 @@ impl Menu {
 
     fn set_visible(&mut self, name: &str, v: bool) {
         if let Some(i) = self.index(name) {
-            self.elements[i].visible = v;
+            let e = &mut self.elements[i];
+            // A show resets the hover (@ 0x00452530: +0x40; the text
+            // button's @ 0x0044ec50: +0x8c): hot again after a move only.
+            if v && !e.visible {
+                if let Kind::Text(t) = &mut e.kind {
+                    t.over = false;
+                }
+            }
+            e.visible = v;
         }
     }
 
