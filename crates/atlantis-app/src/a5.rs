@@ -210,6 +210,18 @@ fn start(src: Arc<Atlantis5Source>, lang: String, audio: Audio) -> Start {
 /// (play.md § 6), at 60 Hz, the common refresh [INFERRED there].
 const FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
 
+/// Until when the event loop sleeps: the next frame's time, or, while a
+/// redraw asked for has not come (a hidden, minimised or covered window,
+/// whose redraws the system holds back), a frame from now: a wake per
+/// frame instead of a loop that never sleeps.
+fn wait_until(next_frame: Instant, redraw_pending: bool, now: Instant) -> Instant {
+    if redraw_pending && next_frame <= now {
+        now + FRAME
+    } else {
+        next_frame
+    }
+}
+
 /// The decoding's step before the game starts (uncompressed bytes).
 const WARM_STEP: u64 = 4 << 20;
 
@@ -226,6 +238,8 @@ struct A5App {
     last: Instant,
     /// When the next frame is due ([`FRAME`] after the last one's).
     next_frame: Instant,
+    /// A redraw was asked for and has not come yet.
+    redraw_pending: bool,
     /// Whether the window has the focus (the mouse's moves turn the view
     /// only then).
     focused: bool,
@@ -331,6 +345,7 @@ impl A5App {
     }
 
     fn frame(&mut self, el: &ActiveEventLoop) {
+        self.redraw_pending = false;
         self.next_frame = (self.next_frame + FRAME).max(Instant::now());
         if !self.ready(el) {
             self.present();
@@ -423,12 +438,14 @@ impl ApplicationHandler for A5App {
         if let StartCause::ResumeTimeReached { .. } = cause {
             if let Some(w) = &self.window {
                 w.request_redraw();
+                self.redraw_pending = true;
             }
         }
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
-        el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
+        let until = wait_until(self.next_frame, self.redraw_pending, Instant::now());
+        el.set_control_flow(ControlFlow::WaitUntil(until));
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -546,6 +563,7 @@ pub fn run_window_on(
         columns: Vec::new(),
         last: Instant::now(),
         next_frame: Instant::now(),
+        redraw_pending: false,
         focused: false,
         menu_cursor: false,
         _audio: out,
@@ -570,4 +588,22 @@ pub fn cab_index_dir() -> std::path::PathBuf {
 /// The player's saves: `atlantis5/saves` in the per-user data folder.
 pub fn saves_dir() -> std::path::PathBuf {
     crate::desktop::data_dir().join("atlantis5").join("saves")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_redraw_that_does_not_come_does_not_spin_the_loop() {
+        let now = Instant::now();
+        let past = now - FRAME * 3;
+        let soon = now + FRAME / 2;
+        // A redraw asked for and not delivered: a frame from now.
+        assert_eq!(wait_until(past, true, now), now + FRAME);
+        // Otherwise the frame's own time.
+        assert_eq!(wait_until(soon, true, now), soon);
+        assert_eq!(wait_until(past, false, now), past);
+        assert_eq!(wait_until(soon, false, now), soon);
+    }
 }
