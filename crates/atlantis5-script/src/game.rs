@@ -76,6 +76,17 @@ struct Transition {
     entering: bool,
     /// +0x98: the camera's mode when a `centring` started.
     saved_mode: u32,
+    /// A step ran since the last frame's picture: the handler's loop
+    /// (@ 0x00405390) draws and flips after each step, so the next step,
+    /// with the loop's frame time, waits for the next frame. Set by every
+    /// step, cleared at the end of [`Game::update`] (the frame's picture
+    /// follows it): a step made before the update (a click's script, a
+    /// script resumed by [`Game::finish_wait`]) keeps its picture.
+    fresh: bool,
+    /// The last step reported the end (@ 0x0042d900 returned 1): the loop
+    /// still draws and flips that step's picture before it returns to the
+    /// script, which goes on in the next frame.
+    finished: bool,
 }
 
 /// A named timer (`Atl_Timer_Create`, the timer list @ 0x00435770: a map
@@ -426,9 +437,11 @@ impl Game {
 
     /// A click on a zone of the view (@ 0x004300d0 → 0x004017c0,
     /// 0x0042f890): `atl.event` filled, then the scene's `on_click`
-    /// script. Ignored while a script runs.
+    /// script. Ignored while a script runs, and while a timer's walk waits
+    /// for the end of its handler's frame (the original takes no event
+    /// before the walk goes on).
     pub fn click_zone(&mut self, id: i32, name: &[u8]) -> bool {
-        if self.busy() || self.state != 4 {
+        if self.busy() || self.state != 4 || self.timer_walk.is_some() {
             return false;
         }
         self.script.set_click_zone(id, name);
@@ -481,7 +494,7 @@ impl Game {
     /// subjects and an empty hand opens its subject menu instead
     /// ([`Request::SubjectMenu`]). Ignored while a script runs.
     pub fn click_sprite(&mut self, object: &[u8], animation: &[u8]) -> bool {
-        if self.busy() || self.state != 4 {
+        if self.busy() || self.state != 4 || self.timer_walk.is_some() {
             return false;
         }
         let semantic = match self.script.object_semantic(object) {
@@ -776,6 +789,8 @@ impl Game {
             fov0: self.fov,
             entering: false,
             saved_mode,
+            fresh: false,
+            finished: false,
         });
         self.continue_transition(0.0);
     }
@@ -812,9 +827,10 @@ impl Game {
         let Some(t) = self.transitions.last_mut() else {
             return;
         };
-        if t.entering {
+        if t.entering || t.finished {
             return;
         }
+        t.fresh = true;
         let pi = f32::from_bits(0x4049_0fdb);
         // 0x00655748: 1/9 (20° of π).
         let ninth = f32::from_bits(0x3de3_8e39);
@@ -894,19 +910,27 @@ impl Game {
             },
         };
         if done {
-            let depth = self.transitions.len() - 1;
-            self.transitions.pop();
-            self.request(&Request::TransitionEnd);
-            if let Some(r) = self
-                .runs
-                .iter_mut()
-                .rev()
-                .find(|r| r.block == Some(Block::Transition(depth)))
-            {
-                r.block = None;
+            if let Some(t) = self.transitions.last_mut() {
+                t.finished = true;
             }
-            self.run();
+            self.request(&Request::TransitionEnd);
         }
+    }
+
+    /// The loop's end once its last step's picture is shown: the
+    /// transition gone and its script going on.
+    fn finish_transition(&mut self) {
+        let depth = self.transitions.len() - 1;
+        self.transitions.pop();
+        if let Some(r) = self
+            .runs
+            .iter_mut()
+            .rev()
+            .find(|r| r.block == Some(Block::Transition(depth)))
+        {
+            r.block = None;
+        }
+        self.run();
     }
 
     /// `CAtlantis5::MainLoop`'s catch (@ 0x0043d320 → 0x0043d456): `--->
@@ -1309,19 +1333,40 @@ impl Game {
         }
     }
 
-    /// One frame of `dt` seconds.
+    /// One frame of `dt` seconds; its picture follows.
     pub fn update(&mut self, dt: f64) {
+        self.frame(dt);
+        for t in &mut self.transitions {
+            t.fresh = false;
+        }
+    }
+
+    fn frame(&mut self, dt: f64) {
         self.clock += dt;
         self.run();
         if self.waiting_for_engine() {
             return;
         }
-        if !self.transitions.is_empty() {
-            #[allow(clippy::cast_possible_truncation)]
-            self.continue_transition(dt as f32);
-            return;
+        // An `Atl_Address_Go` loop (@ 0x00405390): a step a frame, each
+        // with its picture. A step made since the last picture (the
+        // step with a time of 0 of a transition a click started) has this
+        // frame's; a finished one ends, and its script goes on here.
+        if let Some(t) = self.transitions.last() {
+            if t.fresh {
+                return;
+            }
+            if !t.finished {
+                #[allow(clippy::cast_possible_truncation)]
+                self.continue_transition(dt as f32);
+                return;
+            }
+            // When its script ends, the frame goes on below: in state 4 a
+            // timer's walk the handler held ends now, with no event
+            // between, as the original's walk goes on when the handler
+            // returns (@ 0x00435a70).
+            self.finish_transition();
         }
-        if !self.runs.is_empty() {
+        if !self.runs.is_empty() || !self.transitions.is_empty() {
             return;
         }
         match self.state {

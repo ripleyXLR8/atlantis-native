@@ -784,3 +784,94 @@ fn a_save_without_timers_has_no_timer_section() {
     let text = saved_text(&probe);
     assert!(text.contains("<CALLBACK_SHOOTER_MANAGER>"), "{text}");
 }
+
+/// The fields of view the transitions asked for so far.
+fn fovs(probe: &Rc<RefCell<Probe>>) -> Vec<f32> {
+    probe
+        .borrow()
+        .requests
+        .iter()
+        .filter_map(|r| match r {
+            Request::TransitionFov { radians, .. } => Some(*radians),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_clicked_transition_shows_its_step_with_no_time_first() {
+    // The handler's loop (@ 0x00405390): the step with a time of 0, its
+    // picture, then a step per frame with the loop's own frame time. A
+    // click runs before the frame's update: that frame shows the step
+    // with 0, and the time runs from the next.
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    g.set_fov(1.0);
+    probe.borrow_mut().requests.clear();
+    assert!(g.click_zone(7, b""));
+    assert_eq!(fovs(&probe), [1.0]);
+    g.update(0.02);
+    assert_eq!(fovs(&probe), [1.0], "no time in the click's frame");
+    g.update(0.02);
+    let ninth = std::f32::consts::PI / 9.0;
+    let f = fovs(&probe);
+    assert_eq!(f.len(), 2);
+    assert!((f[1] - (1.0 - 0.08 * ninth)).abs() < 1e-5, "{f:?}");
+}
+
+#[test]
+fn a_view_change_is_shown_before_the_script_goes_on() {
+    // The loop's last step (no_fx's view change) is drawn and flipped
+    // before `Atl_Address_Go` returns to the script.
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "if atl.event.type == \"click_zone\" then \
+           Atl_Address_Go(\"deck\", 2, \"no_fx\") AFTER_GO = true end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b""));
+    assert_eq!(g.script().address(), (b"deck".to_vec(), 2));
+    assert_eq!(g.script().global(b"AFTER_GO"), Value::Nil);
+    // The click's frame: the new view's picture.
+    g.update(0.02);
+    assert_eq!(g.script().global(b"AFTER_GO"), Value::Nil);
+    assert!(g.busy());
+    // The next frame: the script goes on.
+    g.update(0.02);
+    assert_eq!(g.script().global(b"AFTER_GO"), Value::Bool(true));
+    assert!(!g.busy());
+}
+
+#[test]
+fn a_timer_handler_that_turns_ends_its_walk_before_the_next_click() {
+    // A timer's handler that ends through a transition: the walk goes on
+    // right after it (@ 0x00435a70, no event step in between), so the
+    // one-shot timer is gone once the game takes clicks again.
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then Atl_Address_Go(\"deck\", 3, \"zoom_and_fade\") \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"once\", 0.1, 1) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"make"));
+    let mut fired = false;
+    for _ in 0..200 {
+        g.update(0.02);
+        fired |= g.busy();
+        if fired && !g.busy() {
+            break;
+        }
+    }
+    assert!(fired);
+    assert!(!g.busy());
+    assert_eq!(g.script().address(), (b"deck".to_vec(), 3));
+    assert!(g.timer_names().is_empty(), "{:?}", g.timer_names());
+}
