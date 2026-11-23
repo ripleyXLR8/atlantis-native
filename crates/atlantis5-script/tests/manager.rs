@@ -51,6 +51,13 @@ impl Engine for Probe {
         self.saves.get(name).cloned()
     }
 
+    /// One section that tells how many engine calls were made before it.
+    fn save_sections(&mut self) -> Vec<atlantis4_data::xml::Element> {
+        let mut e = atlantis5_script::save::element("PROBE");
+        e.attributes.push(("calls".into(), self.seen.len().to_string()));
+        vec![e]
+    }
+
     fn event(&mut self, e: &Event<'_>) {
         match e {
             Event::Call(b, a) => {
@@ -619,3 +626,20 @@ fn play_walks_the_timers_before_it_takes_a_request() {
     assert_eq!(g.state(), 1);
 }
 
+#[test]
+fn atl_save_takes_the_engine_s_sections_at_the_call() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().saves.clear();
+    let before = probe.borrow().seen.len();
+    // @ 0x00408fb0 → 0x0043ad90: the whole file is written inside the
+    // handler, so engine calls after Atl_Save are not in it.
+    assert!(g.run_string(
+        "return function() Atl_Sprite_Play(\"a\", \"z1\", \"loop\") Atl_Save() \
+         Atl_Sprite_Play(\"b\", \"z1\", \"loop\") end"
+    ));
+    let text = String::from_utf8(probe.borrow().saves["autoslot"].clone()).expect("text");
+    let calls = format!("calls=\"{}\"", before + 1);
+    assert!(text.contains(&calls), "{calls} in {text}");
+}

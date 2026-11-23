@@ -51,15 +51,23 @@ pub(crate) struct Shared {
     /// Calls for the game manager (timers, chapter, state requests), in
     /// call order.
     pub manager_calls: Vec<Call>,
-    /// The `LUA_DB` of each `Atl_Save` (taken at the call, as the
-    /// original writes it inside the handler), in call order.
-    pub saved_dbs: Vec<Result<atlantis4_data::xml::Element, String>>,
+    /// The `LUA_DB` and the engine's sections of each `Atl_Save` (taken
+    /// at the call, as the original writes the whole file inside the
+    /// handler), in call order.
+    pub saved_dbs: Vec<SavedGame>,
     /// MSVCRT's `rand` state (`holdrand`), which `lua50.dll`'s
     /// `math.random` uses; 1 until `srand`.
     pub holdrand: u32,
 }
 
 pub(crate) type SharedRef = Rc<RefCell<Shared>>;
+
+/// What a save takes at its call: the `LUA_DB` (or why it could not be
+/// made) and the engine's sections.
+pub(crate) struct SavedGame {
+    pub db: Result<atlantis4_data::xml::Element, String>,
+    pub sections: Vec<atlantis4_data::xml::Element>,
+}
 
 const SHARED_KEY: &[u8] = b"atlantis5-script.shared";
 
@@ -887,7 +895,10 @@ fn binding_entry(state: &mut LuaState) -> LuaResult<u32> {
         }
         Call::Save => {
             // @ 0x00408fb0 → 0x0043ad90: the save is written inside the
-            // handler; its `LUA_DB` is the table now.
+            // handler; its `LUA_DB` is the table now, and the engine's
+            // sections (configuration, camera, sound, persistent
+            // sprites) are the engine's state now, before the calls that
+            // follow in the script.
             let k = str_val(state, b"atl");
             let g = state.global;
             let db = match raw_get(state, g, k) {
@@ -900,8 +911,9 @@ fn binding_entry(state: &mut LuaState) -> LuaResult<u32> {
                         .into(),
                 ),
             };
+            let sections = engine.borrow_mut().save_sections();
             let mut sh = shared.borrow_mut();
-            sh.saved_dbs.push(db);
+            sh.saved_dbs.push(SavedGame { db, sections });
             sh.manager_calls.push(call.clone());
         }
         _ => {}
@@ -1271,17 +1283,23 @@ impl Script {
         std::mem::take(&mut self.shared.borrow_mut().manager_calls)
     }
 
-    /// Takes the `LUA_DB` now, as the next one [`Script::take_saved_db`]
-    /// gives (the save menu's save, outside any script).
+    /// Takes the `LUA_DB` and the engine's sections now, as the next
+    /// save [`Script::take_saved_db`] gives (the save menu's save,
+    /// outside any script).
     pub(crate) fn save_db_now(&mut self) -> Result<(), String> {
         let db = self.lua_db();
         let ok = db.as_ref().map(|_| ()).map_err(Clone::clone);
-        self.shared.borrow_mut().saved_dbs.push(db);
+        let engine = self.shared.borrow().engine.clone();
+        let sections = engine.borrow_mut().save_sections();
+        self.shared
+            .borrow_mut()
+            .saved_dbs
+            .push(SavedGame { db, sections });
         ok
     }
 
-    /// The `LUA_DB` of the oldest `Atl_Save` not yet written.
-    pub(crate) fn take_saved_db(&self) -> Option<Result<atlantis4_data::xml::Element, String>> {
+    /// The `LUA_DB` and the sections of the oldest save not yet written.
+    pub(crate) fn take_saved_db(&self) -> Option<SavedGame> {
         let mut sh = self.shared.borrow_mut();
         (!sh.saved_dbs.is_empty()).then(|| sh.saved_dbs.remove(0))
     }

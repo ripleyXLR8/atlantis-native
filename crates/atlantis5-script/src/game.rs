@@ -920,8 +920,9 @@ impl Game {
     }
 
     /// `Atl_Save` (@ 0x00408fb0 → 0x0043ad90): `saves/autoslot`, an
-    /// `ATL_FILE` with `LUA_DB` (taken at the call), the engine's
-    /// sections, then `CALLBACK_SHOOTER_MANAGER` (@ 0x00436f20): one
+    /// `ATL_FILE` with `LUA_DB` and the engine's sections (both taken at
+    /// the call: the original writes the file inside the handler), then
+    /// `CALLBACK_SHOOTER_MANAGER` (@ 0x00436f20): one
     /// `CALLBACK_SHOOTER` per timer with `name`, `duration` and
     /// `remaining_time` (floats), `repeat` (a `VT_I4`), holding one
     /// `CALLBACK` with the handler's `name` (`OnTimeOut`, 0x0066b004).
@@ -943,19 +944,21 @@ impl Game {
 
     fn save_as(&mut self, file: &str) -> bool {
         use crate::save;
-        let db = match self.script.take_saved_db() {
-            Some(Ok(db)) => db,
-            Some(Err(e)) => {
+        let Some(saved) = self.script.take_saved_db() else {
+            return false;
+        };
+        let db = match saved.db {
+            Ok(db) => db,
+            Err(e) => {
                 self.lua_error(&e);
                 return false;
             }
-            None => return false,
         };
         let mut root = save::element(save::ROOT);
         root.attributes.push(("type".into(), save::TYPE.into()));
         root.children.push(db);
-        let sections = self.engine.borrow_mut().save_sections();
-        root.children.extend(sections);
+        // The engine's sections as they were at the call.
+        root.children.extend(saved.sections);
         let mut manager = save::element("CALLBACK_SHOOTER_MANAGER");
         for (name, t) in &self.timers {
             let mut c = save::element("CALLBACK_SHOOTER");
