@@ -3383,8 +3383,19 @@ impl Engine for Stage {
                 }
             }
             Call::PersistantSpriteStop { object } => {
-                self.persistent.retain(|p| &p.0 != object);
-                self.sprites.retain(|s| &s.object != object);
+                // @ 0x0040bdc0: an object that is not persistent
+                // (@ 0x004421e0 false) is only logged (0x0066af38);
+                // else its record dropped (@ 0x00442350) and its sprite
+                // removed (@ 0x004414d0, 0x00441a90).
+                if self.persistent.iter().any(|p| &p.0 == object) {
+                    self.persistent.retain(|p| &p.0 != object);
+                    self.sprites.retain(|s| &s.object != object);
+                } else {
+                    log::info!(
+                        "Atl_PersistantSprite_Stop -> le sprite persistant {} n'existe pas",
+                        lossy(object)
+                    );
+                }
             }
             Call::PersistantSpriteStopAll => {
                 // @ 0x00442460.

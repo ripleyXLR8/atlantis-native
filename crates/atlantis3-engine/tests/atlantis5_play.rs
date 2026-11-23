@@ -517,6 +517,22 @@ fn a_frame_s_mouse_moves_turn_the_camera_once() {
     assert!((s - want).abs() < 1e-3, "{s} against {want}");
 }
 
+/// `Atl_PersistantSprite_Stop` (@ 0x0040bdc0) on an object that is not
+/// persistent (@ 0x004421e0 false) only logs: its ordinary sprite stays.
+#[test]
+fn persistant_sprite_stop_leaves_an_ordinary_sprite() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    go(&mut play, 4);
+    let coin = |play: &Play| play.stage().sprites().into_iter().any(|s| s.0 == "coin");
+    assert!(coin(&play));
+    assert!(play
+        .game
+        .run_string("return function() Atl_PersistantSprite_Stop(\"coin\") end"));
+    frames(&mut play, 1);
+    assert!(coin(&play), "not persistent: kept");
+}
+
 /// State 4's frame ends with a second sprite pick when one was found
 /// (@ 0x0042f000 case 4, 0x0042f464..0x0042f471: +0x3c read after the
 /// sound, @ 0x00430b70 again, which clears it first): a sprite the
