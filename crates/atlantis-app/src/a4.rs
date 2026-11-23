@@ -1198,6 +1198,7 @@ pub fn label(dir: &Path) -> Result<String, atlantis4_data::files::OpenError> {
 
 /// The edition of the installation `files` (`build` theirs), as [`label`]
 /// gives it.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn files_label(files: &A4Files, build: &atlantis4_data::exe::Build) -> String {
     match language_name(&files.language()) {
         Some(name) => format!("{}, {name}", build.label),
@@ -1503,15 +1504,6 @@ pub fn run_view(
 #[cfg(not(target_arch = "wasm32"))]
 const SHIFT_GRACE: Duration = Duration::from_millis(2000);
 
-/// The game at `dir` as the program plays it (a folder on the command
-/// line, or the game library's choice, on its event loop `el`): the
-/// splashes and the main menu, as `settings.ini` says (the language, the
-/// renderer, the full screen, the bug fixes; `fullscreen` forces the
-/// full screen, `original` (`--original`) turns every fix off for this run
-/// without writing the file); with `shift_grace` (the library's one game,
-/// started without its screen) Shift held in the first moments goes back
-/// to the library. Returns when the window closes.
-#[cfg(not(target_arch = "wasm32"))]
 /// Android: Atlantis Evolution from `files` (a folder chosen in the
 /// picker, read through `FileSource`) on `el`, full screen, until it
 /// ends.
@@ -1541,6 +1533,15 @@ pub fn run_files_on(
         .map_err(|e| format!("The window failed: {e}"))
 }
 
+/// The game at `dir` as the program plays it (a folder on the command
+/// line, or the game library's choice, on its event loop `el`): the
+/// splashes and the main menu, as `settings.ini` says (the language, the
+/// renderer, the full screen, the bug fixes; `fullscreen` forces the
+/// full screen, `original` (`--original`) turns every fix off for this run
+/// without writing the file); with `shift_grace` (the library's one game,
+/// started without its screen) Shift held in the first moments goes back
+/// to the library. Returns when the window closes.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn run_window_on(
     el: &mut EventLoop<()>,
     dir: &Path,
