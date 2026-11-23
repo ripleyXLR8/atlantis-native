@@ -296,6 +296,45 @@ fn an_unreadable_save_keeps_its_page() {
 }
 
 #[test]
+fn a_save_whose_lua_db_fails_keeps_its_page() {
+    // @ 0x0043b210 is one try: a throw in `LUA_DB`'s read (@ 0x00439270,
+    // ReadTable @ 0x004393e0) or in `return Atl_Address_GetCurrent()`
+    // (@ 0x00454220) skips the queueing of 5 and 4 (0x0043b6f4..0x0043b7c1).
+    let Some(d) = dvd() else { return };
+    let dir = scratch("lua-db-fails");
+    let head = "<ATL_FILE type=\"atlantis_5_save\">";
+    // No `LUA_DB` at all.
+    std::fs::write(dir.join("autoslot"), format!("{head}</ATL_FILE>")).expect("autoslot");
+    // An element without its `v`.
+    std::fs::write(
+        dir.join("slot_3"),
+        format!("{head}<LUA_DB><N sk=\"x\"/></LUA_DB></ATL_FILE>"),
+    )
+    .expect("slot_3");
+    // A readable but empty `atl`: `Atl_Address_GetCurrent` raises.
+    std::fs::write(dir.join("slot_4"), format!("{head}<LUA_DB/></ATL_FILE>")).expect("slot_4");
+    let mut play = booted(&d, &dir);
+    assert_eq!(play.menus.current(), Some(menus::MAIN));
+    click(&mut play, "rescue_game");
+    frames(&mut play, 3);
+    assert_eq!(play.game.state(), 3);
+    assert_eq!(play.menus.current(), Some(menus::MAIN), "no LUA_DB");
+    for slot in ["save_3", "save_4"] {
+        click(&mut play, "load_game");
+        frames(&mut play, 1);
+        assert_eq!(play.menus.current(), Some(menus::LOAD));
+        click(&mut play, slot);
+        frames(&mut play, 3);
+        assert_eq!(play.game.state(), 3, "{slot}");
+        assert_eq!(play.menus.current(), Some(menus::LOAD), "{slot}");
+        // Back to the main menu for the next slot.
+        click(&mut play, "back");
+        frames(&mut play, 1);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn the_option_pages_change_the_configuration() {
     let Some(d) = dvd() else { return };
     let dir = scratch("options");

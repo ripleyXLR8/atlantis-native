@@ -1153,7 +1153,9 @@ impl Game {
     /// `rescue_game` @ 0x00428ea0, the load menu's `slot_<n>`
     /// @ 0x00418960); at its end the reader queues the requests 5 (the
     /// transition, here [`Game`]'s own) and 4 (0x0043b6f4..0x0043b7c1).
-    /// False when the file is missing.
+    /// False when the file is missing or its read was abandoned (not an
+    /// `ATL_FILE`, `LUA_DB` missing or unreadable, `Atl_Address_GetCurrent`
+    /// raising).
     pub fn load_file(&mut self, file: &str) -> bool {
         let Some(data) = self.engine.borrow_mut().read_save(file) else {
             self.note(format!("Atl_Load: the file saves/{file} is missing"));
@@ -1173,13 +1175,17 @@ impl Game {
         if self.push_file(&path, false, false) {
             self.run();
         }
-        match root.child("LUA_DB") {
-            Some(db) => {
-                if let Err(e) = self.script.load_lua_db(db) {
-                    self.lua_error(&e);
-                }
-            }
-            None => self.note("CSerialisableLuaDB :: Deserialize: no <LUA_DB> element".into()),
+        // The reader is one try: a throw abandons it at that step, before
+        // the queueing of 5 and 4 (0x0043b6f4..0x0043b7c1); the catches
+        // (0x0043b884, 0x0043b8ca) only log. False, so the menus' loads
+        // reopen their page.
+        let Some(db) = root.child("LUA_DB") else {
+            self.note("CSerialisableLuaDB :: Deserialize: no <LUA_DB> element".into());
+            return false;
+        };
+        if let Err(e) = self.script.load_lua_db(db) {
+            self.lua_error(&e);
+            return false;
         }
         self.engine.borrow_mut().load_sections(&root);
         self.timers.clear();
@@ -1211,7 +1217,12 @@ impl Game {
                 let view = view as i32;
                 self.start_transition(scene, view, Fx::NoFx);
             }
-            Err(e) => self.lua_error(&e),
+            Err(e) => {
+                // @ 0x00454220 raises: the sections and the timers are
+                // read, nothing is queued.
+                self.lua_error(&e);
+                return false;
+            }
         }
         self.queue.push_back(4);
         true
