@@ -128,6 +128,19 @@ impl Film {
         }
     }
 
+    /// Decodes the file's audio track `track` from the next frame on (the
+    /// 2004 program's films have none; *The Secrets of Atlantis*' logos
+    /// have one): its rate and channels, `None` without such a track.
+    pub fn enable_audio(&mut self, track: usize) -> Option<(u32, u16)> {
+        self.video.enable_audio(track)
+    }
+
+    /// The samples of the decoded audio track `track` since the last call
+    /// (interleaved).
+    pub fn take_audio(&mut self, track: usize) -> Vec<i16> {
+        self.video.take_audio(track)
+    }
+
     /// FUN_00402f60 after a drawn frame: at the last frame (`FrameNum` =
     /// `Frames`) the film ends (false); else `BinkNextFrame`.
     pub fn next_frame(&mut self) -> bool {

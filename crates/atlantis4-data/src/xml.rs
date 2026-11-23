@@ -84,6 +84,22 @@ pub fn to_cp1252(s: &str) -> Vec<u8> {
 struct Parser<'a> {
     s: &'a [u8],
     at: usize,
+    /// The bytes are UTF-8 (*Atlantis V*'s texts), not Windows-1252.
+    utf8: bool,
+}
+
+/// Bytes of the file as text in its encoding. In UTF-8 mode the line
+/// ends are normalised to LF as XML 1.0 (§ 2.11) asks of every processor,
+/// MSXML among them (the *Atlantis V* texts' multi-line strings have CR
+/// LF).
+fn text_of(b: &[u8], utf8: bool) -> String {
+    if utf8 {
+        String::from_utf8_lossy(b)
+            .replace("\r\n", "\n")
+            .replace('\r', "\n")
+    } else {
+        cp1252(b)
+    }
 }
 
 fn is_name_byte(c: u8) -> bool {
@@ -123,7 +139,7 @@ impl Parser<'_> {
         if self.at == start {
             return Err(self.err("name expected"));
         }
-        Ok(cp1252(&self.s[start..self.at]))
+        Ok(text_of(&self.s[start..self.at], self.utf8))
     }
 
     /// Declarations, comments and white space before an element or a
@@ -185,7 +201,7 @@ impl Parser<'_> {
                         if self.at == self.s.len() {
                             return Err(self.err("unterminated value"));
                         }
-                        let v = decode_entities(&self.s[start..self.at]);
+                        let v = decode_entities(&self.s[start..self.at], self.utf8);
                         self.at += 1;
                         v
                     } else {
@@ -205,7 +221,7 @@ impl Parser<'_> {
                         if self.at == start {
                             return Err(self.err("value expected"));
                         }
-                        decode_entities(&self.s[start..self.at])
+                        decode_entities(&self.s[start..self.at], self.utf8)
                     };
                     el.attributes.push((key, value));
                 }
@@ -234,7 +250,7 @@ impl Parser<'_> {
                     return Err(self.err("'>' expected"));
                 }
                 self.at += 1;
-                el.text = decode_entities(&text).trim().to_string();
+                el.text = decode_entities(&text, self.utf8).trim().to_string();
                 return Ok(el);
             }
             if self.starts(b"<!--") || self.starts(b"<?") || self.starts(b"<!") {
@@ -247,8 +263,8 @@ impl Parser<'_> {
 }
 
 /// Bytes of a value with TinyXML's entities decoded, as text.
-fn decode_entities(b: &[u8]) -> String {
-    let text = cp1252(b);
+fn decode_entities(b: &[u8], utf8: bool) -> String {
+    let text = text_of(b, utf8);
     if !text.contains('&') {
         return text;
     }
@@ -292,7 +308,23 @@ fn decode_entities(b: &[u8]) -> String {
 
 /// Every top-level element of a file.
 pub fn parse(data: &[u8]) -> Result<Vec<Element>, XmlError> {
-    let mut p = Parser { s: data, at: 0 };
+    parse_in(data, false)
+}
+
+/// Every top-level element of a UTF-8 file (*Atlantis V*'s texts: no
+/// encoding declared, so UTF-8 for the program's MSXML; every byte of
+/// them valid UTF-8). A UTF-8 byte-order mark is skipped.
+pub fn parse_utf8(data: &[u8]) -> Result<Vec<Element>, XmlError> {
+    let data = data.strip_prefix(b"\xef\xbb\xbf").unwrap_or(data);
+    parse_in(data, true)
+}
+
+fn parse_in(data: &[u8], utf8: bool) -> Result<Vec<Element>, XmlError> {
+    let mut p = Parser {
+        s: data,
+        at: 0,
+        utf8,
+    };
     let mut out = Vec::new();
     loop {
         p.skip_misc()?;
@@ -321,6 +353,14 @@ mod tests {
             els[1].child("c").unwrap().attr("v"),
             Some("\"q\" & \u{e9}&zz;")
         );
+    }
+
+    #[test]
+    fn utf8_files() {
+        let els =
+            parse_utf8("<d t=\"caf\u{e9}\">L\u{2019}Atlantide\u{2026}</d>".as_bytes()).unwrap();
+        assert_eq!(els[0].attr("t"), Some("caf\u{e9}"));
+        assert_eq!(els[0].text, "L\u{2019}Atlantide\u{2026}");
     }
 
     #[test]

@@ -46,6 +46,11 @@ mod a4_gl;
 mod a4_prefetch;
 #[cfg(all(test, target_arch = "wasm32"))]
 mod a4_wasm_tests;
+/// Atlantis V's development entry (`--atlantis5`).
+#[cfg(not(target_arch = "wasm32"))]
+pub mod a5;
+#[cfg(target_arch = "wasm32")]
+mod a5_web;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cli;

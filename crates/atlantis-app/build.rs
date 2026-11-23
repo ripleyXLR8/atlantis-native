@@ -9,8 +9,28 @@ fn main() {
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_default();
     println!("cargo:rustc-env=ATLANTIS_NATIVE_COMMIT={commit}");
-    println!("cargo:rerun-if-changed=../../.git/HEAD");
-    println!("cargo:rerun-if-changed=../../.git/refs/heads");
+    // HEAD and the branches where git keeps them: in a linked worktree
+    // `.git` is a file, HEAD is in the worktree's own git folder and the
+    // branches in the common one (a build there kept an old commit).
+    let git = |arg: &str| {
+        std::process::Command::new("git")
+            .args(["rev-parse", "--path-format=absolute", arg])
+            .output()
+            .ok()
+            .filter(|o| o.status.success())
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+    };
+    match (git("--git-dir"), git("--git-common-dir")) {
+        (Some(dir), Some(common)) => {
+            println!("cargo:rerun-if-changed={dir}/HEAD");
+            println!("cargo:rerun-if-changed={common}/refs/heads");
+            println!("cargo:rerun-if-changed={common}/packed-refs");
+        }
+        _ => {
+            println!("cargo:rerun-if-changed=../../.git/HEAD");
+            println!("cargo:rerun-if-changed=../../.git/refs/heads");
+        }
+    }
 
     // Atlantis Evolution in the browser: its scripts (Lua) call the movie
     // and sound decoders deep in their stack, whose frames are large (the

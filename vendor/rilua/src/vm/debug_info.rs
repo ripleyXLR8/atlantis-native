@@ -81,12 +81,16 @@ pub fn symbexec(proto: &Proto, lastpc: usize, reg: u32) -> u32 {
                 last = pc;
             }
 
-            OpCode::TForLoop if reg >= a + 2 => {
+            OpCode::TForLoop | OpCode::TForLoop50 if reg >= a + 2 => {
                 // Writes to registers >= a+2
                 last = pc;
             }
 
-            OpCode::Jmp | OpCode::ForLoop | OpCode::ForPrep => {
+            OpCode::Jmp
+            | OpCode::ForLoop
+            | OpCode::ForPrep
+            | OpCode::ForLoop50
+            | OpCode::TForPrep50 => {
                 // Follow forward jumps that don't skip past lastpc.
                 // PUC-Rio: `if (reg != NO_REG && pc < dest && dest <= lastpc)`
                 let sbx = instr.sbx();

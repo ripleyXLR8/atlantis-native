@@ -504,7 +504,10 @@ pub(crate) fn compile_or_undump(source: &[u8], name: &str) -> LuaResult<ProtoRef
     } else {
         source
     };
-    if data.starts_with(vm::dump::LUA_SIGNATURE) {
+    if data.starts_with(vm::undump50::LUA50_SIGNATURE) {
+        // Native patch 4: Lua 5.0 chunks.
+        vm::undump50::undump50(data, name)
+    } else if data.starts_with(vm::dump::LUA_SIGNATURE) {
         vm::undump::undump(data, name)
     } else {
         // Pass the original source (with shebang) to the compiler.

@@ -19,6 +19,20 @@
 //! - Beside a track's file, `<file minus its 3-letter extension>mrk` in the
 //!   music folder holds markers (a count, then pairs of integers); the CD
 //!   ships none.
+//!
+//! *Atlantis V*'s reader (atlantis5-dvd-int-3891200 @ 0x0045b7a0, the same
+//! log string at 0x0066f1a8) is this one changed ([`Playlist::parse_atlantis5`]):
+//!
+//! - a line equal (upper-cased, @ 0x00455a50) to `RND` (0x0066f1a4) or
+//!   `LOOP` (0x0066f19c) is never a track, on any line; on the first line
+//!   it sets the channel's random flag (+0x59 of the channel's 0x78-byte
+//!   record at DAT_0068e72c) or its loop flag (+0x58), both cleared before
+//!   the file is read;
+//! - an empty line is skipped (its length tested, @ 0x004555b0);
+//! - a track's defaults are a volume of 1.0, fades of 2.0 s and one play;
+//!   `vol` is multiplied by 0.01 (0x006559c4), `tpsfi` and `tpsfo` by
+//!   0.001 (0x006559cc) into floats: the same file numbers as the 2004
+//!   program's, so [`Track`] keeps them as read (volume 100 by default).
 
 use std::collections::BTreeSet;
 
@@ -48,6 +62,9 @@ pub struct Track {
 pub struct Playlist {
     /// The first line was `RND`.
     pub random: bool,
+    /// *Atlantis V*: the first line was `LOOP` (the channel's flag +0x58;
+    /// its effect is the music player's, not read yet).
+    pub looped: bool,
     pub tracks: Vec<Track>,
 }
 
@@ -84,8 +101,17 @@ fn numbers(value: &[u8]) -> BTreeSet<i32> {
 }
 
 impl Playlist {
-    /// Reads a playlist file.
+    /// Reads a playlist file (the 2004 program's reader).
     pub fn parse(data: &[u8]) -> Playlist {
+        Self::parse_with(data, false)
+    }
+
+    /// Reads a playlist file as *Atlantis V*'s program does (@ 0x0045b7a0).
+    pub fn parse_atlantis5(data: &[u8]) -> Playlist {
+        Self::parse_with(data, true)
+    }
+
+    fn parse_with(data: &[u8], a5: bool) -> Playlist {
         let mut list = Playlist::default();
         let mut f = TextCursor::new(data);
         let mut n = 0;
@@ -95,7 +121,16 @@ impl Playlist {
             if line.is_empty() || line.starts_with(b"//") {
                 continue;
             }
-            if n == 1 && line.eq_ignore_ascii_case(b"RND") {
+            if a5 {
+                if line.eq_ignore_ascii_case(b"RND") {
+                    list.random |= n == 1;
+                    continue;
+                }
+                if line.eq_ignore_ascii_case(b"LOOP") {
+                    list.looped |= n == 1;
+                    continue;
+                }
+            } else if n == 1 && line.eq_ignore_ascii_case(b"RND") {
                 list.random = true;
                 continue;
             }
@@ -104,7 +139,7 @@ impl Playlist {
             let mut track = Track {
                 file: first.to_vec(),
                 repeat: 1,
-                volume: 50,
+                volume: if a5 { 100 } else { 50 },
                 fade_in_ms: 2000,
                 fade_out_ms: 2000,
                 mi: BTreeSet::new(),
@@ -171,6 +206,23 @@ mod tests {
         let t = &p.tracks[0];
         assert_eq!((t.volume, t.fade_in_ms, t.fade_out_ms), (60, 2000, 5000));
         assert_eq!(t.mi, [10, 20].into_iter().collect());
+    }
+
+    #[test]
+    fn atlantis5_loop_and_defaults() {
+        let p = Playlist::parse_atlantis5(b"LOOP\r\n\r\na.ogg tpsfi=500\r\nRND\r\nloop\r\n");
+        assert!(p.looped && !p.random);
+        assert_eq!(p.tracks.len(), 1);
+        let t = &p.tracks[0];
+        assert_eq!(
+            (t.volume, t.fade_in_ms, t.fade_out_ms, t.repeat),
+            (100, 500, 2000, 1)
+        );
+        // The 2004 reader takes LOOP for a track.
+        assert_eq!(Playlist::parse(b"LOOP\r\na.ogg").tracks.len(), 2);
+        let p = Playlist::parse_atlantis5(b"rnd\r\n999xb.wav vol=40");
+        assert!(p.random && !p.looped);
+        assert_eq!((p.tracks[0].repeat, p.tracks[0].volume), (999, 40));
     }
 
     /// Every playlist of the CD (`ATLANTIS4_CD`) reads to tracks whose file

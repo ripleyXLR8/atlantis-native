@@ -175,10 +175,33 @@ pub enum OpCode {
     Closure = 36,
     /// `R(A), R(A+1), ..., R(A+B-1) = vararg` — iABC
     VarArg = 37,
+    // ----- Lua 5.0 operations (Native patch 4: Lua 5.0 chunks) -----
+    // A Lua 5.0 chunk is loaded by `undump50`, which re-encodes its
+    // instructions in this layout; the operations whose meaning differs
+    // from 5.1 get their own codes, with Lua 5.0.3's `lvm.c` semantics.
+    /// 5.0 `FORLOOP`: `R(A)+=R(A+2); if R(A) <?= R(A+1) then pc+=sBx` (the
+    /// index is the loop variable; no copy to `R(A+3)`) — iAsBx
+    ForLoop50 = 38,
+    /// 5.0 `TFORLOOP`: `R(A+2), ..., R(A+2+C) := R(A)(R(A+1), R(A+2)); if
+    /// R(A+2) ~= nil then pc++` (followed by a JMP) — iABC
+    TForLoop50 = 39,
+    /// 5.0 `TFORPREP`: `if type(R(A)) == table then R(A+1):=R(A),
+    /// R(A):=next; pc+=sBx` — iAsBx
+    TForPrep50 = 40,
+    /// 5.0 `SETLIST`: `R(A)[Bx-Bx%32+i] := R(A+i), 1 <= i <= Bx%32+1` — iABx
+    SetList50 = 41,
+    /// 5.0 `SETLISTO`: as `SetList50`, up to the stack top — iABx
+    SetListO50 = 42,
+    /// 5.0 `NEWTABLE`: `R(A) := {}`, array size `fb2int50(B)`, `2^C` hash
+    /// nodes when `C > 0` — iABC
+    NewTable50 = 43,
 }
 
 /// Total number of opcodes.
 pub const NUM_OPCODES: u32 = 38;
+
+/// With the six Lua 5.0 operations of Native patch 4.
+pub const NUM_OPCODES_WITH_50: u32 = 44;
 
 /// Instruction format (matches PUC-Rio `enum OpMode`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -248,6 +271,12 @@ impl OpCode {
             35 => Some(Self::Close),
             36 => Some(Self::Closure),
             37 => Some(Self::VarArg),
+            38 => Some(Self::ForLoop50),
+            39 => Some(Self::TForLoop50),
+            40 => Some(Self::TForPrep50),
+            41 => Some(Self::SetList50),
+            42 => Some(Self::SetListO50),
+            43 => Some(Self::NewTable50),
             _ => None,
         }
     }
@@ -309,6 +338,12 @@ impl OpCode {
             Self::Close => "CLOSE",
             Self::Closure => "CLOSURE",
             Self::VarArg => "VARARG",
+            Self::ForLoop50 => "FORLOOP50",
+            Self::TForLoop50 => "TFORLOOP50",
+            Self::TForPrep50 => "TFORPREP50",
+            Self::SetList50 => "SETLIST50",
+            Self::SetListO50 => "SETLISTO50",
+            Self::NewTable50 => "NEWTABLE50",
         }
     }
 
@@ -318,8 +353,15 @@ impl OpCode {
     #[must_use]
     pub fn mode(self) -> OpMode {
         match self {
-            Self::Jmp | Self::ForLoop | Self::ForPrep => OpMode::IAsBx,
-            Self::LoadK | Self::GetGlobal | Self::SetGlobal | Self::Closure => OpMode::IABx,
+            Self::Jmp | Self::ForLoop | Self::ForPrep | Self::ForLoop50 | Self::TForPrep50 => {
+                OpMode::IAsBx
+            }
+            Self::LoadK
+            | Self::GetGlobal
+            | Self::SetGlobal
+            | Self::Closure
+            | Self::SetList50
+            | Self::SetListO50 => OpMode::IABx,
             _ => OpMode::IABC,
         }
     }
@@ -356,6 +398,8 @@ impl OpCode {
             | Self::TestSet
             | Self::ForLoop
             | Self::ForPrep
+            | Self::ForLoop50
+            | Self::TForPrep50
             | Self::GetTable
             | Self::OpSelf => OpArgMask::R,
             // OpArgU: used (arbitrary)
@@ -368,9 +412,12 @@ impl OpCode {
             | Self::Return
             | Self::SetList
             | Self::Closure
-            | Self::VarArg => OpArgMask::U,
+            | Self::VarArg
+            | Self::SetList50
+            | Self::SetListO50
+            | Self::NewTable50 => OpArgMask::U,
             // OpArgN: not used
-            Self::TForLoop | Self::Close => OpArgMask::N,
+            Self::TForLoop | Self::TForLoop50 | Self::Close => OpArgMask::N,
         }
     }
 
@@ -404,6 +451,8 @@ impl OpCode {
             | Self::Test
             | Self::TestSet
             | Self::TForLoop
+            | Self::TForLoop50
+            | Self::NewTable50
             | Self::VarArg => OpArgMask::U,
             // OpArgN: not used
             _ => OpArgMask::N,
@@ -426,8 +475,11 @@ impl OpCode {
                 | Self::Le
                 | Self::Return
                 | Self::SetList
+                | Self::SetList50
+                | Self::SetListO50
                 | Self::Close
                 | Self::TForLoop
+                | Self::TForLoop50
         )
     }
 }
@@ -579,7 +631,9 @@ mod tests {
 
     #[test]
     fn opcode_from_u8_invalid() {
-        assert_eq!(OpCode::from_u8(38), None);
+        // 38..43: the Lua 5.0 operations (Native patch 4).
+        assert_eq!(OpCode::from_u8(38), Some(OpCode::ForLoop50));
+        assert_eq!(OpCode::from_u8(44), None);
         assert_eq!(OpCode::from_u8(255), None);
     }
 

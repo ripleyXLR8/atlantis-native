@@ -305,6 +305,8 @@ pub enum Opened {
     Atlantis3(String),
     /// Atlantis Evolution: its edition's name.
     Atlantis4(String),
+    /// The Secrets of Atlantis: its edition's name.
+    Atlantis5(String),
 }
 
 impl Opened {
@@ -314,6 +316,7 @@ impl Opened {
             Opened::Atlantis2(_) => GameKind::Atlantis2,
             Opened::Atlantis3(_) => GameKind::Atlantis3,
             Opened::Atlantis4(_) => GameKind::Atlantis4,
+            Opened::Atlantis5(_) => GameKind::Atlantis5,
         }
     }
 
@@ -323,9 +326,10 @@ impl Opened {
     pub fn label(&self) -> String {
         match self {
             Opened::LostTales(game, images) => edition_label(game, *images),
-            Opened::Atlantis2(label) | Opened::Atlantis3(label) | Opened::Atlantis4(label) => {
-                label.clone()
-            }
+            Opened::Atlantis2(label)
+            | Opened::Atlantis3(label)
+            | Opened::Atlantis4(label)
+            | Opened::Atlantis5(label) => label.clone(),
         }
     }
 }
@@ -338,7 +342,11 @@ impl Opened {
 /// to the player).
 pub fn open_any(dir: &Path) -> Result<Opened, String> {
     let kind = setup::kind_of(dir);
-    if kind == Some(GameKind::Atlantis4) {
+    if kind == Some(GameKind::Atlantis5) {
+        crate::a5::label(dir)
+            .map(Opened::Atlantis5)
+            .map_err(|e| e.to_string())
+    } else if kind == Some(GameKind::Atlantis4) {
         crate::a4::label(dir)
             .map(Opened::Atlantis4)
             .map_err(|e| e.to_string())
@@ -371,7 +379,18 @@ pub fn edition_label(game: &Game, from_images: bool) -> String {
 /// it does not open.
 pub fn describe(dir: &Path) -> LauncherEntry {
     let kind = setup::kind_of(dir);
-    let (label, found) = if kind == Some(GameKind::Atlantis4) {
+    let (label, found) = if kind == Some(GameKind::Atlantis5) {
+        match crate::a5::label(dir) {
+            Ok(label) => (label, true),
+            Err(e) => {
+                log::info!("{}: {e}", dir.display());
+                (
+                    "Not found: this folder no longer holds the game".to_string(),
+                    false,
+                )
+            }
+        }
+    } else if kind == Some(GameKind::Atlantis4) {
         match crate::a4::label(dir) {
             Ok(label) => (label, true),
             Err(e) => {
@@ -739,6 +758,24 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
                 }
             }
         };
+        if kind == GameKind::Atlantis5 {
+            match crate::a5::label(&root) {
+                Ok(label) => {
+                    log::info!("game folder {} ({label})", root.display());
+                    return Some(vec![(Opened::Atlantis5(label), root)]);
+                }
+                Err(e) => {
+                    log::warn!("{}: {e}", root.display());
+                    let text = setup::explain_atlantis5(&root, &e);
+                    match ask(&text, "Choose another folder", "Help", give_up) {
+                        Choice::First => {}
+                        Choice::Second => setup::open_url(setup::HELP_URL),
+                        Choice::Third => return None,
+                    }
+                    continue;
+                }
+            }
+        }
         if kind == GameKind::Atlantis4 {
             match crate::a4::label(&root) {
                 Ok(label) => {
@@ -888,7 +925,7 @@ fn with_every_dvd_language(found: Vec<(PathBuf, Opened)>) -> Vec<(PathBuf, Opene
 /// offered, nor opened). The folders are opened until one of each game
 /// is found.
 pub fn first_of_each_game(candidates: &[PathBuf]) -> Vec<(PathBuf, Opened)> {
-    let mut found: [Option<(PathBuf, Opened)>; 4] = [None, None, None, None];
+    let mut found: [Option<(PathBuf, Opened)>; 5] = [None, None, None, None, None];
     'candidates: for c in candidates {
         for (root, kind) in setup::find_roots(c, 4) {
             let slot = &mut found[kind.index()];

@@ -26,6 +26,8 @@ Options:
   --size <w>x<h>             the window's size (Atlantis II)
   --resolution <640x480|800x600>  the original's screen size option (Atlantis II)
   --evolution2004 <folder> [--fullscreen]  play Atlantis Evolution's 2004 CD installation
+  --atlantis5 <disc, image or folder> [--fullscreen] [--headless] [--screenshot <file.png>]
+                             The Secrets of Atlantis (2006): its logos, main menu and game
 
 Data folder (saves, settings, game library, log), the first that applies:
   1. --data-dir <folder>

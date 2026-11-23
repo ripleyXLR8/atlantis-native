@@ -33,15 +33,20 @@ pub enum GameKind {
     /// `3D\OnGameEnter.lua`, or the 2004 CD's installation, the same name
     /// beside `cd0\datas\scenar`: [`holds_atlantis4`]).
     Atlantis4,
+    /// The Secrets of Atlantis (Atlantis V, 2006): its DVD, the DVD's
+    /// image, an install or the extracted cabinets
+    /// ([`atlantis3_data::atlantis5::holds_atlantis5`]).
+    Atlantis5,
 }
 
 impl GameKind {
     /// Every game, in the order the library's searches give them.
-    pub const ALL: [GameKind; 4] = [
+    pub const ALL: [GameKind; 5] = [
         GameKind::LostTales,
         GameKind::Atlantis2,
         GameKind::Atlantis3,
         GameKind::Atlantis4,
+        GameKind::Atlantis5,
     ];
 
     /// Its place in [`GameKind::ALL`].
@@ -56,13 +61,15 @@ impl GameKind {
             GameKind::Atlantis2 => "Atlantis II",
             GameKind::Atlantis3 => "Atlantis III",
             GameKind::Atlantis4 => "Atlantis Evolution",
+            // The French DVD's title (the only edition supported).
+            GameKind::Atlantis5 => "The Secrets of Atlantis : L'H\u{e9}ritage sacr\u{e9}",
         }
     }
 }
 
 /// The first-start explanation.
 pub const WELCOME: &str = "Atlantis Native is a new engine for Atlantis: The Lost Tales, \
-Atlantis II, Atlantis III and Atlantis Evolution. It does not include the games themselves: the pictures, videos, voices \
+Atlantis II, Atlantis III, Atlantis Evolution and The Secrets of Atlantis. It does not include the games themselves: the pictures, videos, voices \
 and music belong to the games' publisher, so Atlantis Native plays them from your own copy.\n\n\
 Choose the folder of your game:\n\
 \u{2022} GOG.com: the folder where the game is installed \
@@ -79,7 +86,10 @@ the folder where the French CD installed it (the one with Atlantis3.exe and Data
 images of its three CDs (or copies of the CDs) in it or in a folder inside it.\n\
 \u{2022} Atlantis Evolution: GOG.com's installation folder (the one with Atlantis Evolution.exe \
 and 3D), or the folder where its 2004 CD installed it (the one with Atlantis Evolution.exe \
-and cd0 to cd4).\n\n\
+and cd0 to cd4).\n\
+\u{2022} The Secrets of Atlantis (French DVD): the DVD's drive or a copy of its files (the one \
+with DATAS.cab), the folder holding the DVD's image (.iso), or the folder where it was \
+installed.\n\n\
 Atlantis Native only reads these files and never changes them.";
 
 /// Case-insensitive lookup of a file in a folder.
@@ -163,7 +173,9 @@ pub fn explain_evolution_2004_discs(dir: &Path) -> String {
 /// `Datas\scenar\defnames.con`, which no folder of the other games has),
 /// Atlantis II when [`atlantis2_data::files::holds_atlantis2`] says so
 /// (looked at before the first game: its CD installation's folder may
-/// hold the images of its discs), else the first game when it holds
+/// hold the images of its discs), The Secrets of Atlantis when
+/// [`atlantis3_data::atlantis5::holds_atlantis5`] says so (its DVD, the
+/// DVD's image or a folder holding it, an install), else the first game when it holds
 /// atlantis.exe, or a CD image that is not one of Atlantis II's discs (a
 /// folder of both games' images is the first game's).
 pub fn kind_of(dir: &Path) -> Option<GameKind> {
@@ -173,6 +185,10 @@ pub fn kind_of(dir: &Path) -> Option<GameKind> {
         Some(GameKind::Atlantis3)
     } else if atlantis2_data::files::holds_atlantis2(dir) {
         Some(GameKind::Atlantis2)
+    } else if atlantis3_data::atlantis5::holds_atlantis5(dir) {
+        // Before the first game: its DVD's image would be taken for one of
+        // the first game's.
+        Some(GameKind::Atlantis5)
     } else if has_file(dir, "atlantis.exe") || has_other_disc_images(dir) {
         Some(GameKind::LostTales)
     } else {
@@ -241,7 +257,7 @@ pub fn find_any_root(dir: &Path, depth: usize) -> Option<(PathBuf, GameKind)> {
 /// [`find_atlantis2_root`], [`find_atlantis3_root`] and
 /// [`find_atlantis4_root`], in one walk.
 pub fn find_roots(dir: &Path, depth: usize) -> Vec<(PathBuf, GameKind)> {
-    fn walk(dir: &Path, depth: usize, found: &mut [Option<PathBuf>; 4]) {
+    fn walk(dir: &Path, depth: usize, found: &mut [Option<PathBuf>; 5]) {
         if let Some(k) = kind_of(dir) {
             let slot = &mut found[k.index()];
             slot.get_or_insert_with(|| dir.to_path_buf());
@@ -267,7 +283,7 @@ pub fn find_roots(dir: &Path, depth: usize) -> Vec<(PathBuf, GameKind)> {
             walk(&d, depth - 1, found);
         }
     }
-    let mut found = [None, None, None, None];
+    let mut found = [None, None, None, None, None];
     walk(dir, depth, &mut found);
     found
         .into_iter()
@@ -396,6 +412,18 @@ pub fn explain_atlantis3_no_disc(dir: &Path) -> String {
 
 /// What to tell the player about an Atlantis Evolution folder that does
 /// not open.
+/// What to tell the player about a folder of The Secrets of Atlantis that
+/// does not open.
+pub fn explain_atlantis5(dir: &Path, err: &atlantis3_data::atlantis5::OpenError) -> String {
+    format!(
+        "{} does not hold The Secrets of Atlantis in a form Atlantis Native reads ({err}).\n\n\
+         Choose the DVD's drive or a copy of its files (the folder with DATAS.cab and \
+         DATAS_french.cab), the folder holding the DVD's image (.iso), or the folder where \
+         the game was installed (the one with Datas).",
+        dir.display()
+    )
+}
+
 pub fn explain_atlantis4(dir: &Path, err: &atlantis4_data::files::OpenError) -> String {
     use atlantis4_data::files::OpenError;
     let shown = dir.display();
@@ -829,7 +857,7 @@ mod tests {
         let e = explain_atlantis3_no_disc(d);
         assert!(e.contains("three discs"), "{e}");
         assert_eq!(GameKind::Atlantis3.name(), "Atlantis III");
-        assert_eq!(GameKind::ALL.map(GameKind::index), [0, 1, 2, 3]);
+        assert_eq!(GameKind::ALL.map(GameKind::index), [0, 1, 2, 3, 4]);
     }
 
     /// A fake GOG.com installation of Atlantis Evolution: its program
