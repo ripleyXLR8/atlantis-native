@@ -1776,6 +1776,9 @@ impl Stage {
                     return false;
                 }
                 i += 1;
+            } else if self.facing_awaited(i) {
+                // Kept on its last frame for the next frame's check.
+                i += 1;
             } else {
                 let s = self.sprites.remove(i);
                 if s.persistent {
@@ -1996,6 +1999,32 @@ impl Stage {
                 r.held = held;
             }
         }
+    }
+
+    /// Whether sprite `i` is a `facing` sprite that the dialog's facing
+    /// loop or the subject menu's state 0 still waits on. The original
+    /// checks the sprite's time against (last − first) / fps before the
+    /// sprites' step of each frame, and the step removes it once the time
+    /// passes (last − first + 1) / fps: at the screen's refresh (a frame
+    /// every 1/60 s or so, play.md § 6) a check always lands in that
+    /// 1/15 s window and swaps in `listen`. A frame longer than 1/15 s
+    /// could step over the window and remove the talker for the whole
+    /// dialog; such a sprite is kept, ended, on its last frame, so the
+    /// next frame's check finds it done, as at the full frame rate.
+    fn facing_awaited(&self, i: usize) -> bool {
+        let s = &self.sprites[i];
+        if s.animation != b"facing" {
+            return false;
+        }
+        let dialog = self
+            .dialog
+            .as_ref()
+            .is_some_and(|d| d.facing && d.faced.contains(&s.object));
+        let menu = self
+            .menu
+            .as_ref()
+            .is_some_and(|m| m.state == MenuState::Facing && m.character == s.object);
+        dialog || menu
     }
 
     /// Whether the `facing` sprite of `object` has run its length

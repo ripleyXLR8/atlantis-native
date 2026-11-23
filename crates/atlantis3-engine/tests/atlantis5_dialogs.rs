@@ -243,6 +243,52 @@ fn space_ends_a_dialog_and_its_talkers_turn_back() {
     assert!(!play.game.busy());
 }
 
+/// At about 10 frames a second (a frame longer than a `facing` frame,
+/// 1/15 s) the talker still turns, then listens: the subject menu's and
+/// the dialog's checks find `facing` done instead of the sprites' step
+/// removing it in between.
+#[test]
+fn at_a_low_frame_rate_the_talker_faces_then_listens() {
+    let Some(d) = dvd() else { return };
+    for dt in [0.1, 0.09, 0.11, 0.125] {
+        let mut play = to_first_view(&d, None);
+        go(&mut play, 17);
+        assert!(play.aim_at_sprite(b"gorilla"));
+        play.click();
+        play.update(dt);
+        assert!(play.stage().menu_open_now());
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
+        for _ in 0..100 {
+            play.update(dt);
+            if !play.stage().menu_subjects().is_empty() {
+                break;
+            }
+        }
+        assert_eq!(play.stage().menu_subjects(), [b"gorille".to_vec()]);
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"), "dt {dt}");
+        // Closed: `unfacing`, then a dialog from a script faces again.
+        play.mouse_at(5, 5);
+        play.click();
+        for _ in 0..40 {
+            play.update(dt);
+        }
+        assert!(!play.stage().menu_open_now());
+        assert!(play
+            .game
+            .run_string("return function() Atl_Dialog_Play(1) end"));
+        play.update(dt);
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
+        for _ in 0..100 {
+            play.update(dt);
+            if anim(&play, "gorilla").as_deref() != Some("facing") {
+                break;
+            }
+        }
+        assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"), "dt {dt}");
+        assert!(play.stage().dialog_state().is_some());
+    }
+}
+
 #[test]
 fn the_autosave_is_written_and_loaded() {
     let Some(d) = dvd() else { return };
