@@ -490,3 +490,29 @@ fn a_randomized_sprite_without_its_next_file_stays() {
     }
     assert_eq!(play.game.state(), 4);
 }
+
+/// The mouse's moves of a frame make one move (@ 0x0047c8a0: one
+/// `GetDeviceState` a frame), so the look's rule against an opposing
+/// speed (@ 0x0042cdc0: a third of it taken off) runs once a frame,
+/// whatever the number of system events.
+#[test]
+fn a_frame_s_mouse_moves_turn_the_camera_once() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    assert_eq!(play.game.state(), 4);
+    assert!(!play.game.busy());
+    play.look(1000.0, 0.0);
+    frames(&mut play, 1);
+    let s = play.stage().look_speed()[0];
+    assert!((s + 6.0).abs() < 1e-4, "at the clamp: {s}");
+    // A reversal as a 1000 Hz mouse gives it: 16 events of 1 count. One
+    // move of −16 counts: ax = 16 · dt · 0.3, minus a third of −6.
+    for _ in 0..16 {
+        play.look(-1.0, 0.0);
+    }
+    frames(&mut play, 1);
+    let dt = 1.0f32 / 30.0;
+    let want = -6.0 + (16.0 * dt * 0.3 + 6.0 * f32::from_bits(0x3eaa_aaab));
+    let s = play.stage().look_speed()[0];
+    assert!((s - want).abs() < 1e-3, "{s} against {want}");
+}

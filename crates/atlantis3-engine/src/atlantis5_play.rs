@@ -2365,6 +2365,12 @@ impl Stage {
     }
 
     /// Whether a dialog runs.
+    /// The camera's look speeds (yaw +0x0c, pitch +0x08; radians a
+    /// second), for tests.
+    pub fn look_speed(&self) -> [f32; 2] {
+        self.speed
+    }
+
     pub fn dialog_running(&self) -> bool {
         self.dialog.is_some()
     }
@@ -3651,8 +3657,10 @@ pub enum Hover {
 pub struct Play {
     pub game: Game,
     stage: Rc<RefCell<Stage>>,
-    /// The mouse's moves (DirectInput lX, lY) since the last frame.
-    moves: Vec<(f32, f32)>,
+    /// The mouse's move (DirectInput lX, lY) since the last frame: the
+    /// sum of the system's moves, as the original reads the device's
+    /// state once per frame.
+    moves: (f32, f32),
     /// Left clicks since the last frame.
     clicks: usize,
     hover: Option<Hover>,
@@ -3740,7 +3748,7 @@ impl Play {
         Ok(Play {
             game,
             stage,
-            moves: Vec::new(),
+            moves: (0.0, 0.0),
             clicks: 0,
             hover: None,
             menus,
@@ -3877,7 +3885,7 @@ impl Play {
         if self.logos_playing() {
             // The logos' loop (@ 0x0043d6a0): the film's steps only.
             self.clicks = 0;
-            self.moves.clear();
+            self.moves = (0.0, 0.0);
             self.stage.borrow_mut().update(dt, false, true);
             let ended = std::mem::take(&mut self.stage.borrow_mut().wait_ended);
             if ended && !self.stage().film_playing() {
@@ -3887,15 +3895,16 @@ impl Play {
         }
         self.game.set_fov(self.stage.borrow().fov);
         let play = self.game.state() == 4 && !self.game.busy();
-        let moves = std::mem::take(&mut self.moves);
+        let (dx, dy) = std::mem::take(&mut self.moves);
         let clicks = std::mem::take(&mut self.clicks);
-        if play {
+        // One move event a frame at most (@ 0x0047c8a0: one
+        // `GetDeviceState` of the mouse, the move handler called once when
+        // lX, lY or lZ is not 0), so the look's rule (a third of a speed
+        // against the move taken off, the ±6 clamp, @ 0x0042cdc0) runs
+        // once on the frame's whole move, whatever the mouse's report rate.
+        if play && (dx != 0.0 || dy != 0.0) {
             #[allow(clippy::cast_possible_truncation)]
-            let dtf = dt as f32;
-            let mut st = self.stage.borrow_mut();
-            for (dx, dy) in moves {
-                st.look(dx, dy, dtf);
-            }
+            self.stage.borrow_mut().look(dx, dy, dt as f32);
         }
         // The modes asked by the last frame's scripts.
         let requests = std::mem::take(&mut self.stage.borrow_mut().menu_requests);
@@ -4395,9 +4404,13 @@ impl Play {
     }
 
     /// A mouse move of (dx, dy) (DirectInput's relative lX, lY), taken at
-    /// the next frame.
+    /// the next frame: the moves of a frame add up into one, as the
+    /// device's state the original reads once per frame (@ 0x0047c8a0).
+    /// Every front end (mouse, pointer lock, touch drag) may call it once
+    /// per system event.
     pub fn look(&mut self, dx: f32, dy: f32) {
-        self.moves.push((dx, dy));
+        self.moves.0 += dx;
+        self.moves.1 += dy;
     }
 
     /// A press of the left button (the mouse event of kind 0 with the
