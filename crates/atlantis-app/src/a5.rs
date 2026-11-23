@@ -361,6 +361,7 @@ impl ApplicationHandler for A5App {
             Ok(w) => Rc::new(w),
             Err(e) => {
                 log::error!("no window: {e}");
+                self.error = Some(format!("The window could not be opened: {e}"));
                 el.exit();
                 return;
             }
@@ -371,6 +372,7 @@ impl ApplicationHandler for A5App {
             Ok(s) => self.surface = Some(s),
             Err(e) => {
                 log::error!("no picture in the window: {e}");
+                self.error = Some(format!("The window cannot show the game: {e}"));
                 el.exit();
                 return;
             }
