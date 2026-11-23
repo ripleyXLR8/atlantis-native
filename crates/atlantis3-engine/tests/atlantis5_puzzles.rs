@@ -732,6 +732,48 @@ fn sudoku() {
     assert_eq!(play.stage().address(), Some((b"ishtar".to_vec(), 27)));
 }
 
+/// A click's `Atl_Sprite_PlayRebound(.., "loop", 0, v − 1, v − 1)` (a
+/// new player at frame 0, @ 0x00448d00) is stepped to its figure before
+/// it is first drawn: state 4 runs the scene's update (@ 0x0044c380)
+/// after the frame's events (@ 0x0042f000 case 4).
+#[test]
+fn a_clicked_sudoku_figure_shows_its_frame_at_once() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 8);
+    go(&mut play, "ishtar", 30);
+    let id = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1 == b"sudoku")
+        .map(|z| z.0)
+        .expect("a sudoku case");
+    let (x, y) = ((id - 1) % 9, (id - 1) / 9);
+    let name = format!(
+        "sudoku_{}{}",
+        3 * (y / 3) + x / 3 + 1,
+        3 * (y % 3) + x % 3 + 1
+    );
+    for _ in 0..3 {
+        assert!(play.aim_at_zone_named(id, b"sudoku"));
+        play.click();
+        // One frame: the click's script, then the scene's update, then the
+        // picture.
+        play.update(1.0 / 30.0);
+        assert!(!play.game.busy());
+        let v = int(&lua(&mut play, &format!("atl.puzzle.sudoku.grid[{id}]")));
+        let frame = play
+            .stage()
+            .sprites()
+            .into_iter()
+            .find(|s| s.0 == name)
+            .map(|s| s.2);
+        if v == 0 {
+            continue;
+        }
+        assert_eq!(frame, Some(usize::try_from(v - 1).unwrap()), "{name} = {v}");
+    }
+}
+
 #[test]
 fn lazer() {
     let Some(d) = dvd() else { return };

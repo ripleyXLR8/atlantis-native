@@ -1765,6 +1765,13 @@ impl Stage {
     /// One frame: camera, sprites (@ 0x00441c30) when `scene`, sound and
     /// music (@ 0x00459fd0), film.
     fn update(&mut self, dt: f64, play: bool, scene: bool) {
+        self.update_start(dt, play);
+        self.update_scene(dt, scene);
+    }
+
+    /// The frame's first part: the film's end, the camera, an animated
+    /// look's and a dialog's steps, the film's step.
+    fn update_start(&mut self, dt: f64, play: bool) {
         self.clock += dt;
         // A film whose last step reported its end was drawn once: its loop
         // is left, and the script goes on in this frame.
@@ -1788,6 +1795,15 @@ impl Stage {
         }
         // `Atl_Dialog_Play`'s loop: its checks, then the scene's update.
         self.dialog_update(dt);
+        self.film_update();
+    }
+
+    /// The scene's update (@ 0x0044c380: the sprites' step) and the sound
+    /// (@ 0x00459fd0), after the frame's scripts: state 4 (@ 0x0042f000
+    /// case 4) runs the events and the timers, then the pick and the
+    /// cursor, and only then the scene's update, so a sprite a click or a
+    /// timer made is stepped once before it is first drawn.
+    fn update_scene(&mut self, dt: f64, scene: bool) {
         // A randomized sprite's missing file throws out of the sprites'
         // step; `CGameManager::Process`'s catch (@ 0x0042f3c6) logs it
         // (`CGameManager :: Process -> %s`, 0x0066cc4c) and goes on after
@@ -1803,7 +1819,6 @@ impl Stage {
         if !thrown {
             self.music_update(dt);
         }
-        self.film_update();
     }
 
     /// The sprites' step (@ 0x00441c30, from the scene's update
@@ -3972,8 +3987,9 @@ impl Play {
     /// camera's step (@ 0x0042cf80), the clicks on what the last frame's
     /// pick found (@ 0x004300d0), the timers (@ 0x00435a70); then the pick
     /// for the next frame: the zone under the centre (@ 0x00430740) or,
-    /// with none, the sprite (@ 0x00430b70). Moves and clicks outside play
-    /// are dropped.
+    /// with none, the sprite (@ 0x00430b70), the cursor (@ 0x0042c030);
+    /// last the scene's update (@ 0x0044c380, the sprites' step) and the
+    /// sound (@ 0x00459fd0). Moves and clicks outside play are dropped.
     pub fn update(&mut self, dt: f64) {
         if self.logos_playing() {
             // The logos' loop (@ 0x0043d6a0): the film's steps only.
@@ -4016,7 +4032,7 @@ impl Play {
         if self.stage.borrow().dialog_running() {
             self.stage.borrow_mut().clicks += clicks;
         }
-        self.stage.borrow_mut().update(dt, play, scene);
+        self.stage.borrow_mut().update_start(dt, play);
         if std::mem::take(&mut self.stage.borrow_mut().wait_ended) {
             self.game.finish_wait();
         }
@@ -4038,6 +4054,9 @@ impl Play {
             self.pick();
         }
         self.cursor_frame(dt);
+        // The scene's update and the sound last (@ 0x0042f000 case 4:
+        // after the events, the timers, the pick and the cursor).
+        self.stage.borrow_mut().update_scene(dt, scene);
     }
 
     /// The modes the scripts asked (`Atl_GameOver`, `Atl_ExamineItem`,
