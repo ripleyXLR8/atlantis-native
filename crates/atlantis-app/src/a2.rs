@@ -1143,7 +1143,7 @@ impl A2App {
     #[cfg_attr(not(target_arch = "wasm32"), allow(unused_variables))]
     fn may_grab(&self, in_menu: bool) -> bool {
         #[cfg(target_arch = "wasm32")]
-        return !in_menu && self.web.in_menu && !self.web.lock_refused;
+        return !in_menu && self.web.in_menu && !self.web.lock_refused();
         #[cfg(not(target_arch = "wasm32"))]
         true
     }
@@ -1527,6 +1527,7 @@ impl A2App {
         if a2_web::pointer_locked() {
             self.web.lock_seen = true;
             self.web.lock_auto = false;
+            self.web.lock_refused_at = None;
             return;
         }
         if !self.locked {
@@ -1545,9 +1546,13 @@ impl A2App {
             // click was made): the next click only takes the lock back,
             // instead of acting at the screen's centre.
             self.refocused = true;
-        } else if !self.web.lock_refused {
-            log::info!("pointer lock refused: clicks act at once, the arrow keys turn the view");
-            self.web.lock_refused = true;
+        } else {
+            if self.web.lock_refused_at.is_none() {
+                log::info!(
+                    "pointer lock refused: clicks act at once, the arrow keys turn the view"
+                );
+            }
+            self.web.lock_refused_at = Some(Instant::now());
         }
         self.web.lock_seen = false;
         if self.engine.loop_type != LoopType::Menu {
