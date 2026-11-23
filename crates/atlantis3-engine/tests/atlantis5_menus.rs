@@ -206,6 +206,32 @@ fn the_in_game_menu_saves_and_the_load_page_reads_it() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Two presses in one long frame (a double click at a low frame rate):
+/// the one that closes the menu is its last, as when each press has a
+/// frame of its own at the screen's refresh.
+#[test]
+fn a_double_click_in_one_frame_clicks_once() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("double-click");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert!(play.click_menu("save"));
+    play.click();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    click(&mut play, "back");
+    frames(&mut play, 1);
+    assert_eq!(
+        play.menus.current(),
+        Some(menus::IN_GAME),
+        "one save page, not two"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_option_pages_change_the_configuration() {
     let Some(d) = dvd() else { return };
