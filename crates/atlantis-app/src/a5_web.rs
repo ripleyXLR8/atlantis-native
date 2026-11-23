@@ -255,17 +255,8 @@ impl A5App {
             return (0, 0, VIEW_WIDTH, VIEW_HEIGHT);
         };
         let size = window.inner_size();
-        let (ww, wh) = (size.width.max(1) as usize, size.height.max(1) as usize);
-        let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
-        let (dw, dh) = if ww * gh > wh * gw {
-            (wh * gw / gh, wh)
-        } else {
-            (ww, ww * gh / gw)
-        };
-        let (dw, dh) = (dw.max(1), dh.max(1));
-        ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
+        place_in(size.width as usize, size.height as usize)
     }
-
     /// A canvas position on the game's 1024 × 576 picture.
     fn to_picture(&self, p: PhysicalPosition<f64>) -> (i32, i32) {
         let (ox, oy, dw, dh) = self.place();
@@ -275,12 +266,13 @@ impl A5App {
     }
 
     fn present(&mut self) {
-        let (ox, oy, dw, dh) = self.place();
         let (Some(window), Some(gl)) = (&self.window, self.gl.as_mut()) else {
             return;
         };
+        // The canvas's size read once, for the placement and the draw.
         let size = window.inner_size();
         let (ww, wh) = (size.width.max(1), size.height.max(1));
+        let (ox, oy, dw, dh) = place_in(ww as usize, wh as usize);
         for p in &mut self.picture {
             *p &= 0x00ff_ffff;
         }
@@ -642,4 +634,17 @@ fn record_state(play: &Play, clock: f64, audio: bool, locked: bool, warmed: bool
         crate::audio_out::underruns(),
     );
     STATE.with(|st| *st.borrow_mut() = s);
+}
+
+/// The picture's place in a canvas of `ww` × `wh` (x, y, width, height).
+fn place_in(ww: usize, wh: usize) -> (usize, usize, usize, usize) {
+    let (ww, wh) = (ww.max(1), wh.max(1));
+    let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
+    let (dw, dh) = if ww * gh > wh * gw {
+        (wh * gw / gh, wh)
+    } else {
+        (ww, ww * gh / gw)
+    };
+    let (dw, dh) = (dw.max(1), dh.max(1));
+    ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
 }

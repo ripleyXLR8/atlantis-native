@@ -253,28 +253,12 @@ struct A5App {
 }
 
 impl A5App {
-    /// The picture's place in the window: (x, y, width, height).
-    fn place(&self) -> (usize, usize, usize, usize) {
-        let Some(window) = &self.window else {
-            return (0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-        };
-        let size = window.inner_size();
-        let (ww, wh) = (size.width.max(1) as usize, size.height.max(1) as usize);
-        let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
-        let (dw, dh) = if ww * gh > wh * gw {
-            (wh * gw / gh, wh)
-        } else {
-            (ww, ww * gh / gw)
-        };
-        let (dw, dh) = (dw.max(1), dh.max(1));
-        ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
-    }
-
     fn present(&mut self) {
-        let (ox, oy, dw, dh) = self.place();
         let (Some(window), Some(surface)) = (&self.window, self.surface.as_mut()) else {
             return;
         };
+        // The window's size read once: the placement and the buffer are
+        // both made from it (a second read may differ during a resize).
         let size = window.inner_size();
         let (ww, wh) = (size.width.max(1) as usize, size.height.max(1) as usize);
         let (Some(w), Some(h)) = (NonZeroU32::new(ww as u32), NonZeroU32::new(wh as u32)) else {
@@ -286,24 +270,7 @@ impl A5App {
         let Ok(mut buf) = surface.buffer_mut() else {
             return;
         };
-        // The picture at its proportions, black bars around, nearest
-        // pixel: each window column's picture column computed once per
-        // size (a division a pixel is dear on a small ARM board).
-        let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
-        if self.columns.len() != dw {
-            self.columns = (0..dw).map(|x| x * gw / dw).collect();
-        }
-        buf[..oy * ww].fill(0);
-        buf[(oy + dh) * ww..].fill(0);
-        for y in 0..dh {
-            let row = &self.picture[(y * gh / dh) * gw..][..gw];
-            let line = &mut buf[(oy + y) * ww..][..ww];
-            line[..ox].fill(0);
-            line[ox + dw..].fill(0);
-            for (o, &c) in line[ox..ox + dw].iter_mut().zip(&self.columns) {
-                *o = row[c] & 0x00ff_ffff;
-            }
-        }
+        scale_into(&mut buf, (ww, wh), &self.picture, &mut self.columns);
         let _ = buf.present();
     }
 
@@ -599,6 +566,53 @@ pub fn cab_index_dir() -> std::path::PathBuf {
         .join("cabinets")
 }
 
+/// The picture's place in a window of `ww` × `wh`: (x, y, width,
+/// height), at its proportions, centred.
+fn place(ww: usize, wh: usize) -> (usize, usize, usize, usize) {
+    let (ww, wh) = (ww.max(1), wh.max(1));
+    let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
+    let (dw, dh) = if ww * gh > wh * gw {
+        (wh * gw / gh, wh)
+    } else {
+        (ww, ww * gh / gw)
+    };
+    let (dw, dh) = (dw.max(1), dh.max(1));
+    ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
+}
+
+/// The game's picture into a window buffer of `ww` × `wh` (row by row):
+/// at its proportions, black bars around, nearest pixel. Each window
+/// column's picture column is computed once per size in `columns` (a
+/// division a pixel is dear on a small ARM board). A buffer smaller than
+/// the size given is left alone rather than overrun.
+fn scale_into(
+    buf: &mut [u32],
+    (ww, wh): (usize, usize),
+    picture: &[u32],
+    columns: &mut Vec<usize>,
+) {
+    let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
+    if ww == 0 || wh == 0 || buf.len() < ww * wh || picture.len() < gw * gh {
+        return;
+    }
+    let (ox, oy, dw, dh) = place(ww, wh);
+    if columns.len() != dw {
+        *columns = (0..dw).map(|x| x * gw / dw).collect();
+    }
+    let buf = &mut buf[..ww * wh];
+    buf[..oy * ww].fill(0);
+    buf[(oy + dh) * ww..].fill(0);
+    for y in 0..dh {
+        let row = &picture[(y * gh / dh) * gw..][..gw];
+        let line = &mut buf[(oy + y) * ww..][..ww];
+        line[..ox].fill(0);
+        line[ox + dw..].fill(0);
+        for (o, &c) in line[ox..ox + dw].iter_mut().zip(columns.iter()) {
+            *o = row[c] & 0x00ff_ffff;
+        }
+    }
+}
+
 /// The player's saves: `atlantis5/saves` in the per-user data folder.
 pub fn saves_dir() -> std::path::PathBuf {
     crate::desktop::data_dir().join("atlantis5").join("saves")
@@ -612,6 +626,39 @@ mod tests {
     fn without_a_sound_output_the_game_times_its_sounds() {
         assert!(mixer_for_play(Audio::new(), false).is_none());
         assert!(mixer_for_play(Audio::new(), true).is_some());
+    }
+
+    #[test]
+    fn the_picture_fits_any_window_and_never_overruns_its_buffer() {
+        let picture: Vec<u32> = (0..VIEW_WIDTH * VIEW_HEIGHT)
+            .map(|i| 0xff00_0000 | i as u32)
+            .collect();
+        let mut columns = Vec::new();
+        // A window wider than 16:9: bars left and right.
+        let (ww, wh) = (1200, 576);
+        let mut buf = vec![0xdead_beef; ww * wh];
+        scale_into(&mut buf, (ww, wh), &picture, &mut columns);
+        assert_eq!(place(ww, wh), (88, 0, 1024, 576));
+        assert_eq!(buf[0], 0);
+        assert_eq!(buf[88], picture[0] & 0x00ff_ffff);
+        assert_eq!(buf[88 + 1024], 0);
+        // The size changed between the reads (a buffer of the new, smaller
+        // size given with the old size, and the other way): no panic, the
+        // columns follow the size actually drawn.
+        let mut small = vec![0xdead_beef; 900 * 506];
+        scale_into(&mut small, (1024, 576), &picture, &mut columns);
+        assert!(small.iter().all(|&p| p == 0xdead_beef));
+        let mut big = vec![0xdead_beef; 1024 * 576];
+        scale_into(&mut big, (900, 506), &picture, &mut columns);
+        assert_eq!(columns.len(), place(900, 506).2);
+        // Every size from 1 × 1 up, odd ones included.
+        for (ww, wh) in [(1, 1), (3, 1000), (1000, 3), (1023, 577), (2560, 1440)] {
+            let mut buf = vec![0xdead_beef; ww * wh];
+            scale_into(&mut buf, (ww, wh), &picture, &mut columns);
+            let (ox, oy, dw, dh) = place(ww, wh);
+            assert!(ox + dw <= ww && oy + dh <= wh, "{ww}x{wh}");
+            assert!(buf.iter().all(|&p| p != 0xdead_beef), "{ww}x{wh}");
+        }
     }
 
     #[test]
