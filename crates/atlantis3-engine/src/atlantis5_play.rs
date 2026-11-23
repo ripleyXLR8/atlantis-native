@@ -4863,7 +4863,13 @@ mod tests {
         stretch_into(&mut out, &src, 2, 2, [0, 0, 1023, 575]);
         let at = |x: usize, y: usize| out[y * VIEW_WIDTH + x];
         assert_eq!(
-            (at(0, 0), at(510, 286), at(512, 0), at(0, 288), at(1022, 574)),
+            (
+                at(0, 0),
+                at(510, 286),
+                at(512, 0),
+                at(0, 288),
+                at(1022, 574)
+            ),
             (1, 1, 2, 3, 4)
         );
         assert_eq!((at(1023, 0), at(0, 575)), (0, 0));

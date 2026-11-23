@@ -276,14 +276,22 @@ fn an_unreadable_save_keeps_its_page() {
     click(&mut play, "rescue_game");
     frames(&mut play, 3);
     assert_eq!(play.game.state(), 3);
-    assert_eq!(play.menus.current(), Some(menus::MAIN), "the main menu again");
+    assert_eq!(
+        play.menus.current(),
+        Some(menus::MAIN),
+        "the main menu again"
+    );
     click(&mut play, "load_game");
     frames(&mut play, 1);
     assert_eq!(play.menus.current(), Some(menus::LOAD));
     click(&mut play, "save_3");
     frames(&mut play, 3);
     assert_eq!(play.game.state(), 3);
-    assert_eq!(play.menus.current(), Some(menus::LOAD), "the load page again");
+    assert_eq!(
+        play.menus.current(),
+        Some(menus::LOAD),
+        "the load page again"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
