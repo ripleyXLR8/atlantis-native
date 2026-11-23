@@ -86,7 +86,16 @@ struct Parser<'a> {
     at: usize,
     /// The bytes are UTF-8 (*Atlantis V*'s texts), not Windows-1252.
     utf8: bool,
+    /// The elements open around the one being read.
+    depth: usize,
 }
+
+/// The most elements open inside each other. The games' files nest fewer
+/// than ten; a damaged or made-up file nesting thousands (a few bytes a
+/// level) is an error here, where the recursion would have overflowed
+/// the stack and ended the program (a save's file would then not even be
+/// shown as unreadable).
+const MAX_DEPTH: usize = 256;
 
 /// Bytes of the file as text in its encoding. In UTF-8 mode the line
 /// ends are normalised to LF as XML 1.0 (§ 2.11) asks of every processor,
@@ -160,6 +169,16 @@ impl Parser<'_> {
     }
 
     fn element(&mut self) -> Result<Element, XmlError> {
+        if self.depth >= MAX_DEPTH {
+            return Err(self.err("elements nested too deep"));
+        }
+        self.depth += 1;
+        let el = self.element_in();
+        self.depth -= 1;
+        el
+    }
+
+    fn element_in(&mut self) -> Result<Element, XmlError> {
         // At '<'.
         self.at += 1;
         let mut el = Element {
@@ -335,6 +354,7 @@ fn parse_in(data: &[u8], utf8: bool) -> Result<Vec<Element>, XmlError> {
         s: data,
         at: 0,
         utf8,
+        depth: 0,
     };
     let mut out = Vec::new();
     loop {
@@ -352,6 +372,21 @@ fn parse_in(data: &[u8], utf8: bool) -> Result<Vec<Element>, XmlError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn elements_nested_too_deep_are_an_error() {
+        let deep = |n: usize| {
+            let mut s = "<a>".repeat(n);
+            s.push_str(&"</a>".repeat(n));
+            s.into_bytes()
+        };
+        assert!(parse(&deep(MAX_DEPTH)).is_ok());
+        assert!(parse_utf8(&deep(MAX_DEPTH)).is_ok());
+        // Far deeper than any stack holds: an error, not an overflow.
+        let e = parse(&deep(1_000_000)).unwrap_err();
+        assert!(e.to_string().contains("nested too deep"), "{e}");
+        assert!(parse_utf8(&b"<a>".repeat(1_000_000)).is_err());
+    }
 
     #[test]
     fn a_rootless_file_gives_every_top_element() {
