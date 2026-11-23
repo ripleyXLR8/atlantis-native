@@ -249,8 +249,10 @@ impl Cabinet {
             .min()
             .unwrap_or(size)
             .min(size);
+        // A file list past the end (a copy cut short, a damaged header).
+        let len = end.checked_sub(files_at).ok_or(t.clone())?;
         let list = src
-            .read_at(path, files_at, (end - files_at) as usize)
+            .read_at(path, files_at, usize::try_from(len).map_err(|_| t.clone())?)
             .ok_or(t.clone())?;
         let mut files = Vec::with_capacity(n_files);
         let mut o = 0usize;
@@ -968,6 +970,30 @@ mod tests {
             assert_eq!(f.list("Datas"), ["A.bin", "Sub"]);
             assert_eq!(f.list(""), ["Datas"]);
         }
+    }
+
+    #[test]
+    fn a_file_list_past_the_end_is_truncated() {
+        let cab = build(&[("a.txt", b"abc")], 100, false);
+        // The header and the folder table only: coffFiles (44) lies past
+        // the end.
+        for cut in [36, 40, 44] {
+            let mut m = MemFiles::new();
+            m.insert("x.cab", cab[..cut].to_vec());
+            assert!(matches!(
+                Cabinet::open(Arc::new(m), "x.cab"),
+                Err(CabError::Truncated)
+            ));
+        }
+        // A corrupt coffFiles far beyond the file.
+        let mut bad = cab.clone();
+        bad[16..20].copy_from_slice(&0x7fff_0000u32.to_le_bytes());
+        let mut m = MemFiles::new();
+        m.insert("x.cab", bad);
+        assert!(matches!(
+            Cabinet::open(Arc::new(m), "x.cab"),
+            Err(CabError::Truncated)
+        ));
     }
 
     /// A source that counts the bytes read.
