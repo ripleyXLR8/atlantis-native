@@ -373,6 +373,16 @@ The web version plays the five games: see
 How to get the files from your CD or GOG.com: see
 [Getting the game files](docs/GUIDE.md#getting-the-game-files).
 
+### Wanted editions
+
+Many boxed editions of the five games have never been seen by the
+project: the Polish and Japanese CDs of the first game, the European
+DVD of *Atlantis II*, the English CDs of *Atlantis III*, the French CD of
+*Atlantis Evolution*, the international DVD of *The Secrets of Atlantis*
+and more. If you own one, its box and discs can help it play: see
+[Wanted editions](docs/WANTED.md) for the list and what to send (photos,
+file listings and checksums only, never the game's files).
+
 The game you chose is shown in the window's title and at the foot of the
 options menu, e.g. *GOG.com, French (1999 build)*.
 
@@ -457,6 +467,8 @@ On Linux, install the ALSA headers first (`libasound2-dev` or
 
 - 📖 [Player's guide](docs/GUIDE.md): command line, where the saves and
   settings live, known differences from the original.
+- 📦 [Wanted editions](docs/WANTED.md): the editions the project is
+  looking for, and how owners of the discs can help.
 - 🔧 [Technical notes](docs/TECHNICAL.md): the engine's layout, the
   enhancements, how the HD mode works, subtitles, the web build, tests,
   roadmap.
