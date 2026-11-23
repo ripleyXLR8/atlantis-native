@@ -113,6 +113,8 @@ the 2004 CD (English, in progress) (see
 [Atlantis Evolution](#atlantis-evolution)). For The Secrets of Atlantis:
 the French DVD (2006), its drive, files, image or installation (see
 [The Secrets of Atlantis](#the-secrets-of-atlantis)).
+The editions the project is looking for, and how their owners can help,
+are listed in [Wanted editions](WANTED.md).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
