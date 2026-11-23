@@ -2304,6 +2304,18 @@ mod tests {
     }
 
     #[test]
+    fn a_constructor_with_hash_keys_and_a_call_builds() {
+        // Lua source (5.1 SETLIST) on the state's Lua 5.0 tables.
+        let mut s = Script::new(Rc::new(RefCell::new(Quiet))).expect("state");
+        s.exec(
+            "local function f() return 7, 8 end \
+             local t = {n = 1, f()} \
+             assert(t.n == 1 and t[1] == 7 and t[2] == 8)",
+        )
+        .expect("the table is built");
+    }
+
+    #[test]
     fn sound_names() {
         assert_eq!(sound_path(b"zep_crack"), b"fx/zep_crack.ogg");
     }

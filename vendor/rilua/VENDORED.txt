@@ -102,3 +102,15 @@ PATCHES
    of src/vm/table.rs (orders printed by Lua 5.0.3's `lua`) and
    crates/atlantis5-script/tests/table_order.rs (the walk of `atl` after
    a new game and after events, the MD5 of Lua 5.0.3's walk).
+
+9. src/vm/table.rs (`ensure_array_capacity`): on a table with Lua
+   5.0.3's layout (patch 8), 5.1's `SETLIST` growing the array runs 5.0's
+   `resize` at the current node count instead of 5.1's. 5.1's sets
+   `last_free` one past the last node (its pre-decrement convention),
+   which 5.0's `newkey` then read as a node index and panicked on. Only
+   5.1 source compiled in a 5.0 state hits it (Native's own strings and
+   test scripts); 5.0 chunks use `SetList50`, so the orders of patch 8
+   are unchanged. Reproducer: the test
+   `lua50_setlist_grows_the_array_of_a_table_with_hash_keys` of
+   src/vm/table.rs and atlantis5-script's
+   `a_constructor_with_hash_keys_and_a_call_builds`.
