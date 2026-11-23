@@ -385,7 +385,9 @@ pub fn describe(dir: &Path) -> LauncherEntry {
     let (label, found) = if kind == Some(GameKind::Atlantis5) {
         match crate::a5::edition(dir) {
             Ok((label, disc)) => {
-                copyable = disc;
+                // (not on Android: the copy would go to the app's
+                // internal storage; the disc's image plays as it is)
+                copyable = disc && !cfg!(target_os = "android");
                 (label, true)
             }
             Err(e) => {

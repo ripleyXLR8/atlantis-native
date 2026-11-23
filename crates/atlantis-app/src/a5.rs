@@ -14,7 +14,13 @@
 //! cursor. Its `quit_game`, or closing the window, ends the program. The
 //! saves go to the data folder's `atlantis5/saves`. In play the game draws
 //! its own cursor at the screen centre (the system cursor stays hidden).
+//!
+//! On Android (docs/ANDROID.md) the data come from a folder chosen in the
+//! system's picker ([`run_source_on`]), the picture goes through
+//! `android_frame` with the bag and menu buttons in its black bars, and
+//! the touch screen stands for the mouse (`A5App::touch`).
 
+#[cfg(not(target_os = "android"))]
 use std::num::NonZeroU32;
 use std::path::Path;
 use std::rc::Rc;
@@ -69,16 +75,23 @@ pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError
 /// copy of its files elsewhere than [`crate::a5_copy::copy_dir`], or its
 /// image): what the game library offers to copy to the computer.
 pub fn edition(path: &Path) -> Result<(String, bool), atlantis3_data::atlantis5::OpenError> {
-    use atlantis3_data::atlantis5::Form;
     let src = Atlantis5Source::open(path)?;
     let copy = crate::a5_copy::is_copy(path);
+    Ok(edition_of(&src, copy))
+}
+
+/// [`edition`] of the data opened in `src` (`copy`: they are the copy
+/// [`crate::a5_copy`] made): the label, and whether they are read from
+/// the disc.
+pub fn edition_of(src: &Atlantis5Source, copy: bool) -> (String, bool) {
+    use atlantis3_data::atlantis5::Form;
     let medium = match src.form() {
         Form::DiscFolder if copy => "DVD, copied to this computer",
         Form::DiscFolder => "DVD",
         Form::DiscImage => "DVD image",
         Form::Tree => "DVD, installed",
     };
-    let lang = language(&src);
+    let lang = language(src);
     let mut lang_name = String::new();
     let mut chars = lang.chars();
     if let Some(c) = chars.next() {
@@ -89,7 +102,7 @@ pub fn edition(path: &Path) -> Result<(String, bool), atlantis3_data::atlantis5:
         "{} (2006), {medium}, {lang_name}",
         crate::setup::GameKind::Atlantis5.name()
     );
-    Ok((label, src.form() != Form::Tree && !copy))
+    (label, src.form() != Form::Tree && !copy)
 }
 
 /// The first view's picture (1024 × 576 x8r8g8b8).
@@ -199,10 +212,22 @@ struct A5App {
     _audio: Option<cpal::Stream>,
     /// Why the game could not be made, for the caller.
     error: Option<String>,
+    /// Android: the window's buffers at the picture's size
+    /// (android_frame.rs).
+    #[cfg(target_os = "android")]
+    frame: Option<crate::android_frame::Frame>,
+    /// Android: where the picture was last drawn in the window (x, y,
+    /// width, height, window pixels).
+    #[cfg(target_os = "android")]
+    view: (usize, usize, usize, usize),
+    /// Android: the fingers on the screen (see [`A5App::touch`]).
+    #[cfg(target_os = "android")]
+    touch: TouchA5,
 }
 
 impl A5App {
     /// The picture's place in the window: (x, y, width, height).
+    #[cfg(not(target_os = "android"))]
     fn place(&self) -> (usize, usize, usize, usize) {
         let Some(window) = &self.window else {
             return (0, 0, VIEW_WIDTH, VIEW_HEIGHT);
@@ -219,6 +244,44 @@ impl A5App {
         ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
     }
 
+    /// Android: the picture through [`crate::android_frame`] at its own
+    /// size, scaled by the system's composer, with the bag and menu
+    /// buttons in the black bars (not during a film).
+    #[cfg(target_os = "android")]
+    fn present(&mut self) {
+        let Some(window) = &self.window else {
+            return;
+        };
+        if self.frame.is_none() {
+            self.frame = crate::android_frame::Frame::new(window);
+        }
+        let Some(frame) = self.frame.as_mut() else {
+            return;
+        };
+        let size = window.inner_size();
+        let shown = self
+            .play
+            .as_ref()
+            .is_some_and(|p| !p.logos_playing() && !p.stage().film_playing());
+        let picture = &self.picture;
+        let drawn = crate::android::present_with_buttons(
+            frame,
+            (size.width as usize, size.height as usize),
+            (VIEW_WIDTH, VIEW_HEIGHT),
+            |y, out| {
+                for (o, &p) in out.iter_mut().zip(&picture[y * VIEW_WIDTH..][..VIEW_WIDTH]) {
+                    *o = crate::android_frame::from_xrgb(p);
+                }
+            },
+            shown,
+        );
+        if let Some((view, buttons)) = drawn {
+            self.view = view;
+            self.touch.buttons = buttons;
+        }
+    }
+
+    #[cfg(not(target_os = "android"))]
     fn present(&mut self) {
         let (ox, oy, dw, dh) = self.place();
         let (Some(window), Some(surface)) = (&self.window, self.surface.as_mut()) else {
@@ -292,6 +355,16 @@ impl A5App {
         let now = Instant::now();
         let dt = now.duration_since(self.last).as_secs_f64().min(0.25);
         self.last = now;
+        // Android: the touch screen's next action, one a frame (a menu's
+        // press after the cursor moved there).
+        #[cfg(target_os = "android")]
+        match self.touch.queue.pop_front().flatten() {
+            Some(Press::Click) => play.click(),
+            Some(Press::Right) => play.right_press(),
+            Some(Press::Escape) => play.escape(),
+            Some(Press::Space) => play.space(),
+            None => {}
+        }
         play.update(dt);
         if play.quit_requested() {
             el.exit();
@@ -316,7 +389,21 @@ impl A5App {
 }
 
 impl ApplicationHandler for A5App {
+    /// Android: the activity's window is gone (the app in the
+    /// background): the game and its sound stop until `resumed` makes
+    /// another.
+    #[cfg(target_os = "android")]
+    fn suspended(&mut self, _el: &ActiveEventLoop) {
+        self.surface = None;
+        self.frame = None;
+        self.window = None;
+        self.touch = TouchA5::default();
+        crate::android::pause_audio(&self._audio, true);
+    }
+
     fn resumed(&mut self, el: &ActiveEventLoop) {
+        #[cfg(target_os = "android")]
+        crate::android::pause_audio(&self._audio, false);
         if self.window.is_some() {
             return;
         }
@@ -350,6 +437,8 @@ impl ApplicationHandler for A5App {
         }
         self.window = Some(window);
         self.focused = true;
+        // (Android: a window made again, the app back from the
+        // background: the game goes on where it was)
         self.last = Instant::now();
     }
 
@@ -365,12 +454,40 @@ impl ApplicationHandler for A5App {
     }
 
     fn about_to_wait(&mut self, _el: &ActiveEventLoop) {
+        // Android: the activity is being destroyed.
+        #[cfg(target_os = "android")]
+        if crate::android::destroyed() {
+            _el.exit();
+            return;
+        }
+        // Android: Back (Escape), which reaches the app outside winit.
+        #[cfg(target_os = "android")]
+        if let Some(id) = self.window.as_ref().map(|w| w.id()) {
+            for e in crate::android::mode_typed() {
+                self.window_event(_el, id, e);
+            }
+        }
         if let Some(w) = &self.window {
             w.request_redraw();
         }
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        // Android: the touch screen, and Back as Escape.
+        #[cfg(target_os = "android")]
+        if let WindowEvent::Touch(t) = &event {
+            self.touch(t);
+            return;
+        }
+        #[cfg(target_os = "android")]
+        if let WindowEvent::KeyboardInput { event: k, .. } = &event {
+            if k.logical_key == Key::Named(NamedKey::BrowserBack) {
+                if k.state == ElementState::Pressed {
+                    self.touch.queue.push_back(Some(Press::Escape));
+                }
+                return;
+            }
+        }
         if self.play.is_none() {
             // Black while the start's reads go on: only closing and the
             // redraws that make the game once they end.
@@ -455,8 +572,20 @@ pub fn run_window_on(
     path: &Path,
     fullscreen: bool,
 ) -> Result<crate::a2::Ended, String> {
-    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     let (src, label) = open(path)?;
+    run_source_on(el, src, &label, fullscreen)
+}
+
+/// [`run_window_on`] with the data opened (`label` says what they are):
+/// on Android, a folder chosen in the picker, read through the Storage
+/// Access Framework.
+pub fn run_source_on(
+    el: &mut EventLoop<()>,
+    src: Atlantis5Source,
+    label: &str,
+    fullscreen: bool,
+) -> Result<crate::a2::Ended, String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     log::info!("{label}");
     let lang = language(&src);
     let audio = Audio::new();
@@ -481,6 +610,12 @@ pub fn run_window_on(
         focused: false,
         menu_cursor: false,
         _audio: out,
+        #[cfg(target_os = "android")]
+        frame: None,
+        #[cfg(target_os = "android")]
+        view: (0, 0, 1, 1),
+        #[cfg(target_os = "android")]
+        touch: TouchA5::default(),
     };
     el.run_app_on_demand(&mut app)
         .map_err(|e| format!("The window failed: {e}"))?;
@@ -502,4 +637,174 @@ pub fn cab_index_dir() -> std::path::PathBuf {
 /// The player's saves: `atlantis5/saves` in the per-user data folder.
 pub fn saves_dir() -> std::path::PathBuf {
     crate::desktop::data_dir().join("atlantis5").join("saves")
+}
+
+/// Android: a finger moving less than this (window pixels) from where it
+/// went down is still a tap.
+#[cfg(target_os = "android")]
+const TAP_SLOP: f64 = 24.0;
+
+/// Android: an action for the game at a frame.
+#[cfg(target_os = "android")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Press {
+    /// The left button's press.
+    Click,
+    /// The right button's press: the inventory, or the hand's object put
+    /// back.
+    Right,
+    /// Escape: a film ends, or the in-game menu.
+    Escape,
+    /// Space: a film or a dialog ends.
+    Space,
+}
+
+/// Android: the fingers on the screen.
+#[cfg(target_os = "android")]
+#[derive(Default)]
+struct TouchA5 {
+    fingers: Vec<u64>,
+    /// The first finger, where it went down and where it was last.
+    primary: Option<u64>,
+    from: (f64, f64),
+    last: (f64, f64),
+    /// It moved past [`TAP_SLOP`].
+    moved: bool,
+    /// A second finger came: a right press when they lift.
+    two: bool,
+    /// It went down in a menu (the game's cursor follows it).
+    menu: bool,
+    /// Where a tap presses the bag and the menu buttons (window pixels),
+    /// as last drawn.
+    buttons: [Option<crate::android::Rect>; 2],
+    /// The first finger went down on the bag (0) or menu (1) button.
+    on_button: Option<usize>,
+    /// The game's actions, one a frame (`None`: a frame without one).
+    queue: std::collections::VecDeque<Option<Press>>,
+}
+
+#[cfg(target_os = "android")]
+impl A5App {
+    /// Window point (x, y) as the picture's point.
+    fn to_game(&self, (x, y): (f64, f64)) -> (i32, i32) {
+        let (ox, oy, dw, dh) = self.view;
+        let (gw, gh) = (VIEW_WIDTH as f64, VIEW_HEIGHT as f64);
+        let gx = ((x - ox as f64) * gw / dw.max(1) as f64).floor();
+        let gy = ((y - oy as f64) * gh / dh.max(1) as f64).floor();
+        (
+            (gx as i32).clamp(0, VIEW_WIDTH as i32 - 1),
+            (gy as i32).clamp(0, VIEW_HEIGHT as i32 - 1),
+        )
+    }
+
+    /// A finger on the screen. In a menu (the inventory and the subject
+    /// menu too) the game's cursor goes where the finger is and its
+    /// press is the left button's, a frame later. In play a drag turns
+    /// the view, as the mouse's moves, and a tap is the left button's
+    /// press on what is under the screen centre, as the click; during a
+    /// film a tap is Space, which ends it. Two fingers are the right
+    /// button. The bag button is the right button too, the menu button
+    /// Escape.
+    fn touch(&mut self, t: &winit::event::Touch) {
+        use winit::event::TouchPhase;
+        if self.play.is_none() {
+            return;
+        }
+        let at = (t.location.x, t.location.y);
+        let in_menu = self.play.as_ref().is_some_and(Play::in_menu);
+        match t.phase {
+            TouchPhase::Started => {
+                self.touch.fingers.retain(|f| *f != t.id);
+                self.touch.fingers.push(t.id);
+                if self.touch.fingers.len() == 1 {
+                    let st = &mut self.touch;
+                    st.primary = Some(t.id);
+                    st.from = at;
+                    st.last = at;
+                    st.moved = false;
+                    st.two = false;
+                    st.menu = false;
+                    st.on_button = st.buttons.iter().position(|r| {
+                        r.is_some_and(|(x, y, w, h)| {
+                            at.0 >= x as f64
+                                && at.1 >= y as f64
+                                && at.0 < (x + w) as f64
+                                && at.1 < (y + h) as f64
+                        })
+                    });
+                    if st.on_button.is_none() && in_menu {
+                        st.menu = true;
+                        let (gx, gy) = self.to_game(at);
+                        if let Some(p) = self.play.as_mut() {
+                            p.mouse_at(gx, gy);
+                        }
+                        self.touch.queue.push_back(None);
+                        self.touch.queue.push_back(Some(Press::Click));
+                    }
+                } else if !self.touch.two {
+                    // A second finger: no left press, the right one when
+                    // they lift.
+                    self.touch.two = true;
+                    if self.touch.menu {
+                        self.touch.queue.retain(|p| *p != Some(Press::Click));
+                    }
+                }
+            }
+            TouchPhase::Moved => {
+                let st = &mut self.touch;
+                if st.primary != Some(t.id) || st.two || st.on_button.is_some() {
+                    return;
+                }
+                let (lx, ly) = st.last;
+                st.last = at;
+                if (at.0 - st.from.0).hypot(at.1 - st.from.1) > TAP_SLOP {
+                    st.moved = true;
+                }
+                if st.menu {
+                    let (gx, gy) = self.to_game(at);
+                    if let Some(p) = self.play.as_mut() {
+                        p.mouse_at(gx, gy);
+                    }
+                } else if st.moved && !in_menu {
+                    // The view turns with the finger, as with the mouse
+                    // (the picture's pixels as the mouse's counts).
+                    let k = VIEW_WIDTH as f64 / self.view.2.max(1) as f64;
+                    if let Some(p) = self.play.as_mut() {
+                        p.look(((at.0 - lx) * k) as f32, ((at.1 - ly) * k) as f32);
+                    }
+                }
+            }
+            TouchPhase::Ended | TouchPhase::Cancelled => {
+                self.touch.fingers.retain(|f| *f != t.id);
+                let ended = t.phase == TouchPhase::Ended;
+                let st = &mut self.touch;
+                let button = st.on_button.take();
+                if st.primary == Some(t.id) && !st.two {
+                    if let Some(b) = button {
+                        if ended {
+                            st.queue.push_back(Some(if b == 0 {
+                                Press::Right
+                            } else {
+                                Press::Escape
+                            }));
+                        }
+                    } else if ended && !st.menu && !st.moved {
+                        let film = self
+                            .play
+                            .as_ref()
+                            .is_some_and(|p| p.logos_playing() || p.stage().film_playing());
+                        st.queue
+                            .push_back(Some(if film { Press::Space } else { Press::Click }));
+                    }
+                }
+                if st.fingers.is_empty() {
+                    if st.two && ended {
+                        st.queue.push_back(Some(Press::Right));
+                    }
+                    st.primary = None;
+                    st.two = false;
+                }
+            }
+        }
+    }
 }

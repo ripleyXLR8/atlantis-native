@@ -392,13 +392,20 @@ fn android_main(activity: AndroidApp) {
             return;
         }
         let tree_game = app.android_other.take();
-        let dirs = app
-            .session_mut()
-            .map(|s| (s.take_atlantis2(), s.take_atlantis3(), s.take_atlantis4()));
+        let dirs = app.session_mut().map(|s| {
+            (
+                s.take_atlantis2(),
+                s.take_atlantis3(),
+                s.take_atlantis4(),
+                s.take_atlantis5(),
+            )
+        });
         let next = match (tree_game, dirs) {
             (Some(game), _) => Next::Tree(game),
-            (None, Some((a2, a3, a4))) if a2.is_some() || a3.is_some() || a4.is_some() => {
-                Next::Dirs(a2, a3, a4)
+            (None, Some((a2, a3, a4, a5)))
+                if a2.is_some() || a3.is_some() || a4.is_some() || a5.is_some() =>
+            {
+                Next::Dirs(a2, a3, a4, a5)
             }
             // The player left the app.
             _ => break,
@@ -406,7 +413,7 @@ fn android_main(activity: AndroidApp) {
         drop(app);
         let ran = match next {
             Next::Tree(game) => run_tree_game(&mut event_loop, game),
-            Next::Dirs(a2, a3, a4) => run_other_game(&mut event_loop, a2, a3, a4),
+            Next::Dirs(a2, a3, a4, a5) => run_other_game(&mut event_loop, a2, a3, a4, a5),
         };
         if destroyed() {
             // (the next activity opens the library's first game again)
@@ -434,8 +441,14 @@ fn android_main(activity: AndroidApp) {
 enum Next {
     /// From a chosen folder.
     Tree(OtherGame),
-    /// From the app's own folder: Atlantis II's, III's or Evolution's.
-    Dirs(Option<PathBuf>, Option<PathBuf>, Option<PathBuf>),
+    /// From the app's own folder: Atlantis II's, III's, Evolution's or
+    /// The Secrets of Atlantis's.
+    Dirs(
+        Option<PathBuf>,
+        Option<PathBuf>,
+        Option<PathBuf>,
+        Option<PathBuf>,
+    ),
 }
 
 /// The first game's front end (and the game library's screen), without a
@@ -555,7 +568,11 @@ fn other_label(game: &OtherGame) -> String {
                 .ok()
                 .map(|b| crate::a4::files_label(&files, b))
         }
-        GameKind::Atlantis5 | GameKind::LostTales => None,
+        GameKind::Atlantis5 => game
+            .atlantis5
+            .as_ref()
+            .map(|src| crate::a5::edition_of(src, false).0),
+        GameKind::LostTales => None,
     };
     named.unwrap_or_else(|| game_name(game.kind).to_string())
 }
@@ -571,8 +588,11 @@ fn run_other_game(
     a2: Option<PathBuf>,
     a3: Option<PathBuf>,
     a4: Option<PathBuf>,
+    a5: Option<PathBuf>,
 ) -> Result<(), String> {
-    let run = if let Some(dir) = a2 {
+    let run = if let Some(dir) = a5 {
+        crate::a5::run_window_on(el, &dir, true)
+    } else if let Some(dir) = a2 {
         let enhancements = crate::a2::stored_settings().enhancements;
         crate::a2::open(&dir, &[], &crate::a2::A2Start::default(), enhancements).and_then(
             |(engine, label)| crate::a2::run_window_on(el, engine, label, true, None, false),
@@ -614,6 +634,45 @@ pub(crate) struct OtherGame {
     /// Atlantis Evolution's 2004 program (the CD's installation, played
     /// by Atlantis III's engine), not GOG.com's.
     evolution_2004: bool,
+    /// The Secrets of Atlantis: its data opened (its disc's files, its
+    /// image, or the unpacked tree).
+    atlantis5: Option<atlantis3_data::atlantis5::Atlantis5Source>,
+}
+
+/// The Secrets of Atlantis in the folder `dir` of a chosen one (the
+/// first form found, as [`atlantis3_data::atlantis5::Atlantis5Source::open`]
+/// tries them): the disc's files (`DATAS.cab` and its languages'
+/// cabinets, as the desktop's "Copy to this computer" leaves them), the
+/// unpacked tree (an install's `Datas`, or `Datas` itself), or an image
+/// of the DVD in it, read by parts. Its error when the folder holds the
+/// game's files but they do not open.
+fn atlantis5_in(
+    dir: &Arc<crate::android_saf::SafDir>,
+    names: &[String],
+) -> Option<Result<atlantis3_data::atlantis5::Atlantis5Source, String>> {
+    use atlantis3_data::atlantis5::{Atlantis5Source, Form, OpenError, DATA_CAB};
+    use atlantis_data::FileSource;
+    // (the checkpoints of the cabinets' folders kept between runs)
+    atlantis_data::cab::set_index_dir(Some(crate::a5::cab_index_dir()));
+    let src: Arc<dyn FileSource> = dir.clone();
+    match Atlantis5Source::from_folder(src) {
+        Ok(s) => return Some(Ok(s)),
+        // (another game's tree is not this one's, as on the desktop)
+        Err(OpenError::NotTheGame) => {}
+        Err(_) if dir.size(DATA_CAB).is_none() => {}
+        Err(e) => return Some(Err(e.to_string())),
+    }
+    let image = names.iter().any(|n| {
+        n.rsplit_once('.')
+            .is_some_and(|(_, ext)| atlantis_data::disc_image::IMAGE_EXTENSIONS.contains(&ext))
+    });
+    if !image {
+        return None;
+    }
+    let set = dir.disc_set()?;
+    // (another game's image)
+    set.size(DATA_CAB)?;
+    Some(Atlantis5Source::from_disc(Arc::new(set), Form::DiscImage).map_err(|e| e.to_string()))
 }
 
 /// The 2004 program's installation in `src` (its program beside
@@ -646,6 +705,7 @@ fn find_game_in_tree(tree: &str) -> FoundInTree {
     let mut first_error = None;
     let mut other: Option<(GameKind, usize, bool)> = None;
     let mut unsupported = None;
+    let mut atlantis5 = None;
     for (i, c) in candidates.iter().enumerate() {
         // The other games, by their program files, then checked.
         if other.is_none() {
@@ -677,6 +737,20 @@ fn find_game_in_tree(tree: &str) -> FoundInTree {
                             );
                         }
                     }
+                }
+            } else {
+                // The Secrets of Atlantis, before the first game: its
+                // DVD's image would be taken for one of the first game's.
+                match atlantis5_in(c, &names) {
+                    Some(Ok(src)) => {
+                        atlantis5 = Some(src);
+                        other = Some((GameKind::Atlantis5, i, false));
+                        continue;
+                    }
+                    Some(Err(e)) => {
+                        unsupported.get_or_insert(format!("The Secrets of Atlantis: {e}"));
+                    }
+                    None => {}
                 }
             }
         }
@@ -721,6 +795,7 @@ fn find_game_in_tree(tree: &str) -> FoundInTree {
             install,
             discs,
             evolution_2004,
+            atlantis5,
         });
     }
     match unsupported {
@@ -760,7 +835,14 @@ fn run_tree_game(el: &mut EventLoop<()>, game: OtherGame) -> Result<(), String> 
                 .map_err(|e| crate::setup::explain_atlantis4(shown, &e))?;
             crate::a4::run_files_on(el, files, build)
         }
-        GameKind::Atlantis5 | GameKind::LostTales => Ok(()),
+        GameKind::Atlantis5 => {
+            let src = game
+                .atlantis5
+                .ok_or_else(|| "The Secrets of Atlantis: no data".to_string())?;
+            let label = crate::a5::edition_of(&src, false).0;
+            crate::a5::run_source_on(el, src, &label, true).map(|_| ())
+        }
+        GameKind::LostTales => Ok(()),
     }
 }
 
@@ -836,7 +918,7 @@ impl App {
                     self.show_notice(&[
                         "No game found.".to_string(),
                         String::new(),
-                        "Choose the folder of one of the four Atlantis games (its files, or the images of its CDs),".to_string(),
+                        "Choose the folder of one of the Atlantis games (its files, or the images of its discs),".to_string(),
                         "or copy the game to".to_string(),
                         dir,
                         "and start the app again.".to_string(),
@@ -1297,6 +1379,64 @@ pub(crate) fn draw_button(
     // A tap anywhere in the bar's lower half presses it.
     let top = fit_h / 2;
     Some((right, top, bar, fit_h - top))
+}
+
+/// Shows a `gw` x `gh` picture through `frame` in a window of `window`
+/// pixels (`row` as in [`crate::android_frame::Frame::present`]), with
+/// the bag and menu buttons in its black bars when `shown`. Returns the
+/// picture's rectangle and where a tap presses the bag (0) and the menu
+/// (1), in window pixels; None when the window took no frame.
+pub(crate) fn present_with_buttons(
+    frame: &mut crate::android_frame::Frame,
+    window: (usize, usize),
+    (gw, gh): (usize, usize),
+    row: impl FnMut(usize, &mut [u32]),
+    shown: bool,
+) -> Option<(Rect, [Option<Rect>; 2])> {
+    let mut pressed: [Option<Rect>; 2] = [None; 2];
+    let bars = |b: crate::android_frame::Bars<'_>| {
+        let (lw, lh) = b.size;
+        let (ox, _, pw, _) = b.picture;
+        let right = ox + pw;
+        for (i, (bar, button)) in [((right, lw - right), Button::Bag), ((0, ox), Button::Menu)]
+            .into_iter()
+            .enumerate()
+        {
+            let r = draw_button(b.px, b.stride, bar, lh, shown, button);
+            // (drawn as 0x00RRGGBB: put in the buffer's byte order)
+            if let Some((x, y, w, h)) = r {
+                for line in b.px.chunks_exact_mut(b.stride).skip(y).take(h) {
+                    for p in &mut line[x..x + w] {
+                        *p = crate::android_frame::from_xrgb(*p);
+                    }
+                }
+            }
+            pressed[i] = r;
+        }
+    };
+    let view = frame.present(window, (gw, gh), row, bars)?;
+    // The buttons' rectangles in window pixels: the buffer's pixel is the
+    // picture's (gw across `view.2` window pixels), its picture at the
+    // view's place.
+    let (vx, vy, vw, vh) = view;
+    let (bw, bh) = frame.buffer_size();
+    let (box_, boy) = (bw.saturating_sub(gw) / 2, bh.saturating_sub(gh) / 2);
+    let to_window = |r: Option<Rect>| {
+        r.map(|(x, y, w, h)| {
+            let sx =
+                |v: usize| (vx as f64 + (v as f64 - box_ as f64) * vw as f64 / gw as f64).max(0.0);
+            let sy =
+                |v: usize| (vy as f64 + (v as f64 - boy as f64) * vh as f64 / gh as f64).max(0.0);
+            let (x0, y0, x1, y1) = (sx(x), sy(y), sx(x + w), sy(y + h));
+            (
+                x0 as usize,
+                y0 as usize,
+                (x1 - x0) as usize,
+                (y1 - y0) as usize,
+            )
+        })
+    };
+    Some((view, [to_window(pressed[0]), to_window(pressed[1])]))
 }
 
 /// Whether window point (x, y) is in `r`.

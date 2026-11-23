@@ -1,9 +1,10 @@
 # Atlantis Native on Android
 
-Status: milestone M1, on the `android/m1` branch. It runs Atlantis: The
+Status: milestone M3, on the `android/m3` branch. It runs Atlantis: The
 Lost Tales on an Android phone or tablet (arm64, Android 8 or later).
-Atlantis II, III and Evolution start from the app's own folder (below),
-but nobody has played them on a device yet.
+Atlantis II, III, Evolution and The Secrets of Atlantis (Atlantis V,
+the French DVD) start from a chosen folder or the app's own folder
+(below). The Secrets of Atlantis has not been played on a device yet.
 
 ## Installing
 
@@ -38,10 +39,24 @@ Either of these:
     there, as the game cannot be given another one while it runs.
     Evolution's 2004 CD program is its installation: `Atlantis
     Evolution.exe` beside the `cd0` .. `cd4` folders the installer made;
+  - The Secrets of Atlantis: the folder the desktop's "Copy to this
+    computer" made (the DVD's `DATAS.cab`, its `DATAS_<language>.cab`
+    and its program), a copy of the DVD's files, an install or the
+    unpacked `Datas` tree (the folder holding `Datas`, or `Datas`
+    itself), or the DVD's image (`.iso` and the other image types
+    above), read by parts where it is;
   - any of the above in a folder directly inside it.
 
   The files are read where they are, by parts, through the Storage Access
   Framework. Nothing is copied.
+
+  From The Secrets of Atlantis's cabinets (its DVD's files or image),
+  the screen stays black at the first start while the films' folder is
+  decoded up to the logos (about 460 MB with the French DVD), as on the
+  desktop. The cabinets' checkpoints are then kept in the app's internal
+  storage (`atlantis-native/atlantis5/cabinets`), so a later start, or
+  a read deep in a folder, is quicker. The unpacked `Datas` tree needs
+  none of this.
 - **The app's own folder**, used when no chosen folder holds a game:
 
       /sdcard/Android/data/io.github.ripleyxlr8.atlantisnative/files/game
@@ -76,11 +91,14 @@ first:
 - Back, or "Quit", closes the app.
 
 From the first game, the options menu's "Game library..." entry goes back
-to the list. Atlantis II has the same entry; Atlantis III and Evolution go
-back to it when they are quit from their own menus. When Android ends the
-app while Atlantis II, III or Evolution runs, the next start opens the
-library's last played game again at its menu: the game's own saves are
-kept.
+to the list. Atlantis II has the same entry; Atlantis III, Evolution and
+The Secrets of Atlantis go back to it when they are quit from their own
+menus. When Android ends the app while Atlantis II, III, Evolution or The
+Secrets of Atlantis runs, the next start opens the library's last played
+game again at its menu: the game's own saves are kept.
+
+The desktop's "Copy to this computer" link is not offered on Android: a
+DVD image plays where it is.
 
 The players, the checkpoints and the settings are kept in the app's
 internal storage (`/data/data/io.github.ripleyxlr8.atlantisnative/files/atlantis-native`).
@@ -98,6 +116,9 @@ Uninstalling the app deletes them too.
 | Menu button | The first game's options menu, like three fingers. It is drawn in the black bar left of the picture; a tap anywhere in that bar's lower half presses it. A screen too narrow for the bar shows no button. |
 | Back button | Escape: the game's menu. On the "no game" screen it closes the app. |
 
+These rows are the first game's; Atlantis III and The Secrets of
+Atlantis have their own below.
+
 In Atlantis III, whose original reads only the mouse's moves, a finger
 puts the pointer where it is on the menus, the inventory, the subject
 menu, the dialogs and the puzzles (a tap is a click there); on the
@@ -108,6 +129,20 @@ Back does too, as Escape. A tap ends a travel video, as a click does.
 The bag and menu buttons are drawn in Atlantis III's black bars too,
 except during cinematics and the credits: the bag is a right click (the
 inventory), the menu is Escape (the game's menu, like Back).
+
+In The Secrets of Atlantis, whose original reads the mouse's moves to
+turn the view and acts on what is under the screen's centre:
+
+| Touch | Does |
+| --- | --- |
+| Tap in play | The left button: acts on what is under the centre (also the next line of a dialog). |
+| Drag in play | Turns the view, as the mouse's moves. |
+| Tap in a menu | The game's cursor goes there, then the left button presses (the main and in-game menus, the inventory, the subject menu). A drag moves the cursor. |
+| Tap during a film | Space: the film ends (the logos too). |
+| Two-finger tap | The right button: the inventory, or the hand's object put back; on an inventory's object, its close view. |
+| Bag button | The right button, as two fingers. Drawn in the black bar right of the picture, except during films. |
+| Menu button | Escape: the in-game menu, as Back. Drawn in the black bar left of the picture, except during films. |
+| Back button | Escape: a film ends, or the in-game menu. |
 
 The on-screen keyboard opens while the first game's player screen takes
 a name. The game's picture is then drawn smaller, above the keyboard. If
@@ -128,8 +163,9 @@ the app on the "no game" screen.
   `android_frame.rs`) rather than through softbuffer, whose Android path
   makes a new screen-sized buffer each frame and copies it byte by byte.
   The first game, Atlantis II and the library draw at the screen's size, into a
-  buffer kept between frames, copied into the window once. Atlantis III and
-  Evolution's 2004 program write their picture at its own size into the
+  buffer kept between frames, copied into the window once. Atlantis III,
+  Evolution's 2004 program and The Secrets of Atlantis (1024x576) write
+  their picture at its own size into the
   window's buffers, sized to its proportions with the black bars
   (`android_frame.rs`, `ANativeWindow_setBuffersGeometry`); Android's
   composer scales it to the screen on the graphics chip, so the picture
@@ -141,10 +177,13 @@ the app on the "no game" screen.
 - It keeps the screen on.
 - When the app goes to the background, its window, its sound and the
   first game's clock stop. When it comes back, everything carries on.
+  The Secrets of Atlantis's films and sound stop with the game's frames
+  and its sound output, and go on where they were.
 - If Android destroys the activity and makes a new one in the same
   process (a relaunch, or an activity destroyed in the background), the
-  first game goes on in the new activity where it was. Atlantis II, III
-  and Evolution start again from their beginning. If Android ends the
+  first game goes on in the new activity where it was. Atlantis II, III,
+  Evolution and The Secrets of Atlantis start again from their
+  beginning (the library's last played game, at its menu). If Android ends the
   process, a game continues from its last save, as after a restart on
   the desktop.
 
@@ -166,7 +205,7 @@ emulator test:
 - opens the folder picker, cancels it, then drives it to a folder made
   for the test (whose `atlantis.exe` is read through the Storage Access
   Framework);
-- shows that a folder of each of the other three games is found.
+- shows that a folder of each of the other four games is found.
 
 Screenshots and logs go to the `android-emulator-smoke` artifact. CI has
 no game data, so no game is played there.

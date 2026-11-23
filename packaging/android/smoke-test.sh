@@ -163,11 +163,13 @@ adb logcat -d > "$out/logcat-back.txt"
 grep -q "Back on the \"no game\" screen\|event loop ended" "$out/logcat-back.txt" ||
     fail "Back did not end the app"
 
-# Atlantis II, III and Evolution: a folder of each (its program and one
-# file, not a game) in the app's own folder, one after the other: the app
-# finds it and says it does not open (or that the game could not start).
+# Atlantis II, III, Evolution and The Secrets of Atlantis: a folder of
+# each (its program and one file, or for the last the unpacked tree's
+# folders and one text file, not a game) in the app's own folder, one
+# after the other: the app finds it and says it does not open (or that
+# the game could not start).
 games=/sdcard/Android/data/$pkg/files/game
-for g in A2 A3 A4; do
+for g in A2 A3 A4 A5; do
     adb shell am force-stop "$pkg"
     adb shell "rm -rf $games/*"
     case $g in
@@ -176,6 +178,9 @@ for g in A2 A3 A4; do
             echo x > $games/A3/Datas/scenar/defnames.con" ;;
     A4) adb shell "mkdir -p $games/A4/3D && echo x > '$games/A4/Atlantis Evolution.exe' &&
             echo x > $games/A4/3D/OnGameEnter.lua" ;;
+    A5) adb shell "mkdir -p $games/A5/datas/scenes $games/A5/datas/warps \
+            $games/A5/datas/texts/menu/french &&
+            echo x > $games/A5/datas/texts/menu/french/string_resources.xml" ;;
     esac
     adb logcat -b all -c
     start
@@ -188,8 +193,11 @@ for g in A2 A3 A4; do
     A2) name="Atlantis II" ;;
     A3) name="Atlantis III" ;;
     A4) name="Atlantis Evolution" ;;
+    A5) name="The Secrets of Atlantis" ;;
     esac
-    grep -q "$name found in .* but it does not open\|The game could not start\|could not start" \
+    # (The Secrets of Atlantis's tree opens with no data in it: found,
+    # its window shows, and it must not crash)
+    grep -q "$name found in .* but it does not open\|The game could not start\|could not start\|$name : .* (2006), DVD, installed" \
         "$out/logcat-$g.txt" || fail "$g: not found, or no error shown"
 done
 adb shell "rm -rf $games/*"
