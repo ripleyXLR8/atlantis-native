@@ -338,6 +338,40 @@ fn terminate_dialog_turns_the_character_back_once() {
     );
 }
 
+/// The subject menu made again after a subject's script puts the mouse
+/// at the screen's centre (its state 2, @ 0x00410f90): the cursor drawn
+/// goes there too, where the next click is tested.
+#[test]
+fn the_rebuilt_subject_menu_moves_the_drawn_cursor_too() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+    assert_eq!(play.menus.mouse, centre);
+    let (x, y) = play.stage().menu_subject_point(0).expect("subject 0");
+    play.mouse_at(x, y);
+    play.click();
+    frames(&mut play, 2);
+    assert!(play.stage().dialog_state().is_some());
+    play.space();
+    for _ in 0..30 {
+        frames(&mut play, 1);
+        if play.stage().menu_subjects().len() == 3 {
+            break;
+        }
+    }
+    assert_eq!(play.stage().menu_subjects().len(), 3, "made again");
+    assert_eq!(play.menus.mouse, centre);
+}
+
 #[test]
 fn the_autosave_is_written_and_loaded() {
     let Some(d) = dvd() else { return };

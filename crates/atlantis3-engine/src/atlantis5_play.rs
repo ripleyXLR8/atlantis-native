@@ -4107,6 +4107,7 @@ impl Play {
                 }
             };
             self.stage.borrow_mut().menu_set_subjects(list);
+            self.cursor_to_stage_mouse();
         }
         for _ in 0..clicks {
             self.stage.borrow_mut().menu_click();
@@ -4167,6 +4168,7 @@ impl Play {
             let (size, items) = self.game.script().inventory();
             let hand = self.game.script().handled_item().unwrap_or_default();
             self.stage.borrow_mut().inventory_open(size, items, hand);
+            self.cursor_to_stage_mouse();
             self.inventory_hand_name();
             return;
         }
@@ -4260,6 +4262,7 @@ impl Play {
                 self.stage
                     .borrow_mut()
                     .inventory_open(size, items, Vec::new());
+                self.cursor_to_stage_mouse();
                 self.inventory_hand_name();
             }
             Err(e) => log::warn!("{e}"),
@@ -4342,6 +4345,15 @@ impl Play {
     /// The mouse at (x, y) on the 1024 × 576 picture (menus).
     pub fn mouse_at(&mut self, x: i32, y: i32) {
         self.stage.borrow_mut().mouse = (x, y);
+        self.menus.mouse_at(x, y);
+    }
+
+    /// The drawn cursor moved where the stage put the mouse: a mode's
+    /// initialize puts it at the screen's centre (menus.md: the subject
+    /// menu's state 2, the inventory's open), where both the hit tests
+    /// and the cursor then are.
+    fn cursor_to_stage_mouse(&mut self) {
+        let (x, y) = self.stage.borrow().mouse;
         self.menus.mouse_at(x, y);
     }
 
