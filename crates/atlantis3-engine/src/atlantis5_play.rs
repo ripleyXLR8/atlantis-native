@@ -1753,6 +1753,19 @@ impl Stage {
         self.turn = Some(Turn::new(forward(self.pitch, self.yaw), to));
     }
 
+    /// @ 0x0042cd80 on the camera controller ([[0x0068a528]+0x30]+0x4c),
+    /// called by `Atl_Video_Play` (both forms, before the open:
+    /// 0x0040cdf5..0x0040ce01, 0x0040d2cf..0x0040d2da) and `Atl_Dialog_Play`
+    /// (once the id is valid, 0x00407c0f..0x00407c1b): +0x04..+0x10 set to
+    /// 0. In the free mode those are the look's speeds (+0x08, +0x0c) and
+    /// damping clock (+0x10), so the view does not glide on after the film
+    /// or dialog. In a turn (mode 2) the same words are the turn's time and
+    /// its start direction's x and y; Native leaves a turn as it is.
+    fn look_stop(&mut self) {
+        self.speed = [0.0; 2];
+        self.damping = 0.0;
+    }
+
     /// The controller's mode set back (0: @ 0x0042caa0, the free mode with
     /// the speeds and the damping clock 0; 1: @ 0x0042cab0).
     fn restore_mode(&mut self, mode: u32) {
@@ -2194,6 +2207,8 @@ impl Stage {
             lips: None,
             lip_banks: Vec::new(),
         };
+        // After @ 0x00432960, before the in-menu test (dialog-player.c).
+        self.look_stop();
         let in_menu = self.menu.is_some();
         if !in_menu {
             run.facing = true;
@@ -3263,6 +3278,7 @@ impl Engine for Stage {
                     },
                     None => None,
                 };
+                self.look_stop();
                 if self.video_play(name) {
                     if paper.is_some() {
                         // It holds the half music level (@ 0x0040ce21)

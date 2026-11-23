@@ -517,6 +517,51 @@ fn a_frame_s_mouse_moves_turn_the_camera_once() {
     assert!((s - want).abs() < 1e-3, "{s} against {want}");
 }
 
+/// `Atl_Video_Play` (both forms, before the open @ 0x0042aa90: also when
+/// the film is missing) and `Atl_Dialog_Play` (once the id is valid) zero
+/// the camera controller's look speeds and damping clock (@ 0x0042cd80 on
+/// [[0x0068a528]+0x30]+0x4c): the view does not glide after them.
+#[test]
+fn films_and_dialogs_stop_the_mouse_look() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    let swing = |play: &mut Play| {
+        play.look(1000.0, 0.0);
+        frames(play, 1);
+        assert!(play.stage().look_speed()[0] != 0.0);
+    };
+    for call in [
+        "Atl_Video_Play(\"no_such_film\")",
+        "Atl_Video_Play(\"no_such_film\", 144, 256, 432, 768)",
+        "Atl_Dialog_Play(1)",
+    ] {
+        swing(&mut play);
+        assert!(play
+            .game
+            .run_string(&format!("return function() {call} end")));
+        frames(&mut play, 1);
+        assert_eq!(play.stage().look_speed(), [0.0, 0.0], "{call}");
+        for _ in 0..600 {
+            if !play.game.busy() {
+                break;
+            }
+            if play.stage().film_playing() {
+                play.skip();
+            }
+            play.space();
+            frames(&mut play, 1);
+        }
+        assert!(!play.game.busy(), "{call}");
+    }
+    // An unknown dialog leaves them.
+    swing(&mut play);
+    let s = play.stage().look_speed();
+    assert!(play
+        .game
+        .run_string("return function() Atl_Dialog_Play(9999) end"));
+    assert_eq!(play.stage().look_speed(), s);
+}
+
 /// `Atl_Video_Play`'s loops (@ 0x0040c990) do not run the scene's
 /// update (@ 0x0044c380): the view's sprites are where they were when
 /// the film ends.
