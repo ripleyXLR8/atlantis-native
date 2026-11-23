@@ -466,6 +466,58 @@ struct MusicStream {
     done: bool,
 }
 
+/// A source of a music stream's frames (interleaved, as `ov_read`).
+trait MusicDecoder {
+    /// Up to `max_frames` frames appended to `out`; 0 at the end.
+    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize;
+}
+
+impl MusicDecoder for VorbisStream {
+    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize {
+        self.read(out, max_frames)
+    }
+}
+
+/// A music stream fed until `until` frames are pushed: at the file's end
+/// it starts again while plays are left (`plays_left` < 0: for ever),
+/// with a new decoder from `reopen`. A pass that gives no frame at all
+/// (a file with its headers and no sound) ends the stream instead of
+/// starting it again for ever.
+fn feed_music<D: MusicDecoder>(
+    dec: &mut D,
+    pushed: &mut u64,
+    done: &mut bool,
+    plays_left: &mut i32,
+    until: u64,
+    reopen: impl Fn() -> Option<D>,
+    mut push: impl FnMut(&[i16]),
+) {
+    let mut buf = Vec::new();
+    let mut empty_pass = false;
+    while !*done && *pushed < until {
+        buf.clear();
+        let n = dec.read_frames(&mut buf, 4096);
+        if n == 0 {
+            if !empty_pass && (*plays_left > 1 || *plays_left < 0) {
+                if *plays_left > 1 {
+                    *plays_left -= 1;
+                }
+                match reopen() {
+                    Some(d) => *dec = d,
+                    None => *done = true,
+                }
+                empty_pass = true;
+                continue;
+            }
+            *done = true;
+            break;
+        }
+        empty_pass = false;
+        push(&buf);
+        *pushed += n as u64;
+    }
+}
+
 /// The voice of a tirade: a type-2 sample (`FSOUND` channel 7,
 /// @ 0x004593d0(path, 0, 2, 0), played at 1.0 @ 0x00459630).
 struct Voice {
@@ -1297,27 +1349,16 @@ impl Stage {
             for (ch, c) in self.music.iter_mut().enumerate() {
                 let Some(s) = &mut c.stream else { continue };
                 let played = audio.played(CHANNEL_MUSIC_2004 + ch).unwrap_or(0);
-                let mut buf = Vec::new();
-                while !s.done && s.pushed < played + 44_100 {
-                    buf.clear();
-                    let n = s.dec.read(&mut buf, 4096);
-                    if n == 0 {
-                        if c.plays_left > 1 || c.plays_left < 0 {
-                            if c.plays_left > 1 {
-                                c.plays_left -= 1;
-                            }
-                            match VorbisStream::new(s.data.clone()) {
-                                Ok(d) => s.dec = d,
-                                Err(_) => s.done = true,
-                            }
-                            continue;
-                        }
-                        s.done = true;
-                        break;
-                    }
-                    audio.push(CHANNEL_MUSIC_2004 + ch, &buf);
-                    s.pushed += n as u64;
-                }
+                let data = &s.data;
+                feed_music(
+                    &mut s.dec,
+                    &mut s.pushed,
+                    &mut s.done,
+                    &mut c.plays_left,
+                    played + 44_100,
+                    || VorbisStream::new(data.clone()).ok(),
+                    |buf| audio.push(CHANNEL_MUSIC_2004 + ch, buf),
+                );
                 // @ 0x0045a640: each channel at master × its volume ×
                 // the music level.
                 let g = if self.music_muted {
@@ -5073,6 +5114,61 @@ mod tests {
         assert_eq!((s.fov, s.fade), (1.0, 0.25));
         s.request(&Request::TransitionEnd);
         assert_eq!(s.fade, 0.0);
+    }
+
+    /// A decoder that gives `left` frames, then none.
+    struct Frames(usize);
+
+    impl MusicDecoder for Frames {
+        fn read_frames(&mut self, out: &mut Vec<i16>, max: usize) -> usize {
+            let n = self.0.min(max);
+            self.0 -= n;
+            out.extend(std::iter::repeat_n(0, 2 * n));
+            n
+        }
+    }
+
+    #[test]
+    fn a_music_file_without_sound_ends_even_played_for_ever() {
+        // 999 plays (for ever) of a file that gives no frame: the feed
+        // ends instead of opening it again without end.
+        let (mut pushed, mut done, mut plays) = (0, false, -1);
+        feed_music(
+            &mut Frames(0),
+            &mut pushed,
+            &mut done,
+            &mut plays,
+            44_100,
+            || Some(Frames(0)),
+            |_| {},
+        );
+        assert!(done);
+        assert_eq!(pushed, 0);
+        // A file with sound starts again for ever, and 3 plays end.
+        let (mut pushed, mut done) = (0, false);
+        feed_music(
+            &mut Frames(1000),
+            &mut pushed,
+            &mut done,
+            &mut plays,
+            44_100,
+            || Some(Frames(1000)),
+            |_| {},
+        );
+        assert!(!done);
+        assert!(pushed >= 44_100);
+        let (mut pushed, mut done, mut plays) = (0, false, 3);
+        feed_music(
+            &mut Frames(1000),
+            &mut pushed,
+            &mut done,
+            &mut plays,
+            44_100,
+            || Some(Frames(1000)),
+            |_| {},
+        );
+        assert!(done);
+        assert_eq!((pushed, plays), (3000, 1));
     }
 
     /// The half music level (@ 0x0045caf0 / 0x0045cb20): the first holder
