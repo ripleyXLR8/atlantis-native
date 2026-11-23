@@ -49,6 +49,7 @@ mod a4_wasm_tests;
 /// Atlantis V's development entry (`--atlantis5`).
 #[cfg(not(target_arch = "wasm32"))]
 pub mod a5;
+mod a5_bar;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod a5_copy;
 #[cfg(target_arch = "wasm32")]

@@ -317,18 +317,8 @@ impl A5App {
             );
             return true;
         }
-        // The bar: a third of the screen wide, in its middle.
-        self.picture.fill(0);
-        let (w, h) = (VIEW_WIDTH / 3, 6);
-        let (x0, y0) = ((VIEW_WIDTH - w) / 2, (VIEW_HEIGHT - h) / 2);
         let (at, to) = self.warm;
-        let filled = (w as u64 * at.min(to)).checked_div(to).unwrap_or(0) as usize;
-        for y in y0..y0 + h {
-            let row = &mut self.picture[y * VIEW_WIDTH + x0..][..w];
-            for (i, p) in row.iter_mut().enumerate() {
-                *p = if i < filled { 0x00c8_a050 } else { 0x0030_2818 };
-            }
-        }
+        crate::a5_bar::draw(&mut self.picture, VIEW_WIDTH, VIEW_HEIGHT, at, to);
         false
     }
 

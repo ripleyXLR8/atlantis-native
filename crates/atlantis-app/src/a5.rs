@@ -24,6 +24,7 @@
 use std::num::NonZeroU32;
 use std::path::Path;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -170,30 +171,55 @@ fn language(src: &Atlantis5Source) -> String {
 /// What the game needs before it starts, while the start's first logo is
 /// read in the background ([`start`]).
 struct Start {
-    src: Arc<dyn atlantis_data::FileSource>,
+    src: Arc<Atlantis5Source>,
     lang: String,
     audio: Audio,
     warm: std::thread::JoinHandle<()>,
+    /// How far the films' folder is decoded (the bar on the black
+    /// screen): (decoded up to, the logo's offset in it).
+    progress: Arc<(AtomicU64, AtomicU64)>,
 }
 
 /// The game made and booted once the logos are read; meanwhile the window
-/// is black. From a disc the first run reads (and decodes) the cabinet's
-/// `Videos` folder up to the logos, about 460 MB with the French DVD: the
-/// port's own, the original plays from its install.
-fn start(src: Arc<dyn atlantis_data::FileSource>, lang: String, audio: Audio) -> Start {
+/// is black, with a bar ([`crate::a5_bar`]). From a disc the first run
+/// reads (and decodes) the cabinet's `Videos` folder up to the logos,
+/// about 460 MB with the French DVD, a step at a time: the port's own,
+/// the original plays from its install. Later runs start from the kept
+/// checkpoints, at once.
+fn start(src: Arc<Atlantis5Source>, lang: String, audio: Audio) -> Start {
     let s = src.clone();
+    let progress = Arc::new((AtomicU64::new(0), AtomicU64::new(0)));
+    let p = progress.clone();
     let warm = std::thread::spawn(move || {
+        let t = Instant::now();
         for logo in atlantis3_engine::atlantis5_play::LOGOS {
-            let _ = s.read(&format!("datas/videos/{logo}.bik"));
+            let name = format!("datas/videos/{logo}.bik");
+            while let Some((at, to)) = s.warm_progress(&name, WARM_STEP) {
+                p.0.store(at, Ordering::Relaxed);
+                p.1.store(to, Ordering::Relaxed);
+                if at >= to {
+                    break;
+                }
+            }
+            let _ = atlantis_data::FileSource::read(&*s, &name);
         }
+        log::info!(
+            "the films' folder read up to the logos in {:.1} s ({} MB)",
+            t.elapsed().as_secs_f64(),
+            p.1.load(Ordering::Relaxed) >> 20
+        );
     });
     Start {
         src,
         lang,
         audio,
         warm,
+        progress,
     }
 }
+
+/// The decoding's step before the game starts (uncompressed bytes).
+const WARM_STEP: u64 = 4 << 20;
 
 struct A5App {
     play: Option<Play>,
@@ -317,7 +343,14 @@ impl A5App {
         if self.play.is_some() {
             return true;
         }
-        if self.start.as_ref().is_some_and(|s| !s.warm.is_finished()) {
+        if let Some(s) = self.start.as_ref().filter(|s| !s.warm.is_finished()) {
+            let (at, to) = (
+                s.progress.0.load(Ordering::Relaxed),
+                s.progress.1.load(Ordering::Relaxed),
+            );
+            if to > 0 {
+                crate::a5_bar::draw(&mut self.picture, VIEW_WIDTH, VIEW_HEIGHT, at, to);
+            }
             return false;
         }
         let Some(start) = self.start.take() else {
@@ -593,7 +626,7 @@ pub fn run_source_on(
         let a = audio.clone();
         crate::audio_out::start_with(move |buf, rate, channels| a.fill(buf, rate, channels))
     };
-    let src: Arc<dyn atlantis_data::FileSource> = Arc::new(src);
+    let src = Arc::new(src);
     let mut app = A5App {
         play: None,
         start: Some(start(src, lang, audio)),
