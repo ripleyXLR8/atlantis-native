@@ -594,3 +594,29 @@ fn a_persistent_sprite_crosses_a_view_without_its_file() {
     go_to(&mut play, "etage12", 4);
     assert!(lightning(&play), "the record kept through view 3");
 }
+
+/// `Atl_Video_Play`'s loop (@ 0x0040c990) steps the film before its
+/// first draw and leaves after the draw of the iteration whose step
+/// reported the end (`FrameNum` = `Frames` − 1): the first picture is
+/// frame 1, and the frame decoded last is shown once.
+#[test]
+fn a_film_shows_its_first_and_last_decoded_frames() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    assert!(play
+        .game
+        .run_string("return function() Atl_Video_Play(\"is0001\") end"));
+    // Before any update: the first step was made at the call.
+    let (num, frames_n) = play.stage().film_frame().expect("a film");
+    assert_eq!(num, 2, "frame 1 decoded, FrameNum on 2");
+    let mut last = None;
+    for _ in 0..frames_n * 4 {
+        frames(&mut play, 1);
+        match play.stage().film_frame() {
+            Some(f) => last = Some(f.0),
+            None => break,
+        }
+    }
+    assert!(!play.stage().film_playing());
+    assert_eq!(last, Some(frames_n - 1), "drawn once at the end");
+}

@@ -622,6 +622,10 @@ pub struct Stage {
     film: Option<(Film, Option<FilmSound>)>,
     /// The film's own Bink audio track plays on [`CHANNEL_BINK`].
     film_bink_sound: bool,
+    /// The film's step reported its end (@ 0x00456cb0: `FrameNum` =
+    /// `Frames` − 1): the loop draws that frame once more, then ends at
+    /// the next update.
+    film_ending: bool,
     /// The film's subtitles (`kinematic_subtitles.xml`).
     film_subtitles: Option<FilmSubtitles>,
     /// The text tables of the language.
@@ -732,6 +736,7 @@ impl Stage {
             sound: None,
             film: None,
             film_bink_sound: false,
+            film_ending: false,
             film_subtitles: None,
             dialogs: None,
             kinematic: None,
@@ -845,6 +850,12 @@ impl Stage {
     }
 
     /// Whether a film plays.
+    /// The film's `FrameNum` (the frame its next step decodes, 1-based)
+    /// and `Frames`, for tests.
+    pub fn film_frame(&self) -> Option<(u32, u32)> {
+        self.film.as_ref().map(|(f, _)| (f.frame_num, f.frames()))
+    }
+
     pub fn film_playing(&self) -> bool {
         self.film.is_some()
     }
@@ -1440,10 +1451,27 @@ impl Stage {
                 .map(|f| FilmSubtitles::new(f.subtitles.clone()))
         });
         self.film = Some((film, sound));
+        self.film_ending = false;
+        // The loop's first iteration steps the film before its first draw
+        // (@ 0x0040c990, @ 0x0043d6a0: the step @ 0x0042b0f0, then the draw
+        // @ 0x0042b220): the first picture is the film's first frame.
+        self.film_step();
         true
     }
 
+    /// One update of the film: its step, unless the last one reported
+    /// the end; the loop is then left at the next update, after the frame
+    /// decoded last was drawn once (`evidence/m5/video-play-rect.c`: step,
+    /// sound, draw, flip, then the loop's test).
     fn film_update(&mut self) {
+        if !self.film_ending {
+            self.film_step();
+        }
+    }
+
+    /// The loop's step (@ 0x0042b0f0): the film's own (@ 0x00456cb0) and
+    /// its subtitles; the end it reports is taken at the next update.
+    fn film_step(&mut self) {
         let now = self.clock;
         let Some((film, sound)) = &mut self.film else {
             return;
@@ -1472,11 +1500,12 @@ impl Stage {
             fs.step(frame, rate);
         }
         if over {
-            self.end_film();
+            self.film_ending = true;
         }
     }
 
     fn end_film(&mut self) {
+        self.film_ending = false;
         self.film_subtitles = None;
         if std::mem::take(&mut self.film_ducks) {
             self.music_unduck();
@@ -1724,6 +1753,11 @@ impl Stage {
     /// music (@ 0x00459fd0), film.
     fn update(&mut self, dt: f64, play: bool, scene: bool) {
         self.clock += dt;
+        // A film whose last step reported its end was drawn once: its loop
+        // is left, and the script goes on in this frame.
+        if self.film_ending {
+            self.end_film();
+        }
         #[allow(clippy::cast_possible_truncation)]
         if play {
             self.camera_step(dt as f32);
@@ -3086,6 +3120,7 @@ impl Stage {
         self.persistent.clear();
         self.randomized.clear();
         self.film = None;
+        self.film_ending = false;
         self.film_subtitles = None;
         self.dialog = None;
         self.menu = None;
