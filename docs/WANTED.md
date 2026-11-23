@@ -7,17 +7,15 @@ identified: the size and checksum of `atlantis.exe` (or the program of
 the later games), and where needed the tables and texts it ships. An
 edition nobody has described is refused with its identifiers, so that it
 can be added. This page lists, for each of the five games, the editions
-the project knows of but has never seen, or has seen only as an
-untrusted copy (a program file that was modified after it left the
-factory, a dump with unreadable sectors).
+the project knows of but has never checked on an original disc.
 
 If you own one of them, the box and the discs are enough to help: see
 [How to help](#how-to-help). **Never send or upload a copy of a game or
 a disc image**, only photos, file listings and checksums.
 
 Priorities: **most wanted** marks the editions that would let the most
-players start their copy, or that would replace an untrusted copy the
-project depends on today. The rest are welcome in any order.
+players start their copy, or that would let the project check a
+program file it has only read about. The rest are welcome in any order.
 
 How to read the tables: the barcode is the EAN or UPC under the box's
 bar code; the ring code is the text engraved in the disc's inner ring,
@@ -114,9 +112,9 @@ in progress).
 ## The Secrets of Atlantis: The Sacred Legacy (2006)
 
 **Already supported or tried:** the French DVD (*L'Héritage sacré*,
-Nobilis France, barcode 3760137140938). The international DVD has the
-same layout but has been seen only as a copy whose program file was
-modified, without its English files.
+Nobilis France, barcode 3760137140938). The international DVD's layout
+is known from public file listings and read by Atlantis Native, but its
+original program file and English files have not been checked.
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|
