@@ -925,27 +925,28 @@ impl Game {
     /// The configuration's section is not written (Native keeps the
     /// options elsewhere).
     fn save(&mut self) {
-        self.save_as(crate::save::AUTOSLOT);
+        let _ = self.save_as(crate::save::AUTOSLOT);
     }
 
     /// The save written to `saves/<file>` (the save menu's
     /// `CSaveFileWriter` @ 0x0043ad90 on `slot_<n>`, @ 0x004272b0; the
     /// database taken now, as `Atl_Save` does it at its call).
-    pub fn save_now(&mut self, file: &str) {
+    /// False when the save could not be made or written.
+    pub fn save_now(&mut self, file: &str) -> bool {
         // An error is reported by `save_as`, which takes it.
         let _ = self.script.save_db_now();
-        self.save_as(file);
+        self.save_as(file)
     }
 
-    fn save_as(&mut self, file: &str) {
+    fn save_as(&mut self, file: &str) -> bool {
         use crate::save;
         let db = match self.script.take_saved_db() {
             Some(Ok(db)) => db,
             Some(Err(e)) => {
                 self.lua_error(&e);
-                return;
+                return false;
             }
-            None => return,
+            None => return false,
         };
         let mut root = save::element(save::ROOT);
         root.attributes.push(("type".into(), save::TYPE.into()));
@@ -973,7 +974,9 @@ impl Game {
         let text = save::to_text(&root);
         if !self.engine.borrow_mut().write_save(file, text.as_bytes()) {
             self.note("Atl_Save: the save could not be written".into());
+            return false;
         }
+        true
     }
 
     /// State 2 (@ 0x0042f000): `saves/autoslot` (missing: `Atl_Load usage

@@ -33,8 +33,27 @@ impl SaveFiles for DirSaves {
         std::fs::read(self.0.join(name)).ok()
     }
 
+    /// Written whole to `<name>.tmp` beside it, then renamed over it: a
+    /// write cut short (a full disk, a crash) leaves the earlier file as
+    /// it was.
     fn write(&self, name: &str, data: &[u8]) -> bool {
-        std::fs::create_dir_all(&self.0).is_ok() && std::fs::write(self.0.join(name), data).is_ok()
+        use std::io::Write;
+        if std::fs::create_dir_all(&self.0).is_err() {
+            return false;
+        }
+        let path = self.0.join(name);
+        let tmp = self.0.join(format!("{name}.tmp"));
+        let written = std::fs::File::create(&tmp)
+            .and_then(|mut f| {
+                f.write_all(data)?;
+                f.sync_all()
+            })
+            .and_then(|()| std::fs::rename(&tmp, &path));
+        if written.is_err() {
+            let _ = std::fs::remove_file(&tmp);
+            return false;
+        }
+        true
     }
 
     fn remove(&self, name: &str) {
@@ -59,9 +78,43 @@ impl SaveFiles for DirSaves {
     }
 
     fn copy(&self, from: &str, to: &str) {
-        let (f, t) = (self.0.join(from), self.0.join(to));
-        if f.is_file() {
-            let _ = std::fs::copy(f, t);
+        if let Some(d) = self.read(from) {
+            self.write(to, &d);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DirSaves, SaveFiles};
+
+    fn folder(name: &str) -> std::path::PathBuf {
+        let base = std::env::var_os("ATLANTIS_NATIVE_DATA")
+            .map_or_else(std::env::temp_dir, std::path::PathBuf::from);
+        let d = base.join(format!("a5-saves-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        d
+    }
+
+    #[test]
+    fn a_failed_write_keeps_the_earlier_save() {
+        let d = folder("atomic");
+        let saves = DirSaves(d.clone());
+        assert!(saves.write("slot_1", b"first"));
+        assert!(saves.write("slot_1", b"second"));
+        assert_eq!(saves.read("slot_1").as_deref(), Some(&b"second"[..]));
+        saves.copy("slot_1", "autoslot_1");
+        assert_eq!(saves.read("autoslot_1").as_deref(), Some(&b"second"[..]));
+        // The temporary file cannot be made (a folder holds its name):
+        // the write fails and slot_1 is untouched.
+        std::fs::create_dir_all(d.join("slot_1.tmp")).expect("blocker");
+        assert!(!saves.write("slot_1", b"third"));
+        assert_eq!(saves.read("slot_1").as_deref(), Some(&b"second"[..]));
+        let names: Vec<_> = std::fs::read_dir(&d)
+            .expect("folder")
+            .map(|e| e.expect("entry").file_name())
+            .collect();
+        assert_eq!(names.len(), 3, "{names:?}");
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

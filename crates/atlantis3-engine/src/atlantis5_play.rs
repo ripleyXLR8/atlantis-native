@@ -4191,7 +4191,17 @@ impl Play {
                 self.stage.borrow_mut().hold_sound(true);
             }
         }
+        // A save page's slot not written: its autosave copy is left as it
+        // was too, so the slot and its `autoslot_<n>` stay a pair.
+        let mut save_failed = false;
         for e in self.menus.take_effects() {
+            if save_failed && matches!(e, Effect::Delete(_) | Effect::Copy { .. }) {
+                continue;
+            }
+            if let Effect::Save(file) = &e {
+                save_failed = !self.game.save_now(file);
+                continue;
+            }
             self.menu_effect(e);
         }
         if ended.is_some() {
@@ -4215,7 +4225,9 @@ impl Play {
             Effect::Load(file) => {
                 self.game.load_file(&file);
             }
-            Effect::Save(file) => self.game.save_now(&file),
+            Effect::Save(file) => {
+                let _ = self.game.save_now(&file);
+            }
             Effect::Request(r) => self.game.queue_request(r),
             Effect::Delete(file) => {
                 if let Some(d) = dir {

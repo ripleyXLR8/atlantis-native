@@ -232,6 +232,38 @@ fn a_double_click_in_one_frame_clicks_once() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A slot that could not be written keeps its earlier autosave copy (the
+/// page's `autoslot_<n>` replacement is skipped), so the two stay a pair.
+#[test]
+fn a_failed_slot_save_leaves_its_autosave_copy() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("save-fails");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    std::fs::write(dir.join("autoslot_3"), b"old").expect("autoslot_3");
+    // `slot_3.tmp` taken by a folder: the slot cannot be written.
+    std::fs::create_dir_all(dir.join("slot_3.tmp")).expect("blocker");
+    play.escape();
+    frames(&mut play, 1);
+    click(&mut play, "save");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    click(&mut play, "save_3");
+    frames(&mut play, 1);
+    assert!(!dir.join("slot_3").exists());
+    assert_eq!(std::fs::read(dir.join("autoslot_3")).unwrap(), b"old");
+    // Written: the autosave copied with it.
+    std::fs::remove_dir(dir.join("slot_3.tmp")).expect("blocker gone");
+    click(&mut play, "save_3");
+    frames(&mut play, 1);
+    assert!(dir.join("slot_3").is_file());
+    assert_eq!(
+        std::fs::read(dir.join("autoslot_3")).ok(),
+        std::fs::read(dir.join("autoslot")).ok()
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_option_pages_change_the_configuration() {
     let Some(d) = dvd() else { return };
