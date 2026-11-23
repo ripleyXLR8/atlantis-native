@@ -150,30 +150,43 @@ impl Plan {
     ) -> Result<(), CopyError> {
         let io = |what: &Path, e: std::io::Error| CopyError::Io(format!("{}: {e}", what.display()));
         std::fs::create_dir_all(dest).map_err(|e| io(dest, e))?;
-        // What another disc (another language) or a copy cut short left.
+        // What a copy cut short left (part files) goes at once; another
+        // disc's language cabinet only once this copy is whole, so an
+        // earlier copy stays playable when this one stops (no room, Esc, a
+        // read error), unless the room needs it gone first.
+        let mut stale = Vec::new();
         for entry in std::fs::read_dir(dest).map_err(|e| io(dest, e))?.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
             let l = name.to_ascii_lowercase();
-            let stale = l.ends_with(".part")
-                || (l.starts_with("datas")
-                    && l.ends_with(".cab")
-                    && !self
-                        .files
-                        .iter()
-                        .any(|(n, _)| n.eq_ignore_ascii_case(&name)));
-            if stale {
+            if l.ends_with(".part") {
                 let _ = std::fs::remove_file(entry.path());
+            } else if l.starts_with("datas")
+                && l.ends_with(".cab")
+                && !self
+                    .files
+                    .iter()
+                    .any(|(n, _)| n.eq_ignore_ascii_case(&name))
+            {
+                let size = entry.metadata().map_or(0, |m| m.len());
+                stale.push((entry.path(), size));
             }
         }
         let (left, need) = self.still_to_copy(dest);
         progress.done.store(0, Ordering::Relaxed);
         progress.total.store(need, Ordering::Relaxed);
         if let Some(free) = free(dest) {
-            if free < need + MARGIN {
+            let freed: u64 = stale.iter().map(|s| s.1).sum();
+            if free.saturating_add(freed) < need + MARGIN {
                 return Err(CopyError::NoRoom {
                     need: need + MARGIN,
                     free,
                 });
+            }
+            if free < need + MARGIN {
+                log::info!("the other language's cabinets removed first for the room");
+                for (path, _) in stale.drain(..) {
+                    let _ = std::fs::remove_file(path);
+                }
             }
         }
         for (name, size) in &left {
@@ -185,6 +198,9 @@ impl Plan {
             }
             std::fs::rename(&part, dest.join(name)).map_err(|e| io(&part, e))?;
             log::info!("{name}: copied to {}", dest.display());
+        }
+        for (path, _) in stale {
+            let _ = std::fs::remove_file(path);
         }
         Atlantis5Source::open(dest)
             .map(|_| ())
@@ -470,6 +486,29 @@ pub(crate) mod tests {
         assert_eq!(plan.copy_to(&dest, &p, |_| None), Err(CopyError::Cancelled));
         assert_eq!(std::fs::read_dir(&dest).unwrap().count(), 0);
         assert_eq!(plan.still_to_copy(&dest).1, total);
+        // Another disc's copy there (its language cabinet), then a copy of
+        // this one that stops: the earlier copy keeps its cabinet.
+        std::fs::write(dest.join("DATAS_german.cab"), [0; 5]).unwrap();
+        let p = Progress::default();
+        assert!(matches!(
+            plan.copy_to(&dest, &p, |_| Some(1 << 20)),
+            Err(CopyError::NoRoom { .. })
+        ));
+        assert!(dest.join("DATAS_german.cab").is_file());
+        let p = Progress::default();
+        p.cancel.store(true, Ordering::Relaxed);
+        assert_eq!(plan.copy_to(&dest, &p, |_| None), Err(CopyError::Cancelled));
+        assert!(dest.join("DATAS_german.cab").is_file());
+        // Room only once it is gone: removed first, then the copy.
+        let tight = tmp("copy-tight");
+        std::fs::write(tight.join("DATAS_german.cab"), vec![0; 1000]).unwrap();
+        let p = Progress::default();
+        assert_eq!(
+            plan.copy_to(&tight, &p, |_| Some(total + MARGIN - 500)),
+            Ok(())
+        );
+        assert!(!tight.join("DATAS_german.cab").exists());
+        let _ = std::fs::remove_dir_all(&tight);
         // A copy cut short (a part file, another language's cabinet, the
         // program whole): the rest copied, the leftovers removed, the
         // player's other files kept.
