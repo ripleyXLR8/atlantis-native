@@ -221,6 +221,8 @@ struct A5App {
     fullscreen: bool,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// The picture's column of each window column ([`Self::present`]).
+    columns: Vec<usize>,
     last: Instant,
     /// When the next frame is due ([`FRAME`] after the last one's).
     next_frame: Instant,
@@ -269,14 +271,21 @@ impl A5App {
             return;
         };
         // The picture at its proportions, black bars around, nearest
-        // pixel.
+        // pixel: each window column's picture column computed once per
+        // size (a division a pixel is dear on a small ARM board).
         let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
-        buf.fill(0);
+        if self.columns.len() != dw {
+            self.columns = (0..dw).map(|x| x * gw / dw).collect();
+        }
+        buf[..oy * ww].fill(0);
+        buf[(oy + dh) * ww..].fill(0);
         for y in 0..dh {
             let row = &self.picture[(y * gh / dh) * gw..][..gw];
-            let out = &mut buf[(oy + y) * ww + ox..][..dw];
-            for (x, o) in out.iter_mut().enumerate() {
-                *o = row[x * gw / dw] & 0x00ff_ffff;
+            let line = &mut buf[(oy + y) * ww..][..ww];
+            line[..ox].fill(0);
+            line[ox + dw..].fill(0);
+            for (o, &c) in line[ox..ox + dw].iter_mut().zip(&self.columns) {
+                *o = row[c] & 0x00ff_ffff;
             }
         }
         let _ = buf.present();
@@ -529,6 +538,7 @@ pub fn run_window_on(
         fullscreen,
         window: None,
         surface: None,
+        columns: Vec::new(),
         last: Instant::now(),
         next_frame: Instant::now(),
         focused: false,
