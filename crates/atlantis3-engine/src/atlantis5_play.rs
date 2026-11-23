@@ -4465,6 +4465,19 @@ impl Play {
         self.menus.mouse_at(x, y);
     }
 
+    /// A relative move of the mouse in a menu (DirectInput's lX, lY,
+    /// @ 0x0047c8a0): the menus' mouse moved by it and kept within
+    /// 0..=1024, 0..=576 (@ 0x0040d890).
+    pub fn mouse_by(&mut self, dx: i32, dy: i32) {
+        let (x, y) = self.menus.mouse;
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
+        self.mouse_at(
+            x.saturating_add(dx).clamp(0, w),
+            y.saturating_add(dy).clamp(0, h),
+        );
+    }
+
     /// The drawn cursor moved where the stage put the mouse: a mode's
     /// initialize puts it at the screen's centre (menus.md: the subject
     /// menu's state 2, the inventory's open), where both the hit tests

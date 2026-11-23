@@ -242,10 +242,11 @@ struct A5App {
     /// A redraw was asked for and has not come yet.
     redraw_pending: bool,
     /// Whether the window has the focus (the mouse's moves turn the view
-    /// only then).
+    /// or move the menus' mouse only then; the pointer is held only then).
     focused: bool,
-    /// Whether the mouse is free for a menu.
-    menu_cursor: bool,
+    /// The fractions of the mouse's relative moves not yet given to a
+    /// menu (some systems report them below a pixel).
+    menu_move: (f64, f64),
     _audio: Option<cpal::Stream>,
     /// Why the game could not be made, for the caller.
     error: Option<String>,
@@ -306,6 +307,23 @@ impl A5App {
         let _ = buf.present();
     }
 
+    /// The pointer held in the window while it has the focus, in play and
+    /// in the menus alike (the original reads the mouse's relative moves
+    /// through DirectInput throughout), and let go when another program
+    /// takes the focus.
+    fn grab(&self) {
+        let Some(window) = &self.window else {
+            return;
+        };
+        if self.focused {
+            let _ = window
+                .set_cursor_grab(CursorGrabMode::Locked)
+                .or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined));
+        } else {
+            let _ = window.set_cursor_grab(CursorGrabMode::None);
+        }
+    }
+
     /// The game, made once the start's reads end (black until then).
     fn ready(&mut self, el: &ActiveEventLoop) -> bool {
         if self.play.is_some() {
@@ -363,19 +381,6 @@ impl A5App {
             el.exit();
             return;
         }
-        // A menu frees the mouse (the game draws its cursor); play holds
-        // it. The system cursor stays hidden (ShowCursor(0), @ 0x0043c200).
-        let menu = play.in_menu();
-        if menu != self.menu_cursor {
-            self.menu_cursor = menu;
-            if let Some(w) = &self.window {
-                if menu {
-                    let _ = w.set_cursor_grab(CursorGrabMode::None);
-                } else if w.set_cursor_grab(CursorGrabMode::Locked).is_err() {
-                    let _ = w.set_cursor_grab(CursorGrabMode::Confined);
-                }
-            }
-        }
         play.render(&mut self.picture);
         self.present();
     }
@@ -413,21 +418,33 @@ impl ApplicationHandler for A5App {
         // The original hides the system cursor (ShowCursor(0) at start,
         // @ 0x0043c200) and reads the mouse's relative moves (DirectInput).
         window.set_cursor_visible(false);
-        if window.set_cursor_grab(CursorGrabMode::Locked).is_err() {
-            let _ = window.set_cursor_grab(CursorGrabMode::Confined);
-        }
         self.window = Some(window);
         self.focused = true;
+        self.grab();
         self.last = Instant::now();
     }
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta } = event {
-            if self.focused {
+            if !self.focused {
+                return;
+            }
+            let Some(p) = self.play.as_mut() else {
+                return;
+            };
+            if p.in_menu() {
+                // The menus move their mouse by the relative moves
+                // (menus.md § 2: @ 0x0040d920, kind 2, through
+                // @ 0x0040d890), from the screen's centre where each mode
+                // starts it.
+                let (fx, fy) = (self.menu_move.0 + delta.0, self.menu_move.1 + delta.1);
+                let (ix, iy) = (fx.trunc(), fy.trunc());
+                self.menu_move = (fx - ix, fy - iy);
                 #[allow(clippy::cast_possible_truncation)]
-                if let Some(p) = self.play.as_mut() {
-                    p.look(delta.0 as f32, delta.1 as f32);
-                }
+                p.mouse_by(ix as i32, iy as i32);
+            } else {
+                #[allow(clippy::cast_possible_truncation)]
+                p.look(delta.0 as f32, delta.1 as f32);
             }
         }
     }
@@ -489,7 +506,10 @@ impl ApplicationHandler for A5App {
                     _ => {}
                 }
             }
-            WindowEvent::Focused(f) => self.focused = f,
+            WindowEvent::Focused(f) => {
+                self.focused = f;
+                self.grab();
+            }
             // A press of the left button: the original's mouse event of
             // kind 0 with the buttons 1 (@ 0x0043bbc0).
             WindowEvent::MouseInput {
@@ -502,22 +522,6 @@ impl ApplicationHandler for A5App {
                 button: MouseButton::Right,
                 ..
             } => play.right_press(),
-            // In a menu the mouse moves a cursor on the picture.
-            WindowEvent::CursorMoved { position, .. } => {
-                if let Some(w) = &self.window {
-                    let size = w.inner_size();
-                    let (ww, wh) = (f64::from(size.width.max(1)), f64::from(size.height.max(1)));
-                    #[allow(clippy::cast_precision_loss)]
-                    let (gw, gh) = (VIEW_WIDTH as f64, VIEW_HEIGHT as f64);
-                    let k = (ww / gw).min(wh / gh);
-                    let (ox, oy) = ((ww - gw * k) / 2.0, (wh - gh * k) / 2.0);
-                    #[allow(clippy::cast_possible_truncation)]
-                    play.mouse_at(
-                        ((position.x - ox) / k) as i32,
-                        ((position.y - oy) / k) as i32,
-                    );
-                }
-            }
             WindowEvent::RedrawRequested => self.frame(el),
             _ => {}
         }
@@ -566,7 +570,7 @@ pub fn run_window_on(
         next_frame: Instant::now(),
         redraw_pending: false,
         focused: false,
-        menu_cursor: false,
+        menu_move: (0.0, 0.0),
         _audio: out,
     };
     el.run_app_on_demand(&mut app)

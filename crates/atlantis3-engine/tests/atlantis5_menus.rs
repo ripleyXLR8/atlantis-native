@@ -543,6 +543,26 @@ fn the_logos_play_before_the_main_menu() {
     assert!(!play.logos_playing());
 }
 
+/// Each mode starts the menus' mouse at the screen's centre
+/// (@ 0x0041b780), and the mouse's relative moves move it from there,
+/// kept within the screen (@ 0x0040d890).
+#[test]
+fn a_menu_mouse_moves_from_the_centre() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("menu-mouse");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert_eq!(play.menus.mouse, (512, 288));
+    play.mouse_by(5, -3);
+    assert_eq!(play.menus.mouse, (517, 285));
+    play.mouse_by(-5000, 5000);
+    assert_eq!(play.menus.mouse, (0, 576));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// The menus' cursor (`menu/cursor.spr`, @ 0x0040d9d0 drawn last) is on
 /// the picture where the mouse is, and follows it; nothing else changes.
 #[test]
