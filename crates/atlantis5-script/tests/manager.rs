@@ -478,3 +478,15 @@ fn address_go_under_pcall_runs_after_the_script() {
         probe.borrow().errors
     );
 }
+
+#[test]
+fn ending_the_game_frees_the_runs_that_wait() {
+    let (mut g, probe) = game(BASE);
+    probe.borrow_mut().wait = true;
+    g.new_game();
+    settle(&mut g, 5);
+    assert!(g.waiting_for_engine(), "the chapter waits at its film");
+    assert!(g.script().task_count() > 0);
+    g.end_game();
+    assert_eq!(g.script().task_count(), 0);
+}

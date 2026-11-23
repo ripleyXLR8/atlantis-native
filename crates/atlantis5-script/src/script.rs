@@ -1492,6 +1492,29 @@ impl Script {
         outcome
     }
 
+    /// Forgets a task that will not be resumed again (a run dropped while
+    /// it waits): its thread leaves the registry so the collector can
+    /// free it and what its stack holds.
+    pub fn drop_task(&mut self, task: &Task) {
+        let state = self.lua.state_mut();
+        let _ = raw_set(state, self.tasks, Val::Num(task.key), Val::Nil);
+    }
+
+    /// How many tasks the registry holds (threads not yet ended).
+    pub fn task_count(&mut self) -> usize {
+        let state = self.lua.state_mut();
+        let Some(t) = state.gc.tables.get(self.tasks) else {
+            return 0;
+        };
+        let mut n = 0;
+        let mut key = Val::Nil;
+        while let Ok(Some((k, _))) = t.next(key, &state.gc.string_arena) {
+            key = k;
+            n += 1;
+        }
+        n
+    }
+
     /// The transition of an `Atl_Address_Go` the last resume reached
     /// where it could not stop (its handler would have run it inside the
     /// call); the game manager runs it once that run has ended.

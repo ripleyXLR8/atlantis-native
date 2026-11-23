@@ -837,11 +837,18 @@ impl Game {
     /// quit state 8 taken at once.
     fn exit_on_error(&mut self) {
         self.note("an uncaught script error: the program ends (MainLoop's catch)".into());
-        self.runs.clear();
+        self.drop_runs();
         self.transitions.clear();
         self.queue.clear();
         self.previous = self.state;
         self.state = 8;
+    }
+
+    /// Drops every run, waiting or not, and their tasks with them.
+    fn drop_runs(&mut self) {
+        for run in self.runs.drain(..) {
+            self.script.drop_task(&run.task);
+        }
     }
 
     /// The next request (@ 0x0042ef30 + 0x0042fb90).
@@ -879,7 +886,7 @@ impl Game {
         self.queue.clear();
         self.state = 0;
         self.previous = 0;
-        self.runs.clear();
+        self.drop_runs();
         self.transitions.clear();
         self.timers.clear();
         self.timer_walk = None;
