@@ -434,9 +434,16 @@ impl ApplicationHandler for A5App {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        // The focus in every phase, the start's bar included: the pointer
+        // let go when another program takes it, held again on its return.
+        if let WindowEvent::Focused(f) = event {
+            self.focused = f;
+            self.grab();
+            return;
+        }
         if self.play.is_none() {
-            // Black while the start's reads go on: only closing and the
-            // redraws that make the game once they end.
+            // Black while the start's reads go on: only closing, the focus
+            // (above) and the redraws that make the game once they end.
             match event {
                 WindowEvent::CloseRequested => el.exit(),
                 WindowEvent::RedrawRequested => self.frame(el),
@@ -472,10 +479,6 @@ impl ApplicationHandler for A5App {
                     }
                     _ => {}
                 }
-            }
-            WindowEvent::Focused(f) => {
-                self.focused = f;
-                self.grab();
             }
             // A press of the left button: the original's mouse event of
             // kind 0 with the buttons 1 (@ 0x0043bbc0).
