@@ -447,7 +447,12 @@ impl ApplicationHandler for A5App {
         };
         match event {
             WindowEvent::CloseRequested => el.exit(),
-            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
+            // A key's press, not the system's repeats of a held key: the
+            // original reads the keyboard's buffered DirectInput data
+            // (@ 0x0047c8a0, GetDeviceData), one event per transition.
+            WindowEvent::KeyboardInput { event, .. }
+                if event.state == ElementState::Pressed && !event.repeat =>
+            {
                 match event.logical_key {
                     // Escape (DIK 1): a film ends, or the in-game menu.
                     Key::Named(NamedKey::Escape) => play.escape(),
