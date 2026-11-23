@@ -571,10 +571,13 @@ fn the_logos_sound_plays() {
         audio.fill(&mut out, 44100, 2);
         let peak = out.iter().fold(0f32, |m, v| m.max(v.abs()));
         assert!(peak > 0.01, "{logo}: {peak}");
+        // Skipped: its sound stops at once. (The next logo opens in the
+        // next frame and its first step starts its own sound.)
         play.skip();
-        frames(&mut play, 1);
         assert!(!audio.is_playing(CHANNEL_BINK), "{logo} skipped");
+        frames(&mut play, 1);
     }
     frames(&mut play, 2);
     assert_eq!(play.menus.current(), Some(menus::MAIN));
 }
+
