@@ -51,6 +51,9 @@ use crate::gl_present::GlPresenter;
 /// The game's name in the page.
 const NAME: &str = "The Secrets of Atlantis";
 
+/// A game step's time: the desktop's (`a5.rs` FRAME), one frame at 60 Hz.
+const FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
+
 /// A frame's time for decoding the logos' folder before the game starts
 /// (the page answers between two).
 const WARM_START_MS: f64 = 30.0;
@@ -148,6 +151,8 @@ pub fn start(src: Atlantis5Source, store: Rc<dyn SaveStore>) -> Result<(), JsVal
         gl: None,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
         last: None,
+        next_frame: Instant::now(),
+        shown_size: None,
         clock: 0.0,
         menu: false,
         lock_asked: None,
@@ -181,7 +186,12 @@ struct A5App {
     window: Option<Rc<Window>>,
     gl: Option<GlPresenter>,
     picture: Vec<u32>,
+    /// The last step's time.
     last: Option<Instant>,
+    /// When the next step is due ([`FRAME`] after the last one's).
+    next_frame: Instant,
+    /// The canvas's size at the last picture drawn.
+    shown_size: Option<winit::dpi::PhysicalSize<u32>>,
     /// The game's time (seconds).
     clock: f64,
     /// Whether a menu is up (the pointer is free).
@@ -292,6 +302,7 @@ impl A5App {
         };
         // The canvas's size read once, for the placement and the draw.
         let size = window.inner_size();
+        self.shown_size = Some(size);
         let (ww, wh) = (size.width.max(1), size.height.max(1));
         let (ox, oy, dw, dh) = place_in(ww as usize, wh as usize);
         for p in &mut self.picture {
@@ -391,31 +402,56 @@ impl A5App {
             }
             return;
         }
-        let t = Instant::now();
-        // As on the desktop: a pause longer than a quarter second (a
-        // hidden page, a long read) counts as a quarter second.
-        let dt = self.last.replace(t).map_or(0.0, |l| {
-            t.saturating_duration_since(l).as_secs_f64().min(0.25)
-        });
-        self.clock += dt;
+        // The desktop's pace (`a5.rs` FRAME, the original's frame at a
+        // 60 Hz refresh): a redraw per screen refresh runs the steps due
+        // since the last one, none on most redraws of a 120 or 144 Hz
+        // screen, two at 30 Hz. The look's rule is per frame and not
+        // linear in it (play.md § 2), so a step per redraw turned the view
+        // slower on a fast screen. As on the desktop, a pause longer than
+        // a quarter second (a hidden page, a long read) counts as a
+        // quarter second.
+        let now = Instant::now();
+        if self.last.is_none() {
+            // The game's first step: due now, not since the page opened.
+            self.next_frame = now;
+        }
+        let dts = crate::web_pace::step_dts(&mut self.next_frame, &mut self.last, now, FRAME, 0.25);
         let Some(play) = self.play.as_mut() else {
             return;
         };
         run_test_commands(play);
-        crate::audio_out::web_out::keep_ahead();
-        play.update(dt);
-        crate::audio_out::web_out::keep_ahead();
-        self.play_silently(dt);
+        if dts.is_empty() {
+            // Nothing due: the picture as it is (drawn again only when the
+            // canvas's size changed, which clears it).
+            if self.shown_size != Some(window.inner_size()) {
+                self.present();
+            }
+            window.request_redraw();
+            return;
+        }
+        for dt in dts {
+            self.clock += dt;
+            let Some(play) = self.play.as_mut() else {
+                return;
+            };
+            crate::audio_out::web_out::keep_ahead();
+            play.update(dt);
+            crate::audio_out::web_out::keep_ahead();
+            self.play_silently(dt);
+            let Some(play) = self.play.as_mut() else {
+                return;
+            };
+            if play.quit_requested() {
+                self.done = true;
+                a2_web::exit_lock();
+                a2_web::quit();
+                el.exit();
+                return;
+            }
+        }
         let Some(play) = self.play.as_mut() else {
             return;
         };
-        if play.quit_requested() {
-            self.done = true;
-            a2_web::exit_lock();
-            a2_web::quit();
-            el.exit();
-            return;
-        }
         // A menu frees the pointer (the game draws its cursor); play
         // takes it again at the next click.
         let menu = play.in_menu();

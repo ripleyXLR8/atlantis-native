@@ -41,6 +41,32 @@ pub fn steps_due(next: &mut Instant, now: Instant, frame: Duration) -> (u32, Ins
     (n, first)
 }
 
+/// The steps due at a redraw at `now` ([`steps_due`] with [`SLACK`]), as
+/// the seconds of game time each one covers: from the last step's time
+/// (`last`, moved to each) to its own, at most `max_dt` (a hidden page,
+/// a long read); the first step ever covers 0. So the game is stepped at
+/// `frame`'s pace whatever the page's refresh: none on most redraws of a
+/// fast screen, two at 30 Hz, each covering about one `frame`.
+pub fn step_dts(
+    next: &mut Instant,
+    last: &mut Option<Instant>,
+    now: Instant,
+    frame: Duration,
+    max_dt: f64,
+) -> Vec<f64> {
+    let (n, first) = steps_due(next, now + SLACK, frame);
+    (0..n)
+        .map(|i| {
+            let t = first + frame * i;
+            let dt = last.map_or(0.0, |l| {
+                t.saturating_duration_since(l).as_secs_f64().min(max_dt)
+            });
+            *last = Some(t);
+            dt
+        })
+        .collect()
+}
+
 /// The factor that brings the pointer-lock motion winit reports back to
 /// the browser's own `movementX` / `movementY`: winit takes Chromium's as
 /// device pixels and multiplies the other engines' (Firefox's, Safari's)
@@ -149,6 +175,39 @@ mod tests {
         let mut next = t0 + FRAME;
         assert_eq!(steps_due(&mut next, t0, FRAME), (0, t0));
         assert_eq!(next, t0 + FRAME);
+    }
+
+    #[test]
+    fn steps_cover_a_frame_each_at_any_refresh() {
+        for hz in [30u32, 60, 120, 144, 240] {
+            let period = Duration::from_nanos(1_000_000_000 / u64::from(hz));
+            let t0 = Instant::now();
+            let (mut next, mut last) = (t0, None);
+            let mut dts = Vec::new();
+            for k in 0..hz * 10 {
+                dts.extend(step_dts(&mut next, &mut last, t0 + period * k, FRAME, 0.25));
+            }
+            // 600 steps in 10 s, the first covering nothing, every other
+            // one frame (1/60 s), whatever the refresh.
+            assert!((598..=602).contains(&dts.len()), "{hz} Hz: {}", dts.len());
+            assert_eq!(dts[0], 0.0);
+            for dt in &dts[1..] {
+                assert!((dt - FRAME.as_secs_f64()).abs() < 1e-6, "{hz} Hz: {dt}");
+            }
+        }
+        // A stall: the backlog dropped, the gap capped.
+        let t0 = Instant::now();
+        let (mut next, mut last) = (t0, Some(t0));
+        next += FRAME;
+        let dts = step_dts(
+            &mut next,
+            &mut last,
+            t0 + Duration::from_secs(5),
+            FRAME,
+            0.25,
+        );
+        assert_eq!(dts.len(), MAX_STEPS as usize);
+        assert_eq!(dts[0], 0.25);
     }
 
     #[test]
