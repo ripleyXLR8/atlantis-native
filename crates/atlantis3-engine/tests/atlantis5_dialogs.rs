@@ -163,6 +163,13 @@ fn the_gorillas_subject_menu_and_dialog() {
     assert!(matches!(state, 1..=3), "{state}");
     let talk = shot(&play, "a5-dialog-1.png");
     assert!(talk.iter().any(|&p| p & 0xff_ffff != 0));
+    // The dialog's loop (@ 0x00407ac0) draws the view and the dialog
+    // only: no menus' cursor over it, wherever the mouse goes.
+    play.mouse_at(300, 200);
+    frames(&mut play, 1);
+    let mut view = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    play.stage().render(&mut view);
+    assert!(shot(&play, "a5-dialog-1b.png") == view, "only the dialog's frame");
     // The voices end in turn (no sound: their lengths), each tirade
     // following; a click ends a tirade at once.
     let mut tirades = vec![0];

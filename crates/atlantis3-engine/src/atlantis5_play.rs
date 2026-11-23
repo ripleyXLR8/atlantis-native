@@ -1790,8 +1790,17 @@ impl Stage {
 
     /// The picture: the film while one plays, else the view with its
     /// sprites (drawn from the list's head to its tail, @ 0x0044bd30's
-    /// second pass: @ 0x00456a90 then @ 0x00456ad0) by the cube renderer.
+    /// second pass: @ 0x00456a90 then @ 0x00456ad0) by the cube renderer,
+    /// the subject menu, the inventory and the dialog.
     pub fn render(&self, out: &mut [u32]) {
+        self.render_with(out, true);
+    }
+
+    /// [`Stage::render`]; without `menus`, no subject menu nor inventory:
+    /// a script's handler loop (a dialog, @ 0x00407ac0's loop drawing only
+    /// @ 0x0044bd30 and @ 0x00433910; a film, a transition) draws its own
+    /// frame, not the menus' (@ 0x0041baa0 is state 3's display only).
+    pub fn render_with(&self, out: &mut [u32], menus: bool) {
         out.fill(0);
         if let Some((film, _)) = &self.film {
             let (w, h) = film.size();
@@ -1836,8 +1845,10 @@ impl Stage {
         if self.fade > 0.0 {
             darken(out, self.fade);
         }
-        self.draw_menu(out);
-        self.draw_inventory(out);
+        if menus {
+            self.draw_menu(out);
+            self.draw_inventory(out);
+        }
         self.draw_dialog(out);
     }
 
@@ -4595,7 +4606,11 @@ impl Play {
     /// over the view, with the menus' cursor).
     pub fn render(&self, out: &mut [u32]) {
         let st = self.stage.borrow();
-        st.render(out);
+        // A script waiting in a handler's loop (a subject's or an
+        // inventory click's dialog, film or transition) draws that loop's
+        // frame: no menu, no menus' cursor.
+        let busy = self.game.busy();
+        st.render_with(out, !busy);
         if self.cursor_drawn() {
             self.cursor.draw(out, st.config.crosshair);
         }
@@ -4613,7 +4628,7 @@ impl Play {
                     self.menus.draw_cursor(out);
                 }
             }
-        } else if st.inventory_open_now() || st.menu_open_now() {
+        } else if !busy && (st.inventory_open_now() || st.menu_open_now()) {
             self.menus.draw_cursor(out);
             st.draw_inventory_over_cursor(out);
         }
