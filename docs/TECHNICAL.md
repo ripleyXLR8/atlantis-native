@@ -4690,6 +4690,30 @@ folder holding it, or an unpacked tree. The formats shared with
 playlists, `font.txt`, Bink films) are read by the same code; the XML
 texts (string resources, dialogs, film subtitles) by `atlantis5_texts`.
 
+**The copy to the computer.** `atlantis-app::a5_copy` (desktop only)
+copies the disc's files the game needs to `atlantis5/disc` in the
+per-user data folder: `Atlantis5Source::disc_root` gives the disc's root
+(a folder with `DATAS.cab`, the image, or a folder holding it; `None`
+for an install or the extracted cabinets) and `atlantis5::disc_files`
+its files (`DATAS.cab`, each `DATAS_<language>.cab`, and the program
+when the disc has it, which `Atlantis5Source::build` identifies). The
+copy reads them through `FileSource::read_at` in 8 MiB parts (so an
+image is copied as a drive is), each into `<name>.part` renamed once
+whole; another language's cabinet and leftover parts are removed first,
+files already whole kept; the free room (`statvfs`,
+`GetDiskFreeSpaceExW`) is checked before writing, with 256 MiB to
+spare; the copy ends by opening the folder as the game. It opens as the
+disc's files (`Form::DiscFolder`), and the cabinets' checkpoint indexes
+are named by a hash of the cabinets' headers, so those made from the
+disc serve the copy. In the game library (`launcher.rs`) an entry read
+from the disc (`a5::edition`) shows a **Copy to this computer** link
+(`LauncherAction::Copy`, key C); `session.rs` runs `a5_copy::Job` in
+its own thread, shows its progress in the message line from
+`App::about_to_wait` (four times a second), holds the screen
+(`Launcher::set_busy`: Escape cancels, the rest waits), then moves the
+entry to the copy (`Library::relocate`). `--atlantis5-install <disc>`
+does the same from a terminal (`a5_copy::install_cli`).
+
 **The web build.** `atlantis-app::a5_web` runs `Play` in the page as
 `a5` does in a window; `web.rs` finds the game among the picked files
 (`web_layout::a5_folder`: a copy of the disc, an install or `Datas`
@@ -4745,7 +4769,12 @@ which plays the whole game through the DVD's own scripts by clicks
 cells, subjects from the subject menu) from a new game to the credits,
 and a game over that loads the autosave; `A5_GC_STRESS` runs the Lua
 collector all the time) and the game library's entry
-(`atlantis-app`'s `the_library_plays_atlantis5`).
+(`atlantis-app`'s `the_library_plays_atlantis5`). The copy to the
+computer is checked on a fake disc whose small stored cabinets open as
+the game (`a5_copy`'s tests: the room, the cancel, a copy cut short;
+`the_library_copies_atlantis5s_disc`: the screen held, then the entry
+moved to the copy) and against the French DVD's plan
+(`the_french_dvd_plan`).
 
 ## Tests
 

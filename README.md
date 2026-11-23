@@ -69,14 +69,16 @@ are welcome (see [The 2004 CD](docs/GUIDE.md#the-2004-cd-in-progress)).
 
 *The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,
 2006), the last game of Cryo's *Atlantis III* engine, plays from start
-to end from its French DVD (*L'Héritage sacré*) on the desktop: its
-drive, its files, its image or its installation, in the game library as
-*The Secrets of Atlantis : L'Héritage sacré (2006), DVD, French*. The
-DVD's own Lua 5.0 scripts run as they are; the nine chapters, the twenty
-puzzles, the dialogs, the inventory, the saves, the deaths and the
-credits are checked by an automated walkthrough of the whole story. What
-is missing (the logos' sound, the game's own cursors, two fonts) is
-listed in [The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
+to end from its French DVD (*L'Héritage sacré*) on the desktop and in
+the browser: its drive, its files, its image or its installation, in the
+game library as *The Secrets of Atlantis : L'Héritage sacré (2006), DVD,
+French*; on the desktop the DVD can be copied to the computer once
+(**Copy to this computer** in the game library), so that it plays from
+the hard disk. The DVD's own Lua 5.0 scripts run as they are; the nine
+chapters, the twenty puzzles, the dialogs, the inventory, the saves, the
+deaths and the credits are checked by an automated walkthrough of the
+whole story. What is missing (the logos' sound, two fonts) is listed in
+[The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
 
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
@@ -171,10 +173,12 @@ Atlantis Native contains none of them.</sub>
 - 🏛️ **The Secrets of Atlantis**: the French DVD (2006), read from the
   DVD, its files, its image or its installation, nothing unpacked; its
   own scripts, menus and saves; full screen or windowed (F11); on the
-  desktop.
-- 🌐 **In the browser**: the four first games, read from your own folder; the
-  CD editions of the first three also from their disc images (`.iso`,
-  `.bin`, `.img`, `.mdf`, `.nrg`), a part at a time.
+  desktop (where the DVD can be copied to the computer once) and in the
+  browser.
+- 🌐 **In the browser**: the five games, read from your own folder; the
+  CD editions of the first three and the DVD of *The Secrets of
+  Atlantis* also from their disc images (`.iso`, `.bin`, `.img`, `.mdf`,
+  `.nrg`), a part at a time.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
   proportions, the mouse captured while you look around; full screen at
   a key, and on the desktop kept for the next start (F10, "Start in full
@@ -199,15 +203,15 @@ those of the latest commit:
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
 
 The web version of the latest commit is also online:
-**https://ripleyxlr8.github.io/atlantis-native/**, for the four games
-(tried in Edge, a Chromium browser, and in Firefox, Atlantis II in
-Chrome too; not yet in Safari). Pick your game folder there: its files
+**https://ripleyxlr8.github.io/atlantis-native/**, for the five games
+(tried in Edge, a Chromium browser, and the four first in Firefox,
+Atlantis II in Chrome too; not yet in Safari). Pick your game folder there: its files
 are read inside your browser, a part at a time (the CD images too, and
 Atlantis II's and III's cinematics), and never sent anywhere; the saves
 stay in that browser. For the CD editions of Atlantis I, II and III, the
 folder may hold the CD images (`.iso`, `.bin`, `.img`, `.mdf`, `.nrg`)
-in place of copies of the discs (see [The web
-version](docs/GUIDE.md#the-web-version)).
+in place of copies of the discs, and *The Secrets of Atlantis* its DVD
+image (see [The web version](docs/GUIDE.md#the-web-version)).
 
 > **Windows:** the program is not code-signed (a certificate costs money
 > each year), so Windows SmartScreen may warn that it "protected your PC"
@@ -358,7 +362,12 @@ For *The Secrets of Atlantis*:
 |---|---|---|
 | The French DVD of Nobilis (2006, *L'Héritage sacré*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `e5c43eb0411d1775e6242fec6d241f6e`, never run) | French | the DVD's drive or a copy of its files (the folder with `DATAS.cab`), its image (`.iso`) or the folder holding it, or the folder where its installer put the game (the one with `Datas`) |
 
-The web version plays the four first games: see
+You need your own DVD (or its image, or the game installed from it).
+The international DVD (`The secrets of Atlantis.exe` of 3,891,200 bytes)
+has the same layout, `DATAS.cab` and one `DATAS_<language>.cab` per
+language, which Atlantis Native reads, but it has not been tried.
+
+The web version plays the five games: see
 [The web version](docs/GUIDE.md#the-web-version).
 
 How to get the files from your CD or GOG.com: see
@@ -404,7 +413,9 @@ game library or given on the command line. See
 
 *The Secrets of Atlantis* (2006) too: its DVD, a copy of its files, its
 image or its installation, found by the game library or given on the
-command line. See
+command line. Played from the DVD or its image, its entry in the game
+library offers **Copy to this computer** (about 1.4 GB, once): the game
+then plays from the hard disk, without the disc. See
 [The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
 
 ## Controls
