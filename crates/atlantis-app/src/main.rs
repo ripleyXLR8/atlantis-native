@@ -88,7 +88,17 @@
 //! `--headless <folder> [frames] [--no-intro] [--screenshot <file.png>]`
 //! plays the logos (skipped with `--no-intro`) and the start page without
 //! a window. The game library finds and opens it too, as an edition of
-//! Atlantis Evolution; `--evolution2004 <folder>` opens it directly.
+//! Atlantis Evolution; `--evolution2004 <folder>` opens it directly;
+//! `--atlantis5 <disc, image or folder>` plays The Secrets of Atlantis
+//! (Atlantis V, 2006); a folder holding it (its DVD's files, the DVD's
+//! image or a folder holding it, an install), or the image itself, opens
+//! it too, and the game library finds and opens it (its saves in the
+//! `atlantis5/saves` folder of the per-user data folder). The other
+//! games' options but `--fullscreen` are refused in this mode.
+//! `--atlantis5-install <disc or image>` copies its DVD's cabinets and
+//! program to the `atlantis5/disc` folder of the per-user data folder and
+//! puts that copy in the game library in place of the disc (the library's
+//! "Copy to this computer").
 //!
 //! `atlantis-native --list-games` prints the games found on the computer
 //! (every game: what the library's "Find installations" adds) and ends.
@@ -108,11 +118,16 @@
 //! `--support-screen` shows it at once (see `atlantis_app::support`).
 //!
 //! The players, the checkpoints (the original's `players.atl` and
-//! `p<letter><chapter>.gam`) and `settings.ini` are kept in the per-user
-//! data folder (`~/.local/share/atlantis-native/<build>` on Linux,
-//! `%APPDATA%\atlantis-native\<build>` on Windows, `~/Library/Application
-//! Support/atlantis-native/<build>` on macOS); `settings.ini` also holds
-//! the enhancements.
+//! `p<letter><chapter>.gam`) and `settings.ini` are kept in the data
+//! folder (`<data folder>/<build>`); `settings.ini` also holds the
+//! enhancements. The data folder is `--data-dir <folder>`, else the one
+//! `ATLANTIS_NATIVE_DATA` names, else, in the portable mode
+//! (`portable.txt` or a `data` folder beside the executable, or beside
+//! the `.app` on macOS), that `data` folder, else the per-user folder
+//! (`~/.local/share/atlantis-native` on Linux, `%APPDATA%\atlantis-native`
+//! on Windows, `~/Library/Application Support/atlantis-native` on macOS;
+//! see `atlantis_engine::persist::data_dir_and_source`). `--help` prints
+//! the options.
 
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
@@ -141,6 +156,27 @@ fn main() {
         // opened from the Finder.
         .filter(|a| !a.starts_with("-psn_"))
         .collect();
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        print!("{}", atlantis_app::cli::HELP);
+        return;
+    }
+    // `--data-dir <folder>`: the data folder of this run, before the log
+    // (which goes in it) and anything else reads or writes there.
+    match atlantis_app::cli::take_data_dir(&mut args) {
+        Ok(Some(dir)) => {
+            let dir = std::path::absolute(&dir).unwrap_or(dir);
+            if let Err(e) = std::fs::create_dir_all(&dir) {
+                eprintln!("--data-dir {}: {e}", dir.display());
+                std::process::exit(2);
+            }
+            atlantis_engine::persist::set_data_dir_override(Some(dir));
+        }
+        Ok(None) => {}
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(2);
+        }
+    }
     let headless = args.iter().any(|a| a == "--headless");
     let log_file = init_log(headless);
     // Atlantis Evolution's development viewer.
@@ -206,11 +242,56 @@ fn main() {
         }
         return;
     }
+    // Atlantis V: its disc (a drive, a copy of its files, its image)
+    // copied to the per-user data folder, the library's entry moved to the
+    // copy (the game library's "Copy to this computer").
+    if args.first().map(String::as_str) == Some("--atlantis5-install") {
+        let Some(path) = args.get(1).filter(|a| !a.starts_with("--")) else {
+            eprintln!("--atlantis5-install <disc or image>");
+            std::process::exit(2);
+        };
+        match atlantis_app::a5_copy::install_cli(Path::new(path)) {
+            Ok(dest) => println!("The game now plays from {}", dest.display()),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
+        }
+        return;
+    }
+    // Atlantis V (2006): the development entry, a new game.
+    if args.first().map(String::as_str) == Some("--atlantis5") {
+        let fullscreen = args.iter().any(|a| a == "--fullscreen");
+        let headless = args.iter().any(|a| a == "--headless");
+        let shot = args
+            .iter()
+            .position(|a| a == "--screenshot")
+            .and_then(|i| args.get(i + 1))
+            .map(std::path::PathBuf::from);
+        let Some(path) = args.get(1).filter(|a| !a.starts_with("--")) else {
+            eprintln!("--atlantis5 <disc, image or folder> [--fullscreen] [--headless] [--screenshot <file.png>]");
+            std::process::exit(2);
+        };
+        install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
+        let r = if headless || shot.is_some() {
+            atlantis_app::a5::headless(Path::new(path), shot.as_deref())
+        } else {
+            atlantis_app::a5::run(Path::new(path), fullscreen)
+        };
+        if let Err(e) = r {
+            error_box(&e);
+            std::process::exit(1);
+        }
+        return;
+    }
     // No terminal: the panics and the errors in message boxes.
     install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
     atlantis_app::watchdog::start();
     if let Some(path) = &log_file {
         log::info!("log in {}", path.display());
+    }
+    if let Some((dir, source)) = atlantis_engine::persist::data_dir_and_source() {
+        log::info!("data folder {} ({source:?})", dir.display());
     }
     let mut flag = |name: &str| match args.iter().position(|a| a == name) {
         Some(i) => {
@@ -479,6 +560,41 @@ fn main() {
         None => Start::Boot,
     };
 
+    // The Secrets of Atlantis (its DVD, the DVD's image or a folder
+    // holding it, an install): the other games' options refused (but
+    // `--fullscreen`).
+    let a5_path = match args.as_slice() {
+        [d] if atlantis_app::setup::kind_of(Path::new(d))
+            == Some(atlantis_app::setup::GameKind::Atlantis5) =>
+        {
+            Some(d.clone())
+        }
+        _ => None,
+    };
+    if let Some(path) = a5_path {
+        let mut not_a5: Vec<&str> = first_game_flags.clone();
+        not_a5.extend(a2_flags.iter().copied());
+        if force_wide {
+            not_a5.push("--widescreen");
+        } else if force_hd {
+            not_a5.push("--hd");
+        }
+        if original {
+            not_a5.push("--original");
+        }
+        refuse(&not_a5, "The Secrets of Atlantis' mode");
+        install_panic_hook(log_file.is_some() || !std::io::stderr().is_terminal());
+        let run = EventLoop::new()
+            .map_err(|e| format!("No window can be opened: {e}"))
+            .and_then(|mut el| {
+                atlantis_app::a5::run_window_on(&mut el, Path::new(&path), fullscreen)
+            });
+        if let Err(e) = run {
+            error_box(&e);
+            std::process::exit(1);
+        }
+        return;
+    }
     // Atlantis Evolution: the other games' options refused (but
     // `--fullscreen`).
     let a4_dir = match args.as_slice() {
@@ -805,9 +921,13 @@ fn main() {
         let atlantis2 = app.session_mut().and_then(|s| s.take_atlantis2());
         let atlantis3 = app.session_mut().and_then(|s| s.take_atlantis3());
         let atlantis4 = app.session_mut().and_then(|s| s.take_atlantis4());
+        let atlantis5 = app.session_mut().and_then(|s| s.take_atlantis5());
         // The first game's window and sound end here.
         drop(app);
-        let run = if let Some(dir) = atlantis2 {
+        let run = if let Some(dir) = atlantis5 {
+            atlantis_app::watchdog::leave();
+            atlantis_app::a5::run_window_on(&mut el, &dir, fullscreen)
+        } else if let Some(dir) = atlantis2 {
             atlantis_app::watchdog::leave();
             let enhancements = a2_flags_applied(atlantis_app::a2::stored_settings().enhancements);
             atlantis_app::a2::open(

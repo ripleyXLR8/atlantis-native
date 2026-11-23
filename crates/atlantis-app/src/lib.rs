@@ -46,6 +46,13 @@ mod a4_gl;
 mod a4_prefetch;
 #[cfg(all(test, target_arch = "wasm32"))]
 mod a4_wasm_tests;
+/// Atlantis V's development entry (`--atlantis5`).
+#[cfg(not(target_arch = "wasm32"))]
+pub mod a5;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod a5_copy;
+#[cfg(target_arch = "wasm32")]
+mod a5_web;
 #[cfg(target_os = "android")]
 mod android;
 #[cfg(target_os = "android")]
@@ -53,6 +60,8 @@ mod android_frame;
 #[cfg(target_os = "android")]
 mod android_saf;
 mod audio_out;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod cli;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod desktop;
 pub mod dock_icon;
@@ -1662,6 +1671,17 @@ impl ApplicationHandler for App {
         el.set_control_flow(ControlFlow::Wait);
         #[cfg(not(target_arch = "wasm32"))]
         {
+            // A disc copied to the computer: its progress on the game
+            // library's screen, four times a second.
+            if self.poll_copy() {
+                if let Some(w) = &self.window {
+                    w.request_redraw();
+                }
+                el.set_control_flow(ControlFlow::WaitUntil(
+                    Instant::now() + Duration::from_millis(250),
+                ));
+                return;
+            }
             if self.runner.is_none() || self.menu.is_open() {
                 // (the menu redraws on its events)
                 el.set_control_flow(ControlFlow::Wait);

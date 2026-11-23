@@ -11,6 +11,7 @@ members = [
     "crates/atlantis4-data",
     "crates/atlantis4-engine",
     "crates/atlantis4-script",
+    "crates/atlantis5-script",
     "crates/atlantis4-gl",
     "crates/atlantis-app",
     "crates/atlantis-sdl",
@@ -28,10 +29,15 @@ exclude = ["vendor/rilua", "vendor/winit"]
 winit = { path = "vendor/winit" }
 
 [workspace.package]
-version = "0.8.0"
+version = "0.9.0"
 edition = "2021"
 license = "GPL-3.0-or-later"
 repository = "https://github.com/ripleyXLR8/atlantis-native"
+
+# The Microsoft cabinets' MSZIP blocks (Atlantis V's discs): optimised in
+# test builds too, which read a 1.4 GB cabinet.
+[profile.dev.package.miniz_oxide]
+opt-level = 3
 
 [profile.release]
 # Bit-exact results against the original need IEEE arithmetic as written;

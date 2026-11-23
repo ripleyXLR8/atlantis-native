@@ -40,3 +40,65 @@ PATCHES
    `newproxy`; `package`, `module`, `require`); `package.loaded` receives
    the libraries opened after `package` at the end. A fresh `pairs(_G)`
    then walks in Lua 5.1.4's order.
+
+4. src/vm/undump50.rs (new), src/lib.rs, src/vm/instructions.rs,
+   src/vm/execute.rs, src/vm/debug_info.rs: Lua 5.0 binary chunks
+   (Atlantis V's French DVD ships its scripts as Lua 5.0 bytecode).
+   `compile_or_undump` sends a chunk whose header is `ESC "Lua" 0x50` to
+   `undump50`, which re-encodes the 5.0 instructions in 5.1's layout
+   (5.0's RK operands, constants reordered when an RK operand names a
+   constant past 255) and gives the operations whose meaning differs
+   their own codes, run as Lua 5.0.3's lvm.c runs them: ForLoop50,
+   TForLoop50, TForPrep50 (generic `for` over a table), SetList50,
+   SetListO50, NewTable50. Reproducer: crates/atlantis5-script/tests/
+   lua50.rs (a chunk compiled by Lua 5.0.3's luac and the output of Lua
+   5.0.3's lua).
+
+5. src/stdlib/coroutine.rs: `auxresume` made public, so an embedder can
+   resume a coroutine from Rust (atlantis5-script runs each script as a
+   coroutine that waits at the calls the original runs over frames).
+
+6. src/vm/string.rs (`intern`): a string found in the table while it is
+   dead (the other white, before the sweep frees it) gets the current
+   white, as PUC-Rio's `luaS_newlstr` does. rilua returned it as it was,
+   so the sweep freed a string a new constant or key had just taken
+   (Atlantis V's scripts then failed with "attempt to concatenate a
+   string value" under a busy collector). Reproducer: the walkthrough of
+   crates/atlantis3-engine/tests/atlantis5_walkthrough.rs with
+   A5_GC_STRESS set.
+
+7. src/vm/table.rs, src/vm/state.rs: a table's `MAXBITS` per state.
+   `Gc::table_max_bits` (26, Lua 5.1's) is given to every table
+   `alloc_table` makes; a Lua 5.0.3 state sets 24, Lua 5.0.3's ltable.c
+   value when `BITS_INT` > 26, so its hash part overflows at 2^24 nodes
+   and keys past 2^24 are not counted for the array part. Atlantis V's
+   chessboard asks `GetShortestPath(p, p)`, whose loop only ends on
+   that `table overflow` (the 2^25th level); with 26 it grew past 6 GB.
+   Reproducer: crates/atlantis3-engine/tests/atlantis5_puzzles.rs
+   `chessboard_path_to_the_same_square_overflows` (run with --ignored).
+
+8. src/vm/table.rs, src/vm/state.rs, src/bin/rilua.rs: Lua 5.0.3's table
+   layout per state. `Gc::table_lua50` (false by default) is given to
+   every table `alloc_table` makes; a table with it set runs Lua 5.0.3's
+   ltable.c: `newkey` keeps `firstfree` on a node whose key is nil (from
+   the last node down) and rehashes as soon as an insert takes the last
+   one, the new key counted with the value `false` (5.1 grows when an
+   insert finds no free node; an empty hash part is 5.0's one-node
+   `dummynode`); `rehash` sizes the parts as 5.0's `numuse` and
+   `computesizes` (`a >= 2^(i-1)`, the loop on `*narray >= 2^(i-1)`) and
+   the hash part as 2^(floor(log2 n) + 1) nodes (n = 4 gives 8, 0 the
+   dummy node); `resize` grows the array, makes the node vector,
+   re-inserts a shrinking array's vanishing slice, then the old nodes
+   from last to first. Lookups, `next`, `NewTable50` (log size C) and
+   `SetList50` (plain `luaH_setnum` per item) already were 5.0's. Lua 5.1
+   states keep the code above unchanged. atlantis5-script's `Script::new`
+   sets it with `table_max_bits` 24, so `pairs` walks Atlantis V's tables
+   (and its save writes the LUA_DB) in Lua 5.0.3's order. The `rilua`
+   binary turns both on when its script is a Lua 5.0 binary chunk
+   (header `ESC "Lua" 0x50`), for differential runs against Lua 5.0.3's
+   `lua`. Not reproduced: a key whose value is nil and whose string the
+   collector freed (5.0 then no longer finds the node, rilua may), which
+   depends on each collector's timing. Reproducers: the `lua50_*` tests
+   of src/vm/table.rs (orders printed by Lua 5.0.3's `lua`) and
+   crates/atlantis5-script/tests/table_order.rs (the walk of `atl` after
+   a new game and after events, the MD5 of Lua 5.0.3's walk).

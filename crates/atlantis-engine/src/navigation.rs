@@ -2460,10 +2460,10 @@ mod tests {
             move |sys, _| {
                 frames += 1;
                 let n = s3.borrow().len();
-                if n == press_at + 3 {
+                if Some(n) == press_at.checked_add(3) {
                     button(sys, MouseButton::Left, false);
                 }
-                if n == right_escape_at + 3 {
+                if Some(n) == right_escape_at.checked_add(3) {
                     button(sys, MouseButton::Right, false);
                 }
                 if n >= 12 || frames > 400 {

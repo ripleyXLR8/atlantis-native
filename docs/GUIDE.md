@@ -110,7 +110,11 @@ English, French, German or Spanish, and the French CD (2001, three CDs);
 other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
 GOG.com's release, in English, French, German, Italian and Spanish, and
 the 2004 CD (English, in progress) (see
-[Atlantis Evolution](#atlantis-evolution)).
+[Atlantis Evolution](#atlantis-evolution)). For The Secrets of Atlantis:
+the French DVD (2006), its drive, files, image or installation (see
+[The Secrets of Atlantis](#the-secrets-of-atlantis)).
+The editions the project is looking for, and how their owners can help,
+are listed in [Wanted editions](WANTED.md).
 Another edition of the first game is
 refused with the size of its `atlantis.exe`, and the message offers to
 report it in one click: **Report it on GitHub** opens a new issue on the
@@ -153,9 +157,10 @@ few levels down for `atlantis.exe` (or Atlantis II's `atlantis2.exe` or
 ## Several editions: the game library
 
 Atlantis Native keeps a list of the game folders you have played: the
-game library, for the four games, Atlantis: The Lost Tales,
-[Atlantis II](#atlantis-ii), [Atlantis III](#atlantis-iii) and
-[Atlantis Evolution](#atlantis-evolution). With one game in it, the game starts at
+game library, for the five games, Atlantis: The Lost Tales,
+[Atlantis II](#atlantis-ii), [Atlantis III](#atlantis-iii),
+[Atlantis Evolution](#atlantis-evolution) and
+[The Secrets of Atlantis](#the-secrets-of-atlantis). With one game in it, the game starts at
 once, as before. With two or more (the GOG.com release and the CD, the
 English and the French CD, the first game and Atlantis II...), the
 program opens on the library's screen to choose the one to play, the
@@ -166,7 +171,8 @@ it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
 German*, *Atlantis III, CD, French*, *Atlantis Evolution, GOG.com, English* or *Atlantis Evolution
 (2004), CD, English* (the original 2004 program, in progress: see
-[The 2004 CD](#the-2004-cd-in-progress)), and its folder: the
+[The 2004 CD](#the-2004-cd-in-progress)) or *The Secrets of Atlantis :
+L'Héritage sacré (2006), DVD image, French*, and its folder: the
 game's name in gold capitals, the edition beside it (why the folder does
 not open, in red, when it does not). The screen has the look of the web
 version's page, and its text and ornaments are drawn at the window's
@@ -179,6 +185,7 @@ resolution, so they stay smooth in a large window or in full screen.
 | Add a game folder | **Add a game folder...** (the folder picker) | A |
 | Find the installations on this computer | **Find installations** | F |
 | Take a game off the list (no file is deleted) | **Remove** | Delete |
+| Copy The Secrets of Atlantis's DVD to this computer | **Copy to this computer**, under the selected game's name | C |
 | Quit | **Quit** | Escape |
 
 **Find installations** looks where the first start looks (GOG.com's
@@ -203,6 +210,20 @@ included); the images of Atlantis Evolution's 2004 CDs are not a game
 them. A folder that no longer holds the game (moved, renamed,
 on a drive not plugged in) is shown in red as *not found*: **Locate...**
 (in place of Play) asks where it is now, or remove it.
+
+**Copy to this computer** shows under *The Secrets of Atlantis* when it
+is read from its DVD, a copy of the DVD's files elsewhere, or the DVD's
+image: it copies the disc's files the game needs (`DATAS.cab`, the
+language's `DATAS_french.cab` and the program, which tells the edition;
+about 1.4 GB) to `atlantis5/disc/` in the
+[data folder](#where-the-files-live), then the entry plays from there,
+as *The Secrets of Atlantis : L'Héritage sacré (2006), DVD, copied to
+this computer, French*, without the disc. The free room is checked
+first; the progress is shown under the buttons, and Escape cancels
+(the files copied whole are kept: the next copy goes on from there).
+While it copies, the screen takes no other action. Deleting the
+`atlantis5/disc` folder removes the copy (its library entry is then
+shown *not found*).
 
 To open the library's screen with one game in it: hold **Shift** while
 the program starts (or press it in the first two seconds of the game's
@@ -253,7 +274,7 @@ whatever the counts say.
 
 The web page, **https://ripleyxlr8.github.io/atlantis-native/** (or the
 `atlantis-native-web.zip` of the nightly release, served over HTTP),
-plays the four games in Chrome, Edge, Firefox or Safari on a computer
+plays the games in Chrome, Edge, Firefox or Safari on a computer
 with a mouse and a keyboard. Atlantis II has been tried in Edge, Chrome
 and Firefox. Atlantis III (GOG.com and the French CD) and Atlantis
 Evolution (GOG.com and the 2004 CD) have been tried in Firefox from the
@@ -320,6 +341,24 @@ What to pick:
   `Atlantis4.cfg` are kept in the browser under
   `atlantis-native/atlantis-evolution-2004/`; its controls are the
   desktop's (see [The 2004 CD](#the-2004-cd-in-progress)).
+- *The Secrets of Atlantis*, the French DVD: the DVD's image (an
+  `.iso`: pick it with *or choose the CD image files* under the folder
+  button, or pick the folder holding it), the DVD drive or a copy of the
+  disc (the folder holding `DATAS.cab` and `DATAS_french.cab`), or the
+  folder where the game is installed (the one holding `Datas`). The
+  image is read a part at a time, never whole. The browser cannot keep
+  the desktop's index of the cabinets (see
+  [Starting from the DVD](#the-secrets-of-atlantis)): each start from
+  the DVD reads about 450 MB of it before the logos (a bar on a black
+  screen; about 18 s in Edge from an image on a hard disk), and while
+  the game runs the page reads the rest of the cabinets a little every
+  frame, so that a place deep in them is quick once that is done; until
+  then the first visit of such a place may stop the page for a moment.
+  Its saves are kept in the browser under `atlantis-native/atlantis5/`
+  (about 190 KB each: the browser's storage of a site, about 5 MB,
+  holds some twenty). Its controls are the desktop's (see
+  [The Secrets of Atlantis](#the-secrets-of-atlantis)): a click in play
+  takes the mouse, a menu lets it go.
 - A folder holding more than one game: the page asks which one to play.
 
 The sound starts with the first click or key (browsers allow sound only
@@ -1073,7 +1112,109 @@ options) are in `atlantis-evolution-2004/` in the per-user data folder;
 until its menus write the player's own, the installation's
 `datas\Atlantis4.cfg` is read. The game's folder is never written.
 
+## The Secrets of Atlantis
+
+*The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,
+2006; in French *The Secrets of Atlantis : L'Héritage sacré*) is the third
+program of Cryo's *Atlantis III* engine, after *Atlantis III* and the
+2004 *Atlantis Evolution*; its story is written in Lua 5.0. Atlantis
+Native plays its French DVD with its *Atlantis III* engine and runs the
+DVD's own scripts (the compiled Lua 5.0 chunks of your copy, loaded as
+they are). The game library shows it as *The Secrets of Atlantis :
+L'Héritage sacré (2006), DVD, French*.
+
+**Status.** It plays from its logos and main menu through the nine
+chapters (the zeppelin, the Empire State Building's floors, Macao,
+Ishtar's palace, Mesopotamia) to the last film and the credits, with its
+dialogs and subtitles, the subject menu, the inventory and its compound
+objects, the examine view, the saves and the autosave, the deaths
+(the game over page, then the last autosave), the music and the twenty
+puzzles (poker included). The whole story is checked by an automated
+walkthrough that plays the DVD's own scripts chapter by chapter, by
+clicks as a player makes them; it has not yet been played through by
+many players: reports are welcome. What is missing is listed below.
+
+**What to point it at.** You need your own DVD, in any form: the DVD's
+drive, or a copy of its files (the folder holding `DATAS.cab` and
+`DATAS_french.cab`), the DVD's image (an `.iso`) or the folder holding
+it, or the folder where the DVD's installer put the game (the one with
+`Datas`). The cabinets are read in place: nothing is unpacked, nothing
+is installed. Played from the DVD or its image, the game library offers
+to copy it to the computer once (see below). The DVD's program (`The secrets of Atlantis.exe`) is never
+run nor read beyond its identification. From the command line:
+
+    atlantis-native D:\
+    atlantis-native "C:\Games\soa-fr.iso"
+    atlantis-native --atlantis5 <disc, image or folder> [--fullscreen] [--headless] [--screenshot <file.png>]
+    atlantis-native --atlantis5-install <disc or image>
+
+**Controls.** The mouse turns the view; a left click acts on what is
+under the screen's centre (the cursor shows a move, an action or a
+look); the right button opens the inventory with an empty hand, or puts
+the hand's object back; on a character, a left click with an empty hand
+opens its subjects; Escape or Space skips a film, Space a dialog, a left
+click a dialog's line; Escape in play opens the menu (save, load,
+options, quit); F11 switches between the window and the full screen
+(`--fullscreen` starts in it).
+
+**Saves.** The saves (`autoslot`, which the chapters and puzzles write,
+and the slots of the save page) are in `atlantis5/saves/` in the
+per-user data folder. The DVD's files are never written.
+
+**Starting from the DVD.** The cabinets are compressed as long streams:
+the first start from the DVD reads about 460 MB before the logos (some
+seconds on a fast drive, longer on a slow one) and more on the way to
+the first view. Native keeps index files of what it decoded
+(`atlantis5/cabinets/` in the per-user data folder, about 26 MB), so the
+next starts read only a few MB. Deleting that folder is safe: the next
+start is slow again. From the DVD's image (or a copy of the DVD) on a
+hard disk the first start takes some seconds (about 5 s to the first
+view in a test run on a recent computer), the next ones under a second;
+an installed game has nothing to decode.
+
+**Copying the DVD to the computer.** To play without the disc and
+without its slow first start, copy it once: **Copy to this computer** in
+the [game library](#several-editions-the-game-library) (under the game's
+name when it is read from the DVD or its image), or from a terminal
+`atlantis-native --atlantis5-install <disc or image>`, which prints the
+progress and then puts the copy in the game library in place of the
+disc. The DVD's cabinets and program (about 1.4 GB, the free room
+checked first) go to `atlantis5/disc/` in the per-user data folder; the
+copy is read as the DVD is (nothing unpacked), and the index files
+above serve both. A copy cancelled or cut short goes on from the files
+already copied whole the next time.
+
+**In the browser.** The web version plays it too (see
+[The web version](#the-web-version)): from the DVD's image, the DVD, a
+copy of its files or an installed folder, picked at each visit. The
+browser keeps no index of the cabinets: each start from the DVD or its
+image reads about 450 MB of it before the logos. The saves are kept in
+the browser's storage (about 190 KB each, some twenty fit), not in a
+folder.
+
+**What is missing.**
+
+- Two fonts of the game (Lucida Sans Unicode and Lucida Console: the
+  inventory's and the credits' texts) are the system's own on Windows;
+  where they are not installed (usually macOS and Linux) Liberation Sans
+  stands in, which has other metrics.
+- The display options (the resolution and depth of the graphics page)
+  change nothing: the picture is the game's 1024 × 576, scaled to the
+  window.
+- Six sprites of a Mesopotamian temple's engraved prong are missing from
+  the French DVD itself; the scripts run without them, as the original
+  does.
+- Only the French DVD has been tried. The international DVD has the
+  same layout (`DATAS.cab` and one `DATAS_<language>.cab` per language),
+  which is read, but it has not been tried. Android does not play it
+  yet; the web version does (see [The web version](#the-web-version)),
+  tried in Edge from the DVD's image to the main menu, a new game's
+  first view and its autosave.
+
 ## Command line
+
+`atlantis-native --help` (or `-h`) prints every option, one line each,
+the development ones apart, and the rules of the data folder.
 
 The game folder can be left out of each of these: the game library
 decides (except with `--headless`).
@@ -1140,9 +1281,17 @@ screen (F, F11 or Alt+Enter switches it back): for a launcher such as the
 Ports of Batocera on a Raspberry Pi. The options menu's **Start in full
 screen** does the same for every start (see [Full screen](#full-screen)).
 
-The environment variable `ATLANTIS_NATIVE_DATA` names another folder for
-the per-user data (saves, settings, log): trial runs that must not touch
-your own saves.
+`atlantis-native --data-dir <folder>` keeps the saves, settings, game
+library and log of this run in `<folder>` (made if missing; also
+`--data-dir=<folder>`). The environment variable `ATLANTIS_NATIVE_DATA`
+does the same: trial runs that must not touch your own saves. See
+[where they live](#where-the-files-live).
+
+`atlantis-native --atlantis5-install <disc or image>` copies The Secrets
+of Atlantis's DVD (its drive, a copy of its files, or its image) to
+`atlantis5/disc/` in the data folder and puts the copy in the game
+library in place of the disc (see
+[The Secrets of Atlantis](#the-secrets-of-atlantis)).
 
 `atlantis-native --headless /path/to/game [frames]` runs a new game without
 a window, with no input and the sound mixed and dropped, and prints what it
@@ -1161,21 +1310,52 @@ every chapter change, in the original's own files: `players.atl` (the
 player list) and `p<letter><chapter>.gam` (one checkpoint per chapter and
 player, the original's 2639-byte format). The load picker of the in-game
 menu lists the current player's checkpoints by their chapter names. The
-files are kept in a per-user folder, one per game build:
+files are kept in the data folder, in one folder per game build
+(`<data folder>/<build>`).
+
+### Where the files live
+
+The data folder is the first of these that applies:
+
+1. `--data-dir <folder>` on the command line;
+2. the folder the environment variable `ATLANTIS_NATIVE_DATA` names;
+3. the **portable mode**: when a file named `portable.txt` (its content
+   does not matter) or a folder named `data` is next to the program, the
+   `data` folder there (made if missing). On macOS "next to the program"
+   is the folder holding `Atlantis Native.app` (a `portable.txt` inside
+   `Atlantis Native.app/Contents/MacOS/` works too). Everything then
+   stays in the program's folder: copy it to a USB stick, or delete it to
+   remove the game and its saves. (The folder must be writable: not in
+   `C:\Program Files` or `/Applications` unless you run as their owner.
+   On Windows, check the file is not `portable.txt.txt`.) The desktop
+   builds only: not the web version or the PortMaster port;
+4. the per-user folder, as before:
 
 | System | Folder |
 |---|---|
-| Linux and other Unix systems | `$XDG_DATA_HOME/atlantis-native/<build>` (by default `~/.local/share/atlantis-native/<build>`) |
-| macOS | `~/Library/Application Support/atlantis-native/<build>` |
-| Windows | `%APPDATA%\atlantis-native\<build>` |
+| Linux and other Unix systems | `$XDG_DATA_HOME/atlantis-native` (by default `~/.local/share/atlantis-native`) |
+| macOS | `~/Library/Application Support/atlantis-native` |
+| Windows | `%APPDATA%\atlantis-native` |
+
+Without `portable.txt` or `data` next to the program nothing changes:
+the saves stay in the per-user folder. To move to the portable mode,
+make the `data` folder next to the program and copy the per-user
+folder's contents into it. The log names the folder used and why
+(`data folder ... (Portable)`).
 
 (`games.txt`, the game library, `support.ini`, the counts of the
-[support screen](#the-support-screen), and `atlantis-native.log` are in
-the `atlantis-native` folder itself.)
-Atlantis II's saves and settings are in its `atlantis2` folder there,
-Atlantis III's in `atlantis3` (see [Atlantis III](#atlantis-iii)),
-Atlantis Evolution's in `atlantis4` (see
-[Atlantis Evolution](#atlantis-evolution)).
+[support screen](#the-support-screen), `atlantis-native.log` and
+`game-files/`, the copies made from the discs, are in the data folder
+itself.) Atlantis II's saves and settings are in its `atlantis2` folder
+there, Atlantis III's in `atlantis3` (with its F12 screenshots in
+`atlantis3/screenshots`; see [Atlantis III](#atlantis-iii)), Atlantis
+Evolution's in `atlantis4` (see [Atlantis Evolution](#atlantis-evolution)),
+the 2004 program's in `atlantis-evolution-2004` and The Secrets of
+Atlantis's in `atlantis5` (its saves in `atlantis5/saves`, the
+cabinets' index files in `atlantis5/cabinets`, the copy of its DVD in
+`atlantis5/disc`; see [The Secrets of Atlantis](#the-secrets-of-atlantis)).
+
+### Players and checkpoints
 
 On its first start with a game whose folder holds an original
 `players.atl` (an installation the original game played), the port copies

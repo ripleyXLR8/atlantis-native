@@ -4612,7 +4612,7 @@ pub(crate) fn face_size(files: &A3Files) -> usize {
 /// each channel truncated as its 32 → 16 path does ([`crate::menu`]'s
 /// conversion) [the 24-bit source branch of that copy is not checked
 /// separately].
-fn faces_of_jp6(data: &[u8], depth: Depth) -> Result<Faces, String> {
+pub(crate) fn faces_of_jp6(data: &[u8], depth: Depth) -> Result<Faces, String> {
     use atlantis3_data::evolution2004_jp6::Jp6;
     let jp6 = Jp6::parse(data).map_err(|e| format!("{e:?}"))?;
     let mut rgb: [Vec<u32>; 6] = Default::default();

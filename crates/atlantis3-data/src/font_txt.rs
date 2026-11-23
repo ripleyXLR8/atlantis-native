@@ -40,6 +40,12 @@ pub struct FontDef {
     pub italic: bool,
     /// The character set's name, see [`FontDef::charset`].
     pub charset_name: String,
+    /// *Atlantis V*'s `Antialias` key: the word lower-cased equal to
+    /// `true` (atlantis5-dvd-int-3891200 @ 0x004610e8..0x004611f8); on
+    /// when the block has no such key (0x00460a88). The font is made with
+    /// `lfQuality` 4 (`ANTIALIASED_QUALITY`) when on, 3
+    /// (`NONANTIALIASED_QUALITY`) when off (@ 0x0045fa40).
+    pub antialias: bool,
 }
 
 impl FontDef {
@@ -141,6 +147,7 @@ impl FontTxt {
                 weight_name,
                 italic,
                 charset_name,
+                antialias: false,
             });
         }
         FontTxt { fonts }
@@ -166,9 +173,13 @@ impl FontTxt {
             if line.first() == Some(&b'\'') || Reader::new(line).word() != b"[Font]" {
                 continue;
             }
+            // The block's defaults (@ 0x004608dc..0x00460a88): `FW_NORMAL`,
+            // `DEFAULT_CHARSET`, and `Antialias` on (the byte +0x48 set to
+            // 1 at 0x00460a88).
             let mut f = FontDef {
                 weight_name: "FW_NORMAL".into(),
                 charset_name: "DEFAULT_CHARSET".into(),
+                antialias: true,
                 ..FontDef::default()
             };
             while !file.at_end() {
@@ -194,10 +205,92 @@ impl FontTxt {
         FontTxt { fonts }
     }
 
+    /// Reads *Atlantis V*'s `datas/fonts/<language>/font.txt`
+    /// (atlantis5-dvd-int-3891200 @ 0x004601f0, `CTextManager`): the 2004
+    /// reader's blocks and keys ([`FontTxt::parse_2004`]: `'` lines skipped
+    /// @ 0x004603fa and 0x00460b20, `[Font]` 0x0066f36c .. `[EndFont]`
+    /// 0x0066f350, the same defaults `FW_NORMAL` 0x0066f274 and
+    /// `DEFAULT_CHARSET` 0x0066f35c), with three differences:
+    ///
+    /// - a word starting with `"` runs to the next `"` (the word reader
+    ///   @ 0x00455ea0: `Type "Courier New"`); its separators are the 2004
+    ///   ones (@ 0x00456300);
+    /// - the key `Antialias` (0x0066f2fc) sets [`FontDef::antialias`];
+    /// - a font whose id is already made is not made again (log "La fonte
+    ///   %s existe deja. Creation annulee", 0x0066f2b0): the first wins.
+    pub fn parse_atlantis5(data: &[u8]) -> FontTxt {
+        let mut file = Reader::new(data);
+        let mut fonts: Vec<FontDef> = Vec::new();
+        while !file.at_end() {
+            let line = file.line();
+            if line.first() == Some(&b'\'') || quoted_word(line).0 != b"[Font]" {
+                continue;
+            }
+            // The block's defaults (@ 0x004608dc..0x00460a88): `FW_NORMAL`,
+            // `DEFAULT_CHARSET`, and `Antialias` on (the byte +0x48 set to
+            // 1 at 0x00460a88).
+            let mut f = FontDef {
+                weight_name: "FW_NORMAL".into(),
+                charset_name: "DEFAULT_CHARSET".into(),
+                antialias: true,
+                ..FontDef::default()
+            };
+            while !file.at_end() {
+                let line = file.line();
+                if line.first() == Some(&b'\'') {
+                    continue;
+                }
+                let (key, rest) = quoted_word(line);
+                let value = quoted_word(rest).0;
+                match key {
+                    b"[EndFont]" => break,
+                    b"NameID" => f.id = latin1(value),
+                    b"Type" => f.face = latin1(value),
+                    b"Height" => f.height = atoi(value),
+                    b"Width" => f.width = atoi(value),
+                    b"Weight" => f.weight_name = latin1(value),
+                    b"Italic" => f.italic = lower(value) == b"true",
+                    b"Charset" => f.charset_name = latin1(value),
+                    b"Antialias" => f.antialias = lower(value) == b"true",
+                    _ => {}
+                }
+            }
+            if fonts.iter().any(|g| g.id == f.id) {
+                log::debug!("font.txt: {} made already", f.id);
+                continue;
+            }
+            fonts.push(f);
+        }
+        FontTxt { fonts }
+    }
+
     /// The font `id`: the last line with that id.
     pub fn font(&self, id: &str) -> Option<&FontDef> {
         self.fonts.iter().rev().find(|f| f.id == id)
     }
+}
+
+/// The next word of `s` and what follows it (@ 0x00455ea0): separators
+/// skipped, then a `"`-quoted run (without its quotes) or a run to the
+/// next separator.
+fn quoted_word(s: &[u8]) -> (&[u8], &[u8]) {
+    let mut p = 0;
+    while p < s.len() && crate::tokens::is_separator(s[p]) {
+        p += 1;
+    }
+    if s.get(p) == Some(&b'"') {
+        let start = p + 1;
+        let end = s[start..]
+            .iter()
+            .position(|&c| c == b'"')
+            .map_or(s.len(), |i| start + i);
+        return (&s[start..end], s.get(end + 1..).unwrap_or(&[]));
+    }
+    let start = p;
+    while p < s.len() && !crate::tokens::is_separator(s[p]) {
+        p += 1;
+    }
+    (&s[start..p], &s[p..])
 }
 
 #[cfg(test)]
@@ -219,6 +312,24 @@ Name\tAtlantis.ttf\r\nType\tArial\r\nHeight\t21\r\nWidth\t0\r\n' x\r\nItalic\tTR
         assert_eq!(f.charset_name, "DEFAULT_CHARSET");
         let b = t.font("F_B").unwrap();
         assert_eq!((b.weight(), b.charset_name.as_str()), (700, "ANSI_CHARSET"));
+    }
+
+    #[test]
+    fn fonts_atlantis5() {
+        let t = FontTxt::parse_atlantis5(
+            b"[Font]\r\nNameID\tA \r\nType\t\"Courier New\"\r\nHeight\t16\r\nAntialias TRUE\r\n[EndFont]\r\n\
+[Font]\r\nNameID A\r\nType arial\r\n[EndFont]\r\n[Font]\r\nNameID B\r\nAntialias false\r\n[EndFont]\r\n\
+[Font]\r\nNameID C\r\n[EndFont]\r\n",
+        );
+        assert_eq!(t.fonts.len(), 3);
+        assert!(!t.font("B").unwrap().antialias);
+        assert!(t.font("C").unwrap().antialias);
+        let a = &t.fonts[0];
+        assert_eq!(
+            (a.id.as_str(), a.face.as_str(), a.height),
+            ("A", "Courier New", 16)
+        );
+        assert!(a.antialias);
     }
 
     #[test]

@@ -17,6 +17,7 @@
 | `atlantis4-script` | Atlantis Evolution: its Lua 5.1 scripts (vendored `rilua`) and the engine's bindings |
 | `atlantis4-engine` | Atlantis Evolution: the warp view, the GUI layouts, dialogs, inventory, documents, the menus and the saves, the OpenAL mix, the processor's renderer; see [Atlantis Evolution](#atlantis-evolution) |
 | `atlantis4-gl` | Atlantis Evolution's renderer on the graphics card (OpenGL 3.3, ES 3.0, WebGL 2) |
+| `atlantis5-script` | The Secrets of Atlantis: its Lua 5.0 chunks run on the vendored `rilua` (a 5.0 loader and 5.0's operations), the `Atl_*` C functions as the program checks and converts them, the game manager's states, requests, timers and transitions, the XML saves; see [The Secrets of Atlantis](#the-secrets-of-atlantis) |
 | `atlantis-app` | the window, input and audio (it picks the engine by the game the folder holds) (winit, softbuffer, cpal; in the browser WebGL 2 draws the HD view and composes the HD picture with the engine's integer formulas, bit for bit (Atlantis II's view in single precision), and presents it) |
 | `atlantis-sdl` | the first game's SDL2 front end (the first game only) for handhelds and PortMaster (the program `atlantis-native-sdl`, built with `--features sdl`): the gamepad as the mouse, the on-screen keyboard, SDL audio; see [The SDL2 front end](#the-sdl2-front-end-handhelds-and-portmaster) |
 
@@ -4669,6 +4670,111 @@ and `a3_web::start_evolution_2004` runs it in *Atlantis III*'s page
 window, its saves and `Atlantis4.cfg` in `localStorage` under
 `atlantis-native/atlantis-evolution-2004/`; the files are read a part
 at a time, as for the other games.
+
+## The Secrets of Atlantis
+
+*The Secrets of Atlantis: The Sacred Legacy* (Nobilis, 2006) is the third
+program of *Atlantis III*'s engine. The French DVD's program is protected
+(TAGES) and is not read: the code is read in the international DVD's
+program, atlantis5-dvd-int-3891200 (`The secrets of Atlantis.exe` of
+3,891,200 bytes, MD5 `3d0f55d33d271f6f5b12250d838a2b83`), and every
+address in the code is that program's. The French DVD's scripts are
+byte for byte what Lua 5.0.3's `luac` makes of the international
+program's script sources, so both programs run the same story.
+
+**Data.** `atlantis3-data::atlantis5::Atlantis5Source` reads the DVD's
+Microsoft cabinets (`DATAS.cab`, `DATAS_<language>.cab`; MSZIP,
+`atlantis-data::cab`) in place, from the drive, a copy, the image or a
+folder holding it, or an unpacked tree. The formats shared with
+*Atlantis III* and the 2004 program (WAM, JP6 panoramas, sprites, MLS
+playlists, `font.txt`, Bink films) are read by the same code; the XML
+texts (string resources, dialogs, film subtitles) by `atlantis5_texts`.
+
+**The copy to the computer.** `atlantis-app::a5_copy` (desktop only)
+copies the disc's files the game needs to `atlantis5/disc` in the
+per-user data folder: `Atlantis5Source::disc_root` gives the disc's root
+(a folder with `DATAS.cab`, the image, or a folder holding it; `None`
+for an install or the extracted cabinets) and `atlantis5::disc_files`
+its files (`DATAS.cab`, each `DATAS_<language>.cab`, and the program
+when the disc has it, which `Atlantis5Source::build` identifies). The
+copy reads them through `FileSource::read_at` in 8 MiB parts (so an
+image is copied as a drive is), each into `<name>.part` renamed once
+whole; another language's cabinet and leftover parts are removed first,
+files already whole kept; the free room (`statvfs`,
+`GetDiskFreeSpaceExW`) is checked before writing, with 256 MiB to
+spare; the copy ends by opening the folder as the game. It opens as the
+disc's files (`Form::DiscFolder`), and the cabinets' checkpoint indexes
+are named by a hash of the cabinets' headers, so those made from the
+disc serve the copy. In the game library (`launcher.rs`) an entry read
+from the disc (`a5::edition`) shows a **Copy to this computer** link
+(`LauncherAction::Copy`, key C); `session.rs` runs `a5_copy::Job` in
+its own thread, shows its progress in the message line from
+`App::about_to_wait` (four times a second), holds the screen
+(`Launcher::set_busy`: Escape cancels, the rest waits), then moves the
+entry to the copy (`Library::relocate`). `--atlantis5-install <disc>`
+does the same from a terminal (`a5_copy::install_cli`).
+
+**The web build.** `atlantis-app::a5_web` runs `Play` in the page as
+`a5` does in a window; `web.rs` finds the game among the picked files
+(`web_layout::a5_folder`: a copy of the disc, an install or `Datas`
+itself, by the paths; the DVD's image by reading the picked images for
+`DATAS.cab`). An MSZIP folder is one deflate stream, so the page,
+which has no index folder, decodes the films' folder up to the logos
+before the game starts, a step per frame (`CabFiles::warm_progress`,
+about 450 MB, 18 s in headless Edge from an image on a WSL disk), then
+every folder to its end, the smallest first, 3 ms per frame
+(`CabFiles::warm_next`), the cabinet's next MiB asked ahead
+(`FileSource::read_ahead`) and the step skipped while it is on its way
+(`web::reads_pending`), so that no frame waits for the disc. The saves
+go through `atlantis5_saves::SaveFiles` (the desktop's `DirSaves`, the
+page's `localStorage` with a `<name>.time` key for the load page's
+dates); the sound through `audio_out::web_out`, mixed ahead as Atlantis
+Evolution's. `window.atlantis5.state()` / `.test("click <element>")`
+are the end-to-end runs' aids.
+
+**Scripts.** `atlantis5-script` runs the player's own compiled chunks:
+the vendored `rilua` (a Lua 5.1 VM) loads Lua 5.0 chunks
+(`vendor/rilua/src/vm/undump50.rs`) and runs 5.0's operations that differ
+(see `vendor/rilua/VENDORED.txt`). Each script (a click, a view's
+entry, a timer, the chapter's `InitChapter`) runs as a coroutine that
+waits at the calls the original runs over frames (`Atl_Address_Go`,
+`Atl_Video_Play`, `Atl_Dialog_Play`, an animated look). The game
+manager (`Game`, `CGameManager::Process` @ 0x0042f000) keeps the
+original's states and requests: 1 a chapter, 2 a load, 3 a menu, 4
+play, 7 the end of the game (`Atl_TerminateGame`: the autosave deleted,
+the game ended, the credits), 8 quit. Two faults of `rilua`'s
+incremental collector were found by the walkthrough and fixed in the
+vendored copy and in the bindings: a string found dead in the string
+table is made alive again (PUC-Rio's `luaS_newlstr`), and the bindings'
+raw table writes take the table's back barrier (`luaC_barriert`).
+
+**Engine.** `atlantis3-engine`'s `atlantis5*.rs`: the view
+(`atlantis5_play::Stage`: the panorama, sprites and their players, the
+camera and `BoatFx`, films, music, sounds, dialogs and subtitles, the
+subject menu, the inventory), the menus (`atlantis5_menu`), the poker
+board (`atlantis5_poker`) and the dialogs' faces and fonts
+(`atlantis5_dialog`). The start plays the program's two logos
+(@ 0x0043d320) before the main menu; their sound is the Bink files'
+own audio track, which Native's Bink decoder does not decode, so they
+play silent.
+
+**Tests.** With `ATLANTIS5_DVD_FR` set to the folder holding the DVD's
+image, `files/` the DVD's files and `datas/` the extracted cabinets
+(skipped without): `crates/atlantis5-script/tests/` (a chunk and the
+French scripts against the traces of Lua 5.0.3's own interpreter, the
+game manager without game data), `crates/atlantis3-engine/tests/atlantis5_*.rs`
+(the first view, the menus, dialogs, poker and every puzzle, and `atlantis5_walkthrough.rs`,
+which plays the whole game through the DVD's own scripts by clicks
+(walks over the scenes' WAM move zones, items from the inventory's
+cells, subjects from the subject menu) from a new game to the credits,
+and a game over that loads the autosave; `A5_GC_STRESS` runs the Lua
+collector all the time) and the game library's entry
+(`atlantis-app`'s `the_library_plays_atlantis5`). The copy to the
+computer is checked on a fake disc whose small stored cabinets open as
+the game (`a5_copy`'s tests: the room, the cancel, a copy cut short;
+`the_library_copies_atlantis5s_disc`: the screen held, then the entry
+moved to the copy) and against the French DVD's plan
+(`the_french_dvd_plan`).
 
 ## Tests
 

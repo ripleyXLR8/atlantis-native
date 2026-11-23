@@ -28,11 +28,16 @@
 //! - [`coord`]: `Coord*.txt`, the places' 3D sound positions;
 //! - [`vue`], [`zbf`], [`set`]: the travel videos' cameras, the Licorne
 //!   board's depth buffers and `Toymf.set`;
+//! - [`atlantis5`]: *Atlantis V* (2006), the engine's third program: its
+//!   builds and its data in every form (cabinets, disc image, tree);
+//! - [`atlantis5_texts`]: its UTF-8 XML text tables;
 //! - [`testing`]: what a game-data test does when its data is missing.
 
 #![forbid(unsafe_code)]
 
 pub mod atl;
+pub mod atlantis5;
+pub mod atlantis5_texts;
 pub mod bink;
 pub mod cfg;
 pub mod cine_txt;

@@ -1,0 +1,18 @@
+[package]
+name = "atlantis5-script"
+description = "Atlantis V scripts: the player's Lua 5.0 chunks run on the vendored rilua, the program's 39 C functions, its event model and game manager"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+# rilua is pure Rust with no dependency and builds for wasm32-unknown-unknown.
+[dependencies]
+rilua = { path = "../../vendor/rilua" }
+atlantis4-data = { path = "../atlantis4-data" }
+log = "0.4"
+
+[dev-dependencies]
+atlantis-data = { path = "../atlantis-data" }
+atlantis2-data = { path = "../atlantis2-data" }
+atlantis3-data = { path = "../atlantis3-data" }
+md-5 = "0.10"

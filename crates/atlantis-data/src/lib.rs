@@ -6,6 +6,7 @@
 //! traceable to the original code.
 
 pub mod big;
+pub mod cab;
 pub mod disc_image;
 pub mod dvd;
 pub mod exe;
@@ -19,6 +20,7 @@ pub mod sprite;
 pub mod sprite_anim;
 pub mod sprite_blend;
 pub mod sprite_list;
+pub mod system_fonts;
 pub mod text;
 pub mod wam;
 

@@ -87,6 +87,12 @@ pub struct Gc {
     pub threads: Arena<LuaThread>,
     /// Current white color for new allocations.
     pub current_white: Color,
+    /// `MAXBITS` given to every table allocated here (Native patch 7):
+    /// 26 as in Lua 5.1, 24 for a Lua 5.0.3 state.
+    pub table_max_bits: u8,
+    /// Every table allocated here takes Lua 5.0.3's layout (Native patch
+    /// 8), so `next` walks it in 5.0.3's order; false (5.1's) by default.
+    pub table_lua50: bool,
     /// Per-type metatables. Indexed by type tag (see `metatable::type_tag`).
     /// Tables and userdata have per-instance metatables; other types use these.
     pub type_metatables: [Option<GcRef<Table>>; NUM_TYPE_TAGS],
@@ -109,6 +115,8 @@ impl Gc {
             userdata: Arena::new(),
             threads: Arena::new(),
             current_white: Color::White0,
+            table_max_bits: super::table::MAXBITS,
+            table_lua50: false,
             type_metatables: [None; NUM_TYPE_TAGS],
             tm_names: [None; TM_N],
             gc_state: super::gc::collector::GcState::new(),
@@ -147,7 +155,11 @@ impl Gc {
     }
 
     /// Allocates a new table in the GC arena.
-    pub fn alloc_table(&mut self, table: Table) -> GcRef<Table> {
+    pub fn alloc_table(&mut self, mut table: Table) -> GcRef<Table> {
+        table.set_max_bits(self.table_max_bits);
+        if self.table_lua50 {
+            table.set_lua50(true);
+        }
         let est = super::gc::collector::EST_TABLE_SIZE
             + table.array_slice().len() * 16
             + table.hash_size() as usize * 32;

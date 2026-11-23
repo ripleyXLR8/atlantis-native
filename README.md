@@ -5,9 +5,9 @@
 **Return to Atlantis, on today's machines.**
 
 A native port of *Atlantis: The Lost Tales* (Cryo Interactive, 1997),
-*Atlantis II* (1999), *Atlantis III: The New World* (2001) and *Atlantis
-Evolution* (2004), written in Rust, for Windows, macOS, Linux and your
-browser.
+*Atlantis II* (1999), *Atlantis III: The New World* (2001), *Atlantis
+Evolution* (2004) and *The Secrets of Atlantis: The Sacred Legacy* (2006),
+written in Rust, for Windows, macOS, Linux and your browser.
 
 [![Build](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml/badge.svg)](https://github.com/ripleyXLR8/atlantis-native/actions/workflows/build.yml)
 [![Release](https://img.shields.io/github/v/release/ripleyXLR8/atlantis-native)](https://github.com/ripleyXLR8/atlantis-native/releases/latest)
@@ -66,6 +66,19 @@ Bink films, the ship's pitching and its eight mini-games run, each
 traced to the original's code and checked piece by piece by automated
 tests. It has not yet been played through from start to end: reports
 are welcome (see [The 2004 CD](docs/GUIDE.md#the-2004-cd-in-progress)).
+
+*The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,
+2006), the last game of Cryo's *Atlantis III* engine, plays from start
+to end from its French DVD (*L'Héritage sacré*) on the desktop and in
+the browser: its drive, its files, its image or its installation, in the
+game library as *The Secrets of Atlantis : L'Héritage sacré (2006), DVD,
+French*; on the desktop the DVD can be copied to the computer once
+(**Copy to this computer** in the game library), so that it plays from
+the hard disk. The DVD's own Lua 5.0 scripts run as they are; the nine
+chapters, the twenty puzzles, the dialogs, the inventory, the saves, the
+deaths and the credits are checked by an automated walkthrough of the
+whole story. What is missing (two fonts when Windows' own are not installed) is listed in
+[The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
 
 It is the original game, **pixel for pixel and sample for sample**: the
 engine is a translation of the Atlantis engine written for
@@ -144,7 +157,7 @@ Atlantis Native contains none of them.</sub>
 - ⚙️ **Options menu** (F10, or O): graphics, HD settings and enhancements,
   changed at once while you play.
 - 📚 **Game library**: several editions (GOG.com, CD, DVD, disc
-  images...) of the four games in one list, to choose the one to play at
+  images...) of the five games in one list, to choose the one to play at
   start-up or switch from F10.
 - 🏜️ **Atlantis III**: GOG.com's edition in English, French, German or
   Spanish and the French retail CD, whole, with the original's own menus
@@ -157,9 +170,15 @@ Atlantis Native contains none of them.</sub>
   skips a film (a bug fix: the original has only its skip button); on
   the desktop and in the browser. Its original 2004 CD program is in the game library
   too, as a preview.
-- 🌐 **In the browser**: the four games, read from your own folder; the
-  CD editions of the first three also from their disc images (`.iso`,
-  `.bin`, `.img`, `.mdf`, `.nrg`), a part at a time.
+- 🏛️ **The Secrets of Atlantis**: the French DVD (2006), read from the
+  DVD, its files, its image or its installation, nothing unpacked; its
+  own scripts, menus and saves; full screen or windowed (F11); on the
+  desktop (where the DVD can be copied to the computer once) and in the
+  browser.
+- 🌐 **In the browser**: the five games, read from your own folder; the
+  CD editions of the first three and the DVD of *The Secrets of
+  Atlantis* also from their disc images (`.iso`, `.bin`, `.img`, `.mdf`,
+  `.nrg`), a part at a time.
 - 🪟 **A modern window**: resizable, the picture kept in its 4:3
   proportions, the mouse captured while you look around; full screen at
   a key, and on the desktop kept for the next start (F10, "Start in full
@@ -184,15 +203,15 @@ those of the latest commit:
 | Web (a static site to serve over HTTP; on the nightly release) | `atlantis-native-web.zip` |
 
 The web version of the latest commit is also online:
-**https://ripleyxlr8.github.io/atlantis-native/**, for the four games
-(tried in Edge, a Chromium browser, and in Firefox, Atlantis II in
-Chrome too; not yet in Safari). Pick your game folder there: its files
+**https://ripleyxlr8.github.io/atlantis-native/**, for the five games
+(tried in Edge, a Chromium browser, and the four first in Firefox,
+Atlantis II in Chrome too; not yet in Safari). Pick your game folder there: its files
 are read inside your browser, a part at a time (the CD images too, and
 Atlantis II's and III's cinematics), and never sent anywhere; the saves
 stay in that browser. For the CD editions of Atlantis I, II and III, the
 folder may hold the CD images (`.iso`, `.bin`, `.img`, `.mdf`, `.nrg`)
-in place of copies of the discs (see [The web
-version](docs/GUIDE.md#the-web-version)).
+in place of copies of the discs, and *The Secrets of Atlantis* its DVD
+image (see [The web version](docs/GUIDE.md#the-web-version)).
 
 > **Windows:** the program is not code-signed (a certificate costs money
 > each year), so Windows SmartScreen may warn that it "protected your PC"
@@ -212,6 +231,14 @@ version](docs/GUIDE.md#the-web-version)).
 >
 > Or, in the Terminal:
 > `xattr -dr com.apple.quarantine "/Applications/Atlantis Native.app"`
+
+> **Portable mode:** put an empty file named `portable.txt` (or a folder
+> named `data`) next to the program (on macOS, next to `Atlantis
+> Native.app`) and the saves, settings, game library and log go in that
+> `data` folder instead of your user folder: deleting the program's
+> folder then removes everything. `--data-dir <folder>` chooses another
+> folder for one run, and `--help` lists every option (see [where the
+> saves live](docs/GUIDE.md#players-checkpoints-and-settings)).
 
 > **PortMaster:** unzip `atlantis-native-portmaster.zip` into the
 > device's `ports` folder (it holds `Atlantis Native.sh` and the
@@ -329,11 +356,32 @@ installed folder, which holds all four discs (the CDs are not needed to
 play). Another `Atlantis Evolution.exe` is refused with its size and
 MD5, so that it can be reported and added. The PortMaster build plays the first game only.
 
-The web version plays the four games: see
+For *The Secrets of Atlantis*:
+
+| Release | Languages | What to point it at |
+|---|---|---|
+| The French DVD of Nobilis (2006, *L'Héritage sacré*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `e5c43eb0411d1775e6242fec6d241f6e`, never run) | French | the DVD's drive or a copy of its files (the folder with `DATAS.cab`), its image (`.iso`) or the folder holding it, or the folder where its installer put the game (the one with `Datas`) |
+
+You need your own DVD (or its image, or the game installed from it).
+The international DVD (`The secrets of Atlantis.exe` of 3,891,200 bytes)
+has the same layout, `DATAS.cab` and one `DATAS_<language>.cab` per
+language, which Atlantis Native reads, but it has not been tried.
+
+The web version plays the five games: see
 [The web version](docs/GUIDE.md#the-web-version).
 
 How to get the files from your CD or GOG.com: see
 [Getting the game files](docs/GUIDE.md#getting-the-game-files).
+
+### Wanted editions
+
+Many boxed editions of the five games have never been seen by the
+project: the Polish and Japanese CDs of the first game, the European
+DVD of *Atlantis II*, the English CDs of *Atlantis III*, the French CD of
+*Atlantis Evolution*, the international DVD of *The Secrets of Atlantis*
+and more. If you own one, its box and discs can help it play: see
+[Wanted editions](docs/WANTED.md) for the list and what to send (photos,
+file listings and checksums only, never the game's files).
 
 The game you chose is shown in the window's title and at the foot of the
 options menu, e.g. *GOG.com, French (1999 build)*.
@@ -373,6 +421,13 @@ the folder the 2004 CD's installer filled (a preview), found by the
 game library or given on the command line. See
 [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution).
 
+*The Secrets of Atlantis* (2006) too: its DVD, a copy of its files, its
+image or its installation, found by the game library or given on the
+command line. Played from the DVD or its image, its entry in the game
+library offers **Copy to this computer** (about 1.4 GB, once): the game
+then plays from the hard disk, without the disc. See
+[The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
+
 ## Controls
 
 | Action | Control |
@@ -390,10 +445,11 @@ game library or given on the command line. See
 On the player screen, click the last row to type a new name, then Enter
 or OK.
 
-Atlantis II, Atlantis III and Atlantis Evolution have controls of their
-own: see [Atlantis II](docs/GUIDE.md#controls),
-[Atlantis III](docs/GUIDE.md#atlantis-iii-controls) and
-[Atlantis Evolution](docs/GUIDE.md#atlantis-evolution-controls) in the
+Atlantis II, Atlantis III, Atlantis Evolution and The Secrets of
+Atlantis have controls of their own: see [Atlantis II](docs/GUIDE.md#controls),
+[Atlantis III](docs/GUIDE.md#atlantis-iii-controls),
+[Atlantis Evolution](docs/GUIDE.md#atlantis-evolution-controls) and
+[The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis) in the
 player's guide.
 
 ## Build from source
@@ -411,6 +467,8 @@ On Linux, install the ALSA headers first (`libasound2-dev` or
 
 - 📖 [Player's guide](docs/GUIDE.md): command line, where the saves and
   settings live, known differences from the original.
+- 📦 [Wanted editions](docs/WANTED.md): the editions the project is
+  looking for, and how owners of the discs can help.
 - 🔧 [Technical notes](docs/TECHNICAL.md): the engine's layout, the
   enhancements, how the HD mode works, subtitles, the web build, tests,
   roadmap.
@@ -447,7 +505,8 @@ from its own sources is signed; every release is approved by hand.
 
 Privacy: this program does not transfer any information to other
 networked systems. It only reads the game files you point it at and
-writes its saves, settings and log to your own user folder (in the web
+writes its saves, settings and log to your own user folder, or to the
+folder you choose (portable mode, `--data-dir`) (in the web
 version, to your browser's storage: the page is downloaded from GitHub
 Pages, the game files and saves never leave your computer).
 
@@ -491,6 +550,11 @@ The subtitle font, Liberation Sans Regular
 (`assets/fonts/LiberationSans-Regular.ttf`, Copyright (c) 2010 Google
 Corporation, Copyright (c) 2012 Red Hat, Inc.), is licensed under the SIL
 Open Font License, version 1.1 (see `assets/fonts/LICENSE-LiberationSans`).
+So are Liberation Sans Bold and Liberation Mono Regular and Bold
+(`assets/fonts/LiberationSans-Bold.ttf`, `LiberationMono-Regular.ttf`,
+`LiberationMono-Bold.ttf`, the same 2.1.5 release and copyright; see
+`LICENSE-LiberationSans` and `LICENSE-LiberationMono`), which draw
+*Atlantis V*'s Arial bold and Courier New texts.
 
 The game library's font, P052 Roman and Italic
 (`assets/fonts/P052-Roman.otf`, `P052-Italic.otf`, URW's Palatino-style
@@ -511,7 +575,8 @@ Font License, version 1.1 (see `assets/fonts/LICENSE-NotoSansJP`).
 Noto is a trademark of Google Inc. The fonts are built into the program
 (the web version fetches the Chinese and Japanese ones from its `fonts`
 folder, for a Chinese or the Japanese release only); every package carries
-their licence files, `LICENSE-LiberationSans`, `LICENSE-NotoSerifCJK` and
+their licence files, `LICENSE-LiberationSans`, `LICENSE-LiberationMono`,
+`LICENSE-NotoSerifCJK` and
 `LICENSE-NotoSansJP`, beside `LICENSE`.
 
 The Theora video decoder, the `theora-rs` crate 0.1.0

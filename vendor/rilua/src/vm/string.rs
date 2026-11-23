@@ -205,10 +205,17 @@ impl StringTable {
                 && s.data.len() == data.len()
                 && *s.data == *data
             {
-                // Found existing string.
-                // Resurrection of dead strings will be added with the
-                // GC collector (Phase 7). For now, all valid refs are
-                // returned as-is.
+                // Found existing string. A dead one (the other white,
+                // waiting for the sweep) is made alive again, as
+                // PUC-Rio's `luaS_newlstr` does (`if (isdead(G(L), o))
+                // changewhite(o)`): else the sweep frees a string that is
+                // referenced again (Native patch 6).
+                if let Some(c) = arena.color(r)
+                    && c.is_white()
+                    && c != current_white
+                {
+                    arena.set_color(r, current_white);
+                }
                 return r;
             }
         }

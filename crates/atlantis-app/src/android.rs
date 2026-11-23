@@ -502,6 +502,7 @@ pub(crate) fn describe(path: &Path) -> crate::launcher::LauncherEntry {
             label,
             found,
             kind,
+            copyable: false,
         };
     if !crate::android_saf::can_read(&tree) {
         return entry(
@@ -554,7 +555,7 @@ fn other_label(game: &OtherGame) -> String {
                 .ok()
                 .map(|b| crate::a4::files_label(&files, b))
         }
-        GameKind::LostTales => None,
+        GameKind::Atlantis5 | GameKind::LostTales => None,
     };
     named.unwrap_or_else(|| game_name(game.kind).to_string())
 }
@@ -759,7 +760,7 @@ fn run_tree_game(el: &mut EventLoop<()>, game: OtherGame) -> Result<(), String> 
                 .map_err(|e| crate::setup::explain_atlantis4(shown, &e))?;
             crate::a4::run_files_on(el, files, build)
         }
-        GameKind::LostTales => Ok(()),
+        GameKind::Atlantis5 | GameKind::LostTales => Ok(()),
     }
 }
 
@@ -955,7 +956,7 @@ impl App {
                 QUIT.store(true, Ordering::SeqCst);
                 true
             }
-            A::Remove(_) | A::None => false,
+            A::Remove(_) | A::Copy(_) | A::CancelCopy | A::None => false,
         }
     }
 
@@ -1046,6 +1047,7 @@ fn game_name(kind: crate::setup::GameKind) -> &'static str {
         GameKind::Atlantis2 => "Atlantis II",
         GameKind::Atlantis3 => "Atlantis III",
         GameKind::Atlantis4 => "Atlantis Evolution",
+        GameKind::Atlantis5 => "The Secrets of Atlantis",
     }
 }
 

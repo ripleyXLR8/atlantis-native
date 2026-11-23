@@ -342,6 +342,38 @@ pub async fn start(
     // player's choice.
     let paths: Vec<&str> = all.keys().map(String::as_str).collect();
     let picked = crate::web_layout::picked(&paths);
+    // The Secrets of Atlantis: a copy of its DVD, an install, or the
+    // extracted cabinets, alone or chosen among the games of the folder.
+    if let Some(folder) = crate::web_layout::a5_folder(&paths) {
+        use crate::web_layout::Picked;
+        let mut others: Vec<&str> = match &picked {
+            Picked::Both(_) => vec!["atlantis=Atlantis: The Lost Tales", "atlantis2=Atlantis II"],
+            Picked::Atlantis2(_) => vec!["atlantis2=Atlantis II"],
+            Picked::LostTales => vec!["atlantis=Atlantis: The Lost Tales"],
+            _ => Vec::new(),
+        };
+        if crate::web_layout::a3_install(&paths).is_some() {
+            others.push("atlantis3=Atlantis III");
+        }
+        if crate::web_layout::a4_install(&paths).is_some() {
+            others.push("atlantis4=Atlantis Evolution");
+        }
+        if crate::web_layout::a4cd_install(&paths).is_some() {
+            others.push("atlantis4cd=Atlantis Evolution (2004)");
+        }
+        if others.is_empty() || game.as_deref() == Some("atlantis5") {
+            drop(paths);
+            start_atlantis5(all, &folder)?;
+            return Ok("atlantis5".into());
+        }
+        if game.is_none() {
+            return Err(format!(
+                "GAMES:{};atlantis5=The Secrets of Atlantis",
+                others.join(";")
+            )
+            .into());
+        }
+    }
     // Atlantis Evolution's 2004 CD alone, or chosen among the games of
     // the folder.
     if let Some(install) = crate::web_layout::a4cd_install(&paths) {
@@ -436,6 +468,13 @@ pub async fn start(
     // copy of its files: the game read from them, a part at a time.
     let paths: Vec<&str> = all.keys().map(String::as_str).collect();
     if !crate::web_layout::holds_lost_tales(&paths) {
+        // The Secrets of Atlantis's DVD image among them, found by
+        // reading them.
+        if let Some(image) = a5_image(&all) {
+            drop(paths);
+            start_atlantis5_image(all, &image)?;
+            return Ok("atlantis5".into());
+        }
         let folders = crate::web_layout::image_folders(&paths);
         if !folders.is_empty() {
             return start_from_images(all, folders, language).await;
@@ -940,13 +979,24 @@ fn read_ahead_part(index: usize, offset: u64, len: usize) {
     });
     if fresh {
         wasm_bindgen_futures::spawn_local(async move {
-            if let Ok(d) = fetch(&file, offset, len as u64).await {
-                if d.len() == len {
-                    *data.borrow_mut() = Some(d);
-                }
+            match fetch(&file, offset, len as u64).await {
+                Ok(d) if d.len() == len => *data.borrow_mut() = Some(d),
+                // Not read: forgotten ([`reads_pending`]), read at once
+                // when it is needed.
+                _ => AHEAD.with(|a| {
+                    a.borrow_mut()
+                        .retain(|p| !(p.index == index && p.offset == offset))
+                }),
             }
         });
     }
+}
+
+/// Whether a part asked ahead ([`FileSource::read_ahead`]) is still
+/// being read: The Secrets of Atlantis decodes its cabinets between
+/// frames only when it would not wait for the browser.
+pub(crate) fn reads_pending() -> bool {
+    AHEAD.with(|a| a.borrow().iter().any(|p| p.data.borrow().is_none()))
 }
 
 /// A folder of the picked files (Atlantis II's installed folder, a disc's
@@ -1294,6 +1344,76 @@ fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsVa
         }
     };
     crate::a3_web::start(Arc::new(PickedDir::new(&index, install)), discs, store)
+}
+
+/// The picked image (shallowest first) that holds The Secrets of
+/// Atlantis's DVD (`DATAS.cab` at its root), if any.
+fn a5_image(all: &HashMap<String, File>) -> Option<String> {
+    let mut images: Vec<&String> = all
+        .keys()
+        .filter(|k| crate::web_layout::is_image(k))
+        .collect();
+    images.sort_by_key(|k| (k.matches('/').count(), (*k).clone()));
+    // The images alone in the picked files' table, for the reader.
+    PICKED.with(|p| {
+        let mut p = p.borrow_mut();
+        p.clear();
+        p.extend(images.iter().map(|k| all[*k].clone()));
+    });
+    let found = images.iter().enumerate().find_map(|(i, k)| {
+        let size = all[*k].size() as u64;
+        let img = DiscImage::from_bytes(k.as_str(), Box::new(PickedImage { index: i, size }))?;
+        img.size(atlantis3_data::atlantis5::DATA_CAB)
+            .map(|_| (*k).clone())
+    });
+    PICKED.with(|p| p.borrow_mut().clear());
+    found
+}
+
+/// The browser's storage of The Secrets of Atlantis's saves.
+fn a5_store() -> Rc<dyn SaveStore> {
+    match WebStore::new("atlantis5") {
+        Some(s) => Rc::new(s),
+        None => {
+            log::warn!("no localStorage: the saves last as long as the page");
+            Rc::new(atlantis_engine::MemStore::new())
+        }
+    }
+}
+
+/// Why The Secrets of Atlantis cannot be played from the picked files.
+fn a5_error(e: &atlantis3_data::atlantis5::OpenError) -> JsValue {
+    format!(
+        "The Secrets of Atlantis: {e}.\n\nChoose the DVD's image (.iso), the DVD drive or a \
+         copy of the disc (the folder holding DATAS.cab), or the folder where the game is \
+         installed.\n\nHelp: {}",
+        crate::guide::HELP_URL
+    )
+    .into()
+}
+
+/// The Secrets of Atlantis from its folder among the picked files (a
+/// copy of the DVD, an install, the extracted cabinets), read when the
+/// game reads it, the part it reads.
+fn start_atlantis5(all: HashMap<String, File>, folder: &str) -> Result<(), JsValue> {
+    use atlantis3_data::atlantis5::Atlantis5Source;
+    let index = keep_picked(all);
+    let dir = Arc::new(PickedDir::new(&index, folder));
+    let src = Atlantis5Source::from_folder(dir).map_err(|e| a5_error(&e))?;
+    crate::a5_web::start(src, a5_store())
+}
+
+/// The Secrets of Atlantis from its DVD's image `image` among the picked
+/// files, read a part at a time (never whole: 1.5 GB for the French DVD).
+fn start_atlantis5_image(all: HashMap<String, File>, image: &str) -> Result<(), JsValue> {
+    use atlantis3_data::atlantis5::{Atlantis5Source, Form};
+    let index = keep_picked(all);
+    let &(i, size) = index.get(image).ok_or("the DVD's image")?;
+    let img = DiscImage::from_bytes(image, Box::new(PickedImage { index: i, size }))
+        .ok_or("the DVD's image cannot be read")?;
+    let src =
+        Atlantis5Source::from_disc(Arc::new(img), Form::DiscImage).map_err(|e| a5_error(&e))?;
+    crate::a5_web::start(src, a5_store())
 }
 
 /// Atlantis Evolution's 2004 CD program from its installed folder among
