@@ -415,36 +415,67 @@ impl Fonts {
                 dx: l.dx.clone(),
             })
             .collect();
-        // The coverage first (white on black), then the colour.
-        let mut cover = vec![0u32; w * h];
-        glyphs.draw(&g, &moved, 0x00ff_ffff, &mut cover, w, h);
-        if self.simulated_bold(id) {
+        let bold: Vec<Line> = if self.simulated_bold(id) {
             // GDI's emboldening: the glyph again one pixel to the right
             // [INFERRED: GDI's simulated bold, not measured here].
-            let right: Vec<Line> = moved
+            moved
                 .iter()
                 .map(|l| Line {
                     x: l.x + 1,
                     ..l.clone()
                 })
-                .collect();
-            glyphs.draw(&g, &right, 0x00ff_ffff, &mut cover, w, h);
+                .collect()
+        } else {
+            Vec::new()
+        };
+        // The coverage first (white on black), then the colour; only over
+        // the pixels the glyphs may cover (not the whole screen each time).
+        let union = |a: Option<(i32, i32, i32, i32)>, b: Option<(i32, i32, i32, i32)>| match (a, b)
+        {
+            (Some(a), Some(b)) => Some((a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3))),
+            (a, b) => a.or(b),
+        };
+        let Some((x0, y0, x1, y1)) = union(glyphs.bounds(&g, &moved), glyphs.bounds(&g, &bold))
+        else {
+            return;
+        };
+        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+        let (x0, y0, x1, y1) = (x0.max(0), y0.max(0), x1.min(w as i32), y1.min(h as i32));
+        if x0 >= x1 || y0 >= y1 || out.len() < w * h {
+            return;
+        }
+        #[allow(clippy::cast_sign_loss)]
+        let (x0, y0, bw, bh) = (
+            x0 as usize,
+            y0 as usize,
+            (x1 - x0) as usize,
+            (y1 - y0) as usize,
+        );
+        let mut cover = vec![0u32; bw * bh];
+        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+        let rect = (x0 as i32, y0 as i32, bw, bh);
+        glyphs.draw_in(&g, &moved, 0x00ff_ffff, &mut cover, rect, w, h);
+        if !bold.is_empty() {
+            glyphs.draw_in(&g, &bold, 0x00ff_ffff, &mut cover, rect, w, h);
         }
         let (r, gg, b) = ((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
-        for (px, c) in out.iter_mut().zip(&cover) {
-            let a = (c >> 16) & 0xff;
-            if a == 0 {
-                continue;
-            }
-            if !antialias {
-                if a >= 128 {
-                    *px = (*px & 0xff00_0000) | (rgb & 0x00ff_ffff);
+        for (row, cover) in cover.chunks_exact(bw).enumerate() {
+            let line = &mut out[(y0 + row) * w + x0..][..bw];
+            for (px, c) in line.iter_mut().zip(cover) {
+                let a = (c >> 16) & 0xff;
+                if a == 0 {
+                    continue;
                 }
-                continue;
+                if !antialias {
+                    if a >= 128 {
+                        *px = (*px & 0xff00_0000) | (rgb & 0x00ff_ffff);
+                    }
+                    continue;
+                }
+                let mix = |s: u32, d: u32| (s * a + d * (255 - a)) / 255;
+                let (dr, dg, db) = ((*px >> 16) & 0xff, (*px >> 8) & 0xff, *px & 0xff);
+                *px = (*px & 0xff00_0000) | (mix(r, dr) << 16) | (mix(gg, dg) << 8) | mix(b, db);
             }
-            let mix = |s: u32, d: u32| (s * a + d * (255 - a)) / 255;
-            let (dr, dg, db) = ((*px >> 16) & 0xff, (*px >> 8) & 0xff, *px & 0xff);
-            *px = (*px & 0xff00_0000) | (mix(r, dr) << 16) | (mix(gg, dg) << 8) | mix(b, db);
         }
     }
 
