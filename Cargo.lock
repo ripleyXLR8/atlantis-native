@@ -174,7 +174,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis-app"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "ab_glyph",
  "atlantis-codecs",
@@ -216,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis-codecs"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "atlantis-data",
  "atlantis2-data",
@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis-data"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "encoding_rs",
  "log",
@@ -235,7 +235,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis-engine"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "ab_glyph",
  "atlantis-codecs",
@@ -248,7 +248,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis-sdl"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "atlantis-data",
  "atlantis-engine",
@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis2-data"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "atlantis-data",
  "log",
@@ -268,7 +268,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis2-engine"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "ab_glyph",
  "atlantis-codecs",
@@ -283,7 +283,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis3-data"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "atlantis-codecs",
  "atlantis-data",
@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis3-engine"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "ab_glyph",
  "atlantis-codecs",
@@ -312,7 +312,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis4-data"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "atlantis-data",
  "encoding_rs",
@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis4-engine"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "atlantis-data",
  "atlantis4-data",
@@ -339,7 +339,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis4-gl"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "atlantis4-data",
  "atlantis4-engine",
@@ -352,7 +352,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis4-script"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "atlantis4-data",
  "rilua",
@@ -360,7 +360,7 @@ dependencies = [
 
 [[package]]
 name = "atlantis5-script"
-version = "0.8.1"
+version = "0.9.0"
 dependencies = [
  "atlantis-data",
  "atlantis2-data",
