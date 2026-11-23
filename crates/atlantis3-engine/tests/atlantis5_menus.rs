@@ -673,12 +673,14 @@ fn the_logos_sound_plays() {
     assert_eq!(play.menus.current(), Some(menus::MAIN));
 }
 
-/// A menu opens with the mouse at the screen's centre and no button hot:
-/// the buttons' hit test runs on a mouse move only (@ 0x004523e0), so a
-/// press before any move clicks nothing, even on the button under the
-/// centre (the in-game menu's `option_control`).
+/// A mode opens with one mouse move at the screen's centre (@ 0x0041b780:
+/// the frame's events emptied, @ 0x004546a0(2, 0, w >> 1, h >> 1, 0, 0)
+/// inserted before the mode's process), so the button under the centre
+/// is hot at once: a press without a move clicks it (the in-game menu's
+/// `option_control`, the save page's slot 4). A press in the opening
+/// frame itself is dropped with that frame's events.
 #[test]
-fn a_press_before_any_move_clicks_nothing() {
+fn a_press_before_any_move_clicks_the_button_at_the_centre() {
     let Some(d) = dvd() else { return };
     let dir = scratch("still-mouse");
     let mut play = booted(&d, &dir);
@@ -688,10 +690,38 @@ fn a_press_before_any_move_clicks_nothing() {
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     play.click();
     frames(&mut play, 2);
-    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
-    // A move, then the press: the button under the mouse is clicked.
-    assert!(play.click_menu("option_control"));
-    frames(&mut play, 2);
     assert_eq!(play.menus.current(), Some(menus::CONTROL));
+    click(&mut play, "back");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    // A double click on `save`: the second press, on the page just
+    // opened, saves slot 4.
+    assert!(!dir.join("slot_4").exists());
+    assert!(play.click_menu("save"));
+    // The press's frame closes the in-game menu, the next opens the page.
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    play.click();
+    frames(&mut play, 2);
+    assert!(dir.join("slot_4").is_file(), "slot 4 written");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The opening frame's own presses are dropped (@ 0x0041b780 empties the
+/// frame's event list before it inserts the synthetic move).
+#[test]
+fn a_press_in_the_opening_frame_is_dropped() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("opening-press");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    // Escape and a press in the same frame: the menu opens, the press
+    // (on `option_control`, under the centre) is gone.
+    play.escape();
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     let _ = std::fs::remove_dir_all(&dir);
 }

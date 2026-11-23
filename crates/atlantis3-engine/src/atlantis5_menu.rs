@@ -340,8 +340,9 @@ pub struct Menus {
     examine_item: Vec<u8>,
     pub mouse: (i32, i32),
     /// Where the menu's last hover test was made: the buttons' hit test
-    /// runs on a mouse move only (@ 0x004523e0, event kind 2), so a menu
-    /// just opened has no button under a still mouse.
+    /// runs on a mouse move only (@ 0x004523e0, event kind 2): the
+    /// synthetic move at the centre when a mode opens (@ 0x0041b780), then
+    /// the player's moves.
     last_mouse: (i32, i32),
     clicks: usize,
     /// The saves (a folder, the browser's storage).
@@ -915,16 +916,25 @@ impl Menus {
     /// that ended this frame with nothing queued after it (the manager's
     /// 1: the game manager takes its next request), if any.
     pub fn step(&mut self, dt: f64, fonts: &Fonts, config: &mut Config) -> Option<u32> {
+        let mut opened = false;
         if self.menu.is_none() {
             let mode = self.queue.pop_front()?;
             match self.build(mode, config) {
                 Some(m) => {
                     self.menu = Some(m);
-                    // The mode opens with the mouse at the screen's centre
-                    // and its elements shown (@ 0x00452530: +0x40 = 0;
-                    // @ 0x0044ec50: +0x8c = 0): no move yet.
+                    // @ 0x0041b780: the mouse put at the screen's centre
+                    // (@ 0x0040d890(w >> 1, h >> 1)), the mode's
+                    // Initialize, then the frame's event list emptied and
+                    // one mouse move (kind 2) at the centre inserted
+                    // (@ 0x004546a0(2, 0, w >> 1, h >> 1, 0, 0),
+                    // @ 0x00412cc0) before the mode's process. Every
+                    // ported mode's first state lays out and reaches
+                    // @ 0x0040d920, so the button under the centre is hot
+                    // from the opening frame, and that frame's own
+                    // presses are dropped.
                     self.mouse = (W / 2, H / 2);
-                    self.last_mouse = self.mouse;
+                    self.clicks = 0;
+                    opened = true;
                     if mode == DEATH {
                         // @ 0x00410bd0: the music stopped with a 0.5 s
                         // fade, `death_theme` on channel 4.
@@ -954,17 +964,20 @@ impl Menus {
         // The hit test on a move only (@ 0x004523e0 tests on an event of
         // kind 2 and keeps the result in +0x40; the text button
         // @ 0x0044eb60 turns 1 on a move with it, the sprite button
-        // @ 0x0044f0e0 likewise): a press under a still mouse finds no
-        // button hot.
-        if mouse != self.last_mouse {
+        // @ 0x0044f0e0 likewise): the opening frame's synthetic move, then
+        // the player's moves. A button shown later is not hot until a move
+        // (`Menu::set_visible`).
+        if opened || mouse != self.last_mouse {
             menu.hover(mouse);
             self.last_mouse = mouse;
         }
         // The original takes a frame's events in turn (@ 0x0040d920), but
-        // at the screen's refresh two presses never share a frame: the one
-        // that closes the menu is its last. A long Native frame holding
-        // several drops those after it (a double click would click the
-        // same button twice: two new games, two save pages).
+        // at the screen's refresh two presses never share a frame, so the
+        // one that closes the menu is always its frame's last. Only a long
+        // Native frame can hold several; the presses after the closing one
+        // are dropped (else a double click would click the same button
+        // twice: two new games, two save pages). This changes nothing the
+        // original does.
         for _ in 0..clicks {
             if menu.closed {
                 break;
