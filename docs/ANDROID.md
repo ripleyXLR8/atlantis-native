@@ -51,9 +51,9 @@ Either of these:
   Framework. Nothing is copied.
 
   From The Secrets of Atlantis's cabinets (its DVD's files or image),
-  the screen stays black at the first start while the films' folder is
-  decoded up to the logos (about 460 MB with the French DVD), as on the
-  desktop. The cabinets' checkpoints are then kept in the app's internal
+  the first start shows a bar on a black screen while the films' folder
+  is decoded up to the logos (about 430 MB with the French DVD), as on
+  the desktop and the web. The cabinets' checkpoints are then kept in the app's internal
   storage (`atlantis-native/atlantis5/cabinets`), so a later start, or
   a read deep in a folder, is quicker. The unpacked `Datas` tree needs
   none of this.
