@@ -28,6 +28,9 @@ Options:
   --evolution2004 <folder> [--fullscreen]  play Atlantis Evolution's 2004 CD installation
   --atlantis5 <disc, image or folder> [--fullscreen] [--headless] [--screenshot <file.png>]
                              The Secrets of Atlantis (2006): its logos, main menu and game
+  --atlantis5-install <disc or image>
+                             copy The Secrets of Atlantis's DVD to this computer (about 1.4 GB)
+                             and play it from there (the game library's Copy to this computer)
 
 Data folder (saves, settings, game library, log), the first that applies:
   1. --data-dir <folder>

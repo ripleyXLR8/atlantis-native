@@ -26,6 +26,9 @@ pub struct LauncherEntry {
     pub found: bool,
     /// The game the folder holds (or held), when known: its badge.
     pub kind: Option<GameKind>,
+    /// The game is read from its disc and can be copied to the computer
+    /// (The Secrets of Atlantis's DVD or its image, [`crate::a5_copy`]).
+    pub copyable: bool,
 }
 
 /// The keys the screen reads.
@@ -78,6 +81,10 @@ pub enum LauncherAction {
     Find,
     /// Take entry `i` off the list.
     Remove(usize),
+    /// Copy entry `i`'s disc to the computer.
+    Copy(usize),
+    /// Stop the copy running.
+    CancelCopy,
     /// Open the project's Buy Me a Coffee page.
     Support,
     Quit,
@@ -99,6 +106,9 @@ const MESSAGE_Y: f32 = (BUTTON_Y + BUTTON_H + 22) as f32;
 /// The link to the project's Buy Me a Coffee page, above the help line.
 const SUPPORT_TEXT: &str = "Enjoying Atlantis Native? Buy me a coffee";
 const SUPPORT_BASE: f32 = 447.0;
+/// The link that copies the selected disc to the computer, at the right
+/// of its row's path line.
+const COPY_TEXT: &str = "Copy to this computer";
 const HELP_BASE: f32 = 469.0;
 /// Two clicks on a row this close (ms) play it.
 const DOUBLE_CLICK_MS: u64 = 500;
@@ -119,6 +129,7 @@ const BUTTON_OFF: Style = Style {
 };
 const MESSAGE: Style = Style::italic(13.5, art::MUTED);
 const SUPPORT: Style = Style::body(13.5, art::LINK);
+const COPY_LINK: Style = Style::body(12.0, art::LINK);
 const HELP: Style = Style::body(11.5, art::MUTED);
 
 /// An entry's label as the game's name and the rest (the edition, or why
@@ -192,6 +203,9 @@ pub struct Launcher {
     message: String,
     /// The row and time of the last click, for the double click.
     last_click: Option<(usize, u64)>,
+    /// A copy to the computer is running: only Escape (its cancel) and
+    /// closing the window are taken.
+    busy: bool,
 }
 
 impl Launcher {
@@ -229,6 +243,30 @@ impl Launcher {
         self.focus
     }
 
+    /// A copy runs (true) or ended.
+    pub fn set_busy(&mut self, busy: bool) {
+        self.busy = busy;
+        self.hover = None;
+        self.focus = None;
+    }
+
+    pub fn busy(&self) -> bool {
+        self.busy
+    }
+
+    /// The copy link's rectangle (x, y, w, h) when the selected entry is
+    /// shown and can be copied.
+    fn copy_rect(&self) -> Option<(i32, i32, i32, i32)> {
+        let e = self.entries.get(self.selected)?;
+        if !e.copyable || !e.found || self.busy || self.selected < self.scroll {
+            return None;
+        }
+        let row = (self.selected - self.scroll) as i32;
+        let w = art::width(&COPY_LINK, COPY_TEXT).ceil() as i32;
+        let right = LIST_X + LIST_W - if self.entries.len() > VISIBLE { 18 } else { 12 };
+        Some((right - w, LIST_Y + row * ROW_H + 22, w, 16))
+    }
+
     fn select(&mut self, i: usize) {
         self.selected = i.min(self.entries.len().saturating_sub(1));
         if self.selected < self.scroll {
@@ -245,6 +283,9 @@ impl Launcher {
 
     /// Whether `b` can be pressed now.
     fn enabled(&self, b: Button) -> bool {
+        if self.busy {
+            return false;
+        }
         match b {
             Button::Play | Button::Remove => !self.entries.is_empty(),
             _ => true,
@@ -301,6 +342,13 @@ impl Launcher {
     /// Delete removes it, A adds a folder, F finds installations, Escape
     /// quits.
     pub fn key(&mut self, key: LauncherKey) -> LauncherAction {
+        if self.busy {
+            return if key == LauncherKey::Escape {
+                LauncherAction::CancelCopy
+            } else {
+                LauncherAction::None
+            };
+        }
         let page = VISIBLE - 1;
         match key {
             LauncherKey::Up => self.select(self.selected.saturating_sub(1)),
@@ -322,6 +370,7 @@ impl Launcher {
             LauncherKey::Char(c) => match c.to_ascii_lowercase() {
                 'a' => return LauncherAction::Add,
                 'f' => return LauncherAction::Find,
+                'c' if self.copy_rect().is_some() => return LauncherAction::Copy(self.selected),
                 'q' => return LauncherAction::Quit,
                 _ => {}
             },
@@ -348,13 +397,22 @@ impl Launcher {
     /// The pointer moved to a 640x480 screen point: the button under it
     /// lights up.
     pub fn pointer(&mut self, x: i32, y: i32) {
-        self.hover = Self::button_at(x, y);
+        self.hover = Self::button_at(x, y).filter(|_| !self.busy);
     }
 
     /// A left click at a 640x480 screen point at `now_ms`: a row is
     /// selected (a second click on it soon after plays it), a button
     /// pressed.
     pub fn click(&mut self, x: i32, y: i32, now_ms: u64) -> LauncherAction {
+        if self.busy {
+            return LauncherAction::None;
+        }
+        if let Some((cx, cy, cw, ch)) = self.copy_rect() {
+            if (cx..cx + cw).contains(&x) && (cy..cy + ch).contains(&y) {
+                self.last_click = None;
+                return LauncherAction::Copy(self.selected);
+            }
+        }
         if let Some(i) = self.row_at(x, y) {
             let double = self
                 .last_click
@@ -386,6 +444,9 @@ impl Launcher {
 
     /// The mouse wheel: `rows` down (negative: up).
     pub fn wheel(&mut self, rows: i32) {
+        if self.busy {
+            return;
+        }
         let max = self.entries.len().saturating_sub(VISIBLE) as i64;
         self.scroll = (self.scroll as i64 + i64::from(rows)).clamp(0, max) as usize;
     }
@@ -510,11 +571,19 @@ impl Launcher {
                 let r = art::fit_right(&rest_style, rest, w);
                 items.push(Item::text(rest_style, &r, x, line));
             }
-            let path = art::fit_left(
-                &PATH,
-                &e.path.display().to_string(),
-                (right - text_x) as f32,
-            );
+            let mut path_w = (right - text_x) as f32;
+            if sel {
+                if let Some((lx, ly, lw, _)) = self.copy_rect() {
+                    items.push(Item::text(
+                        COPY_LINK,
+                        COPY_TEXT,
+                        lx as f32,
+                        (ly + 12) as f32,
+                    ));
+                    path_w -= lw as f32 + 14.0;
+                }
+            }
+            let path = art::fit_left(&PATH, &e.path.display().to_string(), path_w);
             items.push(Item::text(PATH, &path, text_x as f32, (y + 34) as f32));
         }
         // A scroll bar when the list is longer than the tablet.
@@ -553,8 +622,13 @@ impl Launcher {
             items.push(centred(&MESSAGE, &m, MESSAGE_Y));
         }
         items.push(centred(&SUPPORT, SUPPORT_TEXT, SUPPORT_BASE));
-        let t =
-            "Arrows choose \u{b7} Enter or double-click plays \u{b7} Del removes \u{b7} Esc quits";
+        let t = if self.busy {
+            "Esc cancels the copy (what is copied already is kept)"
+        } else if self.copy_rect().is_some() {
+            "Arrows choose \u{b7} Enter plays \u{b7} C copies to this computer \u{b7} Esc quits"
+        } else {
+            "Arrows choose \u{b7} Enter or double-click plays \u{b7} Del removes \u{b7} Esc quits"
+        };
         items.push(centred(&HELP, t, HELP_BASE));
         items
     }
@@ -575,6 +649,7 @@ mod tests {
             },
             found,
             kind: Some(GameKind::LostTales),
+            copyable: false,
         }
     }
 
@@ -785,6 +860,7 @@ mod tests {
             label: label.to_string(),
             found,
             kind,
+            copyable: false,
         };
         let a2 = Some(GameKind::Atlantis2);
         let a3 = Some(GameKind::Atlantis3);
@@ -813,6 +889,38 @@ mod tests {
             split_label(&e("Not found: gone", false, None)),
             (None, "Not found: gone")
         );
+    }
+
+    #[test]
+    fn a_disc_offers_its_copy_and_the_copy_holds_the_screen() {
+        let mut l = three();
+        assert_eq!(l.copy_rect(), None);
+        assert_eq!(l.key(LauncherKey::Char('c')), LauncherAction::None);
+        let mut entries = l.entries().to_vec();
+        entries[2].copyable = true;
+        entries[2].kind = Some(GameKind::Atlantis5);
+        l.set_entries(entries, 0);
+        // Offered on the selected row only.
+        assert_eq!(l.copy_rect(), None);
+        l.key(LauncherKey::End);
+        let (x, y, w, h) = l.copy_rect().unwrap();
+        assert!(x > LIST_X + LIST_W / 2 && y > row_y(2) && y + h <= LIST_Y + 3 * ROW_H);
+        let mut bare = vec![0u16; SCREEN_W * SCREEN_H];
+        assert!(texts(&l.draw_scene(&mut bare)).contains(&COPY_TEXT));
+        assert_eq!(l.click(x + w / 2, y + h / 2, 0), LauncherAction::Copy(2));
+        assert_eq!(l.key(LauncherKey::Char('C')), LauncherAction::Copy(2));
+        // While it copies: Escape cancels, the rest waits.
+        l.set_busy(true);
+        assert_eq!(l.copy_rect(), None);
+        assert_eq!(l.key(LauncherKey::Enter), LauncherAction::None);
+        assert_eq!(l.key(LauncherKey::Delete), LauncherAction::None);
+        assert_eq!(l.key(LauncherKey::Escape), LauncherAction::CancelCopy);
+        let (bx, by) = button_centre(Button::Quit);
+        assert_eq!(l.click(bx, by, 10_000), LauncherAction::None);
+        assert_eq!(l.click(LIST_X + 50, row_y(0), 20_000), LauncherAction::None);
+        assert_eq!(l.selected(), 2);
+        l.set_busy(false);
+        assert_eq!(l.key(LauncherKey::Escape), LauncherAction::Quit);
     }
 
     #[test]

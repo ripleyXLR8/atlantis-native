@@ -120,6 +120,8 @@ pub struct Session {
     atlantis4: Option<PathBuf>,
     /// The same for The Secrets of Atlantis.
     atlantis5: Option<PathBuf>,
+    /// The Secrets of Atlantis's disc being copied to the computer.
+    copy: Option<crate::a5_copy::Job>,
 }
 
 impl Session {
@@ -148,6 +150,7 @@ impl Session {
             atlantis3: None,
             atlantis4: None,
             atlantis5: None,
+            copy: None,
         }
     }
 
@@ -488,6 +491,54 @@ impl App {
         true
     }
 
+    /// The copy of a disc to the computer, while one runs: its progress
+    /// on the game library's screen, then its end (the library's entry
+    /// moved to the copy). True while it runs and at its end (the screen
+    /// is to be drawn again).
+    pub(crate) fn poll_copy(&mut self) -> bool {
+        let Some(session) = &mut self.session else {
+            return false;
+        };
+        let Some(job) = &mut session.copy else {
+            return false;
+        };
+        let Some(result) = job.result() else {
+            let status = job.status();
+            session.message(status);
+            return true;
+        };
+        let (from, dest) = (job.from.clone(), job.dest.clone());
+        session.copy = None;
+        if let Some(l) = &mut session.launcher {
+            l.set_busy(false);
+        }
+        match result {
+            Ok(()) => {
+                log::info!("{}: copied to {}", from.display(), dest.display());
+                let at = match session.library.position(&from) {
+                    Some(i) => session.library.relocate(i, &dest),
+                    None => {
+                        session.library.add(&dest);
+                        session.library.position(&dest).unwrap_or(0)
+                    }
+                };
+                session.library.save_logged(&session.data_dir);
+                session.refresh(at, &desktop::describe);
+                session.message("Copied: the game now plays from this computer, without the disc");
+            }
+            Err(crate::a5_copy::CopyError::Cancelled) => {
+                log::info!("{}: copy cancelled", from.display());
+                session
+                    .message("Copy cancelled (the files copied whole are kept for the next try)");
+            }
+            Err(e) => {
+                log::warn!("{}: the copy failed: {e}", from.display());
+                session.message(format!("The copy failed: {e}"));
+            }
+        }
+        true
+    }
+
     /// Carries out an action of the game library's screen.
     fn launcher_action(&mut self, el: &ActiveEventLoop, action: LauncherAction) {
         if action == LauncherAction::Quit {
@@ -605,6 +656,32 @@ impl App {
                 };
                 log::info!("{text}");
                 session.message(text);
+            }
+            LauncherAction::Copy(i) => {
+                let Some(dir) = session.library.folders().get(i).cloned() else {
+                    return;
+                };
+                if session.copy.is_some() {
+                    return;
+                }
+                match crate::a5_copy::Job::start(&dir, &crate::a5_copy::copy_dir()) {
+                    Ok(job) => {
+                        log::info!("copying {} to {}", dir.display(), job.dest.display());
+                        session.message(job.status());
+                        if let Some(l) = &mut session.launcher {
+                            l.set_busy(true);
+                        }
+                        session.copy = Some(job);
+                    }
+                    Err(e) => session.message(format!("The copy cannot start: {e}")),
+                }
+            }
+            LauncherAction::CancelCopy => {
+                if let Some(job) = &session.copy {
+                    job.cancel();
+                    let status = job.status();
+                    session.message(status);
+                }
             }
             LauncherAction::Remove(i) => {
                 if let Some(dir) = session.library.remove(i) {
@@ -932,6 +1009,57 @@ mod tests {
         assert!(s.wants_atlantis5() && s.wants_own_mode() && !s.wants_atlantis4());
         assert_eq!(app.session_mut().unwrap().take_atlantis5(), Some(dvd));
         assert!(!app.session().unwrap().wants_own_mode());
+    }
+
+    /// The Secrets of Atlantis's disc copied to the computer from the game
+    /// library (a fake disc whose cabinets open): the screen held while it
+    /// copies, then the entry moved to the copy, which is no longer
+    /// offered for a copy.
+    #[test]
+    fn the_library_copies_atlantis5s_disc() {
+        let own = own_data_dir("atlantis5-copy");
+        let d = own.dir.clone();
+        let disc = d.join("dvd");
+        crate::a5_copy::tests::fake_disc(&disc);
+        std::fs::write(d.join("games.txt"), format!("{}\n", disc.display())).unwrap();
+        let mut app = app_with_library(&d);
+        app.show_launcher(None);
+        let e = &app.session().unwrap().launcher().unwrap().entries()[0];
+        assert!(e.found && e.copyable, "{e:?}");
+        assert!(e.label.ends_with("(2006), DVD, French"), "{}", e.label);
+        app.run_launcher_action(LauncherAction::Copy(0));
+        assert!(app.session().unwrap().launcher().unwrap().busy());
+        let t0 = Instant::now();
+        while app.session().unwrap().launcher().unwrap().busy() {
+            assert!(app.poll_copy());
+            assert!(
+                t0.elapsed() < Duration::from_secs(30),
+                "the copy does not end"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        assert!(!app.poll_copy());
+        let copy = crate::a5_copy::copy_dir();
+        assert!(copy.starts_with(&d));
+        let s = app.session().unwrap();
+        let l = s.launcher().unwrap();
+        assert!(l.message().starts_with("Copied"), "{}", l.message());
+        assert_eq!(s.library.folders(), std::slice::from_ref(&copy));
+        let e = &l.entries()[0];
+        assert!(e.found && !e.copyable, "{e:?}");
+        assert!(
+            e.label
+                .ends_with("(2006), DVD, copied to this computer, French"),
+            "{}",
+            e.label
+        );
+        assert_eq!(
+            std::fs::read_to_string(d.join("games.txt")).unwrap(),
+            format!("{}\n", copy.display())
+        );
+        // The copy is the game: played from there.
+        app.run_launcher_action(LauncherAction::Play(0));
+        assert_eq!(app.session_mut().unwrap().take_atlantis5(), Some(copy));
     }
 
     /// Atlantis Evolution's 2004 CD in the game library: its installation

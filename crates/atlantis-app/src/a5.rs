@@ -58,11 +58,22 @@ pub fn open(path: &Path) -> Result<(Atlantis5Source, String), String> {
 /// How the game library shows the data at `path`: the game's name, the
 /// year, the medium and the language ("The Secrets of Atlantis : L'Héritage
 /// sacré (2006), DVD, French"); with the DVD's image, "DVD image"; with
-/// an install or the extracted cabinets, "DVD, installed".
+/// an install or the extracted cabinets, "DVD, installed"; with the
+/// copy of the disc's files made by [`crate::a5_copy`], "DVD, copied to
+/// this computer".
 pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError> {
+    edition(path).map(|e| e.0)
+}
+
+/// [`label`], and whether the data are read from the disc (a drive or a
+/// copy of its files elsewhere than [`crate::a5_copy::copy_dir`], or its
+/// image): what the game library offers to copy to the computer.
+pub fn edition(path: &Path) -> Result<(String, bool), atlantis3_data::atlantis5::OpenError> {
     use atlantis3_data::atlantis5::Form;
     let src = Atlantis5Source::open(path)?;
+    let copy = crate::a5_copy::is_copy(path);
     let medium = match src.form() {
+        Form::DiscFolder if copy => "DVD, copied to this computer",
         Form::DiscFolder => "DVD",
         Form::DiscImage => "DVD image",
         Form::Tree => "DVD, installed",
@@ -74,10 +85,11 @@ pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError
         lang_name.extend(c.to_uppercase());
         lang_name.extend(chars);
     }
-    Ok(format!(
+    let label = format!(
         "{} (2006), {medium}, {lang_name}",
         crate::setup::GameKind::Atlantis5.name()
-    ))
+    );
+    Ok((label, src.form() != Form::Tree && !copy))
 }
 
 /// The first view's picture (1024 × 576 x8r8g8b8).
