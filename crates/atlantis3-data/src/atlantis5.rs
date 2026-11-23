@@ -212,6 +212,26 @@ impl Atlantis5Source {
         Err(OpenError::NotTheGame)
     }
 
+    /// The disc's root at `path` when the data there are the disc's
+    /// cabinets (a drive or a copy of its files, its image, or a folder
+    /// holding the image): what [`Atlantis5Source::open`] reads them from.
+    /// `None` for an install, the extracted cabinets, or no game.
+    pub fn disc_root(path: &Path) -> Option<Arc<dyn FileSource>> {
+        if path.is_file() {
+            let img = DiscImage::open(path)?;
+            return img.size(DATA_CAB).is_some().then(|| Arc::new(img) as _);
+        }
+        let dir = StdDir::new(path);
+        if dir.size(DATA_CAB).is_some() {
+            return Some(Arc::new(dir));
+        }
+        if dir.has_dir("datas/scenes") || dir.has_dir("scenes") {
+            return None;
+        }
+        let set = DiscSet::open_folder(path)?;
+        set.size(DATA_CAB).is_some().then(|| Arc::new(set) as _)
+    }
+
     /// The data in folder `dir` (the disc's root or a copy of it, an
     /// install, the extracted cabinets, or `Datas` itself; not an image).
     pub fn from_folder(dir: Arc<dyn FileSource>) -> Result<Atlantis5Source, OpenError> {
@@ -251,16 +271,7 @@ impl Atlantis5Source {
         };
         let main = open(DATA_CAB).map_err(|e| OpenError::Cabinet(e.to_string()))?;
         let mut cabs = vec![main];
-        let mut names: Vec<String> = src
-            .list("")
-            .into_iter()
-            .filter(|n| {
-                let l = n.to_ascii_lowercase();
-                l.starts_with("datas_") && l.ends_with(".cab")
-            })
-            .collect();
-        names.sort_by_key(|n| n.to_ascii_lowercase());
-        for n in names {
+        for n in language_cabinets(&*src) {
             match open(&n) {
                 Ok(c) => cabs.push(c),
                 Err(e) => log::warn!("{n}: {e}"),
@@ -407,6 +418,34 @@ pub mod folder {
     pub const VIDEOS: &str = "datas/videos/";
     pub const WARPS: &str = "datas/warps/";
     pub const SAVES: &str = "datas/saves/";
+}
+
+/// The languages' cabinets in the disc's root `src` (`DATAS_<language>.cab`,
+/// any case), in name order.
+pub fn language_cabinets(src: &dyn FileSource) -> Vec<String> {
+    let mut names: Vec<String> = src
+        .list("")
+        .into_iter()
+        .filter(|n| {
+            let l = n.to_ascii_lowercase();
+            l.starts_with("datas_") && l.ends_with(".cab")
+        })
+        .collect();
+    names.sort_by_key(|n| n.to_ascii_lowercase());
+    names
+}
+
+/// The disc's files the game needs, in its root `src`: `DATAS.cab`, the
+/// languages' cabinets and, when the disc has it, the program (which says
+/// the edition, [`Atlantis5Source::build`]). Copied to a folder, they open
+/// as the disc's files ([`Form::DiscFolder`]).
+pub fn disc_files(src: &dyn FileSource) -> Vec<String> {
+    let mut names = vec![DATA_CAB.to_string()];
+    names.extend(language_cabinets(src));
+    if src.size(EXE_NAME).is_some() {
+        names.push(EXE_NAME.to_string());
+    }
+    names
 }
 
 /// The three text tables of `language` (@ 0x0043d910: the folder, the

@@ -379,9 +379,13 @@ pub fn edition_label(game: &Game, from_images: bool) -> String {
 /// it does not open.
 pub fn describe(dir: &Path) -> LauncherEntry {
     let kind = setup::kind_of(dir);
+    let mut copyable = false;
     let (label, found) = if kind == Some(GameKind::Atlantis5) {
-        match crate::a5::label(dir) {
-            Ok(label) => (label, true),
+        match crate::a5::edition(dir) {
+            Ok((label, disc)) => {
+                copyable = disc;
+                (label, true)
+            }
             Err(e) => {
                 log::info!("{}: {e}", dir.display());
                 (
@@ -461,6 +465,7 @@ pub fn describe(dir: &Path) -> LauncherEntry {
         label,
         found,
         kind: kind.or_else(|| dvd_language_of(dir).map(|_| GameKind::LostTales)),
+        copyable,
     }
 }
 

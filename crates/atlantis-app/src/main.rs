@@ -95,6 +95,10 @@
 //! it too, and the game library finds and opens it (its saves in the
 //! `atlantis5/saves` folder of the per-user data folder). The other
 //! games' options but `--fullscreen` are refused in this mode.
+//! `--atlantis5-install <disc or image>` copies its DVD's cabinets and
+//! program to the `atlantis5/disc` folder of the per-user data folder and
+//! puts that copy in the game library in place of the disc (the library's
+//! "Copy to this computer").
 //!
 //! `atlantis-native --list-games` prints the games found on the computer
 //! (every game: what the library's "Find installations" adds) and ends.
@@ -235,6 +239,23 @@ fn main() {
         if let Err(e) = atlantis_app::a3::run_evolution_2004(Path::new(dir), fullscreen) {
             error_box(&e);
             std::process::exit(1);
+        }
+        return;
+    }
+    // Atlantis V: its disc (a drive, a copy of its files, its image)
+    // copied to the per-user data folder, the library's entry moved to the
+    // copy (the game library's "Copy to this computer").
+    if args.first().map(String::as_str) == Some("--atlantis5-install") {
+        let Some(path) = args.get(1).filter(|a| !a.starts_with("--")) else {
+            eprintln!("--atlantis5-install <disc or image>");
+            std::process::exit(2);
+        };
+        match atlantis_app::a5_copy::install_cli(Path::new(path)) {
+            Ok(dest) => println!("The game now plays from {}", dest.display()),
+            Err(e) => {
+                eprintln!("{e}");
+                std::process::exit(1);
+            }
         }
         return;
     }
