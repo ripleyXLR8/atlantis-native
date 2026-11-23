@@ -544,3 +544,53 @@ fn a_film_freezes_the_view_s_sprites() {
     frames(&mut play, 60);
     assert_ne!(play.stage().sprites(), before);
 }
+
+/// The scripts' `Atl_Address_Go` to a view of any scene, without a
+/// transition.
+fn go_to(play: &mut Play, scene: &str, view: i32) {
+    assert!(play.game.run_string(&format!(
+        "return function() Atl_Address_Go(\"{scene}\", {view}, \"no_fx\") end"
+    )));
+    for _ in 0..60 {
+        frames(play, 1);
+        if play.stage().address() == Some((scene.as_bytes().to_vec(), view)) && !play.game.busy() {
+            break;
+        }
+    }
+    assert_eq!(
+        play.stage().address(),
+        Some((scene.as_bytes().to_vec(), view))
+    );
+}
+
+/// A persistent sprite's record lives on through a view without its
+/// `z1` file (@ 0x004424d0: the next record, nothing erased) and is made
+/// even when the view of the call has none (@ 0x0040ba20 →
+/// 0x00442290 first): it shows again in the next view that has it.
+#[test]
+fn a_persistent_sprite_crosses_a_view_without_its_file() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    let lightning = |play: &Play| {
+        play.stage()
+            .sprites()
+            .iter()
+            .any(|s| s.0 == "floor12_lightning")
+    };
+    // etage12 view 3 has no floor12_lightning file; view 4 has one.
+    go_to(&mut play, "etage12", 3);
+    assert!(play
+        .game
+        .run_string("return function() Atl_PersistantSprite_Play(\"floor12_lightning\", 10) end"));
+    frames(&mut play, 1);
+    assert!(!lightning(&play));
+    go_to(&mut play, "etage12", 4);
+    assert!(
+        lightning(&play),
+        "the record made in view 3 shows in view 4"
+    );
+    go_to(&mut play, "etage12", 3);
+    assert!(!lightning(&play));
+    go_to(&mut play, "etage12", 4);
+    assert!(lightning(&play), "the record kept through view 3");
+}

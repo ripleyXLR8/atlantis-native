@@ -605,8 +605,9 @@ pub struct Stage {
     /// @ 0x0042cf80 or a turn's step, through the setters @ 0x004444c0 →
     /// 0x0048a5a0 / 0x0048aa90). `None`: the angles' rotation.
     cam_override: Option<Quat>,
-    /// Persistent sprites: object, priority, seconds played.
-    persistent: Vec<(Vec<u8>, i32, f64)>,
+    /// Persistent sprites' records (@ 0x00442290: the object and its
+    /// seconds played; no priority, they come back at 0).
+    persistent: Vec<(Vec<u8>, f64)>,
     music: [MusicChannel; MUSIC_CHANNELS],
     music_tick: f64,
     /// The program's own CRT `rand` (statically linked, `_rand`
@@ -897,17 +898,20 @@ impl Stage {
         // change drops the sprites and the randomize records
         // (@ 0x0044b8d0 → 0x004421a0 → 0x00443730); the persistent ones
         // come back (@ 0x004424d0): each object's `z1` of the new view if
-        // the file exists, with its time played, while it is not over.
+        // the file exists, inserted with priority 0 and the persistent
+        // flag (0x00441830(file, 0, 1)), with its time played, while it is
+        // not over. A record whose file the view has not is kept
+        // (GetFileAttributesA = −1 goes to the next record, LAB_004426cf),
+        // its time still growing, for a later view that has it.
         if scene_changed {
             self.persistent.clear();
         }
         self.sprites.clear();
         self.randomized.clear();
-        let persistent = std::mem::take(&mut self.persistent);
-        for (object, priority, time) in persistent {
-            if let Some(s) = self.add_sprite(&object, b"z1", Mode::Stop, priority, true) {
+        let persistent = self.persistent.clone();
+        for (object, time) in persistent {
+            if let Some(s) = self.add_sprite(&object, b"z1", Mode::Stop, 0, true) {
                 s.time = time;
-                self.persistent.push((object, priority, time));
             }
         }
         Ok(())
@@ -1760,7 +1764,7 @@ impl Stage {
     /// the throw ends the step there (the sprites after it not stepped).
     fn sprites_step(&mut self, dt: f64) -> bool {
         for p in &mut self.persistent {
-            p.2 += dt;
+            p.1 += dt;
         }
         // Each sprite in list order; one over goes on with its object's
         // randomize record (@ 0x004432c0), or is removed with its
@@ -3254,15 +3258,16 @@ impl Engine for Stage {
                 self.randomized.retain(|r| &r.object != object);
             }
             Call::PersistantSpritePlay { object, priority } => {
-                // @ 0x0040ba20: once only; the `z1` of the view played
-                // with the player's default mode (1, stop, @ 0x00448c30).
+                // @ 0x0040ba20: once only; the record made first
+                // (@ 0x00442290(name, 0), whether the view has the file or
+                // not), then the `z1` of the view inserted with the call's
+                // priority (@ 0x00441830) and the player's default mode
+                // (1, stop, @ 0x00448c30).
                 if self.persistent.iter().any(|p| &p.0 == object) {
                     log::info!("persistent sprite {} already", lossy(object));
-                } else if self
-                    .add_sprite(object, b"z1", Mode::Stop, *priority, true)
-                    .is_some()
-                {
-                    self.persistent.push((object.clone(), *priority, 0.0));
+                } else {
+                    self.persistent.push((object.clone(), 0.0));
+                    let _ = self.add_sprite(object, b"z1", Mode::Stop, *priority, true);
                 }
             }
             Call::PersistantSpriteStop { object } => {
@@ -3494,7 +3499,7 @@ impl Engine for Stage {
             sound.children.push(p);
         }
         let mut ps = element("PERSISTANT_SPRITES");
-        for (object, _, time) in &self.persistent {
+        for (object, time) in &self.persistent {
             let mut e = element("PS");
             e.attributes
                 .push(("name".into(), atlantis4_data::xml::cp1252(object)));
@@ -3545,7 +3550,7 @@ impl Engine for Stage {
                 .children_named("PS")
                 .filter_map(|e| {
                     let name = atlantis4_data::xml::to_cp1252(e.attr("name")?);
-                    Some((name, 0, get_f64(e, "time").unwrap_or(0.0)))
+                    Some((name, get_f64(e, "time").unwrap_or(0.0)))
                 })
                 .collect();
         }
