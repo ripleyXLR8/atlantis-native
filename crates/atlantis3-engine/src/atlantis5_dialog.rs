@@ -385,6 +385,16 @@ impl Fonts {
         (n + 1) * g.tm_height
     }
 
+    /// The height of `text` not partitioned (@ 0x00461800 with its last
+    /// argument 0: only the text's own `\n` counted): (the number of `\n`
+    /// + 1) × tmHeight.
+    pub fn text_height_raw(&self, id: &str, text: &str) -> i32 {
+        let Some(g) = self.gdi(id) else { return 0 };
+        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+        let n = text.chars().filter(|&c| c == '\n').count() as i32;
+        (n + 1) * g.tm_height
+    }
+
     /// Draws `lines` of font `id` in `rgb` at offset (ox, oy) into `out`
     /// (`w` × `h`): blended by the glyphs' coverage for an antialiased
     /// font, else each pixel covered at least half drawn whole (GDI's

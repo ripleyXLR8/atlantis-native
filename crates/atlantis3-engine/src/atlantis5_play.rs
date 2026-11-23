@@ -4362,7 +4362,15 @@ impl Play {
             let mouse = self.menus.mouse;
             let closed = {
                 let stage = self.stage.clone();
-                let measure = |f: &str, t: &str, w: i32| stage.borrow().fonts.text_height(f, t, w);
+                // @ 0x00461800's last argument: partitioned at `w` or not.
+                let measure = |f: &str, t: &str, w: i32, partition: bool| {
+                    let st = stage.borrow();
+                    if partition {
+                        st.fonts.text_height(f, t, w)
+                    } else {
+                        st.fonts.text_height_raw(f, t)
+                    }
+                };
                 let mut host = PokerHost {
                     game: &mut self.game,
                     stage: &self.stage,

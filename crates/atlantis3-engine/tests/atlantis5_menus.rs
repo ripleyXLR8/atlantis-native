@@ -463,6 +463,39 @@ fn the_examine_view_shows_an_item_and_scrolls() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The credits page (@ 0x0040e750) measures `title` and `names` with
+/// @ 0x00461800(W, font, text, 0): not partitioned, so a line wider than
+/// the screen counts as one line for their places (the text is still
+/// drawn partitioned).
+#[test]
+fn the_credits_place_their_texts_by_their_own_lines() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("credits-wide");
+    let mut play = booted(&d, &dir);
+    let wide = "abcdefgh ".repeat(300);
+    for (id, text) in &mut play.menus.strings.strings {
+        if id == "_credits_start_name" || id == "_credits_start" {
+            *text = wide.clone();
+        }
+    }
+    click(&mut play, "credits");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::CREDITS));
+    let (one_name, one_title, wrapped) = {
+        let st = play.stage();
+        (
+            st.fonts.text_height("AtlFont_Credit", "x", 1024),
+            st.fonts.text_height("AtlFont_CreditTitle", "x", 1024),
+            st.fonts.text_height("AtlFont_Credit", &wide, 1024),
+        )
+    };
+    assert!(wrapped > one_name, "the test's line wraps");
+    let y = (VIEW_HEIGHT as i32 - one_name) / 2;
+    assert_eq!(element(&play, "names").3, y);
+    assert_eq!(element(&play, "title").3, y - one_title - 0x14);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_credits_turn_their_pages() {
     let Some(d) = dvd() else { return };

@@ -1037,8 +1037,10 @@ impl Menus {
             .get(&format!("_credits_{key}_name"))
             .unwrap_or("")
             .to_string();
-        let ht = fonts.text_height("AtlFont_CreditTitle", &title, W);
-        let hn = fonts.text_height("AtlFont_Credit", &names, W);
+        // @ 0x00461800(W, font, text, 0) for both: not partitioned (the
+        // texts are drawn partitioned all the same).
+        let ht = fonts.text_height_raw("AtlFont_CreditTitle", &title);
+        let hn = fonts.text_height_raw("AtlFont_Credit", &names);
         let y = (H - hn) / 2;
         m.set_text("title", title);
         m.set_text("names", names);
