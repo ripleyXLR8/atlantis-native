@@ -44,6 +44,10 @@ pub(crate) struct Shared {
     pub engine: EngineRef,
     /// What the last call that waits asked for.
     pub pending: Option<Pending>,
+    /// An `Atl_Address_Go` reached where the script cannot stop (under
+    /// `dofile`, `require` or `pcall`): the game manager runs its
+    /// transition once the script has ended.
+    pub deferred: Option<Pending>,
     /// Calls for the game manager (timers, chapter, state requests), in
     /// call order.
     pub manager_calls: Vec<Call>,
@@ -903,11 +907,16 @@ fn binding_entry(state: &mut LuaState) -> LuaResult<u32> {
         _ => {}
     }
     if let Call::AddressGo { scene, view, fx } = &call {
-        shared.borrow_mut().pending = Some(Pending::Transition {
+        let t = Pending::Transition {
             scene: scene.clone(),
             view: *view,
             fx: *fx,
-        });
+        };
+        if can_wait(state) {
+            shared.borrow_mut().pending = Some(t);
+        } else {
+            shared.borrow_mut().deferred = Some(t);
+        }
         return wait(state, &engine, binding);
     }
     let reply = engine.borrow_mut().call(&call);
@@ -934,8 +943,9 @@ fn wait(state: &mut LuaState, engine: &EngineRef, binding: Binding) -> LuaResult
     if can_wait(state) {
         Err(LuaError::Yield(0))
     } else {
-        // A call reached through a Rust frame (`dofile`, `require`): the
-        // game manager runs it once the script has ended.
+        // A call reached through a Rust frame (`dofile`, `require`,
+        // `pcall`): an `Atl_Address_Go` is kept in `deferred` and the game
+        // manager runs its transition once the script has ended.
         engine.borrow_mut().event(&Event::Note(format!(
             "{}: called where the script cannot wait; it runs after the script",
             binding.name()
@@ -1166,6 +1176,7 @@ impl Script {
         let shared = Rc::new(RefCell::new(Shared {
             engine,
             pending: None,
+            deferred: None,
             manager_calls: Vec::new(),
             saved_dbs: Vec::new(),
             holdrand: 1,
@@ -1479,6 +1490,13 @@ impl Script {
             let _ = raw_set(state, self.tasks, Val::Num(task.key), Val::Nil);
         }
         outcome
+    }
+
+    /// The transition of an `Atl_Address_Go` the last resume reached
+    /// where it could not stop (its handler would have run it inside the
+    /// call); the game manager runs it once that run has ended.
+    pub fn take_deferred(&mut self) -> Option<Pending> {
+        self.shared.borrow_mut().deferred.take()
     }
 
     // -- the atl table -------------------------------------------------------

@@ -440,3 +440,41 @@ fn uncaught_errors_end_the_program() {
     assert_eq!(g.state(), 4);
     assert!(!g.busy());
 }
+
+#[test]
+fn address_go_under_pcall_runs_after_the_script() {
+    // The handler runs the transition inside the call (@ 0x00405390);
+    // under pcall the coroutine cannot stop there, so the transition
+    // starts once the script has ended instead of being lost.
+    let mut files = BASE.to_vec();
+    files.push((
+        "on_click_deck.lua",
+        "if atl.event.type == \"click_zone\" then \
+           pcall(Atl_Address_Go, \"deck\", atl.event.click.zone.id, \"zoom_and_fade\") \
+           AFTER_GO = true end",
+    ));
+    let (mut g, probe) = game(&files);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().requests.clear();
+    assert!(g.click_zone(9, b""));
+    assert_eq!(g.script().global(b"AFTER_GO"), Value::Bool(true));
+    let mut steps = 0;
+    while g.busy() && steps < 100 {
+        g.update(0.02);
+        steps += 1;
+    }
+    assert!(steps > 10, "the transition ran over frames: {steps}");
+    assert!(probe
+        .borrow()
+        .requests
+        .iter()
+        .any(|r| matches!(r, Request::LoadView { view: 9, .. })));
+    assert_eq!(g.script().address(), (b"deck".to_vec(), 9));
+    assert_eq!(g.script().global(b"ENTERED"), Value::Num(2.0));
+    assert!(
+        probe.borrow().errors.is_empty(),
+        "{:?}",
+        probe.borrow().errors
+    );
+}

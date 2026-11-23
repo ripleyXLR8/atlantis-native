@@ -51,6 +51,10 @@ struct Run {
     /// (`InitChapter`, a new game's files, the event step's
     /// `Atl_Hero_ArrangeHandledObject`): it ends the program.
     fatal: bool,
+    /// An `Atl_Address_Go` this run reached where it could not stop
+    /// (under `dofile`, `require` or `pcall`): its transition starts when
+    /// the run ends.
+    deferred: Option<Pending>,
 }
 
 /// `Atl_Address_Go`'s transition (the step @ 0x0042d900 on the object
@@ -208,6 +212,7 @@ impl Game {
         match self.script.file_task(path) {
             Some(task) => {
                 self.runs.push(Run {
+                    deferred: None,
                     task,
                     args: None,
                     block: None,
@@ -256,6 +261,7 @@ impl Game {
             return false;
         };
         self.runs.push(Run {
+            deferred: None,
             task,
             args: Some(args),
             block: None,
@@ -281,6 +287,7 @@ impl Game {
             return false;
         };
         self.runs.push(Run {
+            deferred: None,
             task,
             args: Some(args),
             block: None,
@@ -314,6 +321,7 @@ impl Game {
             },
         };
         self.runs.push(Run {
+            deferred: None,
             task,
             args: Some(args),
             block: None,
@@ -597,7 +605,13 @@ impl Game {
             let args = top.args.take().unwrap_or_default();
             let what = task.what.clone();
             self.event(&Event::Run(&what));
+            let depth = self.runs.len();
             let outcome = self.script.resume(&task, &args);
+            if let Some(p) = self.script.take_deferred() {
+                if let Some(r) = self.runs.get_mut(depth - 1) {
+                    r.deferred = Some(p);
+                }
+            }
             self.manager_calls();
             match outcome {
                 Outcome::Finished => {
@@ -657,6 +671,9 @@ impl Game {
         }
         if run.chapter {
             self.next_request();
+        }
+        if let Some(Pending::Transition { scene, view, fx }) = run.deferred {
+            self.start_transition(scene, view, fx);
         }
     }
 
@@ -1036,6 +1053,7 @@ impl Game {
         {
             Some((task, args)) => {
                 self.runs.push(Run {
+                    deferred: None,
                     task,
                     args: Some(args),
                     block: None,
