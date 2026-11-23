@@ -161,7 +161,8 @@ fn language(src: &Atlantis5Source) -> String {
 struct Start {
     src: Arc<Atlantis5Source>,
     lang: String,
-    audio: Audio,
+    /// The mixer, none when no sound output could be opened.
+    audio: Option<Audio>,
     warm: std::thread::JoinHandle<()>,
     /// How far the films' folder is decoded (the bar on the black
     /// screen): (decoded up to, the logo's offset in it).
@@ -174,7 +175,7 @@ struct Start {
 /// about 460 MB with the French DVD, a step at a time: the port's own,
 /// the original plays from its install. Later runs start from the kept
 /// checkpoints, at once.
-fn start(src: Arc<Atlantis5Source>, lang: String, audio: Audio) -> Start {
+fn start(src: Arc<Atlantis5Source>, lang: String, audio: Option<Audio>) -> Start {
     let s = src.clone();
     let progress = Arc::new((AtomicU64::new(0), AtomicU64::new(0)));
     let p = progress.clone();
@@ -324,7 +325,7 @@ impl A5App {
             return false;
         };
         let _ = start.warm.join();
-        match Play::new(start.src, &start.lang, Some(start.audio)) {
+        match Play::new(start.src, &start.lang, start.audio) {
             Ok(mut play) => {
                 // The saves (`saves/autoslot`, `slot_<n>`) in the player's
                 // data folder; their dates in local time.
@@ -550,7 +551,7 @@ pub fn run_window_on(
     let src = Arc::new(src);
     let mut app = A5App {
         play: None,
-        start: Some(start(src, lang, audio)),
+        start: Some(start(src, lang, mixer_for_play(audio, out.is_some()))),
         error: None,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
         title: format!(
@@ -576,6 +577,15 @@ pub fn run_window_on(
     Ok(crate::a2::Ended::Quit)
 }
 
+/// The mixer the game is given: none without a sound output, so that the
+/// engine times a voice, a sound or a music track by its length (the
+/// mixer's queues drain only in the output's callback: given the mixer,
+/// a voiced tirade would never end by itself and no playlist would move
+/// on).
+fn mixer_for_play(audio: Audio, output: bool) -> Option<Audio> {
+    output.then_some(audio)
+}
+
 /// The cabinets' checkpoint indexes: `atlantis5/cabinets` in the per-user
 /// data folder (about 26 MB for the French DVD once played through its
 /// largest folders; deleting it only makes the next run slower).
@@ -593,6 +603,12 @@ pub fn saves_dir() -> std::path::PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn without_a_sound_output_the_game_times_its_sounds() {
+        assert!(mixer_for_play(Audio::new(), false).is_none());
+        assert!(mixer_for_play(Audio::new(), true).is_some());
+    }
 
     #[test]
     fn a_redraw_that_does_not_come_does_not_spin_the_loop() {
