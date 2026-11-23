@@ -228,14 +228,15 @@ impl Parser<'_> {
                 None => return Err(self.err("unterminated tag")),
             }
         }
-        // Content.
-        let mut text = Vec::new();
+        // Content: the text's parts with their entities decoded, and
+        // CDATA sections as they are.
+        let mut text = String::new();
         loop {
             let start = self.at;
             while self.at < self.s.len() && self.s[self.at] != b'<' {
                 self.at += 1;
             }
-            text.extend_from_slice(&self.s[start..self.at]);
+            text.push_str(&decode_entities(&self.s[start..self.at], self.utf8));
             if self.at == self.s.len() {
                 return Err(self.err("missing closing tag"));
             }
@@ -250,8 +251,18 @@ impl Parser<'_> {
                     return Err(self.err("'>' expected"));
                 }
                 self.at += 1;
-                el.text = decode_entities(&text, self.utf8).trim().to_string();
+                el.text = text.trim().to_string();
                 return Ok(el);
+            }
+            // MSXML (the UTF-8 files: *Atlantis V*'s texts and saves)
+            // gives a CDATA section's characters as text, unparsed. The
+            // TinyXML path keeps its skip of any `<!` markup.
+            if self.utf8 && self.starts(b"<![CDATA[") {
+                self.at += 9;
+                let start = self.at;
+                self.skip_past(b"]]>", "unterminated CDATA section")?;
+                text.push_str(&text_of(&self.s[start..self.at - 3], true));
+                continue;
             }
             if self.starts(b"<!--") || self.starts(b"<?") || self.starts(b"<!") {
                 self.skip_misc()?;
@@ -361,6 +372,17 @@ mod tests {
             parse_utf8("<d t=\"caf\u{e9}\">L\u{2019}Atlantide\u{2026}</d>".as_bytes()).unwrap();
         assert_eq!(els[0].attr("t"), Some("caf\u{e9}"));
         assert_eq!(els[0].text, "L\u{2019}Atlantide\u{2026}");
+    }
+
+    #[test]
+    fn msxml_files_read_cdata_as_text() {
+        let els = parse_utf8(
+            b"<S id=\"x\"><![CDATA[A > B &amp; <i>]]></S><T>a &amp; <![CDATA[b]]> c</T>",
+        )
+        .unwrap();
+        assert_eq!(els[0].text, "A > B &amp; <i>");
+        assert_eq!(els[1].text, "a & b c");
+        assert!(parse_utf8(b"<S><![CDATA[open</S>").is_err());
     }
 
     #[test]
