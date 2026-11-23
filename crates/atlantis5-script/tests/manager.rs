@@ -54,7 +54,8 @@ impl Engine for Probe {
     /// One section that tells how many engine calls were made before it.
     fn save_sections(&mut self) -> Vec<atlantis4_data::xml::Element> {
         let mut e = atlantis5_script::save::element("PROBE");
-        e.attributes.push(("calls".into(), self.seen.len().to_string()));
+        e.attributes
+            .push(("calls".into(), self.seen.len().to_string()));
         vec![e]
     }
 
@@ -553,7 +554,10 @@ fn the_load_state_ends_the_game_before_the_read() {
     g.new_game();
     settle(&mut g, 5);
     assert_eq!(g.state(), 4);
-    assert!(probe.borrow().saves.contains_key("autoslot"), "the chapter saved");
+    assert!(
+        probe.borrow().saves.contains_key("autoslot"),
+        "the chapter saved"
+    );
     probe.borrow_mut().requests.clear();
     // A request queued after Atl_Load: state 2 ends the game first
     // (@ 0x0042f000 case 2 → 0x0042ffd0, which empties the queue), so it
@@ -599,10 +603,7 @@ fn the_chapter_runs_in_the_next_state_and_clears_its_number_after() {
     probe.borrow_mut().wait = false;
     settle(&mut g, 5);
     // +0x50 = 0 after the call: the nested Atl_InitChapter(5) lost its 5.
-    assert_eq!(
-        g.script().global(b"CHS"),
-        Value::Str(b"2,nil,".to_vec())
-    );
+    assert_eq!(g.script().global(b"CHS"), Value::Str(b"2,nil,".to_vec()));
     assert_eq!(g.state(), 4);
 }
 
