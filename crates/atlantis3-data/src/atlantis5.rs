@@ -198,6 +198,11 @@ impl Atlantis5Source {
     pub fn open(path: &Path) -> Result<Atlantis5Source, OpenError> {
         if path.is_file() {
             let img = DiscImage::open(path).ok_or(OpenError::NotTheGame)?;
+            // Another disc's image: not the game (as for a folder), not
+            // a cabinet that cannot be read.
+            if img.size(DATA_CAB).is_none() {
+                return Err(OpenError::NotTheGame);
+            }
             return Self::from_disc(Arc::new(img), Form::DiscImage);
         }
         match Self::from_folder(Arc::new(StdDir::new(path))) {
@@ -508,5 +513,48 @@ mod tests {
         let s = Atlantis5Source::from_tree(Arc::new(m), "", None).unwrap();
         assert_eq!(s.read("datas/scenes/zeppelin.wam"), Some(vec![1]));
         assert_eq!(s.languages(), ["german"]);
+    }
+
+    /// An ISO 9660 image whose root holds only `README.TXT`.
+    fn other_disc() -> Vec<u8> {
+        let mut s = vec![0u8; 2048 * 21];
+        let rec = |name: &[u8], lba: u32, size: u32, dir: bool| -> Vec<u8> {
+            let mut r = vec![0u8; 33 + name.len() + (name.len() + 1) % 2];
+            r[0] = u8::try_from(r.len()).unwrap();
+            r[2..6].copy_from_slice(&lba.to_le_bytes());
+            r[10..14].copy_from_slice(&size.to_le_bytes());
+            r[25] = if dir { 2 } else { 0 };
+            r[32] = u8::try_from(name.len()).unwrap();
+            r[33..33 + name.len()].copy_from_slice(name);
+            r
+        };
+        let at = |n: usize| n * 2048;
+        s[at(16)] = 1;
+        s[at(16) + 1..at(16) + 6].copy_from_slice(b"CD001");
+        let root = rec(&[0], 18, 2048, true);
+        s[at(16) + 156..at(16) + 156 + root.len()].copy_from_slice(&root);
+        s[at(17)] = 255;
+        s[at(17) + 1..at(17) + 6].copy_from_slice(b"CD001");
+        let mut dir = Vec::new();
+        dir.extend(rec(&[0], 18, 2048, true));
+        dir.extend(rec(&[1], 18, 2048, true));
+        dir.extend(rec(b"README.TXT;1", 20, 5, false));
+        s[at(18)..at(18) + dir.len()].copy_from_slice(&dir);
+        s[at(20)..at(20) + 5].copy_from_slice(b"hello");
+        s
+    }
+
+    #[test]
+    fn another_disc_s_image_is_not_the_game() {
+        let base = std::env::var_os("ATLANTIS_NATIVE_DATA")
+            .map_or_else(std::env::temp_dir, std::path::PathBuf::from);
+        let p = base.join(format!("an-a5-other-disc-{}.iso", std::process::id()));
+        std::fs::write(&p, other_disc()).unwrap();
+        assert!(DiscImage::open(&p).is_some(), "an image");
+        assert!(matches!(
+            Atlantis5Source::open(&p),
+            Err(OpenError::NotTheGame)
+        ));
+        let _ = std::fs::remove_file(&p);
     }
 }
