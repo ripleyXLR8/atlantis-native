@@ -143,6 +143,7 @@ pub fn start(src: Atlantis5Source, store: Rc<dyn SaveStore>) -> Result<(), JsVal
         audio: Audio::new(),
         out: None,
         audio_pending: true,
+        silent_frames: 0.0,
         window: None,
         gl: None,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
@@ -174,6 +175,9 @@ struct A5App {
     /// only then).
     out: Option<crate::audio_out::web_out::WebOutput>,
     audio_pending: bool,
+    /// The part of a frame not yet played out silently while there is no
+    /// output ([`A5App::play_silently`]).
+    silent_frames: f64,
     window: Option<Rc<Window>>,
     gl: Option<GlPresenter>,
     picture: Vec<u32>,
@@ -215,6 +219,23 @@ impl A5App {
             },
             AUDIO_RATE,
         );
+    }
+
+    /// Until the output exists (the first click or key; never on a page
+    /// that cannot make one) the mix is played out silently on the game's
+    /// clock, as Atlantis Evolution's page does (`Sounds::headless`): a
+    /// film's sound does not pile up to play late at the first click, and
+    /// a voice or a playlist still ends when its sound would.
+    fn play_silently(&mut self, dt: f64) {
+        if self.out.is_some() {
+            self.silent_frames = 0.0;
+            return;
+        }
+        self.silent_frames += dt * f64::from(AUDIO_RATE);
+        let n = self.silent_frames.floor();
+        self.silent_frames -= n;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        self.audio.play_silently(n as usize, AUDIO_RATE);
     }
 
     /// Whether the page holds the pointer lock; a request not granted in
@@ -384,6 +405,10 @@ impl A5App {
         crate::audio_out::web_out::keep_ahead();
         play.update(dt);
         crate::audio_out::web_out::keep_ahead();
+        self.play_silently(dt);
+        let Some(play) = self.play.as_mut() else {
+            return;
+        };
         if play.quit_requested() {
             self.done = true;
             a2_web::exit_lock();

@@ -177,6 +177,19 @@ impl Audio {
         self.lock().paused = paused;
     }
 
+    /// Plays `frames` frames at `rate` Hz out silently: the queues move
+    /// on as an output would move them, for a page whose output does not
+    /// exist yet (or cannot), so that the sounds still end on time.
+    pub fn play_silently(&self, frames: usize, rate: u32) {
+        let mut out = [0f32; 2 * 1024];
+        let mut left = frames;
+        while left > 0 {
+            let n = left.min(1024);
+            self.fill(&mut out[..2 * n], rate, 2);
+            left -= n;
+        }
+    }
+
     /// Fills `out` (interleaved, `channels` per frame) at `rate` Hz.
     pub fn fill(&self, out: &mut [f32], rate: u32, channels: usize) {
         out.fill(0.0);
@@ -258,6 +271,18 @@ mod tests {
         a.fill(&mut out, 22050, 2);
         assert!((out[0] - 0.5).abs() < 1e-6);
         assert_eq!(a.played(CHANNEL_CINEMA), Some(4410));
+        assert!(!a.is_playing(CHANNEL_CINEMA));
+    }
+
+    #[test]
+    fn played_silently_a_stream_ends_on_time() {
+        let a = Audio::new();
+        a.start_stream(CHANNEL_CINEMA, 44100, 2, 1.0);
+        a.push(CHANNEL_CINEMA, &vec![100i16; 2 * 44100]);
+        a.play_silently(22050, 44100);
+        assert_eq!(a.played(CHANNEL_CINEMA), Some(22050));
+        assert!(a.is_playing(CHANNEL_CINEMA));
+        a.play_silently(22050, 44100);
         assert!(!a.is_playing(CHANNEL_CINEMA));
     }
 
