@@ -3972,15 +3972,7 @@ impl Play {
             self.stage.borrow_mut().look(dx, dy, dt as f32);
         }
         // The modes asked by the last frame's scripts.
-        let requests = std::mem::take(&mut self.stage.borrow_mut().menu_requests);
-        for (mode, arg) in requests {
-            if mode == menus::DEATH {
-                self.menus.set_death_text(&lossy(&arg));
-            } else if mode == menus::EXAMINE {
-                self.menus.set_examine_item(&arg);
-            }
-            self.menus.request(mode);
-        }
+        self.take_menu_requests();
         // State 3 (the menus' frame @ 0x0041b780): the mode's process
         // first, then the scene's update (@ 0x0044c380 → the sprites'
         // step @ 0x00441c30) for modes 8, 9 and 0xc only (the inventory,
@@ -4018,6 +4010,21 @@ impl Play {
             self.pick();
         }
         self.cursor_frame(dt);
+    }
+
+    /// The modes the scripts asked (`Atl_GameOver`, `Atl_ExamineItem`,
+    /// `Atl_PuzzlePoker_Start`), queued in the menus. The original's
+    /// handlers queue them in the menus at the call.
+    fn take_menu_requests(&mut self) {
+        let requests = std::mem::take(&mut self.stage.borrow_mut().menu_requests);
+        for (mode, arg) in requests {
+            if mode == menus::DEATH {
+                self.menus.set_death_text(&lossy(&arg));
+            } else if mode == menus::EXAMINE {
+                self.menus.set_examine_item(&arg);
+            }
+            self.menus.request(mode);
+        }
     }
 
     /// The game's cursor this frame. Loaded in state 4 (@ 0x0042fb90:
@@ -4171,6 +4178,7 @@ impl Play {
             // A mode queued meanwhile (`Atl_PuzzlePoker_Start` from a
             // subject's script): the manager stays in state 3 and opens it
             // at the next frame (@ 0x0041b780).
+            self.take_menu_requests();
             if !self.menus.active() {
                 self.game.menu_closed();
             }
@@ -4231,8 +4239,10 @@ impl Play {
             };
             if closed {
                 // Its process returned 1: mode 0xd; with a mode queued
-                // (the death panel of `Atl_GameOver`) the manager stays in
-                // state 3, else it takes its next request.
+                // (the death panel of `Atl_GameOver`, which the board's
+                // `OnLose` may have asked in this very frame) the manager
+                // stays in state 3, else it takes its next request.
+                self.take_menu_requests();
                 if !self.menus.active() {
                     self.game.menu_closed();
                 }

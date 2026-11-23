@@ -67,9 +67,16 @@ fn num(v: &Value) -> i32 {
 /// A new game, chapter 7 (Macao), view 20 with the punter at the table
 /// and its `commencer_poker` subject; the subject picked: the board.
 fn to_poker(d: &std::path::Path) -> Play {
+    to_poker_saving(d, None)
+}
+
+/// [`to_poker`] with a save folder (the chapter's `Atl_Save` writes its
+/// `autoslot` there).
+fn to_poker_saving(d: &std::path::Path, saves: Option<PathBuf>) -> Play {
     let src: Arc<dyn atlantis_data::FileSource> =
         Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
     let mut play = Play::new(src, "french", None).expect("play");
+    play.set_save_dir(saves);
     play.new_game();
     frames(&mut play, 6);
     assert!(play
@@ -214,7 +221,14 @@ fn the_five_games_won() {
 #[test]
 fn stopping_every_game_loses_the_last() {
     let Some(d) = dvd() else { return };
-    let mut play = to_poker(&d);
+    // With an autosave, as in a real game (chapter 7 calls `Atl_Save`):
+    // `OnLose(3)` (`Atl_GameOver`, then `Atl_Load`) runs in the board's
+    // last frame, and the death panel it asks comes before the load.
+    let saves = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("a5-poker-lost-saves");
+    let _ = std::fs::remove_dir_all(&saves);
+    std::fs::create_dir_all(&saves).expect("the save folder");
+    let mut play = to_poker_saving(&d, Some(saves.clone()));
+    assert!(saves.join("autoslot").is_file(), "the chapter saved");
     let ended = play_board(&mut play, &|_, _| "stop_bet");
     // Games 1 to 3 end with another winner; in game 4 the fisherman's
     // hand wins (the board's dialog 285, then OnLose(3)): the death
