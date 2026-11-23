@@ -1742,7 +1742,13 @@ impl Stage {
         // (`CGameManager :: Process -> %s`, 0x0066cc4c) and goes on after
         // its try (@ 0x0042f464): that frame the rest of the sprite list
         // and the sound update (@ 0x00459fd0) are skipped.
-        let thrown = scene && !self.sprites_step(dt);
+        //
+        // `Atl_Video_Play`'s two loops (@ 0x0040c990: events, the film's
+        // step @ 0x0042b0f0, the sound @ 0x00459fd0, the draw
+        // @ 0x0042b220, the flip) never call the scene's update
+        // @ 0x0044c380: the sprites, the persistent records' times and the
+        // randomize draws are frozen for the film's length.
+        let thrown = scene && self.film.is_none() && !self.sprites_step(dt);
         if !thrown {
             self.music_update(dt);
         }

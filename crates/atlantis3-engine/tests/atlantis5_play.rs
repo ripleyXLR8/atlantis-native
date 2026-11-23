@@ -516,3 +516,31 @@ fn a_frame_s_mouse_moves_turn_the_camera_once() {
     let s = play.stage().look_speed()[0];
     assert!((s - want).abs() < 1e-3, "{s} against {want}");
 }
+
+/// `Atl_Video_Play`'s loops (@ 0x0040c990) do not run the scene's
+/// update (@ 0x0044c380): the view's sprites are where they were when
+/// the film ends.
+#[test]
+fn a_film_freezes_the_view_s_sprites() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    go(&mut play, 17);
+    frames(&mut play, 5);
+    let before = play.stage().sprites();
+    assert!(play
+        .game
+        .run_string("return function() Atl_Video_Play(\"is0001\") end"));
+    frames(&mut play, 1);
+    assert!(play.stage().film_playing());
+    frames(&mut play, 60);
+    assert!(play.stage().film_playing());
+    assert_eq!(play.stage().sprites(), before);
+    play.skip();
+    for _ in 0..40 {
+        frames(&mut play, 1);
+    }
+    assert!(!play.stage().film_playing());
+    // Stepped again after it.
+    frames(&mut play, 60);
+    assert_ne!(play.stage().sprites(), before);
+}
