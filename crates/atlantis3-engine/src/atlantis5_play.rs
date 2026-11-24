@@ -2764,30 +2764,59 @@ impl Stage {
         }
     }
 
-    /// The subject menu opens (mode 9, @ 0x00410f80(name), the menu's
-    /// Initialize @ 0x004117f0): the mouse at the screen's centre (the
-    /// manager's open, @ 0x0041b780: 0x0040d890(W >> 1, H >> 1) and a
-    /// move there), the character's sprite turns to face (`facing`, its
-    /// priority kept, its record held), state 0.
-    fn menu_open(&mut self, character: &[u8]) {
+    /// The subject menu asked by a click (@ 0x004300d0): only the
+    /// character's name kept (@ 0x00410f80, a string assign) and mode 9
+    /// queued (@ 0x0041b5d0); the click's frame goes on in play with the
+    /// character's sprite as it was. The menus' next frame opens it
+    /// ([`Stage::menu_initialize`]).
+    fn menu_ask(&mut self, character: &[u8]) {
         #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
         let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
-        self.mouse = centre;
-        // The menu's start holds the half music level (@ 0x0041197e).
-        self.music_duck(0.5);
-        self.hold_randomized(character, true);
-        self.replace_anim(character, b"facing", Mode::Stop);
         self.menu = Some(SubjectMenu {
             character: character.to_vec(),
-            state: MenuState::Facing,
+            state: MenuState::Asked,
             subjects: Vec::new(),
             bubble: None,
             images: Vec::new(),
             picked: None,
             closed: false,
             at: centre,
-            fresh: true,
+            fresh: false,
         });
+    }
+
+    /// Whether the subject menu is asked and not yet opened (the
+    /// manager's mode 0xd with mode 9 queued).
+    pub fn menu_asked(&self) -> bool {
+        self.menu
+            .as_ref()
+            .is_some_and(|m| m.state == MenuState::Asked)
+    }
+
+    /// The subject menu opens (the menus' frame @ 0x0041b780 with mode 9
+    /// queued, before the mode's process): the mouse at the screen's
+    /// centre (0x0040d890(W >> 1, H >> 1) and a move there), the menu's
+    /// Initialize (@ 0x004117f0): the character's sprite turns to face
+    /// (`facing`, its priority kept, @ 0x00443650: its record held), the
+    /// music at half (@ 0x0045caf0(0.5)), state 0.
+    pub(crate) fn menu_initialize(&mut self) {
+        let Some(m) = &self.menu else { return };
+        if m.state != MenuState::Asked {
+            return;
+        }
+        let character = m.character.clone();
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+        self.mouse = centre;
+        // The menu's start holds the half music level (@ 0x0041197e).
+        self.music_duck(0.5);
+        self.hold_randomized(&character, true);
+        self.replace_anim(&character, b"facing", Mode::Stop);
+        if let Some(m) = &mut self.menu {
+            m.state = MenuState::Facing;
+            m.at = centre;
+            m.fresh = true;
+        }
     }
 
     /// Whether the subject menu opened since the menus' last frame (its
@@ -3851,7 +3880,7 @@ impl Engine for Stage {
                     d.remove(atlantis5_script::save::AUTOSLOT);
                 }
             }
-            Request::SubjectMenu { character } => self.menu_open(character),
+            Request::SubjectMenu { character } => self.menu_ask(character),
             Request::GameEnded => {
                 // @ 0x0042ffd0's engine part, then the credits (mode 1).
                 self.end_game();
@@ -4486,12 +4515,6 @@ impl Play {
             }
         }
         self.game.update(dt);
-        // The subject menu opened by this frame's scripts: the drawn
-        // cursor at the centre with its mouse (@ 0x0041b780), before the
-        // next moves.
-        if self.stage.borrow_mut().menu_take_fresh() {
-            self.cursor_to_stage_mouse();
-        }
         if self.game.state() == 4 && !self.game.busy() {
             self.pick();
         }
@@ -4691,8 +4714,10 @@ impl Play {
         if !self.stage.borrow().menu_open_now() {
             return self.menus_frame(clicks, dt);
         }
-        // The mode's open (@ 0x0041b780): the drawn cursor at the centre
+        // The mode's open (@ 0x0041b780, the frame after the click that
+        // asked it): its Initialize, then the drawn cursor at the centre
         // with the menu's mouse.
+        self.stage.borrow_mut().menu_initialize();
         if self.stage.borrow_mut().menu_take_fresh() {
             self.cursor_to_stage_mouse();
         }
@@ -5375,17 +5400,21 @@ impl Play {
     /// between chained menus (the in-game menu and its pages, the
     /// examine view and the inventory again, a board after a subject) no
     /// game view is drawn: the picture before stays.
+    /// The click's frame that asks the subject menu is one too: state 3,
+    /// mode 9 queued.
     fn draws_nothing(&self) -> bool {
         if self.game.state() != 3
             || self.game.busy()
             || self.poker.is_some()
             || self.menus.current().is_some()
-            || !self.menus.active()
         {
             return false;
         }
         let st = self.stage.borrow();
-        !st.inventory_open_now() && !st.menu_open_now()
+        if st.menu_asked() {
+            return true;
+        }
+        self.menus.active() && !st.inventory_open_now() && !st.menu_open_now()
     }
 
     fn render_layers(&self, out: &mut [u32], skip_covered: bool) {

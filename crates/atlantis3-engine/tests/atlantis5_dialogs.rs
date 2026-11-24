@@ -136,7 +136,8 @@ fn the_gorillas_subject_menu_and_dialog() {
         "the gorilla under the centre"
     );
     play.click();
-    frames(&mut play, 1);
+    // The click's frame asks the menu; the next opens it.
+    frames(&mut play, 2);
     // A character with subjects and an empty hand: the subject menu, the
     // manager in state 3, the gorilla turning to face.
     assert_eq!(play.game.state(), 3);
@@ -281,6 +282,7 @@ fn at_a_low_frame_rate_the_talker_faces_then_listens() {
         assert!(play.aim_at_sprite(b"gorilla"));
         play.click();
         play.update(dt);
+        play.update(dt);
         assert!(play.stage().menu_open_now());
         assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
         for _ in 0..100 {
@@ -377,7 +379,7 @@ fn the_rebuilt_subject_menu_puts_the_cursor_back_at_the_click() {
     go(&mut play, 17);
     assert!(play.aim_at_sprite(b"gorilla"));
     play.click();
-    frames(&mut play, 1);
+    frames(&mut play, 2);
     let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
     assert!(play.stage().menu_open_now());
     assert_eq!(play.menus.mouse, centre, "centred at the open");
@@ -449,7 +451,7 @@ fn moves_during_the_facing_do_not_move_the_subject_menu_s_cursor() {
     go(&mut play, 17);
     assert!(play.aim_at_sprite(b"gorilla"));
     play.click();
-    frames(&mut play, 1);
+    frames(&mut play, 2);
     let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
     assert!(play.stage().menu_open_now());
     assert_eq!(play.menus.mouse, centre);
@@ -949,4 +951,35 @@ fn a_lost_sound_output_times_the_voices_by_their_length() {
         steps += 1;
         assert!(steps < 30 * 60, "the tirade ends by its length");
     }
+}
+
+/// The click on a character only keeps its name and asks mode 9
+/// (@ 0x004300d0: @ 0x00410f80, a string assign; @ 0x0041b5d0(9); state 3):
+/// that frame's scene update still steps the character's own sprite, and
+/// the menus' display, mode 0xd, draws no view. The menu's Initialize
+/// (@ 0x004117f0: `facing`, the record held, the music at half) runs at
+/// the menus' next frame (@ 0x0041b780), before that frame's scene
+/// update: `facing` is one step old after it.
+#[test]
+fn the_subject_menu_s_facing_starts_at_its_first_frame() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    let before = anim(&play, "gorilla");
+    let t0 = play.stage().sprite_time(b"gorilla").expect("the gorilla");
+    let mut cache = atlantis3_engine::atlantis5_play::PictureCache::default();
+    let mut px = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    assert!(play.render_cached(&mut px, &mut cache));
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 3);
+    assert_eq!(anim(&play, "gorilla"), before, "the click's frame");
+    let t1 = play.stage().sprite_time(b"gorilla").expect("the gorilla");
+    assert!(t1 > t0, "stepped in the click's frame");
+    assert!(!play.render_cached(&mut px, &mut cache), "no view drawn");
+    frames(&mut play, 1);
+    assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
+    assert_eq!(play.stage().sprite_time(b"gorilla"), Some(1.0 / 30.0));
+    assert!(play.render_cached(&mut px, &mut cache));
 }

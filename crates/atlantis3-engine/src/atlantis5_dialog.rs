@@ -890,6 +890,9 @@ pub fn subject_bubble(n: usize) -> String {
 /// (`unfacing`, the music back).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MenuState {
+    /// Asked (mode 9 queued, @ 0x0041b5d0), not yet opened: the menus'
+    /// next frame opens it (@ 0x0041b780 → its Initialize @ 0x004117f0).
+    Asked,
     Facing,
     Open,
     Rebuild,
