@@ -196,12 +196,45 @@ struct Text {
     scroll_box: Option<(i32, i32)>,
 }
 
+impl Text {
+    /// The colour drawn: a button's under the mouse, else its own.
+    fn shown_color(&self) -> u32 {
+        if self.over {
+            self.hover.unwrap_or(self.color)
+        } else {
+            self.color
+        }
+    }
+}
+
 struct SprButton {
     click: Option<Bank>,
     focus: Option<Bank>,
     /// +0x98.
     state: u8,
     time: f64,
+}
+
+impl SprButton {
+    /// The bank drawn and its picture: at 1 the focus looped, at 2 the
+    /// click played once, else the click's first picture (15 a second).
+    fn shown(&self) -> Option<(&Bank, usize)> {
+        let frame = |bank: &Bank, looped: bool| {
+            let n = bank.len().max(1);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let u = (self.time * 15.0) as usize;
+            if looped {
+                u % n
+            } else {
+                u.min(n - 1)
+            }
+        };
+        match self.state {
+            1 => self.focus.as_ref().map(|f| (f, frame(f, true))),
+            2 => self.click.as_ref().map(|c| (c, frame(c, false))),
+            _ => self.click.as_ref().map(|c| (c, 0)),
+        }
+    }
 }
 
 enum Kind {
@@ -351,6 +384,44 @@ pub struct Menus {
     /// pages' dates (`FileTimeToLocalFileTime`).
     pub utc_offset: fn() -> i64,
     effects: Vec<Effect>,
+    /// How many menus were made: tells a menu from the one before it in
+    /// [`MenuPicture`] (their backgrounds and sprites are made with them).
+    made: u64,
+}
+
+/// Everything [`Menus::render`] draws from while the menu's background
+/// covers the screen (a host-side check, not the original's: it draws
+/// every frame): two equal keys are the same picture. The menu (its
+/// background, banks and fonts never change once it is made), the
+/// cursor's place and, in drawing order, each drawn element's place and
+/// what [`Menu::draw`] reads of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MenuPicture {
+    menu: u64,
+    mouse: (i32, i32),
+    elements: Vec<ElementPicture>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ElementPicture {
+    Text {
+        at: (i32, i32),
+        font: String,
+        text: String,
+        width: i32,
+        color: u32,
+        align: u32,
+        scroll_box: Option<(i32, i32)>,
+    },
+    /// The bank drawn (0 none, 1 the focus, 2 the click) and its picture.
+    Button {
+        at: (i32, i32),
+        bank: u8,
+        frame: usize,
+    },
+    Sprite {
+        at: (i32, i32),
+    },
 }
 
 fn no_offset() -> i64 {
@@ -382,6 +453,7 @@ impl Menus {
             saves: None,
             utc_offset: no_offset,
             effects: Vec::new(),
+            made: 0,
         }
     }
 
@@ -922,6 +994,7 @@ impl Menus {
             match self.build(mode, config) {
                 Some(m) => {
                     self.menu = Some(m);
+                    self.made += 1;
                     // @ 0x0041b780: the mouse put at the screen's centre
                     // (@ 0x0040d890(w >> 1, h >> 1)), the mode's
                     // Initialize, then the frame's event list emptied and
@@ -1290,6 +1363,56 @@ impl Menus {
         }
         m.draw(out, fonts);
         self.draw_cursor(out);
+    }
+
+    /// Whether the menu up draws its background over the whole screen
+    /// (every menu has one; none when its picture could not be read):
+    /// then nothing drawn before it shows.
+    pub fn covers_screen(&self) -> bool {
+        self.menu
+            .as_ref()
+            .and_then(|m| m.background.as_ref())
+            .is_some_and(|bg| bg.len() == VIEW_WIDTH * VIEW_HEIGHT)
+    }
+
+    /// What the menu's picture is drawn from ([`MenuPicture`]), when its
+    /// background covers the screen; none otherwise.
+    pub fn picture(&self) -> Option<MenuPicture> {
+        if !self.covers_screen() {
+            return None;
+        }
+        let m = self.menu.as_ref()?;
+        let elements = (0..m.elements.len())
+            .filter(|&i| m.visible(i))
+            .map(|i| {
+                let at = m.abs(i);
+                match &m.elements[i].kind {
+                    Kind::Text(t) => ElementPicture::Text {
+                        at,
+                        font: t.font.clone(),
+                        text: t.text.clone(),
+                        width: t.width,
+                        color: t.shown_color(),
+                        align: t.align,
+                        scroll_box: t.scroll_box,
+                    },
+                    Kind::Button(b) => {
+                        let (bank, frame) = match b.shown() {
+                            Some((_, frame)) if b.state == 1 => (1, frame),
+                            Some((_, frame)) => (2, frame),
+                            None => (0, 0),
+                        };
+                        ElementPicture::Button { at, bank, frame }
+                    }
+                    Kind::Sprite(_) => ElementPicture::Sprite { at },
+                }
+            })
+            .collect();
+        Some(MenuPicture {
+            menu: self.made,
+            mouse: self.mouse,
+            elements,
+        })
     }
 
     /// The cursor (`cursor.spr`, frame 0) at the mouse.
@@ -1720,11 +1843,7 @@ impl Menu {
             let (x, y) = self.abs(i);
             match &self.elements[i].kind {
                 Kind::Text(t) => {
-                    let color = if t.over {
-                        t.hover.unwrap_or(t.color)
-                    } else {
-                        t.color
-                    };
+                    let color = t.shown_color();
                     match t.scroll_box {
                         None => {
                             let h = fonts.text_height(&t.font, &t.text, t.width);
@@ -1787,33 +1906,9 @@ impl Menu {
                     }
                 }
                 Kind::Button(b) => {
-                    let mut tg = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
-                    let frame = |bank: &Bank, looped: bool| {
-                        let n = bank.len().max(1);
-                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                        let u = (b.time * 15.0) as usize;
-                        if looped {
-                            u % n
-                        } else {
-                            u.min(n - 1)
-                        }
-                    };
-                    match b.state {
-                        1 => {
-                            if let Some(f) = &b.focus {
-                                f.draw(&mut tg, Some(x), y, frame(f, true));
-                            }
-                        }
-                        2 => {
-                            if let Some(c) = &b.click {
-                                c.draw(&mut tg, Some(x), y, frame(c, false));
-                            }
-                        }
-                        _ => {
-                            if let Some(c) = &b.click {
-                                c.draw(&mut tg, Some(x), y, 0);
-                            }
-                        }
+                    if let Some((bank, frame)) = b.shown() {
+                        let mut tg = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
+                        bank.draw(&mut tg, Some(x), y, frame);
                     }
                 }
                 Kind::Sprite(Some(bank)) => {

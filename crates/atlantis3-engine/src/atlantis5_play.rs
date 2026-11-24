@@ -61,7 +61,7 @@ use crate::atlantis5_camera::{
     euler_quat, forward, look_at_direction, look_rotation, quat_matrix, quat_mul, Quat, Turn,
 };
 use crate::atlantis5_dialog::{self as dlg, Act, FilmSubtitles, Fonts, Kind, MenuState, Player};
-use crate::atlantis5_menu::{self as menus, Config, Effect, Menus};
+use crate::atlantis5_menu::{self as menus, Config, Effect, MenuPicture, Menus};
 use crate::atlantis5_poker::{self as poker, Poker};
 use crate::audio::{Audio, CHANNEL_CINEMA, CHANNEL_MUSIC_2004, CHANNEL_SOUND, CHANNEL_VOICE};
 use crate::film2004::{Film, FilmSound};
@@ -3824,6 +3824,27 @@ pub enum Hover {
     Sprite(Vec<u8>, Vec<u8>),
 }
 
+/// The picture last composed by [`Play::render_cached`] and how many
+/// times it composed.
+#[derive(Debug, Default)]
+pub struct PictureCache {
+    shown: Option<MenuPicture>,
+    composed: u64,
+}
+
+impl PictureCache {
+    /// The picture is to be composed at the next frame (its buffer was
+    /// written otherwise).
+    pub fn invalidate(&mut self) {
+        self.shown = None;
+    }
+
+    /// How many pictures were composed.
+    pub fn composed(&self) -> u64 {
+        self.composed
+    }
+}
+
 /// A game being played.
 pub struct Play {
     pub game: Game,
@@ -4839,7 +4860,59 @@ impl Play {
     /// with the cursor (the subject menu and the inventory draw theirs
     /// over the view, with the menus' cursor).
     pub fn render(&self, out: &mut [u32]) {
+        self.render_layers(out, true);
+    }
+
+    /// [`Play::render`] drawing every layer, the view under a menu's
+    /// background included (tests: the same picture).
+    #[doc(hidden)]
+    pub fn render_every_layer(&self, out: &mut [u32]) {
+        self.render_layers(out, false);
+    }
+
+    /// What the picture is drawn from when that is a menu whose
+    /// background covers the screen ([`MenuPicture`]); none otherwise
+    /// (play, a film, the inventory, the subject menu, poker: drawn every
+    /// frame).
+    pub fn picture(&self) -> Option<MenuPicture> {
+        if self.game.state() != 3 {
+            return None;
+        }
+        self.menus.picture()
+    }
+
+    /// [`Play::render`] into `out`, unless `out` already holds this
+    /// frame's picture: the last one composed through `cache` had the same
+    /// [`Play::picture`] (a menu with nothing drawn changed). True when it
+    /// was composed. The port's own saving (the original composes every
+    /// frame, the picture is the same); the game's step still runs every
+    /// frame. `out` must not be written otherwise between the calls, or
+    /// the cache be [`PictureCache::invalidate`]d.
+    pub fn render_cached(&self, out: &mut [u32], cache: &mut PictureCache) -> bool {
+        let key = self.picture();
+        if key.is_some() && key == cache.shown && out.len() == VIEW_WIDTH * VIEW_HEIGHT {
+            return false;
+        }
+        self.render(out);
+        cache.shown = key;
+        cache.composed += 1;
+        true
+    }
+
+    fn render_layers(&self, out: &mut [u32], skip_covered: bool) {
         let st = self.stage.borrow();
+        // A menu whose background covers the screen: nothing drawn under
+        // it shows (`Menus::render` copies the background over the whole
+        // picture), so the view is not rendered under it. The same
+        // picture; the original draws the view first (@ 0x0041baa0).
+        if skip_covered
+            && self.game.state() == 3
+            && self.menus.covers_screen()
+            && out.len() == VIEW_WIDTH * VIEW_HEIGHT
+        {
+            self.menus.render(out, &st.fonts);
+            return;
+        }
         // A script waiting in a handler's loop (a subject's or an
         // inventory click's dialog, film or transition) draws that loop's
         // frame: no menu, no menus' cursor.

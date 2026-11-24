@@ -24,7 +24,7 @@ use std::time::Instant;
 
 use atlantis3_data::atlantis5::Atlantis5Source;
 use atlantis3_engine::atlantis5::{View, FIRST_VIEW, VIEW_HEIGHT, VIEW_WIDTH};
-use atlantis3_engine::atlantis5_play::Play;
+use atlantis3_engine::atlantis5_play::{PictureCache, Play};
 use atlantis3_engine::audio::Audio;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -233,6 +233,21 @@ fn next_frame_after(next_frame: Instant, now: Instant) -> Instant {
     (next_frame + FRAME).clamp(now, now + FRAME)
 }
 
+/// The longest a picture goes without a present while it does not
+/// change ([`must_present`]).
+const KEEP_SHOWN: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Whether a frame presents: when its picture was composed, when the
+/// system asked for the window's content (a resize, an expose, a redraw
+/// the port did not ask: on Wayland a skipped present then leaves
+/// garbage), and at least every [`KEEP_SHOWN`] (a system redraw that
+/// came with the port's own cannot be told from it). A picture that did
+/// not change is otherwise not presented again (the menus: the port's
+/// own saving, the original presents every frame the same picture).
+fn must_present(composed: bool, asked: bool, since: std::time::Duration) -> bool {
+    composed || asked || since >= KEEP_SHOWN
+}
+
 /// The decoding's step before the game starts (uncompressed bytes).
 const WARM_STEP: u64 = 4 << 20;
 
@@ -257,6 +272,12 @@ struct A5App {
     /// The fractions of the mouse's relative moves not yet given to a
     /// menu (some systems report them below a pixel).
     menu_move: (f64, f64),
+    /// The picture last composed ([`Play::render_cached`]).
+    cache: PictureCache,
+    /// The system asked for the window's content since the last present.
+    present_asked: bool,
+    /// When the last present was.
+    presented: Instant,
     _audio: Option<cpal::Stream>,
     /// Why the game could not be made, for the caller.
     error: Option<String>,
@@ -282,6 +303,8 @@ impl A5App {
         };
         scale_into(&mut buf, (ww, wh), &self.picture, &mut self.columns);
         let _ = buf.present();
+        self.present_asked = false;
+        self.presented = Instant::now();
     }
 
     /// The pointer held in the window while it has the focus, in play and
@@ -311,6 +334,7 @@ impl A5App {
                 s.progress.0.load(Ordering::Relaxed),
                 s.progress.1.load(Ordering::Relaxed),
             );
+            self.cache.invalidate();
             if to > 0 {
                 crate::a5_bar::draw(&mut self.picture, VIEW_WIDTH, VIEW_HEIGHT, at, to);
             }
@@ -358,8 +382,10 @@ impl A5App {
             el.exit();
             return;
         }
-        play.render(&mut self.picture);
-        self.present();
+        let composed = play.render_cached(&mut self.picture, &mut self.cache);
+        if must_present(composed, self.present_asked, self.presented.elapsed()) {
+            self.present();
+        }
     }
 }
 
@@ -450,6 +476,15 @@ impl ApplicationHandler for A5App {
             self.focused = f;
             self.grab();
             return;
+        }
+        // The window's content asked by the system: presented at the next
+        // frame even when the picture did not change (`must_present`).
+        match event {
+            WindowEvent::Resized(_)
+            | WindowEvent::ScaleFactorChanged { .. }
+            | WindowEvent::Occluded(false) => self.present_asked = true,
+            WindowEvent::RedrawRequested if !self.redraw_pending => self.present_asked = true,
+            _ => {}
         }
         if self.play.is_none() {
             // Black while the start's reads go on: only closing, the focus
@@ -551,6 +586,9 @@ pub fn run_window_on(
         redraw_pending: false,
         focused: false,
         menu_move: (0.0, 0.0),
+        cache: PictureCache::default(),
+        present_asked: true,
+        presented: Instant::now(),
         _audio: out,
     };
     el.run_app_on_demand(&mut app)
@@ -672,6 +710,19 @@ mod tests {
             assert!(ox + dw <= ww && oy + dh <= wh, "{ww}x{wh}");
             assert!(buf.iter().all(|&p| p != 0xdead_beef), "{ww}x{wh}");
         }
+    }
+
+    #[test]
+    fn an_unchanged_picture_is_presented_when_the_system_asks() {
+        let short = FRAME;
+        // Composed: presented.
+        assert!(must_present(true, false, short));
+        // The same picture: not presented again...
+        assert!(!must_present(false, false, short));
+        // ...unless the system asked (a resize, an expose) or it was
+        // long ago.
+        assert!(must_present(false, true, short));
+        assert!(must_present(false, false, KEEP_SHOWN));
     }
 
     #[test]

@@ -30,7 +30,7 @@ use std::sync::Arc;
 
 use atlantis3_data::atlantis5::Atlantis5Source;
 use atlantis3_engine::atlantis5::{VIEW_HEIGHT, VIEW_WIDTH};
-use atlantis3_engine::atlantis5_play::{Play, LOGOS};
+use atlantis3_engine::atlantis5_play::{PictureCache, Play, LOGOS};
 use atlantis3_engine::atlantis5_saves::SaveFiles;
 use atlantis3_engine::audio::Audio;
 use atlantis_data::FileSource;
@@ -153,6 +153,7 @@ pub fn start(src: Atlantis5Source, store: Rc<dyn SaveStore>) -> Result<(), JsVal
         last: None,
         next_frame: Instant::now(),
         shown_size: None,
+        cache: PictureCache::default(),
         clock: 0.0,
         menu: false,
         lock_asked: None,
@@ -192,6 +193,8 @@ struct A5App {
     next_frame: Instant,
     /// The canvas's size at the last picture drawn.
     shown_size: Option<winit::dpi::PhysicalSize<u32>>,
+    /// The picture last composed ([`Play::render_cached`]).
+    cache: PictureCache,
     /// The game's time (seconds).
     clock: f64,
     /// Whether a menu is up (the pointer is free).
@@ -356,6 +359,7 @@ impl A5App {
             return true;
         }
         let (at, to) = self.warm;
+        self.cache.invalidate();
         crate::a5_bar::draw(&mut self.picture, VIEW_WIDTH, VIEW_HEIGHT, at, to);
         false
     }
@@ -461,8 +465,15 @@ impl A5App {
                 a2_web::exit_lock();
             }
         }
-        play.render(&mut self.picture);
-        self.present();
+        // Composed and presented only when it changed (a menu with nothing
+        // drawn changed is the same picture: the port's own saving, the
+        // original draws every frame) or the canvas's size changed, which
+        // clears it; the canvas keeps the last picture meanwhile.
+        if play.render_cached(&mut self.picture, &mut self.cache)
+            || self.shown_size != Some(window.inner_size())
+        {
+            self.present();
+        }
         // The other folders decoded a little, so that the game's later
         // reads seldom decode a folder from its start.
         if !self.warm_done {

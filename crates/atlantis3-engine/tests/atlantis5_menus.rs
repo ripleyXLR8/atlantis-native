@@ -758,3 +758,155 @@ fn a_press_in_the_opening_frame_is_dropped() {
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// One 60 Hz frame of the desktop's loop: the step, then the picture
+/// composed only when it is not provably the one already drawn. True when
+/// it was composed; the picture is checked against a full render of
+/// every layer each time.
+fn frame_cached(
+    play: &mut Play,
+    px: &mut [u32],
+    cache: &mut atlantis3_engine::atlantis5_play::PictureCache,
+) -> bool {
+    play.update(1.0 / 60.0);
+    let composed = play.render_cached(px, cache);
+    let mut full = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    play.render_every_layer(&mut full);
+    assert!(px == full.as_slice(), "the kept picture is the full render");
+    composed
+}
+
+/// The menus' picture is composed again only when something drawn
+/// changed (a host-side saving: the original draws every frame): an idle
+/// main menu is composed once, a mouse move or a hover composes it again,
+/// and the picture is always the full render's.
+#[test]
+fn an_idle_menu_is_not_composed_again() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("menu-cost");
+    let mut play = booted(&d, &dir);
+    assert_eq!(play.menus.current(), Some(menus::MAIN));
+    let mut cache = atlantis3_engine::atlantis5_play::PictureCache::default();
+    let mut px = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    assert!(frame_cached(&mut play, &mut px, &mut cache), "the first");
+    // Five seconds idle: no composition (before: one per frame, 300).
+    let t = std::time::Instant::now();
+    for _ in 0..300 {
+        assert!(!frame_cached(&mut play, &mut px, &mut cache));
+    }
+    eprintln!(
+        "idle main menu: {} compositions in 300 frames ({:.2} ms a frame with the check)",
+        cache.composed(),
+        t.elapsed().as_secs_f64() * 1e3 / 300.0
+    );
+    assert_eq!(cache.composed(), 1);
+    // A mouse move: the cursor moved, composed once.
+    play.mouse_by(7, 3);
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    assert!(!frame_cached(&mut play, &mut px, &mut cache));
+    // A hover: the button turns red, composed once.
+    let (x, y) = {
+        let st = play.stage();
+        play.menus
+            .point_of("new_game", &st.fonts)
+            .expect("new_game")
+    };
+    let before = px.clone();
+    play.mouse_at(x, y);
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    assert!(px != before);
+    for _ in 0..30 {
+        assert!(!frame_cached(&mut play, &mut px, &mut cache));
+    }
+    // Outside a menu's own picture (the cache forgotten): composed.
+    cache.invalidate();
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    assert_eq!(cache.composed(), 4);
+    // The credits: the pages' turns (every 4 s) compose, the frames
+    // between do not.
+    click(&mut play, "credits");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::CREDITS));
+    play.mouse_at(10, 10);
+    let start = cache.composed();
+    for _ in 0..250 {
+        frame_cached(&mut play, &mut px, &mut cache);
+    }
+    let idle = cache.composed() - start;
+    eprintln!("credits, idle: {idle} compositions in 250 frames");
+    assert!((2..=4).contains(&idle), "{idle}");
+    // The sprite button `back`: its focus (one picture) composes once;
+    // a press plays its click (two pictures at 15 a second): each new
+    // picture composes, the frames between do not, until it closes the
+    // credits.
+    let (x, y) = {
+        let st = play.stage();
+        play.menus.point_of("back", &st.fonts).expect("back")
+    };
+    play.mouse_at(x + 1, y);
+    let start = cache.composed();
+    for _ in 0..60 {
+        frame_cached(&mut play, &mut px, &mut cache);
+    }
+    assert_eq!(cache.composed() - start, 1, "the focus");
+    play.click();
+    let (start, mut n) = (cache.composed(), 0);
+    while play.menus.current() == Some(menus::CREDITS) && n < 60 {
+        frame_cached(&mut play, &mut px, &mut cache);
+        n += 1;
+    }
+    let pressed = cache.composed() - start;
+    eprintln!("credits, back pressed: {pressed} compositions in {n} frames");
+    assert_ne!(play.menus.current(), Some(menus::CREDITS), "closed");
+    assert!(pressed >= 3 && pressed < n, "{pressed} in {n}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The in-game menu over the view: its background covers the view, so
+/// the view is not rendered under it (the same picture), and an idle
+/// frame composes nothing.
+#[test]
+fn the_in_game_menu_is_composed_on_change_only() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("in-game-cost");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    let mut cache = atlantis3_engine::atlantis5_play::PictureCache::default();
+    let mut px = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    let n = 60;
+    let t = std::time::Instant::now();
+    for _ in 0..n {
+        play.render_every_layer(&mut px);
+    }
+    let every = t.elapsed().as_secs_f64() * 1e3 / f64::from(n);
+    let t = std::time::Instant::now();
+    for _ in 0..n {
+        play.render(&mut px);
+    }
+    let covered = t.elapsed().as_secs_f64() * 1e3 / f64::from(n);
+    eprintln!("in-game menu: {every:.2} ms a composition with the view, {covered:.2} ms without");
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    for _ in 0..120 {
+        assert!(!frame_cached(&mut play, &mut px, &mut cache));
+    }
+    play.mouse_by(-40, 25);
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    assert_eq!(cache.composed(), 2);
+    // Back to play: every frame composed (no shortcut in play).
+    click(&mut play, "resume");
+    for _ in 0..10 {
+        frames(&mut play, 1);
+        if play.game.state() == 4 {
+            break;
+        }
+    }
+    let start = cache.composed();
+    for _ in 0..5 {
+        assert!(frame_cached(&mut play, &mut px, &mut cache));
+    }
+    assert_eq!(cache.composed() - start, 5);
+    let _ = std::fs::remove_dir_all(&dir);
+}
