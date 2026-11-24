@@ -248,6 +248,19 @@ fn must_present(composed: bool, asked: bool, since: std::time::Duration) -> bool
     composed || asked || since >= KEEP_SHOWN
 }
 
+/// The present's state after one (`asked`, when the last was): one that
+/// reached the window clears the ask and is the last; a failed one (the
+/// surface's resize, its buffer or its present refused) leaves the ask
+/// set, so the next frame presents the picture again even when it was
+/// not composed anew.
+fn after_present(ok: bool, presented: Instant, now: Instant) -> (bool, Instant) {
+    if ok {
+        (false, now)
+    } else {
+        (true, presented)
+    }
+}
+
 /// The decoding's step before the game starts (uncompressed bytes).
 const WARM_STEP: u64 = 4 << 20;
 
@@ -285,26 +298,30 @@ struct A5App {
 
 impl A5App {
     fn present(&mut self) {
+        let ok = self.try_present();
+        (self.present_asked, self.presented) = after_present(ok, self.presented, Instant::now());
+    }
+
+    /// The picture into the window; false when it did not get there.
+    fn try_present(&mut self) -> bool {
         let (Some(window), Some(surface)) = (&self.window, self.surface.as_mut()) else {
-            return;
+            return false;
         };
         // The window's size read once: the placement and the buffer are
         // both made from it (a second read may differ during a resize).
         let size = window.inner_size();
         let (ww, wh) = (size.width.max(1) as usize, size.height.max(1) as usize);
         let (Some(w), Some(h)) = (NonZeroU32::new(ww as u32), NonZeroU32::new(wh as u32)) else {
-            return;
+            return false;
         };
         if surface.resize(w, h).is_err() {
-            return;
+            return false;
         }
         let Ok(mut buf) = surface.buffer_mut() else {
-            return;
+            return false;
         };
         scale_into(&mut buf, (ww, wh), &self.picture, &mut self.columns);
-        let _ = buf.present();
-        self.present_asked = false;
-        self.presented = Instant::now();
+        buf.present().is_ok()
     }
 
     /// The pointer held in the window while it has the focus, in play and
@@ -723,6 +740,22 @@ mod tests {
         // long ago.
         assert!(must_present(false, true, short));
         assert!(must_present(false, false, KEEP_SHOWN));
+    }
+
+    #[test]
+    fn a_failed_present_is_tried_again_at_the_next_frame() {
+        let before = Instant::now();
+        let now = before + FRAME;
+        // Reached the window: the ask cleared, the next frame's unchanged
+        // picture not presented again.
+        let (asked, at) = after_present(true, before, now);
+        assert_eq!((asked, at), (false, now));
+        assert!(!must_present(false, asked, FRAME));
+        // Refused: asked again at the next frame, the last present's time
+        // kept.
+        let (asked, at) = after_present(false, before, now);
+        assert_eq!((asked, at), (true, before));
+        assert!(must_present(false, asked, FRAME));
     }
 
     #[test]
