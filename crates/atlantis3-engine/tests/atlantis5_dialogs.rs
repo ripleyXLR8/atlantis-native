@@ -352,25 +352,34 @@ fn terminate_dialog_turns_the_character_back_once() {
 /// at the screen's centre (its state 2, @ 0x00410f90): the cursor drawn
 /// goes there too, where the next click is tested.
 #[test]
-fn the_rebuilt_subject_menu_moves_the_drawn_cursor_too() {
+fn the_rebuilt_subject_menu_puts_the_cursor_back_at_the_click() {
+    // @ 0x0041b780: the mode's open puts the mouse at the centre;
+    // @ 0x00410f90 state 2: the elements made again with the mouse back at
+    // the menu's own (+0xc/+0x10, where it was at the click), the moves
+    // made during the subject's script dropped.
     let Some(d) = dvd() else { return };
     let mut play = to_first_view(&d, None);
     go(&mut play, 17);
     assert!(play.aim_at_sprite(b"gorilla"));
     play.click();
+    frames(&mut play, 1);
+    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+    assert!(play.stage().menu_open_now());
+    assert_eq!(play.menus.mouse, centre, "centred at the open");
     for _ in 0..300 {
         frames(&mut play, 1);
         if !play.stage().menu_subjects().is_empty() {
             break;
         }
     }
-    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
-    assert_eq!(play.menus.mouse, centre);
+    assert_eq!(play.menus.mouse, centre, "not moved at the facing's end");
     let (x, y) = play.stage().menu_subject_point(0).expect("subject 0");
     play.mouse_at(x, y);
     play.click();
     frames(&mut play, 2);
     assert!(play.stage().dialog_state().is_some());
+    // A move during the subject's dialog.
+    play.mouse_at(100, 100);
     play.space();
     for _ in 0..30 {
         frames(&mut play, 1);
@@ -379,7 +388,40 @@ fn the_rebuilt_subject_menu_moves_the_drawn_cursor_too() {
         }
     }
     assert_eq!(play.stage().menu_subjects().len(), 3, "made again");
-    assert_eq!(play.menus.mouse, centre);
+    assert_eq!(play.menus.mouse, (x, y));
+    assert_eq!(play.stage().mouse, (x, y));
+    // A press there without a move asks a subject again.
+    play.click();
+    frames(&mut play, 2);
+    assert!(play.stage().menu_open_now());
+    assert!(
+        play.stage().dialog_state().is_some(),
+        "a subject asked again"
+    );
+}
+
+#[test]
+fn a_press_in_the_frame_the_subjects_are_made_is_dropped() {
+    // @ 0x00410f90 case 0 returns after making the elements, with no
+    // event taken: a press in that frame does not close the menu.
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 1);
+    assert!(play.stage().menu_open_now());
+    for _ in 0..300 {
+        play.click();
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    frames(&mut play, 2);
+    assert!(play.stage().menu_open_now(), "still open");
+    assert!(!play.stage().menu_subjects().is_empty());
+    assert!(play.stage().menu_subject_point(0).is_some());
 }
 
 #[test]

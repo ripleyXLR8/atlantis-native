@@ -655,13 +655,13 @@ impl Walker {
         self.play.mouse_at(x, y);
         self.play.click();
         // The subject's script, then the menu made again (or closed by
-        // the script, or a chapter started).
+        // the script, or a chapter started); a press in the frame it is
+        // made again is dropped (@ 0x00410f90 state 2).
         for _ in 0..30 * 600 {
             self.frames(1);
             if !self.play.game.busy()
                 && !self.play.stage().dialog_running()
-                && (!self.play.stage().menu_subjects().is_empty()
-                    || !self.play.stage().menu_open_now())
+                && (self.play.stage().menu_shown() || !self.play.stage().menu_open_now())
             {
                 break;
             }

@@ -566,6 +566,13 @@ struct SubjectMenu {
     picked: Option<Vec<u8>>,
     /// The menu has ended (its process returned 1).
     closed: bool,
+    /// +0xc/+0x10: the menu's own mouse, set at the mode's open (the
+    /// screen's centre, @ 0x0041b780) and by its moves in state 1
+    /// (@ 0x0040d920 → 0x0040d890); state 2 puts the mouse back there.
+    at: (i32, i32),
+    /// Opened since the menus' last frame: the drawn cursor is moved to
+    /// the centre then.
+    fresh: bool,
 }
 
 /// The inventory (`CMenu_Inventory`, mode 8).
@@ -2612,9 +2619,14 @@ impl Stage {
     }
 
     /// The subject menu opens (mode 9, @ 0x00410f80(name), the menu's
-    /// Initialize @ 0x004117f0): the character's sprite turns to face
-    /// (`facing`, its priority kept, its record held), state 0.
+    /// Initialize @ 0x004117f0): the mouse at the screen's centre (the
+    /// manager's open, @ 0x0041b780: 0x0040d890(W >> 1, H >> 1) and a
+    /// move there), the character's sprite turns to face (`facing`, its
+    /// priority kept, its record held), state 0.
     fn menu_open(&mut self, character: &[u8]) {
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+        self.mouse = centre;
         // The menu's start holds the half music level (@ 0x0041197e).
         self.music_duck(0.5);
         self.hold_randomized(character, true);
@@ -2627,7 +2639,17 @@ impl Stage {
             images: Vec::new(),
             picked: None,
             closed: false,
+            at: centre,
+            fresh: true,
         });
+    }
+
+    /// Whether the subject menu opened since the menus' last frame (its
+    /// mouse put at the centre); taken once.
+    pub(crate) fn menu_take_fresh(&mut self) -> bool {
+        self.menu
+            .as_mut()
+            .is_some_and(|m| std::mem::take(&mut m.fresh))
     }
 
     /// The subject menu's character whose subjects it needs now (its
@@ -2667,10 +2689,14 @@ impl Stage {
     /// image `sprites2d/dialog/subjects/<name>.spr` (`proxy_subject.spr`
     /// when missing), drawn at half its alpha when disabled
     /// (@ 0x00412b60: 0.5), and its 64 × 64 area. No subject: none, and
-    /// the menu stays.
+    /// the menu stays. Made after the facing (state 0) the mouse is left
+    /// where it is; made again after a subject's script (state 2,
+    /// @ 0x00410f90: 0x0040d890(+0xc, +0x10)) the mouse goes back to the
+    /// menu's own, where it was at the click, the moves made during the
+    /// script dropped.
     pub fn menu_set_subjects(&mut self, subjects: Vec<(Vec<u8>, bool)>) {
         let Some(m) = &self.menu else { return };
-        let _ = m;
+        let back = (m.state == MenuState::Rebuild).then_some(m.at);
         let bubble = self
             .read(&format!(
                 "datas/sprites2d/dialog/{}",
@@ -2694,10 +2720,9 @@ impl Stage {
             m.images = images;
             m.state = MenuState::Open;
         }
-        self.mouse = (
-            i32::try_from(VIEW_WIDTH).unwrap_or(0) / 2,
-            i32::try_from(VIEW_HEIGHT).unwrap_or(0) / 2,
-        );
+        if let Some(at) = back {
+            self.mouse = at;
+        }
     }
 
     /// The subject menu's bubble hot spot.
@@ -2757,6 +2782,7 @@ impl Stage {
             Some(i) => {
                 m.picked = Some(m.subjects[i].0.clone());
                 m.state = MenuState::Rebuild;
+                m.at = (x, y);
             }
             None => m.state = MenuState::Closing,
         }
@@ -2809,6 +2835,14 @@ impl Stage {
     /// Whether the subject menu is open.
     pub fn menu_open_now(&self) -> bool {
         self.menu.is_some()
+    }
+
+    /// Whether the subject menu's elements are up and take presses (state
+    /// 1: made after the facing, or made again after a subject's script).
+    pub fn menu_shown(&self) -> bool {
+        self.menu
+            .as_ref()
+            .is_some_and(|m| m.state == MenuState::Open)
     }
 
     /// The subject menu over the view (@ 0x00411790: not in states 2
@@ -4139,6 +4173,12 @@ impl Play {
             }
         }
         self.game.update(dt);
+        // The subject menu opened by this frame's scripts: the drawn
+        // cursor at the centre with its mouse (@ 0x0041b780), before the
+        // next moves.
+        if self.stage.borrow_mut().menu_take_fresh() {
+            self.cursor_to_stage_mouse();
+        }
         if self.game.state() == 4 && !self.game.busy() {
             self.pick();
         }
@@ -4325,6 +4365,11 @@ impl Play {
             self.menus_frame(clicks, dt);
             return;
         }
+        // The mode's open (@ 0x0041b780): the drawn cursor at the centre
+        // with the menu's mouse.
+        if self.stage.borrow_mut().menu_take_fresh() {
+            self.cursor_to_stage_mouse();
+        }
         // The menu's process (@ 0x00410f90): state 5 (asked by a click
         // elsewhere or `Atl_TerminateDialog` since its last frame) ends it.
         self.stage.borrow_mut().menu_close_step();
@@ -4349,6 +4394,10 @@ impl Play {
             };
             self.stage.borrow_mut().menu_set_subjects(list);
             self.cursor_to_stage_mouse();
+            // No press is taken in the frame the elements are made: state
+            // 0 returns after making them, state 2 empties the frame's
+            // events but its own move (@ 0x00410f90).
+            return;
         }
         for _ in 0..clicks {
             self.stage.borrow_mut().menu_click();
@@ -4641,9 +4690,10 @@ impl Play {
     }
 
     /// The drawn cursor moved where the stage put the mouse: a mode's
-    /// initialize puts it at the screen's centre (menus.md: the subject
-    /// menu's state 2, the inventory's open), where both the hit tests
-    /// and the cursor then are.
+    /// open puts it at the screen's centre (@ 0x0041b780: the subject
+    /// menu's, the inventory's), the subject menu's state 2 back at the
+    /// menu's own mouse (@ 0x00410f90), where both the hit tests and the
+    /// cursor then are.
     fn cursor_to_stage_mouse(&mut self) {
         let (x, y) = self.stage.borrow().mouse;
         self.menus.mouse_at(x, y);
