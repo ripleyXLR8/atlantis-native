@@ -5223,7 +5223,12 @@ impl Play {
                     self.menus.draw_cursor(out);
                 }
             }
-        } else if !busy && (st.inventory_open_now() || st.menu_open_now()) {
+        } else if !busy && (st.inventory_open_now() || st.menu_shown()) {
+            // The subject menu's cursor (+8, a `CIE_Sprite` made hidden,
+            // @ 0x00451b40) is shown only once the facing ends and the
+            // elements are made (@ 0x00410f90 LAB_00411203, again after
+            // state 2's remake), hidden when they are deleted
+            // (@ 0x00412990), and drawn only when shown (@ 0x00411790).
             self.menus.draw_cursor(out);
             st.draw_inventory_over_cursor(out);
         }

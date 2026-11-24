@@ -142,6 +142,18 @@ fn the_gorillas_subject_menu_and_dialog() {
     assert_eq!(play.game.state(), 3);
     assert!(play.stage().menu_open_now());
     assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
+    // No menus' cursor while the character turns (the menu's cursor is
+    // shown only when its elements are made, @ 0x00410f90), wherever the
+    // mouse goes.
+    play.mouse_at(300, 200);
+    frames(&mut play, 1);
+    assert!(play.stage().menu_open_now() && play.stage().menu_subjects().is_empty());
+    let mut view = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    play.stage().render(&mut view);
+    assert!(
+        shot(&play, "a5-subject-facing.png") == view,
+        "no cursor while facing"
+    );
     for _ in 0..300 {
         frames(&mut play, 1);
         if !play.stage().menu_subjects().is_empty() {
@@ -149,6 +161,9 @@ fn the_gorillas_subject_menu_and_dialog() {
         }
     }
     assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"));
+    // Then the cursor is drawn.
+    play.stage().render(&mut view);
+    assert!(shot(&play, "a5-subject-cursor.png") != view, "the cursor");
     assert_eq!(play.stage().menu_subjects(), [b"gorille".to_vec()]);
     let menu = shot(&play, "a5-subject-menu.png");
     assert!(menu.iter().any(|&p| p & 0xff_ffff != 0));
