@@ -437,6 +437,43 @@ fn a_subject_menu_without_subjects_has_no_bubble() {
     assert!(!play.stage().menu_has_bubble());
 }
 
+/// @ 0x00410f90 case 0 never runs the menu's events (@ 0x0040d920): the
+/// moves made while the character plays `facing` reach only the global
+/// mouse, so the subjects appear with the cursor still at the open's
+/// centre; the first move after takes it to the global mouse plus that
+/// move (the move event carries the global mouse, @ 0x0043bde0).
+#[test]
+fn moves_during_the_facing_do_not_move_the_subject_menu_s_cursor() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 1);
+    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+    assert!(play.stage().menu_open_now());
+    assert_eq!(play.menus.mouse, centre);
+    // A move during the facing.
+    play.mouse_by(150, -100);
+    assert_eq!(play.menus.mouse, centre, "the facing's move");
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    assert!(play.stage().menu_shown());
+    assert_eq!(play.menus.mouse, centre, "the cursor at the centre");
+    assert_eq!(play.stage().mouse, centre);
+    // The next move: the global mouse plus it.
+    play.mouse_by(2, 3);
+    let to = (centre.0 + 152, centre.1 - 97);
+    assert_eq!(play.menus.mouse, to);
+    assert_eq!(play.stage().mouse, to);
+    play.mouse_by(1, 1);
+    assert_eq!(play.menus.mouse, (to.0 + 1, to.1 + 1));
+}
+
 #[test]
 fn a_press_in_the_frame_the_subjects_are_made_is_dropped() {
     // @ 0x00410f90 case 0 returns after making the elements, with no

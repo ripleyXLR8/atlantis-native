@@ -2814,8 +2814,9 @@ impl Stage {
     /// image `sprites2d/dialog/subjects/<name>.spr` (`proxy_subject.spr`
     /// when missing), drawn at half its alpha when disabled
     /// (@ 0x00412b60: 0.5), and its 64 × 64 area. No subject: none, and
-    /// the menu stays. Made after the facing (state 0) the mouse is left
-    /// where it is; made again after a subject's script (state 2,
+    /// the menu stays. Made after the facing (state 0) the menu's mouse is
+    /// still the open's centre (the facing's moves reached only the
+    /// global mouse, [`Play::mouse_at`]); made again after a subject's script (state 2,
     /// @ 0x00410f90: 0x0040d890(+0xc, +0x10)) the mouse goes back to the
     /// menu's own, where it was at the click, the moves made during the
     /// script dropped.
@@ -2965,6 +2966,14 @@ impl Stage {
     /// Whether the subject menu is open.
     pub fn menu_open_now(&self) -> bool {
         self.menu.is_some()
+    }
+
+    /// Whether the subject menu's character plays `facing` (state 0: the
+    /// menu's events are not run, @ 0x00410f90).
+    pub fn menu_facing(&self) -> bool {
+        self.menu
+            .as_ref()
+            .is_some_and(|m| m.state == MenuState::Facing)
     }
 
     /// Whether the subject menu's elements are up and take presses (state
@@ -4152,6 +4161,12 @@ pub struct Play {
     sound_held: bool,
     /// The poker board (mode 12) when it is up.
     poker: Option<Poker>,
+    /// The global mouse (0x006b0b38 / 0x006b0b3c) when it went apart from
+    /// the subject menu's own (+0xc/+0x10): moved while the character
+    /// plays `facing`, whose state (@ 0x00410f90 case 0) never runs the
+    /// menu's events (@ 0x0040d920), until the first move once the
+    /// elements are up, which takes the menu's mouse there.
+    menu_global: Option<(i32, i32)>,
     src: Arc<dyn FileSource>,
     /// The logos still to play before the main menu ([`Play::boot`]).
     logos: Vec<&'static str>,
@@ -4239,6 +4254,7 @@ impl Play {
             menus,
             sound_held: false,
             poker: None,
+            menu_global: None,
             src,
             logos: Vec::new(),
             in_logos: false,
@@ -4969,17 +4985,38 @@ impl Play {
         self.game.state() == 3
     }
 
-    /// The mouse at (x, y) on the 1024 × 576 picture (menus).
+    /// The mouse at (x, y) on the 1024 × 576 picture (menus). While the
+    /// subject menu's character plays `facing` only the global mouse
+    /// moves: the menu's own mouse and its cursor stay at the centre the
+    /// open set (@ 0x0041b780), and the first move once the elements are
+    /// up takes them to the mouse (@ 0x0040d920 → 0x0040d890).
     pub fn mouse_at(&mut self, x: i32, y: i32) {
+        let facing = {
+            let st = self.stage.borrow();
+            if !st.menu_open_now() {
+                self.menu_global = None;
+            }
+            st.menu_facing()
+        };
+        if facing {
+            #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+            let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
+            self.menu_global = Some((x.clamp(0, w), y.clamp(0, h)));
+            return;
+        }
+        self.menu_global = None;
         self.stage.borrow_mut().mouse = (x, y);
         self.menus.mouse_at(x, y);
     }
 
     /// A relative move of the mouse in a menu (DirectInput's lX, lY,
-    /// @ 0x0047c8a0): the menus' mouse moved by it and kept within
-    /// 0..=1024, 0..=576 (@ 0x0040d890).
+    /// @ 0x0047c8a0): the global mouse moved by it and kept within
+    /// 0..=1024, 0..=576, then the menus' mouse there (@ 0x0040d890).
     pub fn mouse_by(&mut self, dx: i32, dy: i32) {
-        let (x, y) = self.menus.mouse;
+        if !self.stage.borrow().menu_open_now() {
+            self.menu_global = None;
+        }
+        let (x, y) = self.menu_global.unwrap_or(self.menus.mouse);
         #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
         let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
         self.mouse_at(
