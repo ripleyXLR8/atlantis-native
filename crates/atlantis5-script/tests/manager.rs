@@ -651,6 +651,74 @@ fn a_save_s_read_stops_when_atlantis_lua_raises() {
 }
 
 #[test]
+fn a_save_s_read_stops_when_atlantis_lua_does_not_load() {
+    // @ 0x00454410 throws when `luaL_loadfile` fails (CException
+    // 0x0066eb64, before any `lua_pcall`); the reader calls it with no
+    // existence test, so a missing or broken file abandons the read.
+    let mut files = BASE.to_vec();
+    let atlantis = format!(
+        "{} function Atl_Address_GetCurrent() return \"deck\", 1 end",
+        files[0].1
+    );
+    files[0] = ("atlantis.lua", &atlantis);
+    for broken in [None, Some("function (")] {
+        let (mut g, probe) = game(&files);
+        g.new_game();
+        settle(&mut g, 5);
+        assert_eq!(g.state(), 4);
+        let key = format!("{DIR}atlantis.lua");
+        match broken {
+            None => {
+                probe.borrow_mut().files.remove(&key);
+            }
+            Some(src) => {
+                probe.borrow_mut().files.insert(key, src.to_string());
+            }
+        }
+        probe.borrow_mut().requests.clear();
+        assert!(!g.load_file("autoslot"), "{broken:?}");
+        assert!(!g.requests_pending(), "{broken:?}");
+        assert!(!probe
+            .borrow()
+            .requests
+            .iter()
+            .any(|r| matches!(r, Request::LoadView { .. })));
+    }
+}
+
+/// NewGame (@ 0x0042fc50) evaluates both files with no existence test and
+/// @ 0x00454410 throws on a load failure: `Exit Game`, the program ends.
+/// State 1's `lua_pcall` of a non-function `InitChapter` throws too.
+#[test]
+fn a_new_game_without_its_scripts_ends_the_program() {
+    for (name, src) in [
+        ("atlantis.lua", None),
+        ("atlantis.lua", Some("function (")),
+        ("on_new_game.lua", None),
+        ("on_new_game.lua", Some("function (")),
+        (
+            "atlantis.lua",
+            Some("require \"lib/util.lua\" InitChapter = 3"),
+        ),
+    ] {
+        let files: Vec<(&str, &str)> = BASE
+            .iter()
+            .filter_map(|&(n, s)| {
+                if n == name {
+                    src.map(|src| (n, src))
+                } else {
+                    Some((n, s))
+                }
+            })
+            .collect();
+        let (mut g, _) = game(&files);
+        g.new_game();
+        settle(&mut g, 5);
+        assert_eq!(g.state(), 8, "{name} {src:?}");
+    }
+}
+
+#[test]
 fn the_chapter_runs_in_the_next_state_and_clears_its_number_after() {
     let mut files = BASE.to_vec();
     files[0] = (

@@ -330,11 +330,20 @@ impl Game {
         }
         // Each file runs to its end before the next (EvaluateScriptFile).
         // An error in either is caught @ 0x0042feda / 0x0042ff5e, logged
-        // and rethrown as `Exit Game` (0x0066cdcc): fatal.
+        // and rethrown as `Exit Game` (0x0066cdcc): fatal. That includes a
+        // file that is missing or does not load: @ 0x00454410 throws when
+        // `luaL_loadfile` fails, and NewGame calls it with no existence
+        // test.
         for name in [&b"atlantis.lua"[..], b"on_new_game.lua"] {
             let path = Self::scripts_path(name);
             if self.push_file(&path, false, true) {
                 self.run();
+            } else {
+                self.note(format!(
+                    "CGameManager::NewGame() : EvaluateScriptFile ({}) threw",
+                    String::from_utf8_lossy(&path)
+                ));
+                self.exit_on_error();
             }
             if self.state == 8 {
                 return;
@@ -1162,8 +1171,8 @@ impl Game {
     /// @ 0x00418960); at its end the reader queues the requests 5 (the
     /// transition, here [`Game`]'s own) and 4 (0x0043b6f4..0x0043b7c1).
     /// False when the file is missing or its read was abandoned (not an
-    /// `ATL_FILE`, `atlantis.lua` raising, `LUA_DB` missing or unreadable,
-    /// `Atl_Address_GetCurrent` raising).
+    /// `ATL_FILE`, `atlantis.lua` missing, unloadable or raising, `LUA_DB`
+    /// missing or unreadable, `Atl_Address_GetCurrent` raising).
     pub fn load_file(&mut self, file: &str) -> bool {
         let Some(data) = self.engine.borrow_mut().read_save(file) else {
             self.note(format!("Atl_Load: the file saves/{file} is missing"));
@@ -1184,11 +1193,16 @@ impl Game {
         // (0x0043b884, 0x0043b8ca) only log. False, so the menus' loads
         // reopen their page. First `atlantis.lua` (@ 0x00454410, state 6
         // at 0x0043b2ec): a Lua error in it throws.
+        // A missing or unloadable file throws there as well
+        // (`luaL_loadfile` != 0 → `CException` 0x0066eb64, before any
+        // `lua_pcall`; the reader makes no existence test).
         let path = Self::scripts_path(b"atlantis.lua");
         let errors = self.run_errors;
-        if self.push_file(&path, false, false) {
-            self.run();
+        if !self.push_file(&path, false, false) {
+            self.note("CSaveFileReader :: Read -> atlantis.lua did not load".into());
+            return false;
         }
+        self.run();
         if self.run_errors != errors {
             self.note("CSaveFileReader :: Read -> atlantis.lua raised".into());
             return false;
@@ -1274,7 +1288,13 @@ impl Game {
                 });
                 self.run();
             }
-            None => self.chapter = 0,
+            // `InitChapter` not a function: state 1's `lua_pcall(2, 0)`
+            // fails and throws (format 0x0066cc98), uncaught below
+            // MainLoop: the program ends, as for a raising InitChapter.
+            None => {
+                self.chapter = 0;
+                self.exit_on_error();
+            }
         }
     }
 
