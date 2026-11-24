@@ -4204,6 +4204,10 @@ pub struct Play {
     /// ([`Play::set_buttons`]).
     left_held: bool,
     right_held: bool,
+    /// The inventory opened by a right press since the last frame: the
+    /// next frame is its mode's opening (@ 0x0041b780), whose events are
+    /// dropped.
+    inventory_fresh: bool,
     hover: Option<Hover>,
     /// The menus (the manager's other modes).
     pub menus: Menus,
@@ -4300,6 +4304,7 @@ impl Play {
             play_clicks: 0,
             left_held: false,
             right_held: false,
+            inventory_fresh: false,
             hover: None,
             menus,
             sound_held: false,
@@ -4544,6 +4549,7 @@ impl Play {
                 self.stage.borrow_mut().cursor = Some(cursor);
             }
         }
+        self.inventory_fresh = false;
     }
 
     /// The modes the scripts asked (`Atl_GameOver`, `Atl_ExamineItem`,
@@ -4949,7 +4955,13 @@ impl Play {
                 self.game.run_arrange_handled_object();
             }
             Ok(_) => {
-                // Mode 8, state 3 (@ 0x004305d0).
+                // Mode 8, state 3 (@ 0x004305d0). The mode opens at the
+                // menus' next frame (@ 0x0041b780), which empties that
+                // frame's events and inserts only the move at the centre:
+                // the presses made until then are dropped.
+                self.clicks = 0;
+                self.play_clicks = 0;
+                self.inventory_fresh = true;
                 let (size, items) = self.game.script().inventory();
                 self.game.open_menu();
                 self.stage
@@ -4990,6 +5002,10 @@ impl Play {
             self.right_click();
             return;
         }
+        // In the inventory's opening frame: dropped with its events.
+        if self.inventory_fresh {
+            return;
+        }
         let hit = self.stage.borrow().inventory_hit();
         match hit {
             Some(InventoryHit::Slot(s)) => {
@@ -5028,6 +5044,13 @@ impl Play {
     /// that frame, state 2 (@ 0x00414a30: `buttons & 4` on a press event)
     /// ends the inventory, as a right press off the elements does.
     fn inventory_frame(&mut self, clicks: usize, held_clicks: usize, dt: f64) -> Option<bool> {
+        // Opened by a right press: this is the mode's opening frame, its
+        // presses dropped (@ 0x0041b780).
+        let (clicks, held_clicks) = if std::mem::take(&mut self.inventory_fresh) {
+            (0, 0)
+        } else {
+            (clicks, held_clicks)
+        };
         self.stage.borrow_mut().inventory_buttons_hover();
         let mut taken = false;
         for _ in 0..clicks {

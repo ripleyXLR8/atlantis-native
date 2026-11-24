@@ -1187,6 +1187,26 @@ fn a_right_press_with_the_left_held_clicks_a_menu_button() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The inventory opened by a right press opens as a mode at the menus'
+/// next frame (@ 0x0041b780), which empties that frame's events: a left
+/// press made then, the right button still held (buttons 5), is dropped
+/// instead of ending the inventory (@ 0x00414a30, `& 4` untaken).
+#[test]
+fn the_inventory_s_opening_frame_drops_its_presses() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-opening");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.set_buttons(false, true);
+    play.right_press();
+    play.set_buttons(true, true);
+    play.click();
+    frames(&mut play, 2);
+    assert!(play.stage().inventory_open_now());
+    assert_eq!(play.game.state(), 3);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 /// With a page button hot, a right press with the left held (buttons 5)
 /// is the button's press (`& 1`, @ 0x0044f0e0: its click played, then the
 /// page), not the inventory's end.
