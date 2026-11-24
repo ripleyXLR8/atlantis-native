@@ -118,14 +118,17 @@ in progress).
 ## The Secrets of Atlantis: The Sacred Legacy (2006)
 
 🟢 **Already supported or tried:** the French DVD (*L'Héritage sacré*,
-Nobilis France, barcode 3760137140938) and the international DVD
+Nobilis France, barcode 3760137140938), the international DVD
 (English, German, Italian, Spanish; its program `The secrets of
-Atlantis.exe` of 3,883,008 bytes, MD5 `fcb357acdb6c16a76f3f4f6cb5a625c5`).
+Atlantis.exe` of 3,883,008 bytes, MD5 `fcb357acdb6c16a76f3f4f6cb5a625c5`)
+and the North-American CDs (*The Secrets of Atlantis*, The Adventure
+Company, 2007, UPC 625904549518, serial PC0549CD; the program on the
+first disc `bin\The Secrets of Atlantis.exe` of 7,368,704 bytes, MD5
+`ad356540e6375bf19e31372cd56193ae`).
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|
 | 🟠 wanted | *Das heilige Vermächtnis*, "Solid Games" | Germany, United Independent Entertainment | 2009 | DVD | Barcode 4020636110160 |
-| 🟠 wanted | *The Secrets of Atlantis* (no subtitle) | USA, The Adventure Company | 2007 | 3 CD | UPC 625904549518; serial PC0549CD; Redump [107438](http://redump.org/disc/107438/)–107440 |
 | 🟠 wanted | *The Secrets of Atlantis*, Russian | Russia, Akella | — | 3 CD, or 1 DVD | Barcodes 4607057337606 (CD), 4607057337576 (DVD) |
 | 🟠 wanted | *The Secrets of Atlantis*, Czech | Czech Republic, Hypermax | 2007 | DVD | Barcode 8594037370455 |
 | ⚪ unconfirmed | *The Secrets of Atlantis*, Polish | Poland, IQ Publishing | 2007 | — | Not confirmed; barcode possibly 5907527094602 |

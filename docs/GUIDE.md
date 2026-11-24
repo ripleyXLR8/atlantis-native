@@ -1128,13 +1128,17 @@ Native plays its French DVD with its *Atlantis III* engine and runs the
 DVD's own scripts (the compiled Lua 5.0 chunks of your copy, loaded as
 they are), and its international DVD (English, German, Italian,
 Spanish), whose scripts are the same story as Lua 5.0 source, compiled
-as Lua 5.0 compiles it. The game library shows the French DVD as *The
+as Lua 5.0 compiles it, and its North-American CDs (*The Secrets of
+Atlantis*, The Adventure Company, 2007, three CDs, English), whose data
+are the international DVD's English ones in an InstallShield set spread
+over the three discs, plus The Adventure Company's logo film. The game library shows the French DVD as *The
 Secrets of Atlantis : L'Héritage sacré (2006), DVD, French*, and the
 international DVD once per language, *The Secrets of Atlantis: The
 Sacred Legacy (2006), DVD, English* (German, Italian, Spanish): the
 original's installer asks for one language and installs it, and the
 game has no language option of its own, so here each language is an
-entry to play. The international DVD started from the command line
+entry to play. The CDs are *The Secrets of Atlantis (2007), 3 CDs,
+English*. The international DVD started from the command line
 without a choice plays the system's language when it is one of the
 four, else English; its cabinet's path chooses one
 (`atlantis-native "D:\datas_german.cab"`).
@@ -1155,10 +1159,17 @@ drive, or a copy of its files (the folder holding `DATAS.cab` and
 `DATAS_french.cab`, or `datas.cab` and `datas_english.cab`,
 `datas_german.cab`, `datas_italian.cab`, `datas_spanish.cab`), the DVD's image (an `.iso`) or the folder holding
 it, or the folder where the DVD's installer put the game (the one with
-`Datas`). The cabinets are read in place: nothing is unpacked, nothing
+`Datas`). For the North-American CDs: a folder holding a copy of each
+disc in a folder of its own, side by side (`data1.hdr`, `data1.cab`,
+`data2.cab` and `bin\` from the first disc, `data3.cab` from the second,
+`data4.cab` from the third), the three discs' files copied together
+into one folder, the folder holding the three CD images, or the folder
+where the CDs' installer put the game; the game's files are spread over
+the three discs, so one disc alone does not play (in a drive, copy the
+three, see below). The cabinets are read in place: nothing is unpacked, nothing
 is installed. Played from the DVD or its image, the game library offers
-to copy it to the computer once (see below). The DVD's program (`The secrets of Atlantis.exe`) is never
-run nor read beyond its identification. From the command line:
+to copy it to the computer once (see below). The DVD's program (`The secrets of Atlantis.exe`) and the CDs' (`bin\The Secrets of Atlantis.exe`) are never
+run nor read beyond their identification. From the command line:
 
     atlantis-native D:\
     atlantis-native "C:\Games\soa-fr.iso"
@@ -1201,9 +1212,22 @@ copy is read as the DVD is (nothing unpacked), and the index files
 above serve both. A copy cancelled or cut short goes on from the files
 already copied whole the next time.
 
+**Copying the CDs.** With one drive, the CDs are copied one after the
+other into `atlantis5/cds/` in the per-user data folder (about 1.5 GB):
+add the first CD's drive to the game library (or choose it as the game
+folder) and choose **Copy to this computer**; once a disc is copied the
+library asks for the next one, and the disc in the drive is read with
+those already copied. After the third, the copy plays without the
+discs. If a disc cannot be read (a scratch), the copy stops with the
+error: clean the disc and choose Copy again, which goes on from the
+files already copied whole.
+
 **In the browser.** The web version plays it too (see
 [The web version](#the-web-version)): from the DVD's image, the DVD, a
-copy of its files or an installed folder, picked at each visit. The
+copy of its files or an installed folder, picked at each visit, or a
+folder holding copies of the three North-American CDs (one folder per
+disc or their files together; the CDs' images are not read in the
+browser). The
 browser keeps no index of the cabinets: each start from the DVD or its
 image reads about 450 MB of it before the logos. The saves are kept in
 the browser's storage (about 190 KB each, some twenty fit), not in a
@@ -1221,6 +1245,11 @@ folder.
 - Six sprites of a Mesopotamian temple's engraved prong are missing from
   the French DVD itself; the scripts run without them, as the original
   does.
+- The North-American CDs hold a third logo film, The Adventure Company's
+  (`Logo_TAC.bik`); where their program plays it among the start's logos
+  is not known yet, so Native plays the DVDs' two (Nobilis, then AIE).
+  The CDs have been tried from copies of their files on a hard disk, not
+  yet from their drive or their images.
 - Only the French DVD has been tried. The international DVD has the
   same layout (`DATAS.cab` and one `DATAS_<language>.cab` per language),
   which is read, but it has not been tried. Android does not play it

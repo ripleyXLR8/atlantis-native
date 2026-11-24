@@ -69,12 +69,14 @@ are welcome (see [The 2004 CD](docs/GUIDE.md#the-2004-cd-in-progress)).
 
 *The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,
 2006), the last game of Cryo's *Atlantis III* engine, plays from start
-to end from its French DVD (*L'Héritage sacré*) and its international
-DVD (English, German, Italian, Spanish) on the desktop and in the
-browser: its drive, its files, its image or its installation, in the
-game library as *The Secrets of Atlantis : L'Héritage sacré (2006), DVD,
-French* or, one entry per language, *The Secrets of Atlantis: The Sacred
-Legacy (2006), DVD, German*; on the desktop the DVD can be copied to the computer once
+to end from its French DVD (*L'Héritage sacré*), its international
+DVD (English, German, Italian, Spanish) and its North-American CDs
+(*The Secrets of Atlantis*, The Adventure Company, 2007, English) on the
+desktop and in the browser: its drive, its files, its image or its
+installation, in the game library as *The Secrets of Atlantis :
+L'Héritage sacré (2006), DVD, French*, one entry per language, *The
+Secrets of Atlantis: The Sacred Legacy (2006), DVD, German*, or *The
+Secrets of Atlantis (2007), 3 CDs, English*; on the desktop the DVD (or the three CDs, one after the other) can be copied to the computer once
 (**Copy to this computer** in the game library), so that it plays from
 the hard disk. The DVD's own Lua 5.0 scripts (compiled on the French
 DVD, source on the international one) run as they are; the nine
@@ -173,8 +175,9 @@ Atlantis Native contains none of them.</sub>
   skips a film (a bug fix: the original has only its skip button); on
   the desktop and in the browser. Its original 2004 CD program is in the game library
   too, as a preview.
-- 🏛️ **The Secrets of Atlantis**: the French DVD (2006), read from the
-  DVD, its files, its image or its installation, nothing unpacked; its
+- 🏛️ **The Secrets of Atlantis**: the French and international DVDs
+  (2006) and the North-American CDs (2007), read from the discs, their
+  files, their images or the installation, nothing unpacked; its
   own scripts, menus and saves; full screen or windowed (F11); on the
   desktop (where the DVD can be copied to the computer once) and in the
   browser.
@@ -214,7 +217,7 @@ Atlantis II's and III's cinematics), and never sent anywhere; the saves
 stay in that browser. For the CD editions of Atlantis I, II and III, the
 folder may hold the CD images (`.iso`, `.bin`, `.img`, `.mdf`, `.nrg`)
 in place of copies of the discs, and *The Secrets of Atlantis* its DVD
-image (see [The web version](docs/GUIDE.md#the-web-version)).
+image or copies of its three CDs (see [The web version](docs/GUIDE.md#the-web-version)).
 
 > **Windows:** the program is not code-signed (a certificate costs money
 > each year), so Windows SmartScreen may warn that it "protected your PC"
@@ -365,8 +368,9 @@ For *The Secrets of Atlantis*:
 |---|---|---|
 | The French DVD of Nobilis (2006, *L'Héritage sacré*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `e5c43eb0411d1775e6242fec6d241f6e`, never run) | French | the DVD's drive or a copy of its files (the folder with `DATAS.cab`), its image (`.iso`) or the folder holding it, or the folder where its installer put the game (the one with `Datas`) |
 | The international DVD of Nobilis (2006, *The Sacred Legacy*, *Das heilige Vermächtnis*, *L'Eredità Sacra*, *El Legado Sagrado*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `fcb357acdb6c16a76f3f4f6cb5a625c5`, never run) | English, German, Italian, Spanish | the same forms (its files are `datas.cab` and `datas_english.cab`, `datas_german.cab`, `datas_italian.cab`, `datas_spanish.cab`); the game library lists one entry per language, the web page asks for the language |
+| The North-American CDs of The Adventure Company (2007, *The Secrets of Atlantis*, three CDs; `bin\The Secrets of Atlantis.exe` of 7,368,704 bytes on the first disc, MD5 `ad356540e6375bf19e31372cd56193ae`, never run) | English | a folder holding a copy of each disc (one folder per disc, side by side: `data1.hdr`, `data1.cab`, `data2.cab` on the first, `data3.cab` on the second, `data4.cab` on the third), the three discs' files copied into one folder, the folder holding the three CD images, or the folder where the CDs' installer put the game; one CD in a drive is copied with the others, one after the other (**Copy to this computer**) |
 
-You need your own DVD (or its image, or the game installed from it).
+You need your own DVD or CDs (or their images, or the game installed from them).
 The original's installer asks for the language and installs that one
 only; Atlantis Native offers each language of the disc as its own entry
 of the game library. Started without a choice (`atlantis-native <the
@@ -384,7 +388,7 @@ How to get the files from your CD or GOG.com: see
 Many boxed editions of the five games have never been seen by the
 project: the Polish and Japanese CDs of the first game, the European
 DVD of *Atlantis II*, the English CDs of *Atlantis III*, the French CD of
-*Atlantis Evolution*, the international DVD of *The Secrets of Atlantis*
+*Atlantis Evolution*, the Russian edition of *The Secrets of Atlantis*
 and more. If you own one, its box and discs can help it play: see
 [Wanted editions](docs/WANTED.md) for the list and what to send (photos,
 file listings and checksums only, never the game's files).
@@ -429,9 +433,10 @@ game library or given on the command line. See
 
 *The Secrets of Atlantis* (2006) too: its DVD, a copy of its files, its
 image or its installation, found by the game library or given on the
-command line. Played from the DVD or its image, its entry in the game
+command line, and its North-American CDs (2007) the same way. Played from the DVD or its image, its entry in the game
 library offers **Copy to this computer** (about 1.4 GB, once): the game
-then plays from the hard disk, without the disc. See
+then plays from the hard disk, without the disc. The CDs are copied the
+same way, one disc after the other (about 1.5 GB). See
 [The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
 
 ## Controls
