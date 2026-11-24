@@ -115,8 +115,9 @@ impl Plan {
                 Some((name, size))
             })
             .collect();
-        if files.len() < 2 {
-            // DATAS.cab and no language's cabinet.
+        // No language's cabinet (`DATAS_<language>.cab`; the program is
+        // not one): not the disc, refused before anything is copied.
+        if !files.iter().any(|(n, _)| n.starts_with("DATAS_")) {
             return Err(CopyError::NotADisc);
         }
         Ok(Plan { root, files })
@@ -563,6 +564,15 @@ pub(crate) mod tests {
         assert!(matches!(Plan::of(&d), Err(CopyError::NotADisc)));
         let mut m = atlantis_data::files::MemFiles::new();
         m.insert("DATAS.cab", vec![0; 4]);
+        assert!(matches!(
+            Plan::from_root(Arc::new(m)),
+            Err(CopyError::NotADisc)
+        ));
+        // DATAS.cab and the program, no language's cabinet: still not the
+        // disc (the program is not a language).
+        let mut m = atlantis_data::files::MemFiles::new();
+        m.insert("DATAS.cab", vec![0; 4]);
+        m.insert("The secrets of Atlantis.exe", vec![1; 10]);
         assert!(matches!(
             Plan::from_root(Arc::new(m)),
             Err(CopyError::NotADisc)
