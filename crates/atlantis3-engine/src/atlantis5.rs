@@ -134,6 +134,15 @@ impl std::fmt::Display for ViewError {
 impl std::error::Error for ViewError {}
 
 /// The panorama file of `view` in `scene` (the WAM's view name).
+/// The renderer draws 768² faces only (`A3Raster { face: FACE }`): a
+/// panorama with another size is refused at its load, as a bad file.
+pub(crate) fn check_faces(path: &str, faces: &[Vec<u32>]) -> Result<(), ViewError> {
+    if faces.iter().any(|f| f.len() != FACE * FACE) {
+        return Err(ViewError::Bad(format!("{path}: faces not {FACE}²")));
+    }
+    Ok(())
+}
+
 pub fn panorama_name(src: &dyn FileSource, scene: &str, view: u32) -> Result<String, ViewError> {
     let path = format!("datas/scenes/{scene}.wam");
     let data = src.read(&path).ok_or(ViewError::Missing(path.clone()))?;
@@ -191,9 +200,7 @@ impl View {
         else {
             return Err(ViewError::Bad("faces in another format".into()));
         };
-        if faces.iter().any(|f| f.len() != FACE * FACE) {
-            return Err(ViewError::Bad(format!("{path}: faces not {FACE}²")));
-        }
+        check_faces(&path, &faces)?;
         let mut sprites = Vec::new();
         for (object, anim, _, priority) in sprite_list(calls.sprites) {
             let p = sprite_path(calls.scene, calls.view, object, anim);

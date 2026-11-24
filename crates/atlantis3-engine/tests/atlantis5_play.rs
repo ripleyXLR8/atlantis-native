@@ -853,3 +853,93 @@ fn a_view_change_frame_steps_no_sprite() {
         );
     }
 }
+
+/// The data with one panorama replaced (a damaged or another edition's
+/// file whose faces are 8² instead of 768²).
+struct SmallFaces {
+    inner: Atlantis5Source,
+    name: String,
+    jp6: Vec<u8>,
+}
+
+impl atlantis_data::FileSource for SmallFaces {
+    fn size(&self, name: &str) -> Option<u64> {
+        if name.eq_ignore_ascii_case(&self.name) {
+            return Some(self.jp6.len() as u64);
+        }
+        self.inner.size(name)
+    }
+    fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
+        if name.eq_ignore_ascii_case(&self.name) {
+            let at = usize::try_from(offset).ok()?;
+            return self.jp6.get(at..at + len).map(<[u8]>::to_vec);
+        }
+        self.inner.read_at(name, offset, len)
+    }
+    fn has_dir(&self, name: &str) -> bool {
+        self.inner.has_dir(name)
+    }
+    fn list(&self, dir: &str) -> Vec<String> {
+        self.inner.list(dir)
+    }
+}
+
+/// A JP6 (version 0x20001) of six 8 × 8 faces (one JPEG made for the
+/// test, not the game's).
+fn small_jp6() -> Vec<u8> {
+    const JPEG: &str = "ffd8ffdb004300100b0c0e0c0a100e0d0e1211101318281a181616183123251d283a\
+333d3c3933383740485c4e404457453738506d51575f626768673e4d71797064785c656763ffdb004301111212\
+1815182f1a1a2f634238426363636363636363636363636363636363636363636363636363636363636363636363\
+636363636363636363636363636363ffc00011080008000803011100021101031101ffc400140001000000000000\
+00000000000000000003ffc40014100100000000000000000000000000000000ffc4001501010100000000000000\
+000000000000000405ffc40014110100000000000000000000000000000000ffda000c03010002110311003f0035\
+515fffd9";
+    let jpg: Vec<u8> = (0..JPEG.len() / 2)
+        .map(|i| u8::from_str_radix(&JPEG[2 * i..2 * i + 2], 16).expect("hex"))
+        .collect();
+    let mut d = vec![0u8; 0x6e];
+    d[..4].copy_from_slice(b"JP6\0");
+    d[4..8].copy_from_slice(&0x20001u32.to_le_bytes());
+    d[8..10].copy_from_slice(&8u16.to_le_bytes());
+    d[10..12].copy_from_slice(&8u16.to_le_bytes());
+    for i in 0..6 {
+        let off = d.len();
+        d.extend_from_slice(b"JPG\0");
+        d.extend_from_slice(&(4 + jpg.len() as u32).to_le_bytes());
+        d.extend_from_slice(&jpg);
+        let at = 0xe + 16 * i;
+        d[at..at + 4].copy_from_slice(&0x10u32.to_le_bytes());
+        d[at + 4..at + 8].copy_from_slice(&(off as u32).to_le_bytes());
+        d[at + 8..at + 12].copy_from_slice(&(8 + jpg.len() as u32).to_le_bytes());
+        d[at + 12..at + 16].copy_from_slice(&(0x40u32 | 1 << i).to_le_bytes());
+    }
+    d
+}
+
+/// A panorama whose faces are not 768² is refused at its load, as a bad
+/// file (the view kept), instead of stopping the renderer at the next
+/// picture.
+#[test]
+fn a_panorama_with_other_faces_is_refused() {
+    let Some(d) = dvd() else { return };
+    let inner = Atlantis5Source::open(&d.join("datas")).expect("the extracted tree");
+    let panorama =
+        atlantis3_engine::atlantis5::panorama_name(&inner, "zeppelin", 8).expect("view 8");
+    let src: Arc<dyn atlantis_data::FileSource> = Arc::new(SmallFaces {
+        inner,
+        name: format!("datas/warps/{panorama}"),
+        jp6: small_jp6(),
+    });
+    let mut play = Play::new(src, "french", None).expect("play");
+    play.new_game();
+    frames(&mut play, 3);
+    play.skip();
+    frames(&mut play, 3);
+    assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
+    assert!(play
+        .game
+        .run_string("return function() Atl_Address_Go(\"zeppelin\", 8, \"no_fx\") end"));
+    frames(&mut play, 3);
+    shot(&play, "a5-small-faces.png");
+    assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
+}

@@ -1096,6 +1096,9 @@ impl Stage {
         else {
             return Err(ViewError::Bad("faces in another format".into()));
         };
+        // Faces of another size would stop the renderer (its 768² raster):
+        // refused here, the view kept as on any bad file.
+        crate::atlantis5::check_faces(&path, &faces)?;
         let wam_path = format!("datas/scenes/{scene_s}.wam");
         let zones = self
             .read(&wam_path)
@@ -5526,6 +5529,17 @@ mod tests {
 
     fn stage() -> Stage {
         Stage::new(Arc::new(NoFiles), "french", None)
+    }
+
+    #[test]
+    fn a_panorama_with_other_faces_is_refused() {
+        let good: Vec<Vec<u32>> = (0..6).map(|_| vec![0; FACE * FACE]).collect();
+        assert!(crate::atlantis5::check_faces("p", &good).is_ok());
+        let small: Vec<Vec<u32>> = (0..6).map(|_| vec![0; 512 * 512]).collect();
+        assert!(matches!(
+            crate::atlantis5::check_faces("p", &small),
+            Err(ViewError::Bad(_))
+        ));
     }
 
     #[test]
