@@ -4409,7 +4409,7 @@ impl Play {
         let mut scene = true;
         if self.game.state() == 3 && !self.game.busy() {
             let before = self.scene_under_menu();
-            self.menu_frame(clicks, dt);
+            self.menu_frame(clicks, clicks - play_clicks, dt);
             scene = before || self.scene_under_menu();
         } else if let Some(p) = &mut self.poker {
             // The board's film or dialog runs in its own loop: the board's
@@ -4624,9 +4624,11 @@ impl Play {
         st.inventory_open_now() || st.menu_open_now() || self.poker.is_some()
     }
 
-    fn menu_frame(&mut self, clicks: usize, dt: f64) {
+    /// `held_clicks`: how many of the `clicks` were made with the right
+    /// button held.
+    fn menu_frame(&mut self, clicks: usize, held_clicks: usize, dt: f64) {
         if self.stage.borrow().inventory_open_now() {
-            self.inventory_frame(clicks, dt);
+            self.inventory_frame(clicks, held_clicks, dt);
             return;
         }
         if !self.stage.borrow().menu_open_now() {
@@ -4921,17 +4923,25 @@ impl Play {
     /// players, whose ended click pages (@ 0x00417670 → 0x00414d50,
     /// @ 0x004176a0 → 0x00414d60); after a slot's click or a page the
     /// elements made again (@ 0x00415fe0) from the database; at its end
-    /// the manager's next request.
-    fn inventory_frame(&mut self, clicks: usize, dt: f64) {
+    /// the manager's next request. A left press made with the right
+    /// button held carries the buttons 5: when no element took a press
+    /// that frame, state 2 (@ 0x00414a30: `buttons & 4` on a press event)
+    /// ends the inventory, as a right press off the elements does.
+    fn inventory_frame(&mut self, clicks: usize, held_clicks: usize, dt: f64) {
         self.stage.borrow_mut().inventory_buttons_hover();
+        let mut taken = false;
         for _ in 0..clicks {
             let hit = self.stage.borrow().inventory_hit();
             if let Some(InventoryHit::Slot(s)) = hit {
                 self.game.click_inventory(s);
                 self.inventory_remake();
+                taken = true;
             } else {
-                self.stage.borrow_mut().inventory_buttons_press();
+                taken |= self.stage.borrow_mut().inventory_buttons_press();
             }
+        }
+        if held_clicks > 0 && !taken {
+            self.stage.borrow_mut().inventory_close();
         }
         let pages = self.stage.borrow_mut().inventory_buttons_step(dt);
         for right in pages {

@@ -694,6 +694,33 @@ fn the_inventory_page_buttons_include_their_bottom_edge() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// A left press made with the right button held carries the buttons 5;
+/// off the elements no element takes it and the inventory's state 2
+/// (@ 0x00414a30: `buttons & 4` on a press) ends the inventory. A left
+/// press alone there does nothing.
+#[test]
+fn a_left_press_with_the_right_held_ends_the_inventory() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-held");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    play.mouse_at(500, 100);
+    assert_eq!(play.stage().inventory_hit(), None);
+    play.click();
+    frames(&mut play, 2);
+    assert!(play.stage().inventory_open_now(), "a left press alone");
+    play.set_buttons(false, true);
+    play.set_buttons(true, true);
+    play.click();
+    frames(&mut play, 2);
+    assert!(!play.stage().inventory_open_now());
+    assert_eq!(play.game.state(), 4);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_logos_play_before_the_main_menu() {
     let Some(d) = dvd() else { return };
