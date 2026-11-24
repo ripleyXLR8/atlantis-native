@@ -37,7 +37,7 @@
 //! - The menus' handlers compare the clicked element's name with their
 //!   own (each menu's @ address is on its builder below).
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
 use atlantis3_data::atlantis5_texts::StringResources;
@@ -354,7 +354,8 @@ pub struct Menu {
     credits: Option<Credits>,
     /// The save page's labels to make again.
     relabel: bool,
-    /// Each text's height (+0x28) as last measured.
+    /// Each text's height (+0x28) as last drawn, the hit test's
+    /// (@ 0x00452020): 0 until the element's first draw.
     heights: Vec<i32>,
 }
 
@@ -387,6 +388,12 @@ pub struct Menus {
     /// How many menus were made: tells a menu from the one before it in
     /// [`MenuPicture`] (their backgrounds and sprites are made with them).
     made: u64,
+    /// Each mode's texts' heights as last drawn ([`Menu::heights`]),
+    /// kept for the program's run: the original makes its menus and
+    /// their elements once (the manager's ctor @ 0x0041b170), and a
+    /// text's +0x28 is 0 from its ctor (@ 0x00451170) until its first
+    /// draw (@ 0x00451600, the only write).
+    drawn: HashMap<u32, Vec<i32>>,
 }
 
 /// Everything [`Menus::render`] draws from while the menu's background
@@ -454,6 +461,7 @@ impl Menus {
             utc_offset: no_offset,
             effects: Vec::new(),
             made: 0,
+            drawn: HashMap::new(),
         }
     }
 
@@ -1002,9 +1010,10 @@ impl Menus {
                     // (@ 0x004546a0(2, 0, w >> 1, h >> 1, 0, 0),
                     // @ 0x00412cc0) before the mode's process. Every
                     // ported mode's first state lays out and reaches
-                    // @ 0x0040d920, so the button under the centre is hot
-                    // from the opening frame, and that frame's own
-                    // presses are dropped.
+                    // @ 0x0040d920, so the button whose box (its height as
+                    // last drawn: 0 before its first draw of the run)
+                    // holds the centre is hot from the opening frame, and
+                    // that frame's own presses are dropped.
                     self.mouse = (W / 2, H / 2);
                     self.clicks = 0;
                     opened = true;
@@ -1033,7 +1042,10 @@ impl Menus {
         let mut menu = self.menu.take()?;
         let mouse = self.mouse;
         menu.layout(fonts, self);
-        menu.measure(fonts);
+        // The texts' heights as last drawn (the draw @ 0x00451600 comes
+        // after the process): none yet at a mode's first opening in the
+        // run, so the opening's move at the centre tests one-row boxes.
+        menu.heights = self.drawn.get(&menu.mode).cloned().unwrap_or_default();
         // The hit test on a move only (@ 0x004523e0 tests on an event of
         // kind 2 and keeps the result in +0x40; the text button
         // @ 0x0044eb60 turns 1 on a move with it, the sprite button
@@ -1089,6 +1101,10 @@ impl Menus {
         if menu.credits.is_some() && !menu.laid_out {
             self.credit_page(&mut menu, fonts);
         }
+        // The frame's draw (@ 0x0041baa0, after the process): each shown
+        // text measures its height (+0x28).
+        menu.measure(fonts);
+        self.drawn.insert(menu.mode, menu.heights.clone());
         self.menu = Some(menu);
         None
     }
@@ -1708,16 +1724,18 @@ impl Menu {
         }
     }
 
-    /// Each text's height at its width (+0x28, @ 0x00451600).
+    /// The draw's measure (+0x28, @ 0x00451600): each shown text's height
+    /// at its width; a hidden one is not drawn and keeps its last.
     fn measure(&mut self, fonts: &Fonts) {
-        self.heights = self
-            .elements
-            .iter()
-            .map(|e| match &e.kind {
-                Kind::Text(t) => fonts.text_height(&t.font, &t.text, t.width),
-                _ => 0,
-            })
-            .collect();
+        self.heights.resize(self.elements.len(), 0);
+        for i in 0..self.elements.len() {
+            if !self.visible(i) {
+                continue;
+            }
+            if let Kind::Text(t) = &self.elements[i].kind {
+                self.heights[i] = fonts.text_height(&t.font, &t.text, t.width);
+            }
+        }
     }
 
     /// The mouse's moves (event kind 0, +0xc 2): a text button under the

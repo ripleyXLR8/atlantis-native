@@ -880,10 +880,14 @@ fn the_logos_sound_plays() {
 
 /// A mode opens with one mouse move at the screen's centre (@ 0x0041b780:
 /// the frame's events emptied, @ 0x004546a0(2, 0, w >> 1, h >> 1, 0, 0)
-/// inserted before the mode's process), so the button under the centre
-/// is hot at once: a press without a move clicks it (the in-game menu's
-/// `option_control`, the save page's slot 4). A press in the opening
-/// frame itself is dropped with that frame's events.
+/// inserted before the mode's process), so the button whose box holds
+/// the centre is hot at once: a press without a move clicks it. The box's
+/// height is the text's as last drawn (+0x28, written only by the draw
+/// @ 0x00451600, 0 from the ctor @ 0x00451170; the menus are made once a
+/// run): at a page's first opening of the run the boxes are one row
+/// high. So the in-game menu's `option_control` (y 288) is hot at every
+/// opening, the save page's slot 4 (y 284) only from its second. A press
+/// in the opening frame itself is dropped with that frame's events.
 #[test]
 fn a_press_before_any_move_clicks_the_button_at_the_centre() {
     let Some(d) = dvd() else { return };
@@ -900,10 +904,24 @@ fn a_press_before_any_move_clicks_the_button_at_the_centre() {
     frames(&mut play, 1);
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     // A double click on `save`: the second press, on the page just
-    // opened, saves slot 4.
+    // opened for the first time, finds slot 4 one row high, not hot.
     assert!(!dir.join("slot_4").exists());
     assert!(play.click_menu("save"));
     // The press's frame closes the in-game menu, the next opens the page.
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    play.click();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    assert!(
+        !dir.join("slot_4").exists(),
+        "slot 4 not hot at the first opening"
+    );
+    // Drawn since: from the second opening on, slot 4 is hot at once.
+    click(&mut play, "back");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert!(play.click_menu("save"));
     frames(&mut play, 2);
     assert_eq!(play.menus.current(), Some(menus::SAVE));
     play.click();
