@@ -1278,6 +1278,23 @@ mod tests {
         assert_eq!(scroll_px(10.0, 80, 100), 0);
     }
 
+    /// The faces Native ships draw every character of the international
+    /// DVD's texts (German, Italian, Spanish, English: all in
+    /// Windows-1252, the code page the text is drawn in): each has its own
+    /// glyph, not the missing-glyph box.
+    #[test]
+    fn the_faces_draw_the_international_texts_characters() {
+        use ab_glyph::Font;
+        let chars = "\u{df}\u{e4}\u{f6}\u{fc}\u{c4}\u{d6}\u{dc}\u{a1}\u{bf}\u{f1}\u{e0}\u{e1}\u{e8}\u{e9}\u{ec}\u{ee}\u{f2}\u{f3}\u{f9}\u{fa}\u{c8}\u{c9}\u{d3}\u{da}\u{ab}\u{bb}\u{a9}\u{2019}\u{2026}";
+        for face in FACES {
+            let f = ab_glyph::FontRef::try_from_slice(face).unwrap();
+            for c in chars.chars() {
+                assert_ne!(crate::text::to_cp1252(c), b'?', "{c}");
+                assert_ne!(f.glyph_id(c).0, 0, "U+{:04X}", c as u32);
+            }
+        }
+    }
+
     #[test]
     fn voice_names() {
         assert_eq!(

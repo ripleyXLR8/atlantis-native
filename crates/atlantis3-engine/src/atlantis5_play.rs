@@ -2670,6 +2670,11 @@ impl Stage {
             .map(|f| (f.frame_num, f.frames()))
     }
 
+    /// The text of the tirade shown, for tests.
+    pub fn dialog_text(&self) -> Option<&str> {
+        self.dialog.as_ref().map(|d| d.text.as_str())
+    }
+
     /// The tirade shown (dialog id, tirade, state), for tests.
     pub fn dialog_state(&self) -> Option<(u32, usize, u32)> {
         self.dialog

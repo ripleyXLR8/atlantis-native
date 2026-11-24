@@ -1078,3 +1078,59 @@ fn a_2d_talkers_film_loops_through_a_long_tirade() {
     }
     assert!(wrapped, "the film looped ({steps} steps, at {last:?})");
 }
+
+/// The international DVD (`ATLANTIS5_DVD_INT`: a copy of the pressed
+/// disc's files, read from its cabinets; skipped when unset) in German,
+/// opened from the German cabinet's place as the game library does: the
+/// new game's first view, then the gorilla's subject menu and dialog 1,
+/// its first tirade the German table's with its German voice.
+#[test]
+fn the_international_dvd_in_german() {
+    use atlantis3_data::atlantis5_texts::Dialogs;
+    let Some(d) = atlantis3_data::testing::a5_dvd_int() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d.join("datas_german.cab")).expect("the German place");
+    assert_eq!(src.chosen_language(), Some("german"));
+    let lang = src.language(None);
+    let src: Arc<dyn atlantis_data::FileSource> = Arc::new(src);
+    let table = Dialogs::parse(&src.read("datas/texts/dialog/german/dialogs.xml").unwrap())
+        .expect("the German dialogs");
+    let mut play = Play::new(src.clone(), &lang, None).expect("play");
+    play.set_save_dir(Some(scratch("int-german")));
+    play.new_game();
+    frames(&mut play, 3);
+    assert!(play.stage().film_playing(), "cine01 plays");
+    play.skip();
+    frames(&mut play, 3);
+    assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
+    let view = shot(&play, "a5-int-german-first-view.png");
+    assert!(view.iter().any(|&p| p & 0xff_ffff != 0));
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 2);
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    // The subjects are the scripts' ids, the same in every edition.
+    assert_eq!(play.stage().menu_subjects(), [b"gorille".to_vec()]);
+    let (x, y) = play.stage().menu_subject_point(0).expect("subject 0");
+    play.mouse_at(x, y);
+    play.click();
+    frames(&mut play, 2);
+    let (id, tirade, _) = play.stage().dialog_state().expect("dialog 1 plays");
+    assert_eq!((id, tirade), (1, 0));
+    let want = &table.dialog(1).expect("dialog 1").tirades[0].text;
+    assert_eq!(play.stage().dialog_text(), Some(want.as_str()));
+    assert!(src
+        .size(&atlantis3_engine::atlantis5_dialog::voice_path(
+            "german", 1, 0
+        ))
+        .is_some_and(|n| n > 0));
+    let talk = shot(&play, "a5-int-german-dialog-1.png");
+    assert!(talk != view);
+}

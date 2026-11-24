@@ -71,7 +71,12 @@ impl Walker {
     fn new(d: &Path) -> Walker {
         let src: Arc<dyn FileSource> =
             Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
-        let mut play = Play::new(src.clone(), "french", None).expect("play");
+        Walker::with_source(src, "french")
+    }
+
+    /// A player of the game in `src`, in `language`.
+    fn with_source(src: Arc<dyn FileSource>, language: &str) -> Walker {
+        let mut play = Play::new(src.clone(), language, None).expect("play");
         // The player's saves (the autosave `Atl_Save` writes, `Atl_Load`
         // reads) in a scratch folder of their own.
         static RUN: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -2009,7 +2014,31 @@ fn a_game_over_loads_the_autosave() {
 #[test]
 fn whole_game() {
     let Some(d) = dvd() else { return };
-    let mut w = Walker::new_game(&d);
+    play_whole_game(Walker::new_game(&d));
+}
+
+/// The whole game on the international DVD (`ATLANTIS5_DVD_INT`: a copy
+/// of the pressed disc's files, read from its cabinets; skipped when
+/// unset) in English, opened from the English cabinet's place as the game
+/// library does: the same walk (the scripts are the same game logic, the
+/// French disc's compiled from the same sources).
+#[test]
+fn whole_game_international_english() {
+    let Some(d) = atlantis3_data::testing::a5_dvd_int() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d.join("datas_english.cab")).expect("the English place");
+    let lang = src.language(None);
+    assert_eq!(lang, "english");
+    let src: Arc<dyn FileSource> = Arc::new(src);
+    let mut w = Walker::with_source(src, &lang);
+    w.play.new_game();
+    w.settle();
+    play_whole_game(w);
+}
+
+/// The nine chapters from a new game's first view, then the credits.
+fn play_whole_game(mut w: Walker) {
     for (i, body) in CHAPTERS.iter().enumerate() {
         let c = u32::try_from(i + 1).expect("chapter");
         assert_eq!(w.chapter_now(), c);
