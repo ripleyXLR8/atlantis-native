@@ -2822,12 +2822,17 @@ impl Stage {
     pub fn menu_set_subjects(&mut self, subjects: Vec<(Vec<u8>, bool)>) {
         let Some(m) = &self.menu else { return };
         let back = (m.state == MenuState::Rebuild).then_some(m.at);
-        let bubble = self
-            .read(&format!(
+        // No subject: @ 0x00411a90 leaves before it makes any element, the
+        // bubble's too (its `subject_bubble_8.spr` for 0 is dead code).
+        let bubble = if subjects.is_empty() {
+            None
+        } else {
+            self.read(&format!(
                 "datas/sprites2d/dialog/{}",
                 dlg::subject_bubble(subjects.len())
             ))
-            .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok());
+            .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok())
+        };
         let images: Vec<Option<Bank>> = subjects
             .iter()
             .map(|(name, _)| {
@@ -2968,6 +2973,12 @@ impl Stage {
         self.menu
             .as_ref()
             .is_some_and(|m| m.state == MenuState::Open)
+    }
+
+    /// Whether the subject menu's bubble is made (none without subjects,
+    /// @ 0x00411a90).
+    pub fn menu_has_bubble(&self) -> bool {
+        self.menu.as_ref().is_some_and(|m| m.bubble.is_some())
     }
 
     /// The subject menu over the view (@ 0x00411790: not in states 2

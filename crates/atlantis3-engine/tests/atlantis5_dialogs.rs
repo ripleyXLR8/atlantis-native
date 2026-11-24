@@ -415,6 +415,28 @@ fn the_rebuilt_subject_menu_puts_the_cursor_back_at_the_click() {
     );
 }
 
+/// @ 0x00411a90 leaves before making any element when the subject list
+/// is empty: no bubble (its `subject_bubble_8.spr` arm for 0 is dead).
+#[test]
+fn a_subject_menu_without_subjects_has_no_bubble() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 1);
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    assert!(play.stage().menu_has_bubble());
+    play.stage_mut().menu_set_subjects(Vec::new());
+    assert!(play.stage().menu_shown(), "the menu stays");
+    assert!(!play.stage().menu_has_bubble());
+}
+
 #[test]
 fn a_press_in_the_frame_the_subjects_are_made_is_dropped() {
     // @ 0x00410f90 case 0 returns after making the elements, with no

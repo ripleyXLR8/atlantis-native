@@ -873,9 +873,10 @@ pub fn subject_layout(n: usize) -> Vec<(i32, i32)> {
 /// The subject menu's bubble file: `subject_bubble_<n>.spr` for 1..=8
 /// subjects, `subject_bubble_8.spr` beyond (@ 0x00411f43..), under
 /// `sprites2d/dialog/`; placed at (W · 3 / 5, H / 3) (unsigned
-/// divisions).
+/// divisions). With no subject there is no bubble (@ 0x00411a90 leaves
+/// first; the caller does not ask).
 pub fn subject_bubble(n: usize) -> String {
-    if n == 0 || n > 8 {
+    if n > 8 {
         "subject_bubble_8.spr".into()
     } else {
         format!("subject_bubble_{n}.spr")
