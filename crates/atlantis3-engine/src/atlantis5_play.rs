@@ -4603,8 +4603,14 @@ impl Play {
     /// item has a detailed picture (`objects_detailed/<item>.spr`): the
     /// item given (@ 0x004137b0), modes 11 then 8 asked, the inventory
     /// ended; elsewhere the inventory ends (@ 0x00414a30 state 2: a mouse
-    /// event with the buttons 4 that no element took).
+    /// event with the buttons 4 that no element took). Not while a
+    /// script waits (a dialog, a film, a transition): the original is in
+    /// that call's loop then, whose frame takes only the left press and
+    /// Space (dialogs.md § 3, 0x004329df..0x00432a47).
     pub fn right_press(&mut self) {
+        if self.game.busy() {
+            return;
+        }
         if !(self.game.state() == 3 && self.stage.borrow().inventory_open_now()) {
             self.right_click();
             return;

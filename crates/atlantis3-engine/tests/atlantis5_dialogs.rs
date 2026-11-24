@@ -513,6 +513,40 @@ fn the_right_button_puts_the_hands_object_back() {
 }
 
 #[test]
+fn a_right_press_during_a_scripts_dialog_leaves_the_inventory() {
+    // dialogs.md § 3 (0x004329df..0x00432a47): the dialog player's frame
+    // takes only a left press and Space; the inventory under the script's
+    // dialog is still up after it.
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    play.right_press();
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 3);
+    assert!(play.stage().inventory_open_now());
+    assert!(play
+        .game
+        .run_string("return function() Atl_Dialog_Play(1) end"));
+    frames(&mut play, 1);
+    assert!(play.game.busy());
+    // Off the cells.
+    play.mouse_at(500, 100);
+    play.right_press();
+    frames(&mut play, 2);
+    for _ in 0..600 {
+        if !play.game.busy() {
+            break;
+        }
+        play.space();
+        frames(&mut play, 2);
+    }
+    assert!(!play.game.busy());
+    frames(&mut play, 2);
+    assert_eq!(play.game.state(), 3);
+    assert!(play.stage().inventory_open_now());
+}
+
+#[test]
 fn the_inventory_takes_and_puts_back() {
     let Some(d) = dvd() else { return };
     let mut play = to_first_view(&d, None);
