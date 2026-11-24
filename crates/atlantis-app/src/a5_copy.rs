@@ -174,7 +174,9 @@ impl Plan {
         let (left, need) = self.still_to_copy(dest);
         progress.done.store(0, Ordering::Relaxed);
         progress.total.store(need, Ordering::Relaxed);
-        if let Some(free) = free(dest) {
+        // The room only for bytes to write: a whole copy opens at once,
+        // whatever is left free.
+        if let Some(free) = free(dest).filter(|_| !left.is_empty()) {
             let freed: u64 = stale.iter().map(|s| s.1).sum();
             if free.saturating_add(freed) < need + MARGIN {
                 return Err(CopyError::NoRoom {
@@ -540,6 +542,9 @@ pub(crate) mod tests {
             main
         );
         assert_eq!(plan.still_to_copy(&dest), (Vec::new(), 0));
+        // Copied again with no room left: nothing to write, no room asked.
+        let p = Progress::default();
+        assert_eq!(plan.copy_to(&dest, &p, |_| Some(0)), Ok(()));
         // The copy opens as the disc's files, with the same data.
         let src = Atlantis5Source::open(&dest).unwrap();
         assert_eq!(src.form(), atlantis3_data::atlantis5::Form::DiscFolder);
