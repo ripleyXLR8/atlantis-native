@@ -563,10 +563,13 @@ impl Walker {
             if slot < first {
                 panic!("slot {slot} left of the grid");
             }
+            // A `CIE_Button`: hot after a move onto it, the page turned
+            // when its click's picture ends (2 frames at 15 a second).
             let (rx, ry) = self.right_button.expect("the right button");
             self.play.mouse_at(rx, ry);
-            self.play.click();
             self.frames(1);
+            self.play.click();
+            self.frames(6);
         }
         panic!("slot {slot} not shown");
     }

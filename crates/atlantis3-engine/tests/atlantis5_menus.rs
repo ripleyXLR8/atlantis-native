@@ -594,6 +594,71 @@ fn a_right_press_on_an_inventory_item_examines_it() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The inventory's page buttons are `CIE_Button`s (@ 0x0044ee40,
+/// @ 0x0044f0e0, @ 0x0044f210): hot after a move onto them, a left press
+/// plays the click's picture once (2 frames at 15 a second) and the page
+/// turns at its end; a second press meanwhile is taken and does nothing.
+/// A right press is not theirs: the inventory ends.
+#[test]
+fn the_inventory_page_buttons_click_at_their_picture_s_end() {
+    use atlantis3_engine::atlantis5_play::InventoryHit;
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-pages");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    let find = |play: &mut Play, want: &dyn Fn(Option<InventoryHit>) -> bool| {
+        for y in (300..576).step_by(2) {
+            for x in (0..1024).step_by(2) {
+                play.mouse_at(x, y);
+                if want(play.stage().inventory_hit()) {
+                    return (x + 2, y + 2);
+                }
+            }
+        }
+        panic!("not found");
+    };
+    let cell0 = find(&mut play, &|h| h == Some(InventoryHit::Slot(0)));
+    let right = find(&mut play, &|h| h == Some(InventoryHit::Right));
+    let offset = |play: &mut Play| {
+        play.mouse_at(cell0.0, cell0.1);
+        let o = match play.stage().inventory_hit() {
+            Some(InventoryHit::Slot(s)) => s,
+            h => panic!("{h:?}"),
+        };
+        play.mouse_at(right.0, right.1);
+        o
+    };
+    // Hot after a move: the frame sees the mouse on the button.
+    play.mouse_at(right.0, right.1);
+    frames(&mut play, 1);
+    assert_eq!(play.stage().inventory_button_state(true), Some(1));
+    // A double click: the picture plays, no page yet; the second press is
+    // taken by the pressed button.
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.stage().inventory_button_state(true), Some(2));
+    assert_eq!(offset(&mut play), 0);
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(offset(&mut play), 0);
+    // 2 frames at 15 a second: not ended at 3/30 s, ended at 5/30 s.
+    frames(&mut play, 1);
+    assert_eq!(offset(&mut play), 0);
+    frames(&mut play, 2);
+    assert_eq!(offset(&mut play), 1, "one page");
+    frames(&mut play, 4);
+    assert_eq!(offset(&mut play), 1, "one page");
+    assert_eq!(play.stage().inventory_button_state(true), Some(1));
+    // A right press on the button ends the inventory.
+    play.right_press();
+    frames(&mut play, 2);
+    assert!(!play.stage().inventory_open_now());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_logos_play_before_the_main_menu() {
     let Some(d) = dvd() else { return };

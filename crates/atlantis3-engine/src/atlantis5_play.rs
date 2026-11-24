@@ -668,9 +668,15 @@ struct InventoryMenu {
     size: usize,
     items: Vec<Option<Vec<u8>>>,
     background: Option<Bank>,
-    /// Left and right buttons: normal, focused.
+    /// Left and right buttons (`CIE_Button`s, +0x2c and +0x28, made by
+    /// @ 0x0044ee40): the click's file, the focus's file.
     left: [Option<Bank>; 2],
     right: [Option<Bank>; 2],
+    /// The two buttons' states, left then right (+0x98 of each).
+    arrows: [ArrowButton; 2],
+    /// The mouse at the last move the buttons saw (`None` before the
+    /// mode's opening move).
+    last_mouse: Option<(i32, i32)>,
     icons: Vec<Option<Bank>>,
     hand_icon: Option<Bank>,
     closed: bool,
@@ -682,6 +688,39 @@ struct InventoryMenu {
     /// The hand's item's description (`handled_object_name` and its
     /// shadow, +0x3c and +0x40).
     hand_name: String,
+}
+
+/// A page button's state (`CIE_Button`, @ 0x0044f0e0 / @ 0x0044f210):
+/// 0 the click's frame 0; 1 (a move put the mouse on it) the focus looped;
+/// 2 (a left press at 1) the click played once, the press then taken; its
+/// end is the button's click (event 2), back to 1 when the mouse is on
+/// it. Both at 15 frames a second.
+#[derive(Clone, Copy, Default)]
+struct ArrowButton {
+    state: u8,
+    time: f64,
+}
+
+impl ArrowButton {
+    /// The bank drawn (click, focus) and its picture: at 1 the focus
+    /// looped, at 2 the click played once, else the click's frame 0.
+    fn shown(self, banks: &[Option<Bank>; 2]) -> Option<(&Bank, usize)> {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let u = (self.time * 15.0) as usize;
+        let bank = if self.state == 1 {
+            &banks[1]
+        } else {
+            &banks[0]
+        };
+        let bank = bank.as_ref()?;
+        let n = bank.len().max(1);
+        let frame = match self.state {
+            1 => u % n,
+            2 => u.min(n - 1),
+            _ => 0,
+        };
+        Some((bank, frame))
+    }
 }
 
 /// The inventory's texts' font (@ 0x004144a0: every one of its four
@@ -2998,6 +3037,8 @@ impl Stage {
                 spr(&format!("{dir}/button_right_focus.spr")),
             ],
             icons,
+            arrows: [ArrowButton::default(); 2],
+            last_mouse: None,
             closed: false,
             hover: None,
             info: String::new(),
@@ -3015,12 +3056,107 @@ impl Stage {
         }
     }
 
-    /// The elements made again (@ 0x00415fe0) after a click.
+    /// The elements made again (@ 0x00415fe0) after a click. The page
+    /// buttons are not among them: they keep their states.
     pub fn inventory_refresh(&mut self, size: usize, items: Vec<Option<Vec<u8>>>, hand: Vec<u8>) {
-        let offset = self.inventory.as_ref().map_or(0, |i| i.offset);
-        if self.inventory.is_some() {
-            self.inventory = Some(self.inventory_build(size, items, hand, offset));
+        let Some(old) = &self.inventory else { return };
+        let (offset, arrows, last_mouse) = (old.offset, old.arrows, old.last_mouse);
+        let mut inv = self.inventory_build(size, items, hand, offset);
+        inv.arrows = arrows;
+        inv.last_mouse = last_mouse;
+        self.inventory = Some(inv);
+    }
+
+    /// The page buttons on a move of the mouse (@ 0x0044f0e0, an event of
+    /// kind 2; the mode's opening move at the centre first): at 0 under
+    /// the mouse 1 (the focus from frame 0), at 1 away from it 0.
+    pub fn inventory_buttons_hover(&mut self) {
+        let hit = self.inventory_hit();
+        let mouse = self.mouse;
+        let Some(inv) = &mut self.inventory else {
+            return;
+        };
+        if inv.last_mouse == Some(mouse) {
+            return;
         }
+        inv.last_mouse = Some(mouse);
+        for (b, which) in inv
+            .arrows
+            .iter_mut()
+            .zip([InventoryHit::Left, InventoryHit::Right])
+        {
+            let inside = hit == Some(which);
+            match b.state {
+                0 if inside => {
+                    b.state = 1;
+                    b.time = 0.0;
+                }
+                1 if !inside => b.state = 0,
+                _ => {}
+            }
+        }
+    }
+
+    /// A left press the page buttons take (@ 0x0044f0e0): a button at 1
+    /// turns 2 (its click played once from frame 0); one at 2 takes it
+    /// and nothing else happens.
+    pub fn inventory_buttons_press(&mut self) -> bool {
+        let Some(inv) = &mut self.inventory else {
+            return false;
+        };
+        for b in &mut inv.arrows {
+            match b.state {
+                1 => {
+                    b.state = 2;
+                    b.time = 0.0;
+                    return true;
+                }
+                2 => return true,
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// The page buttons' players (@ 0x0044f210): a click whose picture
+    /// ended (t > n / 15) is the button's click, `true` for the right one
+    /// (back to 1 when the mouse is still on it; else it stays at 2 and
+    /// clicks again each frame, as the original's).
+    pub fn inventory_buttons_step(&mut self, dt: f64) -> Vec<bool> {
+        let hit = self.inventory_hit();
+        let Some(inv) = &mut self.inventory else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for (i, b) in inv.arrows.iter_mut().enumerate() {
+            b.time += dt;
+            if b.state != 2 {
+                continue;
+            }
+            let bank = if i == 0 { &inv.left[0] } else { &inv.right[0] };
+            let n = bank.as_ref().map_or(1, Bank::len).max(1);
+            #[allow(clippy::cast_precision_loss)]
+            if b.time > n as f64 / 15.0 {
+                let which = if i == 0 {
+                    InventoryHit::Left
+                } else {
+                    InventoryHit::Right
+                };
+                if hit == Some(which) {
+                    b.state = 1;
+                    b.time = 0.0;
+                }
+                out.push(i == 1);
+            }
+        }
+        out
+    }
+
+    /// A page button's state (tests): 0, 1 or 2.
+    pub fn inventory_button_state(&self, right: bool) -> Option<u8> {
+        self.inventory
+            .as_ref()
+            .map(|i| i.arrows[usize::from(right)].state)
     }
 
     /// Whether the inventory is open.
@@ -3118,25 +3254,22 @@ impl Stage {
     }
 
     /// The inventory over the view (@ 0x00414b70): its background +4 with
-    /// its children, the grid and buttons (a button's focus picture under
-    /// the mouse [INFERRED]) and the icons in their cells. The cursor's
+    /// its children, the grid and buttons (each as its state shows it,
+    /// [`ArrowButton`]) and the icons in their cells. The cursor's
     /// children come after the cursor
     /// ([`Stage::draw_inventory_over_cursor`]).
     fn draw_inventory(&self, out: &mut [u32]) {
         let Some(inv) = &self.inventory else { return };
         let ((gx, gy), (lx, ly), (rx, ry)) = Self::inventory_layout(inv);
-        let hit = self.inventory_hit();
         let mut t = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
         if let Some(b) = &inv.background {
             b.draw(&mut t, Some(gx), gy, 0);
         }
-        let lb = usize::from(hit == Some(InventoryHit::Left));
-        if let Some(b) = inv.left[lb].as_ref().or(inv.left[0].as_ref()) {
-            b.draw(&mut t, Some(lx), ly, 0);
+        if let Some((b, f)) = inv.arrows[0].shown(&inv.left) {
+            b.draw(&mut t, Some(lx), ly, f);
         }
-        let rb = usize::from(hit == Some(InventoryHit::Right));
-        if let Some(b) = inv.right[rb].as_ref().or(inv.right[0].as_ref()) {
-            b.draw(&mut t, Some(rx), ry, 0);
+        if let Some((b, f)) = inv.arrows[1].shown(&inv.right) {
+            b.draw(&mut t, Some(rx), ry, f);
         }
         for c in 0..10usize {
             if let Some(Some(icon)) = inv.icons.get(c + inv.offset) {
@@ -4447,7 +4580,7 @@ impl Play {
 
     fn menu_frame(&mut self, clicks: usize, dt: f64) {
         if self.stage.borrow().inventory_open_now() {
-            self.inventory_frame(clicks);
+            self.inventory_frame(clicks, dt);
             return;
         }
         if !self.stage.borrow().menu_open_now() {
@@ -4723,29 +4856,39 @@ impl Play {
                     self.stage.borrow_mut().inventory_close();
                 }
             }
-            Some(_) => {}
-            None => self.stage.borrow_mut().inventory_close(),
+            // The page buttons take only a left press (`buttons & 1`,
+            // @ 0x0044f0e0): state 2 (@ 0x00414a30) sees the right press
+            // untaken and ends the inventory, as off the elements.
+            Some(InventoryHit::Left | InventoryHit::Right) | None => {
+                self.stage.borrow_mut().inventory_close();
+            }
         }
     }
 
-    /// The inventory's frame: each left press on a slot (@ 0x00417120)
-    /// or a button; then the elements made again (@ 0x00415fe0) from the
-    /// database; at its end the manager's next request.
-    fn inventory_frame(&mut self, clicks: usize) {
+    /// The inventory's frame: the page buttons on a move; each left press
+    /// on a slot (@ 0x00417120) or taken by a page button; the buttons'
+    /// players, whose ended click pages (@ 0x00417670 → 0x00414d50,
+    /// @ 0x004176a0 → 0x00414d60); after a slot's click or a page the
+    /// elements made again (@ 0x00415fe0) from the database; at its end
+    /// the manager's next request.
+    fn inventory_frame(&mut self, clicks: usize, dt: f64) {
+        self.stage.borrow_mut().inventory_buttons_hover();
         for _ in 0..clicks {
             let hit = self.stage.borrow().inventory_hit();
-            match hit {
-                Some(InventoryHit::Slot(s)) => {
-                    self.game.click_inventory(s);
-                }
-                Some(InventoryHit::Left) => self.stage.borrow_mut().inventory_page(false),
-                Some(InventoryHit::Right) => self.stage.borrow_mut().inventory_page(true),
-                None => continue,
+            if let Some(InventoryHit::Slot(s)) = hit {
+                self.game.click_inventory(s);
+                self.inventory_remake();
+            } else {
+                self.stage.borrow_mut().inventory_buttons_press();
             }
-            let (size, items) = self.game.script().inventory();
-            let hand = self.game.script().handled_item().unwrap_or_default();
-            self.stage.borrow_mut().inventory_refresh(size, items, hand);
-            self.inventory_hand_name();
+        }
+        let pages = self.stage.borrow_mut().inventory_buttons_step(dt);
+        for right in pages {
+            if !self.stage.borrow().inventory_open_now() {
+                break;
+            }
+            self.stage.borrow_mut().inventory_page(right);
+            self.inventory_remake();
         }
         // The bubble (@ 0x00416c50, after the events).
         if self.stage.borrow().inventory_open_now() {
@@ -5100,6 +5243,15 @@ impl Play {
     /// The hand name's text after the inventory's elements are made
     /// (@ 0x00414db0 when it opens, @ 0x00415fe0 after a click): the
     /// hand's item's description, empty with an empty hand.
+    /// The inventory's elements made again (@ 0x00415fe0) from the
+    /// database.
+    fn inventory_remake(&mut self) {
+        let (size, items) = self.game.script().inventory();
+        let hand = self.game.script().handled_item().unwrap_or_default();
+        self.stage.borrow_mut().inventory_refresh(size, items, hand);
+        self.inventory_hand_name();
+    }
+
     fn inventory_hand_name(&mut self) {
         let hand = self.game.script().handled_item().unwrap_or_default();
         let text = if hand.is_empty() {
