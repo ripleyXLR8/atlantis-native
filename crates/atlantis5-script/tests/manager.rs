@@ -209,6 +209,59 @@ fn zoom_and_fade_turns_the_field_of_view() {
     assert_eq!(g.script().global(b"ENTERED"), Value::Num(2.0));
 }
 
+/// zoom_and_fade's view change, frame by frame: the frame that loads the
+/// view asks for no field of view (@ 0x0042d900 phase 1: phase 2 and
+/// t = 0 set, then LAB_0042dec4, the scene update and return); phase 2
+/// first runs at the next frame, with that frame's time.
+fn zoom_and_fade_view_change_frame(with_enter_script: bool) {
+    let (mut g, probe) = game(BASE);
+    if !with_enter_script {
+        probe
+            .borrow_mut()
+            .files
+            .remove(&format!("{DIR}on_enter_view_deck.lua"));
+    }
+    g.new_game();
+    settle(&mut g, 5);
+    g.set_fov(1.0);
+    probe.borrow_mut().requests.clear();
+    assert!(g.click_zone(7, b""));
+    let loaded = |p: &Rc<RefCell<Probe>>| {
+        p.borrow()
+            .requests
+            .iter()
+            .any(|r| matches!(r, Request::LoadView { view: 7, .. }))
+    };
+    let mut frames = 0;
+    while !loaded(&probe) && frames < 100 {
+        g.update(0.02);
+        frames += 1;
+    }
+    assert!(loaded(&probe));
+    let ninth = std::f32::consts::PI / 9.0;
+    let f = fovs(&probe);
+    // The view change's frame: the camera kept at phase 0's last value.
+    assert!((f.last().unwrap() - (1.0 - ninth)).abs() < 1e-5, "{f:?}");
+    let n = f.len();
+    g.update(0.02);
+    let f = fovs(&probe);
+    assert_eq!(f.len(), n + 1, "{f:?}");
+    // Phase 2's first step: t = 0.02, k = 1 − 0.02 · 2.857143.
+    let k = 1.0 - 0.02 * f32::from_bits(0x4036_db6e);
+    let want = (ninth + 1.0) - (1.0 - k) * ninth;
+    assert!((f[n] - want).abs() < 1e-5, "{f:?}");
+}
+
+#[test]
+fn zoom_and_fade_keeps_the_field_of_view_in_the_view_change_frame() {
+    zoom_and_fade_view_change_frame(true);
+}
+
+#[test]
+fn zoom_and_fade_keeps_the_field_of_view_without_an_enter_script() {
+    zoom_and_fade_view_change_frame(false);
+}
+
 #[test]
 fn timers_repeat_and_end() {
     let (mut g, _probe) = game(BASE);

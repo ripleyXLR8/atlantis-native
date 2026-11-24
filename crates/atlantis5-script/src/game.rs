@@ -787,17 +787,7 @@ impl Game {
             return;
         };
         if run.enter_view {
-            if let Some(t) = self.transitions.last_mut() {
-                t.entering = false;
-            }
-            // no_fx and centring end with the view change. The
-            // continuation is the same step as the view change: its scene
-            // update is the view change's.
-            let kept = self.transition_scene.take();
-            self.continue_transition(0.0);
-            if kept.is_some() {
-                self.transition_scene = kept;
-            }
+            self.view_entered();
         }
         if run.chapter {
             // @ 0x0042f000 case 1: +0x50 = 0 once `InitChapter` has
@@ -856,13 +846,31 @@ impl Game {
         let path = Self::scripts_path(&name);
         if self.push_file(&path, true, false) {
             self.run();
-        } else if let Some(t) = self.transitions.last_mut() {
-            t.entering = false;
-            let kept = self.transition_scene.take();
-            self.continue_transition(0.0);
-            if kept.is_some() {
-                self.transition_scene = kept;
-            }
+        } else {
+            self.view_entered();
+        }
+    }
+
+    /// The view change's step once `on_enter_view` is done (@ 0x0042d900).
+    /// no_fx and centring end with the view change (LAB_0042e5fe, return
+    /// 1): the continuation is the same step, its scene update the view
+    /// change's. zoom_and_fade's phase 1 only sets phase 2 and t = 0, then
+    /// the scene update and return (LAB_0042dec4): phase 2 first runs at
+    /// the loop's next step, with that frame's time.
+    fn view_entered(&mut self) {
+        let Some(t) = self.transitions.last_mut() else {
+            return;
+        };
+        t.entering = false;
+        if t.fx == Fx::ZoomAndFade {
+            // The step ends now; its picture comes before the next one.
+            t.fresh = true;
+            return;
+        }
+        let kept = self.transition_scene.take();
+        self.continue_transition(0.0);
+        if kept.is_some() {
+            self.transition_scene = kept;
         }
     }
 
