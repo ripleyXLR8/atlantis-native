@@ -522,6 +522,17 @@ impl App {
                 session.refresh(at, &desktop::describe);
                 session.message("Copied: the game now plays from this computer, without the disc");
             }
+            Err(crate::a5_copy::CopyError::NextDisc(v)) => {
+                log::info!("{}: a CD copied, still needed {v:?}", from.display());
+                session.refresh(
+                    session.launcher.as_ref().map_or(0, |l| l.selected()),
+                    &desktop::describe,
+                );
+                session.message(format!(
+                    "CD copied. Insert the next CD of The Secrets of Atlantis, then choose Copy to this computer again (still needed: {})",
+                    v.join(", ")
+                ));
+            }
             Err(crate::a5_copy::CopyError::Cancelled) => {
                 log::info!("{}: copy cancelled", from.display());
                 session
@@ -582,8 +593,14 @@ impl App {
                             desktop::try_open(&dir),
                             Err(atlantis_data::GameError::DvdOtherSide(_))
                         );
+                        let a5_cd = matches!(
+                            atlantis3_data::atlantis5::Atlantis5Source::open(&dir),
+                            Err(atlantis3_data::atlantis5::OpenError::MissingDiscs(_))
+                        );
                         session.message(if side {
                             "This version is on the other side of the DVD: turn the disc over"
+                        } else if a5_cd {
+                            "This is one of the three CDs: choose Copy to this computer to copy them, one after the other"
                         } else {
                             "This folder no longer opens: locate it or remove it"
                         });
@@ -668,7 +685,7 @@ impl App {
                 if session.copy.is_some() {
                     return;
                 }
-                match crate::a5_copy::Job::start(&dir, &crate::a5_copy::copy_dir()) {
+                match crate::a5_copy::Job::start(&dir, &crate::a5_copy::copy_dir_for(&dir)) {
                     Ok(job) => {
                         log::info!("copying {} to {}", dir.display(), job.dest.display());
                         session.message(job.status());
@@ -1013,6 +1030,33 @@ mod tests {
         assert!(s.wants_atlantis5() && s.wants_own_mode() && !s.wants_atlantis4());
         assert_eq!(app.session_mut().unwrap().take_atlantis5(), Some(dvd));
         assert!(!app.session().unwrap().wants_own_mode());
+    }
+
+    /// The Secrets of Atlantis's North-American CDs in the game library
+    /// (`ATLANTIS5_CD_US`: a folder holding a copy of each disc's files in
+    /// `CD1`, `CD2` and `CD3`): the folder of the three, and one disc's
+    /// folder with the others beside it, each named with the edition and
+    /// offered to copy; found by the search for installations.
+    #[test]
+    fn the_library_lists_atlantis5s_cds() {
+        let Some(root) = atlantis3_data::testing::a5_cd_us() else {
+            return;
+        };
+        let _own = own_data_dir("atlantis5-cds");
+        let want = "The Secrets of Atlantis (2007), 3 CDs, English";
+        for folder in [root.clone(), root.join("CD2")] {
+            assert_eq!(
+                crate::setup::kind_of(&folder),
+                Some(crate::setup::GameKind::Atlantis5)
+            );
+            assert_eq!(crate::a5::label(&folder).unwrap(), want);
+            let e = crate::desktop::describe(&folder);
+            assert!(e.found && e.copyable, "{e:?}");
+            assert_eq!(e.label, want);
+        }
+        let found = crate::desktop::first_of_each_game(std::slice::from_ref(&root));
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].1.label(), want);
     }
 
     /// The Secrets of Atlantis's international DVD in the game library

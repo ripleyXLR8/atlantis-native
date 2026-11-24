@@ -415,11 +415,21 @@ pub fn explain_atlantis3_no_disc(dir: &Path) -> String {
 /// What to tell the player about a folder of The Secrets of Atlantis that
 /// does not open.
 pub fn explain_atlantis5(dir: &Path, err: &atlantis3_data::atlantis5::OpenError) -> String {
+    if let atlantis3_data::atlantis5::OpenError::MissingDiscs(missing) = err {
+        return format!(
+            "{} holds one of the three CDs of The Secrets of Atlantis (2007), whose files              are spread over the three discs ({} still needed).
+
+             Choose a folder holding a copy of each CD (one folder per disc, side by side,              or the three discs' files copied together), or the folder holding the three              CD images; or add this drive to the game library and choose Copy to this              computer, then insert each disc when asked.",
+            dir.display(),
+            missing.join(", ")
+        );
+    }
     format!(
         "{} does not hold The Secrets of Atlantis in a form Atlantis Native reads ({err}).\n\n\
          Choose the DVD's drive or a copy of its files (the folder with DATAS.cab and \
-         DATAS_french.cab), the folder holding the DVD's image (.iso), or the folder where \
-         the game was installed (the one with Datas).",
+         DATAS_french.cab), the folder holding the DVD's image (.iso), a folder holding \
+         copies of the three North-American CDs (data1.hdr and data1.cab to data4.cab), \
+         or the folder where the game was installed (the one with Datas).",
         dir.display()
     )
 }

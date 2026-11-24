@@ -330,14 +330,46 @@ pub fn a4cd_install(paths: &[&str]) -> Option<String> {
 /// shallowest holding the DVD's `datas.cab` (a copy of the disc), an
 /// install or the extracted cabinets (`datas/texts/menu/<language>/
 /// string_resources.xml` beside `datas/scenes` and `datas/warps`), or
-/// `Datas` itself (the same without `datas/`)
+/// `Datas` itself (the same without `datas/`), or the North-American
+/// CDs' copies: the folder holding `data1.hdr` (the three discs' files
+/// together), or the folder above it when the other discs' volumes are
+/// in folders beside it (a folder per disc)
 /// ([`atlantis3_data::atlantis5::Atlantis5Source::from_folder`]). The
 /// DVD's image is found by reading it, not from the paths.
 pub fn a5_folder(paths: &[&str]) -> Option<String> {
     const TEXTS: &str = "texts/menu/";
     const STRINGS: &str = "/string_resources.xml";
     let mut found: Vec<String> = Vec::new();
+    // A volume of the CDs' set (`data<n>.cab`) in folder `dir`.
+    let volume_in = |p: &str, dir: &str| {
+        p.strip_prefix(dir)
+            .and_then(|n| n.strip_prefix("data"))
+            .and_then(|n| n.strip_suffix(".cab"))
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+    };
     for p in paths {
+        if let Some(dir) = p.strip_suffix("data1.hdr") {
+            if !(dir.is_empty() || dir.ends_with('/')) {
+                continue;
+            }
+            let parent = dir
+                .strip_suffix('/')
+                .map(|d| d.rfind('/').map_or("", |i| &d[..=i]));
+            let beside = parent.is_some_and(|parent| {
+                paths.iter().any(|q| {
+                    !q.starts_with(dir)
+                        && q.strip_prefix(parent).is_some_and(|rest| {
+                            rest.split_once('/')
+                                .is_some_and(|(sub, _)| volume_in(q, &format!("{parent}{sub}/")))
+                        })
+                })
+            });
+            match parent {
+                Some(parent) if beside => found.push(parent.to_string()),
+                _ => found.push(dir.to_string()),
+            }
+            continue;
+        }
         if let Some(dir) = p.strip_suffix("datas.cab") {
             if dir.is_empty() || dir.ends_with('/') {
                 found.push(dir.to_string());
@@ -817,6 +849,24 @@ mod tests {
             None
         );
         assert_eq!(a5_folder(&["g/mydatas.cab", "soa-fr.iso"]), None);
+        // The North-American CDs: a folder per disc, or together.
+        let discs = [
+            "soa/cd1/data1.hdr",
+            "soa/cd1/data1.cab",
+            "soa/cd1/data2.cab",
+            "soa/cd2/data3.cab",
+            "soa/cd3/data4.cab",
+        ];
+        assert_eq!(a5_folder(&discs), Some("soa/".to_string()));
+        assert_eq!(
+            a5_folder(&["cds/data1.hdr", "cds/data1.cab", "cds/data3.cab"]),
+            Some("cds/".to_string())
+        );
+        assert_eq!(a5_folder(&["data1.hdr"]), Some(String::new()));
+        assert_eq!(
+            a5_folder(&["x/cd1/data1.hdr", "x/notes.txt"]),
+            Some("x/cd1/".to_string())
+        );
     }
 
     #[test]

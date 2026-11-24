@@ -179,6 +179,9 @@ fn main() {
     }
     let headless = args.iter().any(|a| a == "--headless");
     let log_file = init_log(headless);
+    // The Secrets of Atlantis's CDs: those copied already complete the one
+    // in a drive.
+    atlantis_app::a5_copy::register_cd_copy();
     // Atlantis Evolution's development viewer.
     if args.first().map(String::as_str) == Some("--atlantis4-view") {
         // How it draws: the graphics card unless `--cpu`; `--gpu-check`

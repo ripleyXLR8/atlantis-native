@@ -386,6 +386,17 @@ pub fn describe(dir: &Path) -> LauncherEntry {
                 copyable = disc;
                 (label, true)
             }
+            // One of the North-American CDs: copied one after the other.
+            Err(atlantis3_data::atlantis5::OpenError::MissingDiscs(v)) => {
+                copyable = true;
+                (
+                    format!(
+                        "The Secrets of Atlantis (2007), a CD: copy the three CDs to play ({} still needed)",
+                        v.join(", ")
+                    ),
+                    true,
+                )
+            }
             Err(e) => {
                 log::info!("{}: {e}", dir.display());
                 (
@@ -564,6 +575,60 @@ fn copy_from_discs() -> Option<PathBuf> {
         ));
         if !ask2(&text, "Copy", "Cancel") {
             return None;
+        }
+    }
+}
+
+/// Copies The Secrets of Atlantis's three North-American CDs, the one at
+/// `first` first, then each next one the player inserts (in the same
+/// drive or another), into [`crate::a5_copy::cd_copy_dir`]; the game
+/// copied and its folder, or `None` when the player cancels or a copy
+/// fails. A copy cut short goes on from the files copied whole.
+fn copy_atlantis5_cds(first: &Path) -> Option<(Opened, PathBuf)> {
+    use crate::a5_copy::{cd_copy_dir, free_space, CopyError, Plan, Progress};
+    let dest = cd_copy_dir();
+    let mut from = first.to_path_buf();
+    loop {
+        let r =
+            Plan::of(&from).and_then(|plan| plan.copy_to(&dest, &Progress::default(), free_space));
+        match r {
+            Ok(()) => break,
+            Err(CopyError::NextDisc(missing)) => loop {
+                let text = format!(
+                    "This CD is copied.\n\nInsert the next CD of The Secrets of Atlantis, then \
+                     click Copy (still needed: {}).\n\nThe files go to {}.",
+                    missing.join(", "),
+                    dest.display()
+                );
+                if !ask2(&text, "Copy", "Cancel") {
+                    return None;
+                }
+                // The drive used so far, else any drive holding a file
+                // still needed.
+                let holds = |r: &Path| missing.iter().any(|n| StdDir::new(r).size(n).is_some());
+                if let Some(r) = std::iter::once(from.clone())
+                    .chain(setup::disc_roots())
+                    .find(|r| holds(r))
+                {
+                    from = r;
+                    break;
+                }
+            },
+            Err(e) => {
+                error_box(&format!(
+                    "The copy from {} failed:\n\n{e}\n\nCheck that the disc is clean and that \
+                     there is room on the computer, then try again.",
+                    from.display()
+                ));
+                return None;
+            }
+        }
+    }
+    match crate::a5::label(&dest) {
+        Ok(label) => Some((Opened::Atlantis5(label), dest)),
+        Err(e) => {
+            error_box(&setup::explain_atlantis5(&dest, &e));
+            None
         }
     }
 }
@@ -774,6 +839,25 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
                 Ok(label) => {
                     log::info!("game folder {} ({label})", root.display());
                     return Some(vec![(Opened::Atlantis5(label), root)]);
+                }
+                // One of the North-American CDs: copy the three.
+                Err(e @ atlantis3_data::atlantis5::OpenError::MissingDiscs(_)) => {
+                    log::info!("{}: {e}", root.display());
+                    let text = format!(
+                        "{}\n\nCopy the three CDs to this computer now (about 1.5 GB; \
+                         each disc takes a few minutes, the next message appears when it is done)?",
+                        setup::explain_atlantis5(&root, &e)
+                    );
+                    match ask(&text, "Copy the CDs", "Choose another folder", give_up) {
+                        Choice::First => {
+                            if let Some(found) = copy_atlantis5_cds(&root) {
+                                return Some(vec![found]);
+                            }
+                        }
+                        Choice::Second => {}
+                        Choice::Third => return None,
+                    }
+                    continue;
                 }
                 Err(e) => {
                     log::warn!("{}: {e}", root.display());

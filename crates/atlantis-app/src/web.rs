@@ -1385,8 +1385,9 @@ fn a5_store() -> Rc<dyn SaveStore> {
 fn a5_error(e: &atlantis3_data::atlantis5::OpenError) -> JsValue {
     format!(
         "The Secrets of Atlantis: {e}.\n\nChoose the DVD's image (.iso), the DVD drive or a \
-         copy of the disc (the folder holding DATAS.cab), or the folder where the game is \
-         installed.\n\nHelp: {}",
+         copy of the disc (the folder holding DATAS.cab), a folder holding copies of the three \
+         North-American CDs (one folder per disc, or their files together), or the folder \
+         where the game is installed.\n\nHelp: {}",
         crate::guide::HELP_URL
     )
     .into()

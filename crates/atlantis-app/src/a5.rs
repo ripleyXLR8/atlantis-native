@@ -59,12 +59,14 @@ pub fn open(path: &Path) -> Result<(Atlantis5Source, String), String> {
 }
 
 /// How the game library shows the data at `path`: the edition's title
-/// ([`title`]), the year, the medium and the language played ("The Secrets
-/// of Atlantis : L'Héritage sacré (2006), DVD, French", "The Secrets of
-/// Atlantis: The Sacred Legacy (2006), DVD, German"); with the DVD's image, "DVD image"; with
-/// an install or the extracted cabinets, "DVD, installed"; with the
-/// copy of the disc's files made by [`crate::a5_copy`], "DVD, copied to
-/// this computer".
+/// ([`title`]), the year ([`year`]), the medium and the language played
+/// ("The Secrets of Atlantis : L'Héritage sacré (2006), DVD, French",
+/// "The Secrets of Atlantis: The Sacred Legacy (2006), DVD, German", "The
+/// Secrets of Atlantis (2007), 3 CDs, English"); with the DVD's image,
+/// "DVD image"; with an install or the extracted cabinets, "DVD,
+/// installed"; with the copy of the disc's files made by
+/// [`crate::a5_copy`], "DVD, copied to this computer" (the CDs: "CD
+/// images", "CDs, installed", "CDs, copied to this computer").
 pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError> {
     edition(path).map(|e| e.0)
 }
@@ -75,15 +77,21 @@ pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError
 pub fn edition(path: &Path) -> Result<(String, bool), atlantis3_data::atlantis5::OpenError> {
     use atlantis3_data::atlantis5::Form;
     let src = Atlantis5Source::open(path)?;
+    use atlantis3_data::atlantis5::Edition;
     let copy = crate::a5_copy::is_copy(&atlantis3_data::atlantis5::place_root(path));
-    let medium = match src.form() {
-        Form::DiscFolder if copy => "DVD, copied to this computer",
-        Form::DiscFolder => "DVD",
-        Form::DiscImage => "DVD image",
-        Form::Tree => "DVD, installed",
+    let cds = src.edition() == Edition::NorthAmericanCds;
+    let medium = match (src.form(), cds) {
+        (Form::DiscFolder, false) if copy => "DVD, copied to this computer",
+        (Form::DiscFolder, false) => "DVD",
+        (Form::DiscImage, false) => "DVD image",
+        (Form::Tree, false) => "DVD, installed",
+        (Form::DiscFolder, true) if copy => "CDs, copied to this computer",
+        (Form::DiscFolder, true) => "3 CDs",
+        (Form::DiscImage, true) => "CD images",
+        (Form::Tree, true) => "CDs, installed",
     };
     let lang_name = atlantis3_data::atlantis5::language_name(&language(&src));
-    let label = format!("{} (2006), {medium}, {lang_name}", title(&src));
+    let label = format!("{} ({}), {medium}, {lang_name}", title(&src), year(&src));
     Ok((label, src.form() != Form::Tree && !copy))
 }
 
@@ -147,12 +155,24 @@ pub fn language(src: &Atlantis5Source) -> String {
 
 /// The edition's title: the French DVD's (French only) is *L'Héritage
 /// sacré*; the international DVD's (English, German, Italian, Spanish) is
-/// sold as *The Sacred Legacy*.
+/// sold as *The Sacred Legacy*; the North-American CDs' as *The Secrets
+/// of Atlantis*, with no subtitle.
 pub fn title(src: &Atlantis5Source) -> &'static str {
-    if src.languages().iter().all(|l| l == "french") {
+    if src.edition() == atlantis3_data::atlantis5::Edition::NorthAmericanCds {
+        "The Secrets of Atlantis"
+    } else if src.languages().iter().all(|l| l == "french") {
         crate::setup::GameKind::Atlantis5.name()
     } else {
         "The Secrets of Atlantis: The Sacred Legacy"
+    }
+}
+
+/// The edition's year: 2006 for the DVDs, 2007 for the North-American
+/// CDs.
+pub fn year(src: &Atlantis5Source) -> u16 {
+    match src.edition() {
+        atlantis3_data::atlantis5::Edition::NorthAmericanCds => 2007,
+        atlantis3_data::atlantis5::Edition::Dvd => 2006,
     }
 }
 
@@ -750,7 +770,7 @@ pub fn run_window_on(
     let (src, label) = open(path)?;
     log::info!("{label}");
     let lang = language(&src);
-    let game_title = title(&src);
+    let game_title = format!("{} ({})", title(&src), year(&src));
     let audio = Audio::new();
     let audio_lost = Arc::new(AtomicBool::new(false));
     let out = open_output(&audio, &audio_lost);
@@ -764,7 +784,7 @@ pub fn run_window_on(
         )),
         error: None,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
-        title: format!("{game_title} (2006) - Atlantis Native"),
+        title: format!("{game_title} - Atlantis Native"),
         fullscreen,
         window: None,
         surface: None,
