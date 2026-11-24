@@ -301,6 +301,21 @@ struct A5App {
     audio_lost: Arc<AtomicBool>,
     /// Why the game could not be made, for the caller.
     error: Option<String>,
+    /// Started as the library's one game without its screen: until then
+    /// Shift goes back to the library (as in the other games' modes).
+    shift_until: Option<Instant>,
+    /// Shift was pressed in time: the library's screen next.
+    to_library: bool,
+}
+
+/// How long after an automatic start Shift goes back to the game library
+/// (the other games' modes' grace).
+const SHIFT_GRACE: std::time::Duration = std::time::Duration::from_millis(2000);
+
+/// Whether Shift (`shift`, the modifiers now) at `now` goes back to the
+/// game library: only within the grace `until` of an automatic start.
+fn shift_to_library(until: Option<Instant>, now: Instant, shift: bool) -> bool {
+    shift && until.is_some_and(|t| now < t)
 }
 
 impl A5App {
@@ -530,6 +545,16 @@ impl ApplicationHandler for A5App {
             }
             return;
         }
+        // Shift in the first moments of an automatic start (the start's
+        // reads included): the game library.
+        if let WindowEvent::ModifiersChanged(m) = &event {
+            if shift_to_library(self.shift_until, Instant::now(), m.state().shift_key()) {
+                log::info!("The Secrets of Atlantis stopped: the game library");
+                self.to_library = true;
+                el.exit();
+                return;
+            }
+        }
         // The window's content asked by the system: presented at the next
         // frame even when the picture did not change (`must_present`).
         match event {
@@ -615,16 +640,19 @@ impl ApplicationHandler for A5App {
 /// menu first); returns when the window is closed.
 pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
     let mut el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
-    run_window_on(&mut el, path, fullscreen).map(|_| ())
+    run_window_on(&mut el, path, fullscreen, false).map(|_| ())
 }
 
 /// [`run`] on the program's event loop (the game chosen in the game
 /// library, or a folder given to the program): the window opens, the game
-/// plays until its `quit_game` or the window's closing.
+/// plays until its `quit_game` or the window's closing. With `shift_grace`
+/// (the library's one game, started without its screen) Shift pressed in
+/// the first moments goes back to the library ([`crate::a2::Ended::Library`]).
 pub fn run_window_on(
     el: &mut EventLoop<()>,
     path: &Path,
     fullscreen: bool,
+    shift_grace: bool,
 ) -> Result<crate::a2::Ended, String> {
     use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     let (src, label) = open(path)?;
@@ -663,9 +691,14 @@ pub fn run_window_on(
         audio_out: out,
         mixer: audio,
         audio_lost,
+        shift_until: shift_grace.then(|| Instant::now() + SHIFT_GRACE),
+        to_library: false,
     };
     el.run_app_on_demand(&mut app)
         .map_err(|e| format!("The window failed: {e}"))?;
+    if app.to_library {
+        return Ok(crate::a2::Ended::Library);
+    }
     if let Some(e) = app.error {
         return Err(e);
     }
@@ -755,6 +788,19 @@ pub fn saves_dir() -> std::path::PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The library's one game started without its screen: Shift within
+    /// the grace goes back to the library, as in the other games' modes;
+    /// not after it, nor without the grace (a folder given to the program).
+    #[test]
+    fn shift_in_the_first_moments_goes_back_to_the_library() {
+        let t0 = Instant::now();
+        let until = Some(t0 + SHIFT_GRACE);
+        assert!(shift_to_library(until, t0, true));
+        assert!(!shift_to_library(until, t0, false));
+        assert!(!shift_to_library(until, t0 + SHIFT_GRACE, true));
+        assert!(!shift_to_library(None, t0, true));
+    }
 
     #[test]
     fn without_a_sound_output_the_game_times_its_sounds() {

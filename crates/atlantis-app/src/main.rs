@@ -587,7 +587,7 @@ fn main() {
         let run = EventLoop::new()
             .map_err(|e| format!("No window can be opened: {e}"))
             .and_then(|mut el| {
-                atlantis_app::a5::run_window_on(&mut el, Path::new(&path), fullscreen)
+                atlantis_app::a5::run_window_on(&mut el, Path::new(&path), fullscreen, false)
             });
         if let Err(e) = run {
             error_box(&e);
@@ -926,7 +926,7 @@ fn main() {
         drop(app);
         let run = if let Some(dir) = atlantis5 {
             atlantis_app::watchdog::leave();
-            atlantis_app::a5::run_window_on(&mut el, &dir, fullscreen)
+            atlantis_app::a5::run_window_on(&mut el, &dir, fullscreen, a2_grace.replace(false))
         } else if let Some(dir) = atlantis2 {
             atlantis_app::watchdog::leave();
             let enhancements = a2_flags_applied(atlantis_app::a2::stored_settings().enhancements);
