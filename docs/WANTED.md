@@ -118,13 +118,12 @@ in progress).
 ## The Secrets of Atlantis: The Sacred Legacy (2006)
 
 🟢 **Already supported or tried:** the French DVD (*L'Héritage sacré*,
-Nobilis France, barcode 3760137140938). The international DVD's layout
-is known from public file listings and read by Atlantis Native, but its
-original program file and English files have not been checked.
+Nobilis France, barcode 3760137140938) and the international DVD
+(English, German, Italian, Spanish; its program `The secrets of
+Atlantis.exe` of 3,883,008 bytes, MD5 `fcb357acdb6c16a76f3f4f6cb5a625c5`).
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|
-| 🔴 **most wanted** | *The Secrets of Atlantis: The Sacred Legacy* (*L'Eredità Sacra*, *El Legado Sagrado*, *Das heilige Vermächtnis*), international DVD | Europe, Nobilis: UK barcode 3760137140976, Spain 3760137140945, Italy 3760137140952, Germany 3760137140969 | 2006 | 1 DVD | Ring code `DVD 3760137140976 27/10/2006`; volume `SOA`; Redump [73173](http://redump.org/disc/73173/). What is wanted is its original program, `The secrets of Atlantis.exe` at the disc's root (3,883,008 bytes, dated 2006-10-26), and `datas_english.cab` |
 | 🟠 wanted | *Das heilige Vermächtnis*, "Solid Games" | Germany, United Independent Entertainment | 2009 | DVD | Barcode 4020636110160 |
 | 🟠 wanted | *The Secrets of Atlantis* (no subtitle) | USA, The Adventure Company | 2007 | 3 CD | UPC 625904549518; serial PC0549CD; Redump [107438](http://redump.org/disc/107438/)–107440 |
 | 🟠 wanted | *The Secrets of Atlantis*, Russian | Russia, Akella | — | 3 CD, or 1 DVD | Barcodes 4607057337606 (CD), 4607057337576 (DVD) |

@@ -111,7 +111,8 @@ other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For
 GOG.com's release, in English, French, German, Italian and Spanish, and
 the 2004 CD (English, in progress) (see
 [Atlantis Evolution](#atlantis-evolution)). For The Secrets of Atlantis:
-the French DVD (2006), its drive, files, image or installation (see
+the French DVD (2006) and the international DVD (English, German,
+Italian, Spanish), their drive, files, image or installation (see
 [The Secrets of Atlantis](#the-secrets-of-atlantis)).
 The editions the project is looking for, and how their owners can help,
 are listed in [Wanted editions](WANTED.md).
@@ -214,11 +215,13 @@ on a drive not plugged in) is shown in red as *not found*: **Locate...**
 **Copy to this computer** shows under *The Secrets of Atlantis* when it
 is read from its DVD, a copy of the DVD's files elsewhere, or the DVD's
 image: it copies the disc's files the game needs (`DATAS.cab`, the
-language's `DATAS_french.cab` and the program, which tells the edition;
-about 1.4 GB) to `atlantis5/disc/` in the
+languages' cabinets, `DATAS_french.cab` or the international DVD's four,
+and the program, which tells the edition; about 1.4 GB, 1.7 GB for the
+international DVD) to `atlantis5/disc/` in the
 [data folder](#where-the-files-live), then the entry plays from there,
 as *The Secrets of Atlantis : L'Héritage sacré (2006), DVD, copied to
-this computer, French*, without the disc. The free room is checked
+this computer, French*, without the disc (each language's entry of the
+international DVD moves to the copy). The free room is checked
 first; the progress is shown under the buttons, and Escape cancels
 (the files copied whole are kept: the next copy goes on from there).
 While it copies, the screen takes no other action. Deleting the
@@ -341,11 +344,14 @@ What to pick:
   `Atlantis4.cfg` are kept in the browser under
   `atlantis-native/atlantis-evolution-2004/`; its controls are the
   desktop's (see [The 2004 CD](#the-2004-cd-in-progress)).
-- *The Secrets of Atlantis*, the French DVD: the DVD's image (an
+- *The Secrets of Atlantis*, the French or the international DVD: the DVD's image (an
   `.iso`: pick it with *or choose the CD image files* under the folder
   button, or pick the folder holding it), the DVD drive or a copy of the
-  disc (the folder holding `DATAS.cab` and `DATAS_french.cab`), or the
+  disc (the folder holding `DATAS.cab` and `DATAS_french.cab`, or
+  `datas.cab` and the international DVD's four `datas_<language>.cab`), or the
   folder where the game is installed (the one holding `Datas`). The
+  international DVD asks for the language to play (or `?lang=de`, `en`,
+  `es` or `it` after the page's address chooses it). The
   image is read a part at a time, never whole. The browser cannot keep
   the desktop's index of the cabinets (see
   [Starting from the DVD](#the-secrets-of-atlantis)): each start from
@@ -1120,8 +1126,18 @@ program of Cryo's *Atlantis III* engine, after *Atlantis III* and the
 2004 *Atlantis Evolution*; its story is written in Lua 5.0. Atlantis
 Native plays its French DVD with its *Atlantis III* engine and runs the
 DVD's own scripts (the compiled Lua 5.0 chunks of your copy, loaded as
-they are). The game library shows it as *The Secrets of Atlantis :
-L'Héritage sacré (2006), DVD, French*.
+they are), and its international DVD (English, German, Italian,
+Spanish), whose scripts are the same story as Lua 5.0 source, compiled
+as Lua 5.0 compiles it. The game library shows the French DVD as *The
+Secrets of Atlantis : L'Héritage sacré (2006), DVD, French*, and the
+international DVD once per language, *The Secrets of Atlantis: The
+Sacred Legacy (2006), DVD, English* (German, Italian, Spanish): the
+original's installer asks for one language and installs it, and the
+game has no language option of its own, so here each language is an
+entry to play. The international DVD started from the command line
+without a choice plays the system's language when it is one of the
+four, else English; its cabinet's path chooses one
+(`atlantis-native "D:\datas_german.cab"`).
 
 **Status.** It plays from its logos and main menu through the nine
 chapters (the zeppelin, the Empire State Building's floors, Macao,
@@ -1136,7 +1152,8 @@ many players: reports are welcome. What is missing is listed below.
 
 **What to point it at.** You need your own DVD, in any form: the DVD's
 drive, or a copy of its files (the folder holding `DATAS.cab` and
-`DATAS_french.cab`), the DVD's image (an `.iso`) or the folder holding
+`DATAS_french.cab`, or `datas.cab` and `datas_english.cab`,
+`datas_german.cab`, `datas_italian.cab`, `datas_spanish.cab`), the DVD's image (an `.iso`) or the folder holding
 it, or the folder where the DVD's installer put the game (the one with
 `Datas`). The cabinets are read in place: nothing is unpacked, nothing
 is installed. Played from the DVD or its image, the game library offers
@@ -1178,8 +1195,8 @@ the [game library](#several-editions-the-game-library) (under the game's
 name when it is read from the DVD or its image), or from a terminal
 `atlantis-native --atlantis5-install <disc or image>`, which prints the
 progress and then puts the copy in the game library in place of the
-disc. The DVD's cabinets and program (about 1.4 GB, the free room
-checked first) go to `atlantis5/disc/` in the per-user data folder; the
+disc. The DVD's cabinets and program (about 1.4 GB, 1.7 GB for the
+international DVD, the free room checked first) go to `atlantis5/disc/` in the per-user data folder; the
 copy is read as the DVD is (nothing unpacked), and the index files
 above serve both. A copy cancelled or cut short goes on from the files
 already copied whole the next time.

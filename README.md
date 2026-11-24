@@ -69,12 +69,15 @@ are welcome (see [The 2004 CD](docs/GUIDE.md#the-2004-cd-in-progress)).
 
 *The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,
 2006), the last game of Cryo's *Atlantis III* engine, plays from start
-to end from its French DVD (*L'Héritage sacré*) on the desktop and in
-the browser: its drive, its files, its image or its installation, in the
+to end from its French DVD (*L'Héritage sacré*) and its international
+DVD (English, German, Italian, Spanish) on the desktop and in the
+browser: its drive, its files, its image or its installation, in the
 game library as *The Secrets of Atlantis : L'Héritage sacré (2006), DVD,
-French*; on the desktop the DVD can be copied to the computer once
+French* or, one entry per language, *The Secrets of Atlantis: The Sacred
+Legacy (2006), DVD, German*; on the desktop the DVD can be copied to the computer once
 (**Copy to this computer** in the game library), so that it plays from
-the hard disk. The DVD's own Lua 5.0 scripts run as they are; the nine
+the hard disk. The DVD's own Lua 5.0 scripts (compiled on the French
+DVD, source on the international one) run as they are; the nine
 chapters, the twenty puzzles, the dialogs, the inventory, the saves, the
 deaths and the credits are checked by an automated walkthrough of the
 whole story. What is missing (two fonts when Windows' own are not installed) is listed in
@@ -361,11 +364,14 @@ For *The Secrets of Atlantis*:
 | Release | Languages | What to point it at |
 |---|---|---|
 | The French DVD of Nobilis (2006, *L'Héritage sacré*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `e5c43eb0411d1775e6242fec6d241f6e`, never run) | French | the DVD's drive or a copy of its files (the folder with `DATAS.cab`), its image (`.iso`) or the folder holding it, or the folder where its installer put the game (the one with `Datas`) |
+| The international DVD of Nobilis (2006, *The Sacred Legacy*, *Das heilige Vermächtnis*, *L'Eredità Sacra*, *El Legado Sagrado*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `fcb357acdb6c16a76f3f4f6cb5a625c5`, never run) | English, German, Italian, Spanish | the same forms (its files are `datas.cab` and `datas_english.cab`, `datas_german.cab`, `datas_italian.cab`, `datas_spanish.cab`); the game library lists one entry per language, the web page asks for the language |
 
 You need your own DVD (or its image, or the game installed from it).
-The international DVD (`The secrets of Atlantis.exe` of 3,891,200 bytes)
-has the same layout, `DATAS.cab` and one `DATAS_<language>.cab` per
-language, which Atlantis Native reads, but it has not been tried.
+The original's installer asks for the language and installs that one
+only; Atlantis Native offers each language of the disc as its own entry
+of the game library. Started without a choice (`atlantis-native <the
+disc's folder>`), it plays the system's language when the disc has it,
+else English.
 
 The web version plays the five games: see
 [The web version](docs/GUIDE.md#the-web-version).

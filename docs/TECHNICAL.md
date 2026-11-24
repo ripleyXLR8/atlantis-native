@@ -4690,6 +4690,25 @@ folder holding it, or an unpacked tree. The formats shared with
 playlists, `font.txt`, Bink films) are read by the same code; the XML
 texts (string resources, dialogs, film subtitles) by `atlantis5_texts`.
 
+**Languages.** The program reads the registry's `Language` (written by
+the installer: `ENGLISH`, `GERMAN`, `ITALIAN`, `SPANISH` on the
+international DVD, `FRENCH` on the French one) and uses it as the folder
+of its texts, voices, film voices and fonts; it has no language page.
+The international DVD holds four languages. A disc of several languages
+has a place per language, `atlantis5::language_place` (the cabinet's
+path, `<root>/DATAS_<language>.cab`; on the disc it is the cabinet, for
+an image or an install a name of that form), which
+`Atlantis5Source::open` opens in that language (`chosen_language`).
+The game library lists the places (`desktop::atlantis5_places`, also in
+the search and the first start's offer); a copy to the computer moves
+each of them to the copy (`a5_copy::move_entries_to_copy`). The root
+alone plays `atlantis5::default_language`: the only language, else the
+system's (`locale::system_language`: `GetUserDefaultUILanguage` on
+Windows, `AppleLocale` on macOS, `LC_ALL`/`LC_MESSAGES`/`LANG`
+elsewhere, `navigator.language` in the browser) when the disc has it,
+else English. The web page asks (`A5LANGUAGES:` from `start`, as Cryo's
+DVD's `LANGUAGES:`), or takes `?lang=`.
+
 **The copy to the computer.** `atlantis-app::a5_copy` (desktop only)
 copies the disc's files the game needs to `atlantis5/disc` in the
 per-user data folder: `Atlantis5Source::disc_root` gives the disc's root
@@ -4732,10 +4751,13 @@ dates); the sound through `audio_out::web_out`, mixed ahead as Atlantis
 Evolution's. `window.atlantis5.state()` / `.test("click <element>")`
 are the end-to-end runs' aids.
 
-**Scripts.** `atlantis5-script` runs the player's own compiled chunks:
-the vendored `rilua` (a Lua 5.1 VM) loads Lua 5.0 chunks
-(`vendor/rilua/src/vm/undump50.rs`) and runs 5.0's operations that differ
-(see `vendor/rilua/VENDORED.txt`). Each script (a click, a view's
+**Scripts.** `atlantis5-script` runs the player's own scripts: the
+vendored `rilua` (a Lua 5.1 VM) loads the French DVD's Lua 5.0 chunks
+(`vendor/rilua/src/vm/undump50.rs`) and runs 5.0's operations that differ;
+the international DVD's scripts are Lua 5.0 source, which a state with
+`Gc::compile_lua50` compiles with Lua 5.0.3's loops (its numeric loop's
+variable is the index; a generic loop over a table walks it with `next`)
+(see `vendor/rilua/VENDORED.txt`, patches 4 and 11). Each script (a click, a view's
 entry, a timer, the chapter's `InitChapter`) runs as a coroutine that
 waits at the calls the original runs over frames (`Atl_Address_Go`,
 `Atl_Video_Play`, `Atl_Dialog_Play`, an animated look). The game
@@ -4774,7 +4796,17 @@ computer is checked on a fake disc whose small stored cabinets open as
 the game (`a5_copy`'s tests: the room, the cancel, a copy cut short;
 `the_library_copies_atlantis5s_disc`: the screen held, then the entry
 moved to the copy) and against the French DVD's plan
-(`the_french_dvd_plan`).
+(`the_french_dvd_plan`). With `ATLANTIS5_DVD_INT` set to a copy of the
+international DVD's files (skipped without):
+`atlantis3-data/tests/atlantis5_dvd_int.rs` (its four languages, its
+program, a place per language, each language's texts and fonts, every
+character in Windows-1252), `atlantis5-script/tests/international_dvd.rs`
+(the 66 sources compile with Lua 5.0's loops; with `ATLANTIS5_DVD_FR`
+too, each function's loops are the French chunks'),
+`whole_game_international_english` (the walkthrough in English, from the
+cabinets) and `the_international_dvd_in_german` (the first view and a
+dialog), the game library's entries (`the_library_lists_atlantis5s_languages`)
+and the copy's plan (`the_international_dvd_plan`).
 
 ## Tests
 
