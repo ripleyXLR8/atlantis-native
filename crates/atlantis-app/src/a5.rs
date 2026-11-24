@@ -264,6 +264,51 @@ fn after_present(ok: bool, presented: Instant, now: Instant) -> (bool, Instant) 
 /// The decoding's step before the game starts (uncompressed bytes).
 const WARM_STEP: u64 = 4 << 20;
 
+/// When the pointer is held in the window. Held only while the window has
+/// the focus and the system pointer is known to be in it: winit's
+/// `Locked` holds the pointer where it is (Windows clips it to a 1 × 1
+/// rectangle at its place, macOS freezes it), so a lock taken with the
+/// pointer over another window or on another screen would send the
+/// next press there. The pointer is seen in the window by `CursorEntered`,
+/// `CursorMoved` or a press (which only comes to the window under it);
+/// it is known gone by `CursorLeft` while it is not held (a held pointer
+/// cannot leave, and a crossing that a grab itself makes is not a leave).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct PointerHold {
+    inside: bool,
+    held: bool,
+}
+
+impl PointerHold {
+    /// The pointer seen in the window.
+    fn seen_inside(&mut self) {
+        self.inside = true;
+    }
+
+    /// The pointer left the window.
+    fn left(&mut self) {
+        if !self.held {
+            self.inside = false;
+        }
+    }
+
+    /// The window changed under the pointer (the full screen switched):
+    /// where the pointer is now is not known until it is seen again.
+    fn forget(&mut self) {
+        self.inside = false;
+    }
+
+    /// Whether the pointer is to be held with the window's `focused`:
+    /// the new state when it changes.
+    fn update(&mut self, focused: bool) -> Option<bool> {
+        let want = focused && self.inside;
+        (want != self.held).then(|| {
+            self.held = want;
+            want
+        })
+    }
+}
+
 struct A5App {
     play: Option<Play>,
     start: Option<Start>,
@@ -282,6 +327,8 @@ struct A5App {
     /// Whether the window has the focus (the mouse's moves turn the view
     /// or move the menus' mouse only then; the pointer is held only then).
     focused: bool,
+    /// Whether the pointer is in the window and held ([`PointerHold`]).
+    pointer: PointerHold,
     /// The fractions of the mouse's relative moves not yet given to a
     /// menu (some systems report them below a pixel).
     menu_move: (f64, f64),
@@ -349,17 +396,22 @@ impl A5App {
     /// The pointer held in the window while it has the focus, in play and
     /// in the menus alike (the original reads the mouse's relative moves
     /// through DirectInput throughout), and let go when another program
-    /// takes the focus.
-    fn grab(&self) {
+    /// takes the focus. Held only once the pointer is in the window
+    /// ([`PointerHold`]).
+    fn grab(&mut self) {
         let Some(window) = &self.window else {
             return;
         };
-        if self.focused {
-            let _ = window
-                .set_cursor_grab(CursorGrabMode::Locked)
-                .or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined));
-        } else {
-            let _ = window.set_cursor_grab(CursorGrabMode::None);
+        match self.pointer.update(self.focused) {
+            Some(true) => {
+                let _ = window
+                    .set_cursor_grab(CursorGrabMode::Locked)
+                    .or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined));
+            }
+            Some(false) => {
+                let _ = window.set_cursor_grab(CursorGrabMode::None);
+            }
+            None => {}
         }
     }
 
@@ -490,7 +542,9 @@ impl ApplicationHandler for A5App {
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta } = event {
-            if !self.focused {
+            // Not while the pointer is free (outside the window): those
+            // moves are the player's on the other programs.
+            if !self.focused || !self.pointer.held {
                 return;
             }
             let Some(p) = self.play.as_mut() else {
@@ -533,6 +587,20 @@ impl ApplicationHandler for A5App {
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
         // The focus in every phase, the start's bar included: the pointer
         // let go when another program takes it, held again on its return.
+        // Where the system pointer is: held once it is in the window.
+        match &event {
+            WindowEvent::CursorEntered { .. }
+            | WindowEvent::CursorMoved { .. }
+            | WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                ..
+            } => {
+                self.pointer.seen_inside();
+                self.grab();
+            }
+            WindowEvent::CursorLeft { .. } => self.pointer.left(),
+            _ => {}
+        }
         if let WindowEvent::Focused(f) = event {
             self.focused = f;
             self.grab();
@@ -613,6 +681,10 @@ impl ApplicationHandler for A5App {
                                 self.fullscreen.then_some(Fullscreen::Borderless(None)),
                             );
                         }
+                        // The held place may be outside the new window:
+                        // let go until the pointer is seen in it again.
+                        self.pointer.forget();
+                        self.grab();
                     }
                     _ => {}
                 }
@@ -683,6 +755,7 @@ pub fn run_window_on(
         next_frame: Instant::now(),
         redraw_pending: false,
         focused: false,
+        pointer: PointerHold::default(),
         buttons: (false, false),
         menu_move: (0.0, 0.0),
         cache: PictureCache::default(),
@@ -788,6 +861,39 @@ pub fn saves_dir() -> std::path::PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The pointer is held only once it is seen in the window: the focus
+    /// coming back with the pointer over another window or screen does
+    /// not lock it there (Windows' `Locked` clips it where it is, macOS
+    /// freezes it), and the full screen's switch lets it go until it is
+    /// seen in the new window.
+    #[test]
+    fn the_pointer_is_held_only_inside_the_window() {
+        let mut p = PointerHold::default();
+        // The window opens with the focus, the pointer not seen yet.
+        assert_eq!(p.update(true), None);
+        assert!(!p.held);
+        p.seen_inside();
+        assert_eq!(p.update(true), Some(true));
+        // A crossing while held is not a leave.
+        p.left();
+        assert_eq!(p.update(true), None);
+        assert!(p.held);
+        // Another program takes the focus; the pointer goes over it.
+        assert_eq!(p.update(false), Some(false));
+        p.left();
+        // The focus back with the pointer still outside: not held.
+        assert_eq!(p.update(true), None);
+        assert!(!p.held);
+        // The pointer comes into the window: held.
+        p.seen_inside();
+        assert_eq!(p.update(true), Some(true));
+        // F11: let go until seen again.
+        p.forget();
+        assert_eq!(p.update(true), Some(false));
+        p.seen_inside();
+        assert_eq!(p.update(true), Some(true));
+    }
 
     /// The library's one game started without its screen: Shift within
     /// the grace goes back to the library, as in the other games' modes;
