@@ -354,3 +354,53 @@ fn the_panel_puts_the_mouse_back_at_the_cursor() {
     frames(&mut play, 3);
     assert_eq!(play.poker().map(|p| p.state), Some(3));
 }
+
+/// The showdown's dialogs (281 in game 2, the punter's win) run after
+/// state 0xc's put-back and block the board's process: the moves made
+/// meanwhile reach the mouse, not the cursor element (@ 0x0040d920 sees
+/// no move event after them), so the cursor stays at its place and
+/// `next_game` is not hot (+0x8c = 0 from its show) until a move.
+#[test]
+fn a_move_during_the_showdown_s_dialog_waits_for_the_next_move() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_poker(&d);
+    let mut moved_to = None;
+    for _ in 0..30_000 {
+        frames(&mut play, 1);
+        let Some(state) = play.poker().map(|p| p.state) else {
+            panic!("the board ended");
+        };
+        let game = num(&lua(&mut play, "atl.puzzle.poker.game"));
+        if play.game.busy() {
+            if game == 2 && state == 0xe && moved_to.is_none() {
+                let (x, y) = play.poker().unwrap().place_of("next_game").unwrap();
+                play.mouse_at(x + 5, y + 5);
+                moved_to = Some((x + 5, y + 5));
+            }
+            continue;
+        }
+        match state {
+            3 => assert!(play.click_poker(if game == 2 { "stop_bet" } else { "follow_bet" })),
+            0xb => assert!(play.click_poker("follow_bet")),
+            0xd if moved_to.is_some() => break,
+            0xd => assert!(play.click_poker("next_game")),
+            _ => {}
+        }
+    }
+    let at = moved_to.expect("game 2's showdown dialog");
+    assert_eq!(play.poker().map(|p| p.state), Some(0xd));
+    assert_eq!(play.menus.mouse, at, "the mouse moved");
+    assert_ne!(
+        play.poker().unwrap().cursor_place(),
+        Some(at),
+        "the cursor at its place"
+    );
+    // A press without a move: `next_game` is not hot.
+    play.click();
+    frames(&mut play, 3);
+    assert_eq!(play.poker().map(|p| p.state), Some(0xd));
+    // After a move: the cursor follows, the press starts the next game.
+    assert!(play.click_poker("next_game"));
+    frames(&mut play, 1);
+    assert_ne!(play.poker().map(|p| p.state), Some(0xd));
+}

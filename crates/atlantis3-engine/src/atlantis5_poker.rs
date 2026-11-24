@@ -564,6 +564,12 @@ impl Poker {
         self.seen = Some(mouse);
     }
 
+    /// Where the board's cursor is drawn: its place (+0x08), which only a
+    /// move event of a frame the process runs changes (@ 0x0040d920).
+    pub fn cursor_place(&self) -> Option<(i32, i32)> {
+        self.place
+    }
+
     /// The mouse the board put back at the cursor's place this frame, if
     /// any: the host's menus' mouse is to be set to it.
     pub fn take_mouse(&mut self) -> Option<(i32, i32)> {
@@ -613,7 +619,10 @@ impl Poker {
         if moved || self.place.is_none() {
             self.place = Some(mouse);
         }
-        if self.last_mouse.is_some_and(|m| m != mouse) {
+        // The hover on a move event of this frame only: not for the moves
+        // made while a run held the process (the showdown's dialogs, after
+        // state 0xc's put-back), nor for a put-back's place.
+        if moved && self.last_mouse.is_some_and(|m| m != mouse) {
             self.hover(mouse, measure);
         }
         self.last_mouse = Some(mouse);

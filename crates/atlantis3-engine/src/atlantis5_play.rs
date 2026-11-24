@@ -5305,7 +5305,11 @@ impl Play {
             if !self.game.busy() {
                 p.draw(out, &st.fonts);
                 if p.cursor {
-                    self.menus.draw_cursor(out);
+                    // At the cursor element's place: the moves made while
+                    // a run held the board reach it only with the next
+                    // move event (@ 0x0040d920).
+                    let at = p.cursor_place().unwrap_or(self.menus.mouse);
+                    self.menus.draw_cursor_at(out, at);
                 }
             }
         } else if !busy && (st.inventory_open_now() || st.menu_shown()) {

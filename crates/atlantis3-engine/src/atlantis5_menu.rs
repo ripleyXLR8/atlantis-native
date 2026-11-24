@@ -1417,9 +1417,15 @@ impl Menus {
 
     /// The cursor (`cursor.spr`, frame 0) at the mouse.
     pub fn draw_cursor(&self, out: &mut [u32]) {
+        self.draw_cursor_at(out, self.mouse);
+    }
+
+    /// The menus' cursor drawn at (x, y) (a board whose cursor element
+    /// stays where it was while the mouse moved).
+    pub fn draw_cursor_at(&self, out: &mut [u32], (x, y): (i32, i32)) {
         if let Some(c) = &self.cursor {
             let mut t = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
-            c.draw(&mut t, Some(self.mouse.0), self.mouse.1, 0);
+            c.draw(&mut t, Some(x), y, 0);
         }
     }
 
