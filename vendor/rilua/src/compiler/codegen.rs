@@ -249,6 +249,9 @@ pub struct Compiler {
     source_name: String,
     /// Current line number (for instruction debug info).
     pub(crate) current_line: u32,
+    /// Lua 5.0 source (Native patch 11): a generic `for` starts with
+    /// `TForPrep50`.
+    lua50: bool,
 }
 
 #[allow(dead_code)] // Methods used in chunk 2i (full code generation)
@@ -260,6 +263,7 @@ impl Compiler {
             func_states: vec![fs],
             source_name: source_name.to_string(),
             current_line: 1,
+            lua50: false,
         }
     }
 
@@ -1726,8 +1730,17 @@ impl Compiler {
 
 /// Compiles a Lua source string into a Proto (function prototype).
 pub fn compile(source: &[u8], name: &str) -> LuaResult<ProtoRef> {
+    compile_lua50(source, name, false)
+}
+
+/// [`compile`], of Lua 5.0 source when `lua50` (Native patch 11): each
+/// generic `for` starts with Lua 5.0's `TFORPREP` (Lua 5.0.3's lparser.c
+/// `forlist` codes `OP_TFORPREP` where 5.1's `forbody` codes a `JMP`), run
+/// as `TForPrep50`: a table as the iterator is walked with `next`.
+pub fn compile_lua50(source: &[u8], name: &str, lua50: bool) -> LuaResult<ProtoRef> {
     let block = parser::parse(source, name)?;
     let mut compiler = Compiler::new(name);
+    compiler.lua50 = lua50;
 
     // Main chunk: vararg function with 0 params
     compiler.fs_mut().proto.is_vararg = 2; // VARARG_ISVARARG
@@ -1823,6 +1836,25 @@ fn compile_stat(compiler: &mut Compiler, stat: &super::ast::Stat) -> LuaResult<(
             body,
             end_line,
             ..
+        } if compiler.lua50 => compile_numeric_for50(
+            compiler,
+            name,
+            start,
+            stop,
+            step.as_ref(),
+            body,
+            line,
+            *end_line,
+        ),
+
+        Stat::NumericFor {
+            name,
+            start,
+            stop,
+            step,
+            body,
+            end_line,
+            ..
         } => compile_numeric_for(
             compiler,
             name,
@@ -1832,6 +1864,17 @@ fn compile_stat(compiler: &mut Compiler, stat: &super::ast::Stat) -> LuaResult<(
             body,
             line,
             *end_line,
+        ),
+
+        Stat::GenericFor {
+            names,
+            iterators,
+            body,
+            iter_line,
+            end_line,
+            ..
+        } if compiler.lua50 => compile_generic_for50(
+            compiler, names, iterators, body, line, *iter_line, *end_line,
         ),
 
         Stat::GenericFor {
@@ -2274,6 +2317,114 @@ fn compile_generic_for(
     let _ = endfor;
     compiler.leave_block();
     compiler.current_line = end_line;
+    Ok(())
+}
+
+// -- Lua 5.0 loops (Native patch 11) --
+//
+// Lua 5.0.3's lparser.c `forstat`, `fornum`, `forlist` and `forbody`, for
+// Lua 5.0 source: the numeric loop's variable is its index (no copy), set
+// up by `SUB` then a jump to `FORLOOP` (run as `ForLoop50`); a generic
+// loop starts with `TFORPREP` (a table walked with `next`) and its first
+// variable is the control value (`TForLoop50`); one breakable block for
+// the body, inside the block of the loop's variables.
+
+/// Lua 5.0.3's `forstat` + `fornum`.
+#[allow(clippy::too_many_arguments)]
+fn compile_numeric_for50(
+    compiler: &mut Compiler,
+    name: &str,
+    start: &super::ast::Expr,
+    stop: &super::ast::Expr,
+    step: Option<&super::ast::Expr>,
+    body: &Block,
+    line: u32,
+    end_line: u32,
+) -> LuaResult<()> {
+    compiler.enter_block(false); // forstat: the variables' scope
+    let base = u32::from(compiler.fs().free_reg);
+    compiler.new_local(name)?;
+    compiler.new_local("(for limit)")?;
+    compiler.new_local("(for step)")?;
+    let mut e = compile_expr(compiler, start)?;
+    compiler.exp2nextreg(&mut e, line)?;
+    let mut e = compile_expr(compiler, stop)?;
+    compiler.exp2nextreg(&mut e, line)?;
+    if let Some(step_expr) = step {
+        let mut e = compile_expr(compiler, step_expr)?;
+        compiler.exp2nextreg(&mut e, line)?;
+    } else {
+        let k = compiler.number_constant(1.0)?;
+        let reg = u32::from(compiler.fs().free_reg);
+        compiler.emit_abx(OpCode::LoadK, reg, k, line);
+        compiler.reserve_regs(1)?;
+    }
+    let free = u32::from(compiler.fs().free_reg);
+    compiler.emit_abc(OpCode::Sub, free - 3, free - 3, free - 1, line);
+    compiler.emit_jump(line);
+    for_body50(compiler, base, line, 3, true, body)?;
+    compiler.leave_block();
+    compiler.current_line = end_line;
+    Ok(())
+}
+
+/// Lua 5.0.3's `forstat` + `forlist`.
+fn compile_generic_for50(
+    compiler: &mut Compiler,
+    names: &[String],
+    iterators: &[super::ast::Expr],
+    body: &Block,
+    line: u32,
+    iter_line: u32,
+    end_line: u32,
+) -> LuaResult<()> {
+    compiler.enter_block(false); // forstat: the variables' scope
+    let base = u32::from(compiler.fs().free_reg);
+    compiler.new_local("(for generator)")?;
+    compiler.new_local("(for state)")?;
+    for name in names {
+        compiler.new_local(name)?;
+    }
+    let nvars = names.len() + 2;
+    let (nexps, mut last_e) = compile_exprlist(compiler, iterators, line)?;
+    adjust_assign(compiler, nvars, nexps, &mut last_e, line)?;
+    compiler.check_stack(3)?;
+    compiler.emit_asbx(OpCode::TForPrep50, base, NO_JUMP, iter_line);
+    #[allow(clippy::cast_possible_truncation)]
+    for_body50(compiler, base, iter_line, nvars as u32, false, body)?;
+    compiler.leave_block();
+    compiler.current_line = end_line;
+    Ok(())
+}
+
+/// Lua 5.0.3's `forbody`: the loop's variables active, a breakable block
+/// for the body, the jump before it patched to the loop's end, then
+/// `FORLOOP` (back to the body) or `TFORLOOP` and a jump back.
+fn for_body50(
+    compiler: &mut Compiler,
+    base: u32,
+    line: u32,
+    nvars: u32,
+    numeric: bool,
+    body: &Block,
+) -> LuaResult<()> {
+    compiler.activate_locals(nvars);
+    compiler.enter_block(true);
+    let prep = compiler.get_label();
+    compile_block(compiler, body)?;
+    #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+    compiler.patch_to_here(prep as i32 - 1);
+    if numeric {
+        let endfor = compiler.emit_asbx(OpCode::ForLoop50, base, NO_JUMP, line);
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        compiler.patch_list(endfor as i32, prep);
+    } else {
+        compiler.emit_abc(OpCode::TForLoop50, base, 0, nvars - 3, line);
+        let back = compiler.emit_jump(line);
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        compiler.patch_list(back as i32, prep);
+    }
+    compiler.leave_block();
     Ok(())
 }
 

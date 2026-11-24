@@ -186,7 +186,8 @@ impl Lua {
     /// Source is `&[u8]` because Lua files may contain arbitrary byte
     /// sequences (e.g. `\0`, `\255` in string literals).
     pub fn exec_bytes(&mut self, source: &[u8], name: &str) -> LuaResult<()> {
-        let proto = compile_or_undump(source, name)?;
+        let lua50 = self.state().gc.compile_lua50;
+        let proto = compile_or_undump_in(source, name, lua50)?;
         self.run_proto(proto)
     }
 
@@ -492,6 +493,12 @@ pub fn exec_with_name(source: &[u8], name: &str) -> LuaResult<()> {
 /// chunks or `compile` for source text. Both return an unpatched Proto
 /// (strings in `string_pool`, `Val::Nil` placeholders).
 pub(crate) fn compile_or_undump(source: &[u8], name: &str) -> LuaResult<ProtoRef> {
+    compile_or_undump_in(source, name, false)
+}
+
+/// [`compile_or_undump`] in a state whose source is Lua 5.0's when
+/// `lua50` (Native patch 11, `Gc::compile_lua50`).
+pub(crate) fn compile_or_undump_in(source: &[u8], name: &str, lua50: bool) -> LuaResult<ProtoRef> {
     // Skip shebang line before checking for binary signature.
     // PUC-Rio's luaL_loadfile reads past the leading '#' line, then
     // checks if the remaining content starts with LUA_SIGNATURE.
@@ -512,7 +519,7 @@ pub(crate) fn compile_or_undump(source: &[u8], name: &str) -> LuaResult<ProtoRef
     } else {
         // Pass the original source (with shebang) to the compiler.
         // The lexer handles shebang stripping internally.
-        compiler::compile(source, name)
+        compiler::codegen::compile_lua50(source, name, lua50)
     }
 }
 
