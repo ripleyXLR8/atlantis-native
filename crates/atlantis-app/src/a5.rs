@@ -285,6 +285,9 @@ struct A5App {
     /// The fractions of the mouse's relative moves not yet given to a
     /// menu (some systems report them below a pixel).
     menu_move: (f64, f64),
+    /// The left and right buttons held (the original's press events carry
+    /// both, [`Play::set_buttons`]).
+    buttons: (bool, bool),
     /// The picture last composed ([`Play::render_cached`]).
     cache: PictureCache,
     /// The system asked for the window's content since the last present.
@@ -492,6 +495,13 @@ impl ApplicationHandler for A5App {
         if let WindowEvent::Focused(f) = event {
             self.focused = f;
             self.grab();
+            // Away from the window no release comes: both buttons up.
+            if !f {
+                self.buttons = (false, false);
+                if let Some(play) = self.play.as_mut() {
+                    play.set_buttons(false, false);
+                }
+            }
             return;
         }
         // The window's content asked by the system: presented at the next
@@ -513,9 +523,23 @@ impl ApplicationHandler for A5App {
             }
             return;
         }
+        // Both buttons' state, before the press is handled (@ 0x0047c8a0
+        // sets 0x006b0b04 before calling the press handlers).
+        if let WindowEvent::MouseInput { state, button, .. } = event {
+            let down = state == ElementState::Pressed;
+            match button {
+                MouseButton::Left => self.buttons.0 = down,
+                MouseButton::Right => self.buttons.1 = down,
+                _ => {}
+            }
+        }
+        let buttons = self.buttons;
         let Some(play) = self.play.as_mut() else {
             return;
         };
+        if matches!(event, WindowEvent::MouseInput { .. }) {
+            play.set_buttons(buttons.0, buttons.1);
+        }
         match event {
             WindowEvent::CloseRequested => el.exit(),
             // A key's press, not the system's repeats of a held key: the
@@ -543,7 +567,8 @@ impl ApplicationHandler for A5App {
                 }
             }
             // A press of the left button: the original's mouse event of
-            // kind 0 with the buttons 1 (@ 0x0043bbc0).
+            // kind 0 with the buttons 1, 5 with the right one held
+            // (@ 0x0043bbc0).
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
                 button: MouseButton::Left,
@@ -602,6 +627,7 @@ pub fn run_window_on(
         next_frame: Instant::now(),
         redraw_pending: false,
         focused: false,
+        buttons: (false, false),
         menu_move: (0.0, 0.0),
         cache: PictureCache::default(),
         present_asked: true,

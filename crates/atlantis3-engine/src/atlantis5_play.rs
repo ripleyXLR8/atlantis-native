@@ -4124,6 +4124,14 @@ pub struct Play {
     moves: (f32, f32),
     /// Left clicks since the last frame.
     clicks: usize,
+    /// The left presses made with the right button up: the play state's
+    /// clicks (@ 0x004300d0 compares the event's buttons, which hold both
+    /// buttons' state, @ 0x0043bbc0, for equality with 1).
+    play_clicks: usize,
+    /// The buttons held, as the front end last told them
+    /// ([`Play::set_buttons`]).
+    left_held: bool,
+    right_held: bool,
     hover: Option<Hover>,
     /// The menus (the manager's other modes).
     pub menus: Menus,
@@ -4211,6 +4219,9 @@ impl Play {
             stage,
             moves: (0.0, 0.0),
             clicks: 0,
+            play_clicks: 0,
+            left_held: false,
+            right_held: false,
             hover: None,
             menus,
             sound_held: false,
@@ -4352,6 +4363,7 @@ impl Play {
         if self.logos_playing() {
             // The logos' loop (@ 0x0043d6a0): the film's steps only.
             self.clicks = 0;
+            self.play_clicks = 0;
             self.moves = (0.0, 0.0);
             self.stage.borrow_mut().update(dt, false, true);
             let ended = std::mem::take(&mut self.stage.borrow_mut().wait_ended);
@@ -4364,6 +4376,7 @@ impl Play {
         let play = self.game.state() == 4 && !self.game.busy();
         let (dx, dy) = std::mem::take(&mut self.moves);
         let clicks = std::mem::take(&mut self.clicks);
+        let play_clicks = std::mem::take(&mut self.play_clicks);
         // One move event a frame at most (@ 0x0047c8a0: one
         // `GetDeviceState` of the mouse, the move handler called once when
         // lX, lY or lZ is not 0), so the look's rule (a third of a speed
@@ -4403,7 +4416,7 @@ impl Play {
         // picks again after each, so a press never acts on what an earlier
         // one removed. Native's longer frames can hold more: the rest are
         // dropped, as the menus do.
-        if play && clicks > 0 {
+        if play && play_clicks > 0 {
             match self.hover.clone() {
                 Some(Hover::Zone(id, name)) => {
                     self.game.click_zone(id, &name);
@@ -4823,7 +4836,7 @@ impl Play {
     /// hand the original opens the inventory (mode 8, state 3), which is
     /// not ported (logged).
     pub fn right_click(&mut self) {
-        if self.game.state() != 4 || self.game.busy() {
+        if self.game.state() != 4 || self.game.busy() || self.left_held {
             return;
         }
         match self.game.script().handled_item() {
@@ -4997,6 +5010,21 @@ impl Play {
     /// is under the screen centre.
     pub fn click(&mut self) {
         self.clicks += 1;
+        if !self.right_held {
+            self.play_clicks += 1;
+        }
+    }
+
+    /// Both mouse buttons' state now (the front end, at each press and
+    /// release; both up when the window loses the focus). The original's
+    /// press event carries both (@ 0x0047c8a0 sets 0x006b0b04 before the
+    /// press handlers, @ 0x0043bbc0 builds the buttons from it): in play
+    /// (@ 0x004300d0) a left press is a click only with the right button
+    /// up (buttons == 1), a right press acts only with the left one up
+    /// (== 4); the menus test `& 1` / `& 4` and take either.
+    pub fn set_buttons(&mut self, left: bool, right: bool) {
+        self.left_held = left;
+        self.right_held = right;
     }
 
     /// Turns the camera so that the screen centre is on the direction of

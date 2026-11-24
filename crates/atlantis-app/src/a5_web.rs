@@ -157,6 +157,7 @@ pub fn start(src: Atlantis5Source, store: Rc<dyn SaveStore>) -> Result<(), JsVal
         clock: 0.0,
         menu: false,
         lock_asked: None,
+        buttons: (false, false),
         lock_refused: None,
         motion_acc: (0.0, 0.0),
         cursor: None,
@@ -200,6 +201,9 @@ struct A5App {
     /// Whether a menu is up (the pointer is free).
     menu: bool,
     lock_asked: Option<Instant>,
+    /// The left and right buttons held (the original's press events carry
+    /// both, [`Play::set_buttons`]).
+    buttons: (bool, bool),
     /// When a lock request was last taken as refused: a click asks again
     /// once [`a2_web::LOCK_RETRY`] has passed (a browser refuses for a moment
     /// after the player left the lock with Escape).
@@ -570,8 +574,32 @@ impl ApplicationHandler for A5App {
             }
             _ => {}
         }
+        // Both buttons' state, before the press is handled (@ 0x0047c8a0
+        // sets 0x006b0b04 before calling the press handlers); both up when
+        // the page loses the focus (no release comes then).
+        match &event {
+            WindowEvent::MouseInput { state, button, .. } => {
+                let down = *state == ElementState::Pressed;
+                match button {
+                    MouseButton::Left => self.buttons.0 = down,
+                    MouseButton::Right => self.buttons.1 = down,
+                    _ => {}
+                }
+            }
+            WindowEvent::Focused(false) => self.buttons = (false, false),
+            _ => {}
+        }
         if self.play.is_none() {
             return;
+        }
+        if matches!(
+            event,
+            WindowEvent::MouseInput { .. } | WindowEvent::Focused(false)
+        ) {
+            let (l, r) = self.buttons;
+            if let Some(play) = self.play.as_mut() {
+                play.set_buttons(l, r);
+            }
         }
         match event {
             WindowEvent::Occluded(_) => {

@@ -774,3 +774,43 @@ fn two_presses_in_one_play_frame_click_once() {
     frames(&mut play, 1);
     assert_eq!(play.game.script().global(b"__gone"), Value::Num(1.0));
 }
+
+/// A press carries both buttons' state (@ 0x0043bbc0); in play
+/// (@ 0x004300d0) a left press is a click only with the buttons exactly 1,
+/// a right press acts only with exactly 4: with the other button held,
+/// neither does anything.
+#[test]
+fn a_press_with_the_other_button_held_does_nothing_in_play() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    let zone = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1.is_empty())
+        .map(|z| z.0)
+        .expect("a move zone");
+    assert!(play.aim_at_zone(zone));
+    play.game
+        .script()
+        .exec("__gone = 0 Atl_Address_Go = function() __gone = __gone + 1 end")
+        .expect("lua");
+    // The left press with the right button held: buttons 5.
+    play.set_buttons(true, true);
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().global(b"__gone"), Value::Num(0.0));
+    // The right press with the left button held: no inventory.
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(!play.stage().inventory_open_now());
+    assert_eq!(play.game.state(), 4);
+    // Alone, each acts.
+    play.set_buttons(true, false);
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().global(b"__gone"), Value::Num(1.0));
+    play.set_buttons(false, true);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+}
