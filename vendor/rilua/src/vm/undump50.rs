@@ -169,12 +169,15 @@ impl Loader<'_> {
         })
     }
 
+    /// The next `n` bytes. A size past the data (a corrupt chunk's size_t
+    /// near 2^64 too) is an error, not a wrapped sum.
     fn block(&mut self, n: usize) -> LuaResult<&[u8]> {
-        if self.pos + n > self.data.len() {
-            return Err(self.error("truncated"));
-        }
-        let s = &self.data[self.pos..self.pos + n];
-        self.pos += n;
+        let end = match self.pos.checked_add(n) {
+            Some(end) if end <= self.data.len() => end,
+            _ => return Err(self.error("truncated")),
+        };
+        let s = &self.data[self.pos..end];
+        self.pos = end;
         Ok(s)
     }
 
@@ -187,9 +190,18 @@ impl Loader<'_> {
         Ok(i32::from_le_bytes([b[0], b[1], b[2], b[3]]))
     }
 
+    /// A vector's length. Each item takes at least one byte of the
+    /// chunk, so a count past the bytes left is a cut or corrupt chunk:
+    /// an error before anything is reserved for it (Lua 5.0's
+    /// `luaM_newvector` raises one there too, a memory error or the end
+    /// of the file, which its callers catch).
     fn count(&mut self) -> LuaResult<usize> {
         let n = self.int()?;
-        usize::try_from(n).map_err(|_| self.error("bad count"))
+        let n = usize::try_from(n).map_err(|_| self.error("bad count"))?;
+        if n > self.data.len() - self.pos {
+            return Err(self.error("truncated"));
+        }
+        Ok(n)
     }
 
     fn size(&mut self) -> LuaResult<u64> {
@@ -468,6 +480,80 @@ mod tests {
         let t = Instruction::from_raw(translate(i, &[0]).unwrap());
         assert_eq!(t.opcode(), OpCode::Add);
         assert_eq!((t.a(), t.b(), t.c()), (3, 256, 1));
+    }
+
+    /// A chunk by hand: the header (`size_t` bytes wide) and a main
+    /// function with one `RETURN 0 1`.
+    fn chunk(size_t: u8) -> Vec<u8> {
+        let mut c = LUA50_SIGNATURE.to_vec();
+        c.extend_from_slice(&[1, 4, size_t, 4, 6, 8, 9, 9, 8]);
+        c.extend_from_slice(&31_415_926.535_897_93_f64.to_le_bytes());
+        c.extend(std::iter::repeat_n(0, usize::from(size_t))); // source: none
+        c.extend_from_slice(&0i32.to_le_bytes()); // line defined
+        c.extend_from_slice(&[0, 0, 0, 2]); // nups, params, vararg, stack
+        for _ in 0..5 {
+            // line info, locals, upvalue names, constants, functions
+            c.extend_from_slice(&0i32.to_le_bytes());
+        }
+        c.extend_from_slice(&1i32.to_le_bytes());
+        c.extend_from_slice(&(27u32 | (1 << 15)).to_le_bytes());
+        c
+    }
+
+    /// Where the main function's counts start in [`chunk`].
+    fn counts_at(size_t: u8) -> usize {
+        LUA50_SIGNATURE.len() + 9 + 8 + usize::from(size_t) + 4 + 4
+    }
+
+    #[test]
+    fn loads_the_hand_made_chunk() {
+        for w in [4, 8] {
+            let f = undump50(&chunk(w), "=t").unwrap();
+            assert_eq!(f.code.len(), 1);
+        }
+    }
+
+    #[test]
+    fn a_huge_count_is_a_load_error() {
+        // Each count set to 0x7fffffff: an error, nothing reserved for it.
+        for w in [4, 8] {
+            for i in 0..6 {
+                let mut c = chunk(w);
+                let at = counts_at(w) + 4 * i;
+                c[at..at + 4].copy_from_slice(&i32::MAX.to_le_bytes());
+                assert!(undump50(&c, "=t").is_err(), "count {i}, size_t {w}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_string_size_near_2_pow_64_is_a_load_error() {
+        // An 8-byte size_t: the source's length u64::MAX − k would wrap
+        // `pos + n`.
+        for k in [0u64, 1, 16, 64] {
+            let mut c = chunk(8);
+            let at = LUA50_SIGNATURE.len() + 9 + 8;
+            c[at..at + 8].copy_from_slice(&(u64::MAX - k).to_le_bytes());
+            assert!(undump50(&c, "=t").is_err(), "{k}");
+        }
+    }
+
+    #[test]
+    fn corrupt_chunks_load_or_fail_without_a_panic() {
+        // Fuzz-style: every cut, and every byte set to a few values.
+        for w in [4, 8] {
+            let good = chunk(w);
+            for n in 0..good.len() {
+                assert!(undump50(&good[..n], "=t").is_err(), "cut at {n}");
+            }
+            for i in 0..good.len() {
+                for v in [0x00, 0x01, 0x7f, 0x80, 0xfe, 0xff] {
+                    let mut c = good.clone();
+                    c[i] = v;
+                    let _ = undump50(&c, "=t");
+                }
+            }
+        }
     }
 
     #[test]

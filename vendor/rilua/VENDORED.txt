@@ -52,7 +52,13 @@ PATCHES
    TForLoop50, TForPrep50 (generic `for` over a table), SetList50,
    SetListO50, NewTable50. Reproducer: crates/atlantis5-script/tests/
    lua50.rs (a chunk compiled by Lua 5.0.3's luac and the output of Lua
-   5.0.3's lua).
+   5.0.3's lua). A corrupt chunk is a load error, never an abort or a
+   panic: a vector's count past the bytes left fails before anything is
+   reserved, and a size whose end wraps (an 8-byte size_t near 2^64)
+   fails as truncated (Lua 5.0's lundump.c raises a memory or
+   end-of-file error there, which the loaders catch). Reproducer: the
+   tests of src/vm/undump50.rs (hand-made chunks, huge counts and sizes,
+   every cut and byte change).
 
 5. src/stdlib/coroutine.rs: `auxresume` made public, so an embedder can
    resume a coroutine from Rust (atlantis5-script runs each script as a
