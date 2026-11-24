@@ -4245,17 +4245,20 @@ impl Play {
         if std::mem::take(&mut self.stage.borrow_mut().wait_ended) {
             self.game.finish_wait();
         }
-        if play {
-            for _ in 0..clicks {
-                match self.hover.clone() {
-                    Some(Hover::Zone(id, name)) => {
-                        self.game.click_zone(id, &name);
-                    }
-                    Some(Hover::Sprite(object, animation)) => {
-                        self.game.click_sprite(&object, &animation);
-                    }
-                    None => {}
+        // One press a frame at most: the original reads the mouse once a
+        // frame (@ 0x0047c8a0, a button going down makes one event) and
+        // picks again after each, so a press never acts on what an earlier
+        // one removed. Native's longer frames can hold more: the rest are
+        // dropped, as the menus do.
+        if play && clicks > 0 {
+            match self.hover.clone() {
+                Some(Hover::Zone(id, name)) => {
+                    self.game.click_zone(id, &name);
                 }
+                Some(Hover::Sprite(object, animation)) => {
+                    self.game.click_sprite(&object, &animation);
+                }
+                None => {}
             }
         }
         self.game.update(dt);

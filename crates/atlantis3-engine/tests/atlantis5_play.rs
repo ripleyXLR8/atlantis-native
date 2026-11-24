@@ -748,3 +748,29 @@ fn a_wave_playlist_plays() {
     let peak = out.iter().fold(0f32, |m, v| m.max(v.abs()));
     assert!(peak > 0.01, "{peak}");
 }
+
+/// Two presses in one long frame: one click on the last frame's pick, the
+/// other dropped (the original has at most one press a frame,
+/// @ 0x0047c8a0, and picks again after each).
+#[test]
+fn two_presses_in_one_play_frame_click_once() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    let zone = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1.is_empty())
+        .map(|z| z.0)
+        .expect("a move zone");
+    assert!(play.aim_at_zone(zone));
+    // The scene's script goes to the zone's view: counted, no transition,
+    // so the game is free again for a second click in the same frame.
+    play.game
+        .script()
+        .exec("__gone = 0 Atl_Address_Go = function() __gone = __gone + 1 end")
+        .expect("lua");
+    play.click();
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().global(b"__gone"), Value::Num(1.0));
+}
