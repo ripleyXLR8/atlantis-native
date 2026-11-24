@@ -219,6 +219,10 @@ pub struct Game {
     /// The runs that ended on a Lua error so far (a save's read stops
     /// when its `atlantis.lua` is one).
     run_errors: u64,
+    /// The scene's update of the transition steps since the last
+    /// [`Game::take_transition_scene`]: `Some(Some(dt))` for a step that
+    /// calls it with its time, `Some(None)` for one that does not.
+    transition_scene: Option<Option<f64>>,
 }
 
 impl Game {
@@ -239,6 +243,7 @@ impl Game {
             clock: 0.0,
             fov: 0.0,
             run_errors: 0,
+            transition_scene: None,
         })
     }
 
@@ -261,6 +266,19 @@ impl Game {
     /// (the loop @ 0x00405390 that draws the frames), none outside one.
     pub fn transition_fx(&self) -> Option<Fx> {
         self.transitions.last().map(|t| t.fx)
+    }
+
+    /// Whether a transition step ran since the last call, and the time
+    /// it gave the scene's update. The loop @ 0x00405390 runs only the
+    /// step, the sound, the draw and the flip; the step itself calls the
+    /// scene's update (@ 0x0044c380, the sprites' step) with its time in
+    /// `centring`'s phase 0 (LAB_0042e2c0) and in every `zoom_and_fade`
+    /// step but the last (LAB_0042dec4), never in `no_fx`'s step nor in
+    /// `centring`'s view change, which reach LAB_0042e5fe without it.
+    /// `Some(Some(dt))`: the sprites stepped by `dt`; `Some(None)`: not
+    /// stepped this frame; `None`: no step (the frame's own update).
+    pub fn take_transition_scene(&mut self) -> Option<Option<f64>> {
+        self.transition_scene.take()
     }
 
     /// Whether requests wait in the manager's queue (+0x2c).
@@ -772,8 +790,14 @@ impl Game {
             if let Some(t) = self.transitions.last_mut() {
                 t.entering = false;
             }
-            // no_fx and centring end with the view change.
+            // no_fx and centring end with the view change. The
+            // continuation is the same step as the view change: its scene
+            // update is the view change's.
+            let kept = self.transition_scene.take();
             self.continue_transition(0.0);
+            if kept.is_some() {
+                self.transition_scene = kept;
+            }
         }
         if run.chapter {
             // @ 0x0042f000 case 1: +0x50 = 0 once `InitChapter` has
@@ -834,13 +858,18 @@ impl Game {
             self.run();
         } else if let Some(t) = self.transitions.last_mut() {
             t.entering = false;
+            let kept = self.transition_scene.take();
             self.continue_transition(0.0);
+            if kept.is_some() {
+                self.transition_scene = kept;
+            }
         }
     }
 
     /// One step of the transition on top, `dt` seconds on.
     #[allow(clippy::cast_possible_truncation)]
-    fn continue_transition(&mut self, dt: f32) {
+    fn continue_transition(&mut self, step_dt: f64) {
+        let dt = step_dt as f32;
         let Some(t) = self.transitions.last_mut() else {
             return;
         };
@@ -848,6 +877,17 @@ impl Game {
             return;
         }
         t.fresh = true;
+        // The scene's update of this step (@ 0x0042d900: LAB_0042e2c0 and
+        // LAB_0042dec4 only); a view change's continuation (no_fx's and
+        // centring's end) keeps the view change's.
+        self.transition_scene = match (t.fx, t.phase) {
+            (Fx::Centring, 0) | (Fx::ZoomAndFade, 0 | 1) => Some(Some(step_dt)),
+            (Fx::ZoomAndFade, _) => {
+                let last = t.t + dt > f32::from_bits(0x3eb3_3333);
+                Some((!last).then_some(step_dt))
+            }
+            _ => Some(None),
+        };
         let pi = f32::from_bits(0x4049_0fdb);
         // 0x00655748: 1/9 (20° of π).
         let ninth = f32::from_bits(0x3de3_8e39);
@@ -958,6 +998,7 @@ impl Game {
         self.note("an uncaught script error: the program ends (MainLoop's catch)".into());
         self.drop_runs();
         self.transitions.clear();
+        self.transition_scene = None;
         self.queue.clear();
         self.previous = self.state;
         self.state = 8;
@@ -1036,6 +1077,7 @@ impl Game {
         self.previous = 0;
         self.drop_runs();
         self.transitions.clear();
+        self.transition_scene = None;
         self.timers.clear();
         self.timer_walk = None;
     }
@@ -1401,8 +1443,7 @@ impl Game {
                 return;
             }
             if !t.finished {
-                #[allow(clippy::cast_possible_truncation)]
-                self.continue_transition(dt as f32);
+                self.continue_transition(dt);
                 return;
             }
             // When its script ends, the frame goes on below: in state 4 a

@@ -814,3 +814,42 @@ fn a_press_with_the_other_button_held_does_nothing_in_play() {
     frames(&mut play, 1);
     assert!(play.stage().inventory_open_now());
 }
+
+/// A transition's loop (@ 0x00405390) steps the sprites only through its
+/// step (@ 0x0042d900), which calls the scene's update in `centring`'s
+/// phase 0 and in `zoom_and_fade`'s steps but the last, never in the
+/// step that changes the view by `no_fx` or `centring`: the new view's
+/// first picture shows its sprites with no time played, and their first
+/// step is the play frame after `Atl_Address_Go` returns.
+#[test]
+fn a_view_change_frame_steps_no_sprite() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    for (fx, back) in [("\"no_fx\"", 8), ("nil", 8)] {
+        go(&mut play, back);
+        // View 17's script plays the gorilla's `stand`.
+        let fx = if fx == "nil" {
+            String::new()
+        } else {
+            format!(", {fx}")
+        };
+        assert!(play.game.run_string(&format!(
+            "return function() Atl_Address_Go(\"zeppelin\", 17{fx}) end"
+        )));
+        for _ in 0..60 {
+            frames(&mut play, 1);
+            if play.stage().address() == Some((b"zeppelin".to_vec(), 17)) {
+                break;
+            }
+        }
+        assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 17)));
+        assert_eq!(play.stage().sprite_time(b"gorilla"), Some(0.0), "{fx}");
+        frames(&mut play, 1);
+        assert!(!play.game.busy());
+        assert_eq!(
+            play.stage().sprite_time(b"gorilla"),
+            Some(1.0 / 30.0),
+            "{fx}: stepped once after the transition"
+        );
+    }
+}

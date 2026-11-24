@@ -1961,7 +1961,7 @@ impl Stage {
     /// music (@ 0x00459fd0), film.
     fn update(&mut self, dt: f64, play: bool, scene: bool) {
         self.update_start(dt, play);
-        self.update_scene(dt, scene, true);
+        self.update_scene(dt, scene.then_some(dt), true);
     }
 
     /// The frame's first part: the film's end, the camera, an animated
@@ -1999,8 +1999,9 @@ impl Stage {
     /// cursor, and only then the scene's update, so a sprite a click or a
     /// timer made is stepped once before it is first drawn. Without
     /// `sound` neither runs (the frame a menu chain ends, @ 0x0041b780
-    /// returns 1 before both).
-    fn update_scene(&mut self, dt: f64, scene: bool, sound: bool) {
+    /// returns 1 before both). `scene` is the sprites' step time, none
+    /// when they are not stepped.
+    fn update_scene(&mut self, dt: f64, scene: Option<f64>, sound: bool) {
         if !sound {
             return;
         }
@@ -2015,7 +2016,10 @@ impl Stage {
         // @ 0x0042b220, the flip) never call the scene's update
         // @ 0x0044c380: the sprites, the persistent records' times and the
         // randomize draws are frozen for the film's length.
-        let thrown = scene && self.film.is_none() && !self.sprites_step(dt);
+        let thrown = match scene {
+            Some(t) if self.film.is_none() => !self.sprites_step(t),
+            _ => false,
+        };
         if !thrown {
             self.music_update(dt);
         }
@@ -4490,7 +4494,16 @@ impl Play {
         }
         self.cursor_frame(dt);
         // The scene's update and the sound last (@ 0x0042f000 case 4:
-        // after the events, the timers, the pick and the cursor).
+        // after the events, the timers, the pick and the cursor). A frame
+        // of a transition's loop (@ 0x00405390: the step, the sound, the
+        // draw) steps the sprites only from the step, and only in the
+        // steps that call the scene's update (@ 0x0042d900): never in the
+        // frame that changes the view by `no_fx` or `centring`, nor in
+        // `zoom_and_fade`'s last.
+        let scene = match self.game.take_transition_scene() {
+            Some(step) => step,
+            None => scene.then_some(dt),
+        };
         self.stage.borrow_mut().update_scene(dt, scene, sound);
         // Then, on the normal path and after the catch alike
         // (0x0042f464..0x0042f471), a sprite found by the pick (+0x3c)
