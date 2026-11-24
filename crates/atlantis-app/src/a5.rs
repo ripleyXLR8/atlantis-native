@@ -702,6 +702,14 @@ impl ApplicationHandler for A5App {
                 button: MouseButton::Right,
                 ..
             } => play.right_press(),
+            // The third and fourth buttons (DirectInput's `DIMOUSESTATE`
+            // has four, @ 0x0047c8a0 walks them; X1 is the fourth, X2 is
+            // not read): a press with the left and right buttons' state.
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Middle | MouseButton::Back,
+                ..
+            } => play.other_press(),
             WindowEvent::RedrawRequested => self.frame(el),
             _ => {}
         }

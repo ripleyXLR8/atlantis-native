@@ -943,3 +943,20 @@ fn a_panorama_with_other_faces_is_refused() {
     shot(&play, "a5-small-faces.png");
     assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
 }
+
+/// A press of the third or fourth button is a press event whose buttons
+/// are the left and right buttons' state (@ 0x0047c8a0, @ 0x0043bbc0):
+/// with the right button held it is a right press (`== 4`) and opens the
+/// inventory; with neither held it does nothing.
+#[test]
+fn a_middle_press_takes_the_held_buttons() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    play.other_press();
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 4);
+    play.set_buttons(false, true);
+    play.other_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+}

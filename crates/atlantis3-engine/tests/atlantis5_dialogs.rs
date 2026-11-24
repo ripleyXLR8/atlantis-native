@@ -983,3 +983,39 @@ fn the_subject_menu_s_facing_starts_at_its_first_frame() {
     assert_eq!(play.stage().sprite_time(b"gorilla"), Some(1.0 / 30.0));
     assert!(play.render_cached(&mut px, &mut cache));
 }
+
+/// A right press made with the left button held carries the buttons 5
+/// (@ 0x0043bbc0): the dialog player's frame takes `& 1`
+/// (0x004329df..0x00432a47) and ends the tirade, as a left press.
+#[test]
+fn a_right_press_with_the_left_held_ends_a_tirade() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play
+        .game
+        .run_string("return function() Atl_Dialog_Play(1) end"));
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if play
+            .stage()
+            .dialog_state()
+            .is_some_and(|s| matches!(s.2, 1..=3))
+        {
+            break;
+        }
+    }
+    let (_, tirade, _) = play.stage().dialog_state().expect("a tirade");
+    // Not ended by itself in a few frames.
+    frames(&mut play, 2);
+    assert_eq!(play.stage().dialog_state().map(|s| s.1), Some(tirade));
+    play.set_buttons(true, false);
+    play.set_buttons(true, true);
+    play.right_press();
+    frames(&mut play, 2);
+    assert_ne!(
+        play.stage().dialog_state().map(|s| s.1),
+        Some(tirade),
+        "the tirade ended"
+    );
+}

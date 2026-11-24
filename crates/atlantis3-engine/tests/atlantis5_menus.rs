@@ -1148,3 +1148,73 @@ fn a_move_onto_a_later_button_leaves_the_earlier_one_hot() {
     assert_eq!(play.menus.current(), Some(menus::GRAPHIC));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A right press made with the left button held carries the buttons 5
+/// (@ 0x0043bbc0 builds them from both buttons' state): the menus take it
+/// as a left press (`& 1`, @ 0x0044eb60), so the button hot at the centre
+/// is clicked; a middle press with the left held is a left press too.
+#[test]
+fn a_right_press_with_the_left_held_clicks_a_menu_button() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("right-with-left");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert_eq!(play.menus.hot(), ["option_control"]);
+    play.set_buttons(true, false);
+    play.set_buttons(true, true);
+    play.right_press();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::CONTROL));
+    click(&mut play, "back");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    // The middle button with the left held.
+    let (x, y) = {
+        let st = play.stage();
+        play.menus
+            .point_of("option_sound", &st.fonts)
+            .expect("option_sound")
+    };
+    play.mouse_at(x, y);
+    frames(&mut play, 1);
+    play.set_buttons(true, false);
+    play.other_press();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::SOUND));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// With a page button hot, a right press with the left held (buttons 5)
+/// is the button's press (`& 1`, @ 0x0044f0e0: its click played, then the
+/// page), not the inventory's end.
+#[test]
+fn a_right_press_with_the_left_held_takes_a_page_button() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-page-held");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    let y = 576 - 10;
+    let x = (0..1024)
+        .find(|&x| {
+            play.mouse_at(x, y);
+            play.stage().inventory_hit()
+                == Some(atlantis3_engine::atlantis5_play::InventoryHit::Right)
+        })
+        .expect("the right page button");
+    play.mouse_at(x + 1, y);
+    frames(&mut play, 1);
+    play.mouse_at(x, y);
+    frames(&mut play, 1);
+    play.set_buttons(true, false);
+    play.set_buttons(true, true);
+    play.right_press();
+    frames(&mut play, 2);
+    assert!(play.stage().inventory_open_now(), "taken by the button");
+    let _ = std::fs::remove_dir_all(&dir);
+}

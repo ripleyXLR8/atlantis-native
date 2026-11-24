@@ -4973,6 +4973,16 @@ impl Play {
     /// that call's loop then, whose frame takes only the left press and
     /// Space (dialogs.md § 3, 0x004329df..0x00432a47).
     pub fn right_press(&mut self) {
+        // With the left button held the event's buttons are 5
+        // (@ 0x0043bbc0 builds them from both buttons' state, not from the
+        // one that went down): the same event as a left press made with
+        // the right button held. Play ignores it (`== 1` / `== 4`,
+        // @ 0x004300d0); the menus, the dialog player, the subject menu
+        // and the examine view take it as a left press (`& 1`).
+        if self.left_held {
+            self.click();
+            return;
+        }
         if self.game.busy() {
             return;
         }
@@ -5151,6 +5161,21 @@ impl Play {
         self.clicks += 1;
         if !self.right_held {
             self.play_clicks += 1;
+        }
+    }
+
+    /// A press of the mouse's third or fourth button: @ 0x0047c8a0 reads
+    /// four buttons (DirectInput's `DIMOUSESTATE`, 16 bytes) and calls the
+    /// same press handler for each that went down; @ 0x0043bbc0 builds the
+    /// event's buttons from the left (1) and right (4) buttons' state
+    /// only. So with the left button held it is a left press (buttons 1,
+    /// or 5 with the right one held too), with the right alone a right
+    /// press (4), and alone (0) nothing takes it.
+    pub fn other_press(&mut self) {
+        if self.left_held {
+            self.click();
+        } else if self.right_held {
+            self.right_press();
         }
     }
 

@@ -649,6 +649,18 @@ impl ApplicationHandler for A5App {
                     play.right_press();
                 }
             }
+            // The third and fourth buttons, as on the desktop: a press with
+            // the left and right buttons' state (@ 0x0047c8a0,
+            // @ 0x0043bbc0).
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Middle | MouseButton::Back,
+                ..
+            } => {
+                if let Some(play) = self.play.as_mut() {
+                    play.other_press();
+                }
+            }
             WindowEvent::KeyboardInput { event, .. }
                 if event.state == ElementState::Pressed && !event.repeat =>
             {
