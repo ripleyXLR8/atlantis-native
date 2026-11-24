@@ -1019,3 +1019,62 @@ fn a_right_press_with_the_left_held_ends_a_tirade() {
         "the tirade ended"
     );
 }
+
+/// A 2D talker's film loops for as long as its tirade lasts: the dialog
+/// player's state 2 steps it (@ 0x00456cb0: at most one frame a step)
+/// without testing the end, and `binkw32.dll`'s `BinkNextFrame` goes to
+/// frame 1 after the last one. The first dialog whose first tirade is a
+/// 2D talker's with a voice longer than one pass of the film.
+#[test]
+fn a_2d_talkers_film_loops_through_a_long_tirade() {
+    use atlantis3_data::atlantis5_texts::{Dialogs, Picturing};
+    use atlantis3_engine::atlantis5_dialog::{picturing, voice_path};
+    let Some(d) = dvd() else { return };
+    let src = Atlantis5Source::open(&d.join("datas")).unwrap();
+    let read = |p: &str| atlantis_data::FileSource::read(&src, p);
+    let set = Dialogs::parse(&read("datas/texts/dialog/french/dialogs.xml").unwrap()).unwrap();
+    let (id, film) = set
+        .dialogs
+        .iter()
+        .filter_map(|g| {
+            let t = &g.tirades.first()?.talker;
+            (picturing(&set, g, t) == Picturing::TwoD).then_some((g, t))
+        })
+        .find_map(|(g, t)| {
+            let film = read(&format!("datas/videos/{t}.bik"))?;
+            let v = atlantis3_data::bink::BinkVideo::open(Arc::<[u8]>::from(film)).ok()?;
+            let pass = f64::from(v.frame_count()) / v.fps();
+            let voice = read(&voice_path("french", g.id, 0))?;
+            let a = atlantis4_data::audio::decode_vorbis(&voice).ok()?;
+            #[allow(clippy::cast_precision_loss)]
+            let length = a.samples.len() as f64 / f64::from(a.channels) / f64::from(a.sample_rate);
+            (length > pass + 1.0).then_some((g.id, v.frame_count()))
+        })
+        .expect("a long 2D tirade");
+    let mut play = to_first_view(&d, None);
+    assert!(play
+        .game
+        .run_string(&format!("return function() Atl_Dialog_Play({id}) end")));
+    let (mut wrapped, mut last, mut steps) = (false, None, 0);
+    for i in 0..30 * 120 {
+        // 10 frames at 10 fps first, below the film's rate: still one
+        // film frame a step, late, none skipped.
+        play.update(if i < 10 { 0.1 } else { 1.0 / 30.0 });
+        let Some((_, 0, 2)) = play.stage().dialog_state() else {
+            if last.is_some() {
+                break;
+            }
+            continue;
+        };
+        let (n, frames) = play.stage().dialog_portrait().expect("the film");
+        assert_eq!(frames, film);
+        if let Some(p) = last {
+            // One frame a step at most; frame 1 again after the last.
+            assert!(n == p || n == p + 1 || (p == frames && n == 1), "{p} → {n}");
+            wrapped |= p == frames && n == 1;
+            steps += usize::from(n != p);
+        }
+        last = Some(n);
+    }
+    assert!(wrapped, "the film looped ({steps} steps, at {last:?})");
+}

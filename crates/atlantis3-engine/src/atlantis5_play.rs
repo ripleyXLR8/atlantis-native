@@ -2479,13 +2479,10 @@ impl Stage {
         }
         if let Some(run) = &mut self.dialog {
             if let Some(f) = &mut run.portrait {
-                // The 2D talker's film (the player's +0x14 step, case 2).
-                while f.due(self.clock) {
-                    f.do_frame();
-                    if !f.next_frame() {
-                        break;
-                    }
-                }
+                // The 2D talker's film: the player's +0x14 step (its base
+                // class's vtable 0x006559ac, @ 0x00456cb0) in case 2, its
+                // return not tested: one frame at most, looping.
+                f.bink_step(self.clock);
             }
         }
     }
@@ -2663,6 +2660,14 @@ impl Stage {
 
     pub fn dialog_running(&self) -> bool {
         self.dialog.is_some()
+    }
+
+    /// The 2D talker's film (`FrameNum`, `Frames`), for tests.
+    pub fn dialog_portrait(&self) -> Option<(u32, u32)> {
+        self.dialog
+            .as_ref()
+            .and_then(|d| d.portrait.as_ref())
+            .map(|f| (f.frame_num, f.frames()))
     }
 
     /// The tirade shown (dialog id, tirade, state), for tests.
