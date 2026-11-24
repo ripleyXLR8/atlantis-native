@@ -3208,9 +3208,11 @@ impl Stage {
                 return Some(InventoryHit::Slot(c + inv.offset));
             }
         }
+        // `CIE_Button`s: the element's hit test (@ 0x00452020) includes
+        // both ends, x..=x + w and y..=y + h.
         let inside = |b: &Option<Bank>, bx: i32, by: i32| {
             b.as_ref().and_then(|b| b.info(0)).is_some_and(|i| {
-                (bx..bx + i32::from(i.w)).contains(&x) && (by..by + i32::from(i.h)).contains(&y)
+                (bx..=bx + i32::from(i.w)).contains(&x) && (by..=by + i32::from(i.h)).contains(&y)
             })
         };
         if inside(&inv.left[0], lx, ly) {

@@ -659,6 +659,41 @@ fn the_inventory_page_buttons_click_at_their_picture_s_end() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The page buttons' hit box (@ 0x00452020) includes the right and bottom
+/// edges: both buttons sit 10 above the bottom, so the row H − 10 is
+/// still theirs and the row under it is not.
+#[test]
+fn the_inventory_page_buttons_include_their_bottom_edge() {
+    use atlantis3_engine::atlantis5_play::InventoryHit;
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-edge");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    let row = |play: &mut Play, y: i32| {
+        let mut hits = Vec::new();
+        for x in 0..1024 {
+            play.mouse_at(x, y);
+            if let Some(h @ (InventoryHit::Left | InventoryHit::Right)) =
+                play.stage().inventory_hit()
+            {
+                if !hits.contains(&h) {
+                    hits.push(h);
+                }
+            }
+        }
+        hits
+    };
+    assert_eq!(
+        row(&mut play, 576 - 10),
+        [InventoryHit::Left, InventoryHit::Right]
+    );
+    assert!(row(&mut play, 576 - 9).is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_logos_play_before_the_main_menu() {
     let Some(d) = dvd() else { return };
