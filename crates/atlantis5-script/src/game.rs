@@ -216,6 +216,9 @@ pub struct Game {
     /// The camera's field of view as the engine last set it (radians),
     /// which `zoom_and_fade` starts from.
     fov: f32,
+    /// The runs that ended on a Lua error so far (a save's read stops
+    /// when its `atlantis.lua` is one).
+    run_errors: u64,
 }
 
 impl Game {
@@ -235,6 +238,7 @@ impl Game {
             timers_paused: false,
             clock: 0.0,
             fov: 0.0,
+            run_errors: 0,
         })
     }
 
@@ -726,6 +730,7 @@ impl Game {
                         crate::engine::ErrorSite::String(what.clone())
                     };
                     self.event(&Event::Error(site, &m));
+                    self.run_errors += 1;
                     if self.runs.last().is_some_and(|r| r.fatal) {
                         self.exit_on_error();
                         return;
@@ -1157,8 +1162,8 @@ impl Game {
     /// @ 0x00418960); at its end the reader queues the requests 5 (the
     /// transition, here [`Game`]'s own) and 4 (0x0043b6f4..0x0043b7c1).
     /// False when the file is missing or its read was abandoned (not an
-    /// `ATL_FILE`, `LUA_DB` missing or unreadable, `Atl_Address_GetCurrent`
-    /// raising).
+    /// `ATL_FILE`, `atlantis.lua` raising, `LUA_DB` missing or unreadable,
+    /// `Atl_Address_GetCurrent` raising).
     pub fn load_file(&mut self, file: &str) -> bool {
         let Some(data) = self.engine.borrow_mut().read_save(file) else {
             self.note(format!("Atl_Load: the file saves/{file} is missing"));
@@ -1174,14 +1179,20 @@ impl Game {
             self.note("CSaveFileReader :: Read -> not an ATL_FILE".into());
             return false;
         };
-        let path = Self::scripts_path(b"atlantis.lua");
-        if self.push_file(&path, false, false) {
-            self.run();
-        }
         // The reader is one try: a throw abandons it at that step, before
         // the queueing of 5 and 4 (0x0043b6f4..0x0043b7c1); the catches
         // (0x0043b884, 0x0043b8ca) only log. False, so the menus' loads
-        // reopen their page.
+        // reopen their page. First `atlantis.lua` (@ 0x00454410, state 6
+        // at 0x0043b2ec): a Lua error in it throws.
+        let path = Self::scripts_path(b"atlantis.lua");
+        let errors = self.run_errors;
+        if self.push_file(&path, false, false) {
+            self.run();
+        }
+        if self.run_errors != errors {
+            self.note("CSaveFileReader :: Read -> atlantis.lua raised".into());
+            return false;
+        }
         let Some(db) = root.child("LUA_DB") else {
             self.note("CSerialisableLuaDB :: Deserialize: no <LUA_DB> element".into());
             return false;

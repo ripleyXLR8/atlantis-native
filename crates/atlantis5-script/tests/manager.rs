@@ -609,6 +609,48 @@ fn the_load_state_ends_the_game_before_the_read() {
 }
 
 #[test]
+fn a_save_s_read_stops_when_atlantis_lua_raises() {
+    // @ 0x0043b210: `atlantis.lua` first (@ 0x00454410, state 6 at
+    // 0x0043b2ec); its Lua error throws, the catch @ 0x0043b884 rethrows
+    // and every later step is skipped, the queueing of 5 and 4 included.
+    let mut files = BASE.to_vec();
+    let atlantis = format!(
+        "{} function Atl_Address_GetCurrent() return \"deck\", 1 end",
+        files[0].1
+    );
+    files[0] = ("atlantis.lua", &atlantis);
+    let (mut g, probe) = game(&files);
+    g.new_game();
+    settle(&mut g, 5);
+    assert_eq!(g.state(), 4);
+    assert!(probe.borrow().saves.contains_key("autoslot"));
+    // A whole read first.
+    probe.borrow_mut().requests.clear();
+    assert!(g.load_file("autoslot"));
+    assert!(g.requests_pending());
+    settle(&mut g, 5);
+    assert_eq!(g.state(), 4);
+    // Then with an atlantis.lua that raises.
+    probe.borrow_mut().files.insert(
+        format!("{DIR}atlantis.lua"),
+        format!("{atlantis} error(\"boom\")"),
+    );
+    assert!(g.run_string("return function() Atl_Timer_Create(\"kept\", 100) end"));
+    probe.borrow_mut().requests.clear();
+    probe.borrow_mut().errors.clear();
+    assert!(!g.load_file("autoslot"));
+    assert!(!g.requests_pending());
+    assert_eq!(probe.borrow().errors.len(), 1);
+    // Nothing read: the timers as they were, no view loaded.
+    assert_eq!(g.timer_names(), [b"kept".to_vec()]);
+    assert!(!probe
+        .borrow()
+        .requests
+        .iter()
+        .any(|r| matches!(r, Request::LoadView { .. })));
+}
+
+#[test]
 fn the_chapter_runs_in_the_next_state_and_clears_its_number_after() {
     let mut files = BASE.to_vec();
     files[0] = (
