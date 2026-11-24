@@ -258,7 +258,13 @@ impl Launcher {
     /// shown and can be copied.
     fn copy_rect(&self) -> Option<(i32, i32, i32, i32)> {
         let e = self.entries.get(self.selected)?;
-        if !e.copyable || !e.found || self.busy || self.selected < self.scroll {
+        // Only on a shown row (the draw walks `scroll..scroll + VISIBLE`):
+        // the wheel moves the rows without the selection.
+        if !e.copyable
+            || !e.found
+            || self.busy
+            || !(self.scroll..self.scroll + VISIBLE).contains(&self.selected)
+        {
             return None;
         }
         let row = (self.selected - self.scroll) as i32;
@@ -921,6 +927,35 @@ mod tests {
         assert_eq!(l.selected(), 2);
         l.set_busy(false);
         assert_eq!(l.key(LauncherKey::Escape), LauncherAction::Quit);
+    }
+
+    #[test]
+    fn no_copy_link_for_a_row_scrolled_out_of_view() {
+        let mut entries: Vec<LauncherEntry> =
+            (0..8).map(|i| entry(&format!("/{i}"), true)).collect();
+        entries[7].copyable = true;
+        entries[7].kind = Some(GameKind::Atlantis5);
+        let mut l = Launcher::new(Vec::new());
+        l.set_entries(entries, 0);
+        l.key(LauncherKey::End);
+        assert_eq!(l.selected(), 7);
+        assert!(l.copy_rect().is_some());
+        // The wheel up: the selected row one below the shown ones.
+        l.wheel(-1);
+        assert_eq!(l.selected(), 7);
+        assert_eq!(l.copy_rect(), None);
+        assert_eq!(l.key(LauncherKey::Char('c')), LauncherAction::None);
+        let mut bare = vec![0u16; SCREEN_W * SCREEN_H];
+        assert!(!texts(&l.draw_scene(&mut bare)).contains(&COPY_TEXT));
+        // Where the link would be: no copy.
+        let w = art::width(&COPY_LINK, COPY_TEXT).ceil() as i32;
+        let (x, y) = (
+            LIST_X + LIST_W - 18 - w / 2,
+            LIST_Y + VISIBLE as i32 * ROW_H + 30,
+        );
+        assert_ne!(l.click(x, y, 0), LauncherAction::Copy(7));
+        l.wheel(1);
+        assert!(l.copy_rect().is_some());
     }
 
     #[test]
