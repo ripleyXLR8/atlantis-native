@@ -4369,6 +4369,10 @@ impl Play {
             let before = self.scene_under_menu();
             self.menu_frame(clicks, dt);
             scene = before || self.scene_under_menu();
+        } else if let Some(p) = &mut self.poker {
+            // The board's film or dialog runs in its own loop: the board's
+            // process (and its cursor) does not see the moves.
+            p.held_frame(self.menus.mouse);
         }
         // A dialog takes the frame's clicks (`Atl_Dialog_Play`'s loop).
         if self.stage.borrow().dialog_running() {
@@ -4670,6 +4674,11 @@ impl Play {
                 };
                 poker.frame(&mut host, mouse, clicks, &measure)
             };
+            // States 2, 0xa, 0xc: the mouse back at the cursor's place
+            // (@ 0x0040d890).
+            if let Some((x, y)) = poker.take_mouse() {
+                self.mouse_at(x, y);
+            }
             if closed {
                 // Its process returned 1: mode 0xd; with a mode queued
                 // (the death panel of `Atl_GameOver`, which the board's

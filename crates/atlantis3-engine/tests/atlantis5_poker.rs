@@ -322,3 +322,35 @@ fn a_shown_panel_takes_a_click_only_after_a_move() {
     frames(&mut play, 1);
     assert_ne!(play.poker().map(|p| p.state), Some(3), "after a move");
 }
+
+/// The panel's return (states 2, 0xa, 0xc) puts the mouse back at the
+/// cursor's place (@ 0x004520a0 on the cursor, @ 0x0040d890): the moves
+/// made while the opponents' dialogs played are dropped, and the button
+/// under it is not hot until a move.
+#[test]
+fn the_panel_puts_the_mouse_back_at_the_cursor() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_poker(&d);
+    let wait_panel = |play: &mut Play| {
+        for _ in 0..30_000 {
+            frames(play, 1);
+            if !play.game.busy() && play.poker().is_some_and(|p| p.state == 3) {
+                return;
+            }
+        }
+        panic!("no panel");
+    };
+    wait_panel(&mut play);
+    assert!(play.click_poker("follow_bet"));
+    let at_click = play.menus.mouse;
+    frames(&mut play, 1);
+    assert!(play.game.busy(), "the opponents' dialogs");
+    play.mouse_by(200, 50);
+    assert_ne!(play.menus.mouse, at_click);
+    wait_panel(&mut play);
+    assert_eq!(play.menus.mouse, at_click, "back at the cursor's place");
+    // On the button, but not hot: a press does nothing.
+    play.click();
+    frames(&mut play, 3);
+    assert_eq!(play.poker().map(|p| p.state), Some(3));
+}

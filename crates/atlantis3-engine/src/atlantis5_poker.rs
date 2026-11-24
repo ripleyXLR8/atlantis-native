@@ -132,6 +132,17 @@ pub struct Poker {
     /// The mouse at the last frame: the buttons' hover is tested only on
     /// a move (a mouse event of kind 2, @ 0x004523e0).
     last_mouse: Option<(i32, i32)>,
+    /// The cursor's place (+0x08, put at the menu's mouse by @ 0x0040d920
+    /// on the move events of the frames the process runs). A run's dialog
+    /// or film blocks the original's process: the moves made meanwhile
+    /// reach the global mouse, not the cursor, until a move event of a
+    /// frame the process runs.
+    place: Option<(i32, i32)>,
+    /// The mouse at the last frame, held by a run or not.
+    seen: Option<(i32, i32)>,
+    /// The mouse to put back at the cursor's place (states 2, 0xa, 0xc),
+    /// for the host to take ([`Poker::take_mouse`]).
+    mouse_back: Option<(i32, i32)>,
 }
 
 fn num(v: Option<&Value>) -> f64 {
@@ -185,6 +196,9 @@ impl Poker {
                 spr("punter.spr"),
             ],
             last_mouse: None,
+            place: None,
+            seen: None,
+            mouse_back: None,
         };
         p.add(None, 0, 0, Kind::Root);
         // card_bubble_1..3 (bubble.spr) at (0, 10).
@@ -531,10 +545,29 @@ impl Poker {
             .push_back(Op::Run(format!("Atl_Dialog_Play({id})"), None));
     }
 
-    /// The panel's mouse (the cursor's place, @ 0x004520a0 then
-    /// @ 0x0040d890) and the cursor shown.
+    /// The panel's mouse put back at the cursor's place (@ 0x004520a0 on
+    /// the cursor, stored in the global mouse 0x006b0b38 / 0x006b0b3c and
+    /// given to @ 0x0040d890), so the moves made during the blocking film
+    /// or dialogs are dropped; the cursor shown. No hover is tested for
+    /// that place (no move).
     fn show_cursor(&mut self) {
         self.cursor = true;
+        if let Some(p) = self.place {
+            self.mouse_back = Some(p);
+            self.last_mouse = Some(p);
+        }
+    }
+
+    /// A frame held by a script run (a film or dialog of the board's): its
+    /// moves reach the mouse, not the cursor.
+    pub fn held_frame(&mut self, mouse: (i32, i32)) {
+        self.seen = Some(mouse);
+    }
+
+    /// The mouse the board put back at the cursor's place this frame, if
+    /// any: the host's menus' mouse is to be set to it.
+    pub fn take_mouse(&mut self) -> Option<(i32, i32)> {
+        self.mouse_back.take()
     }
 
     // -- a frame -------------------------------------------------------------
@@ -570,8 +603,15 @@ impl Poker {
         clicks: usize,
         measure: &dyn Fn(&str, &str, i32, bool) -> i32,
     ) -> bool {
+        let moved = self.seen != Some(mouse);
+        self.seen = Some(mouse);
         if !self.drain(host) {
             return false;
+        }
+        // The process runs: the cursor at the mouse when this frame moved
+        // it (the moves of the frames held by a run are not events here).
+        if moved || self.place.is_none() {
+            self.place = Some(mouse);
         }
         if self.last_mouse.is_some_and(|m| m != mouse) {
             self.hover(mouse, measure);
