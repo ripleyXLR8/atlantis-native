@@ -1040,6 +1040,15 @@ impl Stage {
             .collect()
     }
 
+    /// The seconds played by `object`'s sprite (tests).
+    #[doc(hidden)]
+    pub fn sprite_time(&self, object: &[u8]) -> Option<f64> {
+        self.sprites
+            .iter()
+            .find(|s| s.object == object)
+            .map(|s| s.time)
+    }
+
     /// The film playing, by its name.
     pub fn film_name(&self) -> Option<String> {
         self.film.as_ref().map(|(f, _)| f.name().to_string())
@@ -1952,7 +1961,7 @@ impl Stage {
     /// music (@ 0x00459fd0), film.
     fn update(&mut self, dt: f64, play: bool, scene: bool) {
         self.update_start(dt, play);
-        self.update_scene(dt, scene);
+        self.update_scene(dt, scene, true);
     }
 
     /// The frame's first part: the film's end, the camera, an animated
@@ -1988,8 +1997,13 @@ impl Stage {
     /// (@ 0x00459fd0), after the frame's scripts: state 4 (@ 0x0042f000
     /// case 4) runs the events and the timers, then the pick and the
     /// cursor, and only then the scene's update, so a sprite a click or a
-    /// timer made is stepped once before it is first drawn.
-    fn update_scene(&mut self, dt: f64, scene: bool) {
+    /// timer made is stepped once before it is first drawn. Without
+    /// `sound` neither runs (the frame a menu chain ends, @ 0x0041b780
+    /// returns 1 before both).
+    fn update_scene(&mut self, dt: f64, scene: bool, sound: bool) {
+        if !sound {
+            return;
+        }
         // A randomized sprite's missing file throws out of the sprites'
         // step; `CGameManager::Process`'s catch (@ 0x0042f3c6) logs it
         // (`CGameManager :: Process -> %s`, 0x0066cc4c) and goes on after
@@ -4421,12 +4435,20 @@ impl Play {
         // first, then the scene's update (@ 0x0044c380 → the sprites'
         // step @ 0x00441c30) for modes 8, 9 and 0xc only (the inventory,
         // the subject menu, poker: the 3D view stays under them), then the
-        // sound (@ 0x00459fd0); the other modes freeze the sprites.
+        // sound (@ 0x00459fd0); the other modes freeze the sprites. In the
+        // frame the mode's process returns 1 the mode is 0xd: with nothing
+        // queued @ 0x0041b780 returns 1 before both (the manager's case 3
+        // falls into case 0), with a mode queued only the sound runs.
         let mut scene = true;
+        let mut sound = true;
         if self.game.state() == 3 && !self.game.busy() {
-            let before = self.scene_under_menu();
-            self.menu_frame(clicks, clicks - play_clicks, dt);
-            scene = before || self.scene_under_menu();
+            match self.menu_frame(clicks, clicks - play_clicks, dt) {
+                Some(queued) => {
+                    scene = false;
+                    sound = queued;
+                }
+                None => scene = self.scene_under_menu(),
+            }
         } else if let Some(p) = &mut self.poker {
             // The board's film or dialog runs in its own loop: the board's
             // process (and its cursor) does not see the moves.
@@ -4469,7 +4491,7 @@ impl Play {
         self.cursor_frame(dt);
         // The scene's update and the sound last (@ 0x0042f000 case 4:
         // after the events, the timers, the pick and the cursor).
-        self.stage.borrow_mut().update_scene(dt, scene);
+        self.stage.borrow_mut().update_scene(dt, scene, sound);
         // Then, on the normal path and after the catch alike
         // (0x0042f464..0x0042f471), a sprite found by the pick (+0x3c)
         // is picked again (@ 0x00430b70, which clears +0x3c first) on the
@@ -4642,14 +4664,16 @@ impl Play {
 
     /// `held_clicks`: how many of the `clicks` were made with the right
     /// button held.
-    fn menu_frame(&mut self, clicks: usize, held_clicks: usize, dt: f64) {
+    ///
+    /// `Some(queued)` when the mode's process returned 1 this frame (the
+    /// mode 0xd then), `queued` when another mode waits for the next
+    /// frame.
+    fn menu_frame(&mut self, clicks: usize, held_clicks: usize, dt: f64) -> Option<bool> {
         if self.stage.borrow().inventory_open_now() {
-            self.inventory_frame(clicks, held_clicks, dt);
-            return;
+            return self.inventory_frame(clicks, held_clicks, dt);
         }
         if !self.stage.borrow().menu_open_now() {
-            self.menus_frame(clicks, dt);
-            return;
+            return self.menus_frame(clicks, dt);
         }
         // The mode's open (@ 0x0041b780): the drawn cursor at the centre
         // with the menu's mouse.
@@ -4664,10 +4688,11 @@ impl Play {
             // subject's script): the manager stays in state 3 and opens it
             // at the next frame (@ 0x0041b780).
             self.take_menu_requests();
-            if !self.menus.active() {
+            let queued = self.menus.active();
+            if !queued {
                 self.game.menu_closed();
             }
-            return;
+            return Some(queued);
         }
         let wants = self.stage.borrow_mut().menu_wants_subjects();
         if let Some(c) = wants {
@@ -4683,7 +4708,7 @@ impl Play {
             // No press is taken in the frame the elements are made: state
             // 0 returns after making them, state 2 empties the frame's
             // events but its own move (@ 0x00410f90).
-            return;
+            return None;
         }
         for _ in 0..clicks {
             self.stage.borrow_mut().menu_click();
@@ -4693,6 +4718,7 @@ impl Play {
                 break;
             }
         }
+        None
     }
 
     /// The menus' frame (@ 0x0041b780): the next mode made when none is
@@ -4700,7 +4726,7 @@ impl Play {
     /// what it asks done; at its end with nothing queued, the music goes
     /// on and the manager takes its next request. With no menu up nor
     /// queued, state 3 ends at once (logged).
-    fn menus_frame(&mut self, clicks: usize, dt: f64) {
+    fn menus_frame(&mut self, clicks: usize, dt: f64) -> Option<bool> {
         if self.poker.is_none() && self.menus.take_next(menus::POKER) {
             // The mode opens (@ 0x0041b780): the mouse at the screen's
             // centre, the board's init (state 0, @ 0x00425890).
@@ -4745,13 +4771,14 @@ impl Play {
                 // `OnLose` may have asked in this very frame) the manager
                 // stays in state 3, else it takes its next request.
                 self.take_menu_requests();
-                if !self.menus.active() {
+                let queued = self.menus.active();
+                if !queued {
                     self.game.menu_closed();
                 }
-            } else {
-                self.poker = Some(poker);
+                return Some(queued);
             }
-            return;
+            self.poker = Some(poker);
+            return None;
         }
         // Mode 8 queued (after the examine view of an inventory item): the
         // inventory again.
@@ -4761,21 +4788,25 @@ impl Play {
             self.stage.borrow_mut().inventory_open(size, items, hand);
             self.cursor_to_stage_mouse();
             self.inventory_hand_name();
-            return;
+            return None;
         }
         if !self.menus.active() {
             log::info!("menu of state 3: none asked, closed");
             self.game.menu_closed();
-            return;
+            return None;
         }
         for _ in 0..clicks {
             self.menus.click();
         }
+        let was_up = self.menus.current().is_some();
         let ended = {
             let mut st = self.stage.borrow_mut();
             let st = &mut *st;
             self.menus.step(dt, &st.fonts, &mut st.config)
         };
+        // Its process returned 1 with a mode queued: the menu dropped, the
+        // next one made at the next frame.
+        let ended_queued = was_up && ended.is_none() && self.menus.current().is_none();
         if let Some(m) = self.menus.current() {
             if menus::pauses_sound(m) && !self.sound_held {
                 self.sound_held = true;
@@ -4809,7 +4840,7 @@ impl Play {
             // no mode; Native opens the page again.
             log::warn!("the save could not be read: its page again");
             self.menus.request(mode);
-            return;
+            return Some(true);
         }
         if ended.is_some() {
             if self.sound_held {
@@ -4817,7 +4848,9 @@ impl Play {
                 self.stage.borrow_mut().hold_sound(false);
             }
             self.game.menu_closed();
+            return Some(false);
         }
+        ended_queued.then_some(true)
     }
 
     /// What a menu asked.
@@ -4943,7 +4976,7 @@ impl Play {
     /// button held carries the buttons 5: when no element took a press
     /// that frame, state 2 (@ 0x00414a30: `buttons & 4` on a press event)
     /// ends the inventory, as a right press off the elements does.
-    fn inventory_frame(&mut self, clicks: usize, held_clicks: usize, dt: f64) {
+    fn inventory_frame(&mut self, clicks: usize, held_clicks: usize, dt: f64) -> Option<bool> {
         self.stage.borrow_mut().inventory_buttons_hover();
         let mut taken = false;
         for _ in 0..clicks {
@@ -4974,9 +5007,14 @@ impl Play {
         }
         // Its end: the manager's next mode (the examine view), or the
         // game manager's next request.
-        if self.stage.borrow_mut().inventory_take_closed() && !self.menus.active() {
-            self.game.menu_closed();
+        if self.stage.borrow_mut().inventory_take_closed() {
+            let queued = self.menus.active();
+            if !queued {
+                self.game.menu_closed();
+            }
+            return Some(queued);
         }
+        None
     }
 
     /// Whether a menu is up (the manager's state 3): the mouse moves a

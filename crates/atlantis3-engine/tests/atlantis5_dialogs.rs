@@ -474,6 +474,38 @@ fn moves_during_the_facing_do_not_move_the_subject_menu_s_cursor() {
     assert_eq!(play.menus.mouse, (to.0 + 1, to.1 + 1));
 }
 
+/// The frame the subject menu's process returns 1 (state 5: `unfacing`
+/// put in) makes the mode 0xd; with nothing queued @ 0x0041b780 returns 1
+/// before the scene's update (@ 0x0044c380) and the sound's: no sprite is
+/// stepped that frame, so `unfacing` is still at its time 0 after it.
+#[test]
+fn the_frame_the_subject_menu_ends_steps_no_sprite() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 1);
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    // A press off the subjects: state 5 at the next frame.
+    play.mouse_at(5, 5);
+    play.click();
+    frames(&mut play, 1);
+    assert!(play.stage().menu_open_now(), "closing");
+    frames(&mut play, 1);
+    assert!(!play.stage().menu_open_now(), "ended");
+    assert_eq!(anim(&play, "gorilla").as_deref(), Some("unfacing"));
+    assert_eq!(play.stage().sprite_time(b"gorilla"), Some(0.0));
+    // The next frame (play) steps it.
+    frames(&mut play, 1);
+    assert!(play.stage().sprite_time(b"gorilla").unwrap() > 0.0);
+}
+
 #[test]
 fn a_press_in_the_frame_the_subjects_are_made_is_dropped() {
     // @ 0x00410f90 case 0 returns after making the elements, with no
