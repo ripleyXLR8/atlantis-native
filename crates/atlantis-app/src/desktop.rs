@@ -764,6 +764,12 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
             }
         };
         if kind == GameKind::Atlantis5 {
+            // A disc of several languages: each its own edition.
+            let places = atlantis5_places(&root);
+            if !places.is_empty() {
+                log::info!("{}: {} languages", root.display(), places.len());
+                return Some(places);
+            }
             match crate::a5::label(&root) {
                 Ok(label) => {
                     log::info!("game folder {} ({label})", root.display());
@@ -901,11 +907,39 @@ fn open_dvd_languages(
     (opened, first_error)
 }
 
+/// The places of the languages of The Secrets of Atlantis at `root` that
+/// open, each its own edition, when its data hold several
+/// ([`atlantis3_data::atlantis5::language_places`]: the international
+/// DVD's four); none otherwise.
+pub fn atlantis5_places(root: &Path) -> Vec<(Opened, PathBuf)> {
+    atlantis3_data::atlantis5::language_places(root)
+        .into_iter()
+        .filter_map(|p| match crate::a5::label(&p) {
+            Ok(label) => Some((Opened::Atlantis5(label), p)),
+            Err(e) => {
+                log::warn!("{}: {e}", p.display());
+                None
+            }
+        })
+        .collect()
+}
+
 /// `found` with each of Cryo's DVD's languages met replaced by every
-/// language of its side (or sides) that opens: each its own edition.
+/// language of its side (or sides) that opens, and The Secrets of
+/// Atlantis's disc of several languages by its languages: each its own
+/// edition.
 fn with_every_dvd_language(found: Vec<(PathBuf, Opened)>) -> Vec<(PathBuf, Opened)> {
     let mut out = Vec::new();
     for (dir, opened) in found {
+        if opened.kind() == GameKind::Atlantis5 {
+            let places = atlantis5_places(&dir);
+            if places.is_empty() {
+                out.push((dir, opened));
+            } else {
+                out.extend(places.into_iter().map(|(o, p)| (p, o)));
+            }
+            continue;
+        }
         let Some((_, root)) = dvd_language_of(&dir) else {
             out.push((dir, opened));
             continue;
@@ -975,7 +1009,8 @@ pub fn game_folders_in(
         .map(|(d, _)| d)
         .collect();
     // Cryo's DVD: every language of a side met (each its own edition),
-    // and the drives holding a side.
+    // and the drives holding a side; The Secrets of Atlantis's disc of
+    // several languages: each of them.
     roots = roots
         .into_iter()
         .flat_map(|r| match dvd_language_of(&r) {
@@ -987,7 +1022,14 @@ pub fn game_folders_in(
                     all
                 }
             }
-            None => vec![r],
+            None => {
+                let places = atlantis3_data::atlantis5::language_places(&r);
+                if places.is_empty() {
+                    vec![r]
+                } else {
+                    places
+                }
+            }
         })
         .collect();
     for d in discs {

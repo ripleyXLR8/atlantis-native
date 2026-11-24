@@ -363,7 +363,7 @@ pub async fn start(
         }
         if others.is_empty() || game.as_deref() == Some("atlantis5") {
             drop(paths);
-            start_atlantis5(all, &folder)?;
+            start_atlantis5(all, &folder, language.as_deref(), a4_language.as_deref())?;
             return Ok("atlantis5".into());
         }
         if game.is_none() {
@@ -472,7 +472,7 @@ pub async fn start(
         // reading them.
         if let Some(image) = a5_image(&all) {
             drop(paths);
-            start_atlantis5_image(all, &image)?;
+            start_atlantis5_image(all, &image, language.as_deref(), a4_language.as_deref())?;
             return Ok("atlantis5".into());
         }
         let folders = crate::web_layout::image_folders(&paths);
@@ -1392,27 +1392,68 @@ fn a5_error(e: &atlantis3_data::atlantis5::OpenError) -> JsValue {
     .into()
 }
 
+/// The language of The Secrets of Atlantis's disc of several languages
+/// (the international DVD's four): `language` once the page's player chose
+/// it (a folder name: `german`, ...), else the page address's `?lang=`
+/// (`code`: `de`, `en`, `es`, `it`, `fr`); without either the page is
+/// asked, with `A5LANGUAGES:` then `folder=name` pairs separated by `;`
+/// in the installer's order (as Cryo's DVD's `LANGUAGES:`). A disc of one
+/// language plays it.
+fn a5_choose_language(
+    src: &mut atlantis3_data::atlantis5::Atlantis5Source,
+    language: Option<&str>,
+    code: Option<&str>,
+) -> Result<(), JsValue> {
+    use atlantis3_data::atlantis5::{in_installer_order, language_name, language_of_code};
+    if src.languages().len() < 2 {
+        return Ok(());
+    }
+    let wanted = [language, code.and_then(language_of_code)];
+    if wanted.into_iter().flatten().any(|l| src.choose_language(l)) {
+        return Ok(());
+    }
+    let list: Vec<String> = in_installer_order(src.languages())
+        .iter()
+        .map(|l| format!("{l}={}", language_name(l)))
+        .collect();
+    Err(format!("A5LANGUAGES:{}", list.join(";")).into())
+}
+
 /// The Secrets of Atlantis from its folder among the picked files (a
 /// copy of the DVD, an install, the extracted cabinets), read when the
-/// game reads it, the part it reads.
-fn start_atlantis5(all: HashMap<String, File>, folder: &str) -> Result<(), JsValue> {
+/// game reads it, the part it reads; in `language` or the page's `?lang=`
+/// ([`a5_choose_language`]).
+fn start_atlantis5(
+    all: HashMap<String, File>,
+    folder: &str,
+    language: Option<&str>,
+    code: Option<&str>,
+) -> Result<(), JsValue> {
     use atlantis3_data::atlantis5::Atlantis5Source;
     let index = keep_picked(all);
     let dir = Arc::new(PickedDir::new(&index, folder));
-    let src = Atlantis5Source::from_folder(dir).map_err(|e| a5_error(&e))?;
+    let mut src = Atlantis5Source::from_folder(dir).map_err(|e| a5_error(&e))?;
+    a5_choose_language(&mut src, language, code)?;
     crate::a5_web::start(src, a5_store())
 }
 
 /// The Secrets of Atlantis from its DVD's image `image` among the picked
-/// files, read a part at a time (never whole: 1.5 GB for the French DVD).
-fn start_atlantis5_image(all: HashMap<String, File>, image: &str) -> Result<(), JsValue> {
+/// files, read a part at a time (never whole: 1.5 GB for the French DVD);
+/// in `language` or the page's `?lang=` ([`a5_choose_language`]).
+fn start_atlantis5_image(
+    all: HashMap<String, File>,
+    image: &str,
+    language: Option<&str>,
+    code: Option<&str>,
+) -> Result<(), JsValue> {
     use atlantis3_data::atlantis5::{Atlantis5Source, Form};
     let index = keep_picked(all);
     let &(i, size) = index.get(image).ok_or("the DVD's image")?;
     let img = DiscImage::from_bytes(image, Box::new(PickedImage { index: i, size }))
         .ok_or("the DVD's image cannot be read")?;
-    let src =
+    let mut src =
         Atlantis5Source::from_disc(Arc::new(img), Form::DiscImage).map_err(|e| a5_error(&e))?;
+    a5_choose_language(&mut src, language, code)?;
     crate::a5_web::start(src, a5_store())
 }
 

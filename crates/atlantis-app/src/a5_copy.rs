@@ -361,17 +361,54 @@ pub fn install_cli(from: &Path) -> Result<PathBuf, String> {
     println!("copied in {:.1} s", t0.elapsed().as_secs_f64());
     let data = crate::desktop::data_dir();
     let mut lib = crate::library::Library::load(&data);
-    match lib.position(from) {
-        Some(i) => {
-            lib.relocate(i, &dest);
-        }
-        None => {
-            lib.add(&dest);
-        }
-    }
+    move_entries_to_copy(&mut lib, from, &dest);
     lib.save(&data)
         .map_err(|e| format!("{}: {e}", data.display()))?;
     Ok(dest)
+}
+
+/// The game library `lib` once the disc at `from` (its root, or a
+/// language's place of it, [`atlantis3_data::atlantis5::language_place`])
+/// is copied to `copy`: every entry of that disc now names the copy (a
+/// language's place the same language's place of the copy). With no
+/// entry of it, the copy is added: a place per language when it has
+/// several. Returns where `from`'s entry is now.
+pub fn move_entries_to_copy(lib: &mut crate::library::Library, from: &Path, copy: &Path) -> usize {
+    use crate::library::same_folder;
+    use atlantis3_data::atlantis5::{language_place, language_places, place_language, place_root};
+    let to = |f: &Path| match place_language(f) {
+        Some(l) => language_place(copy, &l),
+        None => copy.to_path_buf(),
+    };
+    let disc = place_root(from);
+    let mine: Vec<PathBuf> = lib
+        .folders()
+        .iter()
+        .filter(|f| same_folder(&place_root(f), &disc))
+        .cloned()
+        .collect();
+    if mine.is_empty() {
+        let places = language_places(copy);
+        let added = if places.is_empty() {
+            vec![to(from)]
+        } else {
+            places
+        };
+        for p in &added {
+            lib.add(p);
+        }
+        let want = to(from);
+        return lib
+            .position(&want)
+            .or_else(|| lib.position(&added[0]))
+            .unwrap_or(0);
+    }
+    for f in mine {
+        if let Some(i) = lib.position(&f) {
+            lib.relocate(i, &to(&f));
+        }
+    }
+    lib.position(&to(from)).unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -439,18 +476,25 @@ pub(crate) mod tests {
     /// French menu texts), the program and the installer. Returns the
     /// bytes the copy takes.
     pub(crate) fn fake_disc(dir: &Path) -> u64 {
+        fake_disc_of(dir, &["french"])
+    }
+
+    /// [`fake_disc`] with a cabinet per language of `languages`
+    /// (`datas_<language>.cab`, as the international DVD's).
+    pub(crate) fn fake_disc_of(dir: &Path, languages: &[&str]) -> u64 {
         std::fs::create_dir_all(dir).unwrap();
         let main = stored_cab(&[
             (".\\Datas\\Scenes\\zeppelin.wam", b"wam"),
             (".\\Datas\\Warps\\ze0003.jp6", &big()),
         ]);
-        let french = stored_cab(&[(
-            ".\\Datas\\Texts\\Menu\\french\\string_resources.xml",
-            b"<x/>",
-        )]);
-        let n = main.len() + french.len() + 10;
+        let mut n = main.len() + 10;
         std::fs::write(dir.join("DATAS.cab"), main).unwrap();
-        std::fs::write(dir.join("datas_french.cab"), french).unwrap();
+        for l in languages {
+            let name = format!(".\\Datas\\Texts\\Menu\\{l}\\string_resources.xml");
+            let cab = stored_cab(&[(name.as_str(), b"<x/>")]);
+            n += cab.len();
+            std::fs::write(dir.join(format!("datas_{l}.cab")), cab).unwrap();
+        }
         std::fs::write(dir.join("The secrets of Atlantis.exe"), [1; 10]).unwrap();
         std::fs::write(dir.join("Install.exe"), [2; 10]).unwrap();
         n as u64
@@ -606,5 +650,57 @@ pub(crate) mod tests {
             Plan::of(&root.join("datas")),
             Err(CopyError::NotADisc)
         ));
+    }
+
+    /// The international DVD (`ATLANTIS5_DVD_INT`): its plan, from the
+    /// disc's root and from a language's place (the same disc).
+    #[test]
+    fn the_international_dvd_plan() {
+        let Some(root) = atlantis3_data::testing::a5_dvd_int() else {
+            return;
+        };
+        for p in [root.clone(), root.join("datas_german.cab")] {
+            let plan = Plan::of(&p).unwrap();
+            let names: Vec<&str> = plan.files.iter().map(|f| f.0.as_str()).collect();
+            assert_eq!(
+                names,
+                [
+                    "DATAS.cab",
+                    "DATAS_english.cab",
+                    "DATAS_german.cab",
+                    "DATAS_italian.cab",
+                    "DATAS_spanish.cab",
+                    "The secrets of Atlantis.exe"
+                ],
+                "{}",
+                p.display()
+            );
+            let bytes: u64 = plan.files.iter().map(|f| f.1).sum();
+            assert_eq!(bytes, 1_709_151_146 + 3_883_008);
+        }
+    }
+
+    /// A disc of two languages copied: the copy opens in both, each from
+    /// its place.
+    #[test]
+    fn a_disc_of_two_languages() {
+        let d = tmp("two");
+        let disc = d.join("dvd");
+        fake_disc_of(&disc, &["english", "german"]);
+        let dest = d.join("copy");
+        let plan = Plan::of(&disc.join("datas_german.cab")).unwrap();
+        plan.copy_to(&dest, &Progress::default(), |_| Some(u64::MAX))
+            .unwrap();
+        let places = atlantis3_data::atlantis5::language_places(&dest);
+        assert_eq!(
+            places,
+            [
+                dest.join("DATAS_english.cab"),
+                dest.join("DATAS_german.cab")
+            ]
+        );
+        let src = Atlantis5Source::open(&places[1]).unwrap();
+        assert_eq!(src.chosen_language(), Some("german"));
+        let _ = std::fs::remove_dir_all(&d);
     }
 }

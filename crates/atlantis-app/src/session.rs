@@ -515,13 +515,9 @@ impl App {
         match result {
             Ok(()) => {
                 log::info!("{}: copied to {}", from.display(), dest.display());
-                let at = match session.library.position(&from) {
-                    Some(i) => session.library.relocate(i, &dest),
-                    None => {
-                        session.library.add(&dest);
-                        session.library.position(&dest).unwrap_or(0)
-                    }
-                };
+                // Each entry of the disc (its languages' places too) now
+                // the copy's.
+                let at = crate::a5_copy::move_entries_to_copy(&mut session.library, &from, &dest);
                 session.library.save_logged(&session.data_dir);
                 session.refresh(at, &desktop::describe);
                 session.message("Copied: the game now plays from this computer, without the disc");
@@ -603,10 +599,18 @@ impl App {
                         .get(i)
                         .and_then(|d| desktop::dvd_language_of(d))
                         .map(|(l, _)| l);
+                    // The Secrets of Atlantis: the same language's place.
+                    let a5_language = atlantis3_data::atlantis5::place_language;
+                    let was_a5 = session
+                        .library
+                        .folders()
+                        .get(i)
+                        .and_then(|d| a5_language(d));
                     let k = found
                         .iter()
                         .position(|(_, d)| {
-                            was.is_some() && desktop::dvd_language_of(d).map(|(l, _)| l) == was
+                            (was.is_some() && desktop::dvd_language_of(d).map(|(l, _)| l) == was)
+                                || (was_a5.is_some() && a5_language(d) == was_a5)
                         })
                         .unwrap_or(0);
                     let (opened, dir) = found.swap_remove(k);
@@ -1009,6 +1013,110 @@ mod tests {
         assert!(s.wants_atlantis5() && s.wants_own_mode() && !s.wants_atlantis4());
         assert_eq!(app.session_mut().unwrap().take_atlantis5(), Some(dvd));
         assert!(!app.session().unwrap().wants_own_mode());
+    }
+
+    /// The Secrets of Atlantis's international DVD in the game library
+    /// (`ATLANTIS5_DVD_INT`: a copy of the disc's files): a place per
+    /// language, each its own edition named with its language, in the
+    /// installer's order; one chosen is played in its language.
+    #[test]
+    fn the_library_lists_atlantis5s_languages() {
+        let Some(root) = atlantis3_data::testing::a5_dvd_int() else {
+            return;
+        };
+        let own = own_data_dir("atlantis5-int");
+        let d = own.dir.clone();
+        let name = "The Secrets of Atlantis: The Sacred Legacy (2006), DVD";
+        assert_eq!(
+            crate::setup::kind_of(&root),
+            Some(crate::setup::GameKind::Atlantis5)
+        );
+        let places = crate::desktop::game_folders_in(std::slice::from_ref(&root), &[], &[]);
+        let labels: Vec<String> = places
+            .iter()
+            .map(|p| crate::desktop::describe(p).label)
+            .collect();
+        assert_eq!(
+            labels,
+            ["English", "Spanish", "Italian", "German"].map(|l| format!("{name}, {l}"))
+        );
+        for p in &places {
+            let e = crate::desktop::describe(p);
+            assert!(e.found && e.copyable, "{e:?}");
+            assert_eq!(e.kind, Some(crate::setup::GameKind::Atlantis5));
+        }
+        let found = crate::desktop::first_of_each_game(std::slice::from_ref(&root));
+        assert_eq!(found.len(), 1);
+        let text: String = places
+            .iter()
+            .map(|p| format!("{}\n", p.display()))
+            .collect();
+        std::fs::write(d.join("games.txt"), text).unwrap();
+        let mut app = app_with_library(&d);
+        app.show_launcher(None);
+        assert_eq!(
+            app.session().unwrap().launcher().unwrap().entries().len(),
+            4
+        );
+        app.run_launcher_action(LauncherAction::Play(3));
+        assert_eq!(
+            app.session_mut().unwrap().take_atlantis5(),
+            Some(places[3].clone())
+        );
+        let (src, label) = crate::a5::open(&places[3]).unwrap();
+        assert_eq!(crate::a5::language(&src), "german");
+        assert!(label.ends_with("playing german"), "{label}");
+    }
+
+    /// A disc of two languages copied from one language's entry: both
+    /// entries then play from the copy, each in its language.
+    #[test]
+    fn the_library_copies_a_disc_of_two_languages() {
+        let own = own_data_dir("atlantis5-copy-two");
+        let d = own.dir.clone();
+        let disc = d.join("dvd");
+        crate::a5_copy::tests::fake_disc_of(&disc, &["english", "german"]);
+        let places = atlantis3_data::atlantis5::language_places(&disc);
+        assert_eq!(places.len(), 2);
+        let text: String = places
+            .iter()
+            .map(|p| format!("{}\n", p.display()))
+            .collect();
+        std::fs::write(d.join("games.txt"), text).unwrap();
+        let mut app = app_with_library(&d);
+        app.show_launcher(None);
+        let e = &app.session().unwrap().launcher().unwrap().entries()[1];
+        assert!(e.found && e.copyable, "{e:?}");
+        assert!(e.label.ends_with("(2006), DVD, German"), "{}", e.label);
+        app.run_launcher_action(LauncherAction::Copy(1));
+        let t0 = Instant::now();
+        while app.session().unwrap().launcher().unwrap().busy() {
+            assert!(app.poll_copy());
+            assert!(
+                t0.elapsed() < Duration::from_secs(30),
+                "the copy does not end"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+        let copy = crate::a5_copy::copy_dir();
+        let s = app.session().unwrap();
+        assert_eq!(
+            s.library.folders(),
+            [
+                copy.join("DATAS_english.cab"),
+                copy.join("DATAS_german.cab")
+            ]
+        );
+        let l = s.launcher().unwrap();
+        for (e, lang) in l.entries().iter().zip(["English", "German"]) {
+            assert!(e.found && !e.copyable, "{e:?}");
+            assert!(
+                e.label
+                    .ends_with(&format!("(2006), DVD, copied to this computer, {lang}")),
+                "{}",
+                e.label
+            );
+        }
     }
 
     /// The Secrets of Atlantis's disc copied to the computer from the game

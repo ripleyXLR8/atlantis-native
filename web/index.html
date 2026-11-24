@@ -392,11 +392,16 @@
     <section>
     <h2 class="gold">The Secrets of Atlantis</h2>
     <ul>
-      <li><em>DVD</em> (French, 2006): the DVD's image (<code>.iso</code>,
+      <li><em>DVD</em> (French, 2006; or the international DVD, English,
+          German, Italian, Spanish): the DVD's image (<code>.iso</code>,
           choose it below or the folder holding it), the DVD drive or a
           copy of the disc (the folder holding <code>DATAS.cab</code> and
-          <code>DATAS_french.cab</code>), or the folder where the game is
-          installed (the one holding <code>Datas</code>). The image is read
+          <code>DATAS_french.cab</code>, or <code>datas_english.cab</code>
+          and the other languages' cabinets), or the folder where the game is
+          installed (the one holding <code>Datas</code>). The international
+          DVD asks for the language to play; <code>?lang=de</code> (or
+          <code>en</code>, <code>es</code>, <code>it</code>) after the page's
+          address chooses it. The image is read
           a part at a time; each start from the DVD or its image reads
           about 450 MB of it before the logos. Other editions are untested.</li>
     </ul>
@@ -452,7 +457,8 @@
   // folder of the language the player chose (the engine lists them); for
   // a folder holding several games, `game` the one chosen.
   // Atlantis Evolution's language when the page's address asks for one
-  // (`?lang=de|en|es|fr|it`): Native's choice over the install's lang.ini.
+  // (`?lang=de|en|es|fr|it`): Native's choice over the install's lang.ini;
+  // the international DVD of The Secrets of Atlantis's too.
   const a4lang = new URLSearchParams(location.search).get("lang") || undefined;
   const open = async (files, language, game, paths) => {
     const box = document.getElementById("err");
@@ -497,10 +503,14 @@
       window.addEventListener("resize", layout);
     } catch (err) {
       status.textContent = "";
-      // Cryo's DVD: the player chooses the language.
-      if (String(err).startsWith("LANGUAGES:")) {
-        box.append("This is Cryo's DVD. Choose the language to play:");
-        for (const pair of String(err).slice(10).split(";")) {
+      // Cryo's DVD, or The Secrets of Atlantis's international DVD: the
+      // player chooses the language.
+      const a5langs = String(err).startsWith("A5LANGUAGES:");
+      if (a5langs || String(err).startsWith("LANGUAGES:")) {
+        box.append(a5langs
+          ? "This is the international DVD of The Secrets of Atlantis. Choose the language to play:"
+          : "This is Cryo's DVD. Choose the language to play:");
+        for (const pair of String(err).slice(a5langs ? 12 : 10).split(";")) {
           const [folder, name] = pair.split("=");
           const b = document.createElement("button");
           b.className = "language";

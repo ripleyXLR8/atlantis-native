@@ -112,16 +112,10 @@ impl SaveFiles for WebSaves {
     }
 }
 
-/// The language of the films' voices: French when the data have it, else
-/// the first (as the desktop's).
+/// The language played: the one the page chose, else the only one, else
+/// the browser's when the disc has it, else English (as the desktop's).
 fn language(src: &Atlantis5Source) -> String {
-    let langs = src.languages();
-    langs
-        .iter()
-        .find(|l| l.eq_ignore_ascii_case("french"))
-        .or_else(|| langs.first())
-        .cloned()
-        .unwrap_or_else(|| "french".to_string())
+    src.language(crate::locale::system_language().as_deref())
 }
 
 /// Starts the game from `src`, the saves in `store`: the logos' folder
