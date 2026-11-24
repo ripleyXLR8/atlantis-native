@@ -3883,7 +3883,17 @@ impl Engine for Stage {
             attr_f32(&mut e, "time", *time as f32);
             ps.children.push(e);
         }
-        vec![conf, self.camera_mover_section(), cam, sound, ps]
+        let mut out = vec![conf, self.camera_mover_section(), cam];
+        // `SOUND` made only at the first channel with a playlist's name
+        // (@ 0x0043a4f0: none, LAB_0043a57e without it);
+        // `PERSISTANT_SPRITES` only when the list is not empty
+        // (@ 0x00439f10, its size +0x2c).
+        for section in [sound, ps] {
+            if !section.children.is_empty() {
+                out.push(section);
+            }
+        }
+        out
     }
 
     fn load_sections(&mut self, root: &atlantis4_data::xml::Element) {
@@ -3921,19 +3931,25 @@ impl Engine for Stage {
             self.pitch = f("pitch");
             self.yaw = f("yaw");
         }
-        if let Some(ps) = root.child("PERSISTANT_SPRITES") {
-            self.persistent = ps
-                .children_named("PS")
-                .filter_map(|e| {
-                    let name = atlantis4_data::xml::to_cp1252(e.attr("name")?);
-                    Some((name, get_f64(e, "time").unwrap_or(0.0)))
-                })
-                .collect();
+        // `PERSISTANT_SPRITES` and `SOUND` are written only with content
+        // (@ 0x00439f10, @ 0x0043a4f0): a file without them is read as
+        // with them empty (the readers @ 0x0043a170 and @ 0x0043a880 are
+        // not dumped; Native's choice, as its saves read before).
+        self.persistent = root
+            .child("PERSISTANT_SPRITES")
+            .map(|ps| {
+                ps.children_named("PS")
+                    .filter_map(|e| {
+                        let name = atlantis4_data::xml::to_cp1252(e.attr("name")?);
+                        Some((name, get_f64(e, "time").unwrap_or(0.0)))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        for ch in 0..MUSIC_CHANNELS {
+            self.music_stop(ch, 0.0);
         }
         if let Some(snd) = root.child("SOUND") {
-            for ch in 0..MUSIC_CHANNELS {
-                self.music_stop(ch, 0.0);
-            }
             for p in snd.children_named("PLAYLIST") {
                 #[allow(clippy::cast_possible_truncation)]
                 let ch = get_f64(p, "channel").unwrap_or(-1.0) as i32;

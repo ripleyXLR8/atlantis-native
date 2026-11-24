@@ -461,11 +461,13 @@ fn the_autosave_is_written_and_loaded() {
         "<LUA_DB>",
         "<CAMERA ",
         "<SOUND>",
-        "<PERSISTANT_SPRITES",
         "<CALLBACK_SHOOTER_MANAGER>",
     ] {
         assert!(text.contains(section), "{section}");
     }
+    // No persistent sprite: no `PERSISTANT_SPRITES` (@ 0x00439f10 makes
+    // it only for a list that is not empty).
+    assert!(!text.contains("PERSISTANT_SPRITES"), "no empty section");
     // `CAMERA_MOVER` after `CONFIGURATION` (@ 0x00437f40): the free mode,
     // its speeds, no boat.
     let at = |s: &str| text.find(s).unwrap_or_else(|| panic!("{s}"));
@@ -498,6 +500,15 @@ fn the_autosave_is_written_and_loaded() {
         play.game.script().global(b"native_check"),
         Value::Str(b"yes".to_vec())
     );
+    // No list playing: no `SOUND` (@ 0x0043a4f0 makes it at the first
+    // channel with a list's name).
+    assert!(play
+        .game
+        .run_string("return function() Atl_Music_StopAll(0) Atl_Save() end"));
+    frames(&mut play, 1);
+    let text = std::fs::read_to_string(&file).expect("saves/autoslot written");
+    assert!(text.contains("<CAMERA "));
+    assert!(!text.contains("SOUND"), "no empty section");
     assert!(play.game.timer_names().contains(&b"native_t".to_vec()));
     let _ = std::fs::remove_dir_all(&dir);
 }
