@@ -96,3 +96,27 @@ fn the_scripts_compile_with_lua_50s_loops() {
     eprintln!("{functions} functions, {loop_ops} loop instructions");
     assert!(loop_ops > 0);
 }
+
+/// The North-American CDs' scripts (`ATLANTIS5_CD_US`, read from the
+/// discs' InstallShield set; skipped when unset): the international
+/// DVD's 66 sources, compiled the same way.
+#[test]
+fn the_north_american_cds_scripts_compile_too() {
+    let Some(d) = atlantis3_data::testing::a5_cd_us() else {
+        return;
+    };
+    let us = Atlantis5Source::open(&d).expect("the discs");
+    let names = scripts(&us);
+    assert_eq!(names.len(), 66);
+    let int =
+        atlantis3_data::testing::a5_dvd_int().map(|d| Atlantis5Source::open(&d).expect("the DVD"));
+    for n in &names {
+        let path = format!("datas/scripts/{n}");
+        let source = us.read(&path).expect("the source");
+        assert!(!source.starts_with(b"\x1bLua"), "{n}: source");
+        compile_lua50(&source, &format!("@./src/{n}"), true).unwrap_or_else(|e| panic!("{n}: {e}"));
+        if let Some(int) = &int {
+            assert_eq!(int.read(&path).as_deref(), Some(&source[..]), "{n}");
+        }
+    }
+}

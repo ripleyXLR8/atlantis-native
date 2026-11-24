@@ -21,6 +21,17 @@
 //! `/`) from what the player has: the disc's root (a drive or a copy),
 //! the disc's image, or an installed or extracted folder.
 //!
+//! The North-American edition (*The Secrets of Atlantis*, The Adventure
+//! Company 2007, three CDs, English only) holds the same `datas` tree
+//! (and `datas/videos/Logo_TAC.bik`) in an InstallShield cabinet set:
+//! `data1.hdr` and `data1.cab`, `data2.cab` on the first disc, `data3.cab`
+//! on the second, `data4.cab` on the third, the program in the first
+//! disc's `bin` folder; its installer copies the tree to the install
+//! folder. [`Atlantis5Source`] reads the set in place
+//! ([`atlantis_data::installshield`]): the three discs' folders side by
+//! side (a folder holding them), their files copied into one folder, or
+//! their images.
+//!
 //! The language is the installer's choice: the international DVD's
 //! (NSIS, `LangDLL`) offers English, Spanish, Italian and German and
 //! writes the chosen one's name (`ENGLISH`, ...) as `Language`; the
@@ -34,6 +45,7 @@ use std::sync::Arc;
 
 use atlantis_data::cab::{CabFiles, Cabinet};
 use atlantis_data::disc_image::{DiscImage, DiscSet};
+use atlantis_data::installshield::{InstallShield, IsError, IsFiles, Layered};
 use atlantis_data::{FileSource, StdDir};
 use md5::{Digest, Md5};
 
@@ -44,6 +56,26 @@ pub const EXE_NAME: &str = "The secrets of Atlantis.exe";
 
 /// The shared cabinet; the languages' are `DATAS_<language>.cab`.
 pub const DATA_CAB: &str = "DATAS.cab";
+
+/// The North-American CDs' InstallShield header (first disc's root).
+pub const CD_HEADER: &str = "data1.hdr";
+
+/// The North-American CDs' program, in the first disc's `bin` folder.
+pub const CD_EXE: &str = "bin/The Secrets of Atlantis.exe";
+
+/// The film only the North-American edition has (The Adventure Company's
+/// logo): its data are otherwise the international DVD's English ones.
+pub const CD_LOGO: &str = "datas/videos/Logo_TAC.bik";
+
+/// Which edition the data are.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Edition {
+    /// Nobilis's DVDs of 2006 (French, international).
+    Dvd,
+    /// The Adventure Company's three CDs of 2007 (North America,
+    /// English).
+    NorthAmericanCds,
+}
 
 /// A known build of the program.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,7 +92,7 @@ pub struct Build {
 
 /// The builds this port knows. Detection does not depend on them (the data
 /// decide); they name the edition.
-pub const KNOWN_BUILDS: [Build; 3] = [
+pub const KNOWN_BUILDS: [Build; 4] = [
     // The French DVD's pressed program (TAGES-encrypted).
     Build {
         id: "atlantis5-dvd-fr-3883008",
@@ -96,6 +128,19 @@ pub const KNOWN_BUILDS: [Build; 3] = [
         md5: [
             0x3d, 0x0f, 0x55, 0xd3, 0x3d, 0x27, 0x1f, 0x6f, 0x5b, 0x12, 0x25, 0x0d, 0x83, 0x8a,
             0x2b, 0x83,
+        ],
+    },
+    // The North-American CDs' program (SecuROM-wrapped; the same PE
+    // timestamp as the international DVD's pressed program).
+    Build {
+        id: "atlantis5-cd-us-7368704",
+        label: "The Secrets of Atlantis (2007), North-American CD",
+        size: 7_368_704,
+        // 2006-10-25 12:23:52 UTC.
+        pe_timestamp: 0x453f_5758,
+        md5: [
+            0xad, 0x35, 0x65, 0x40, 0xe6, 0x37, 0x5b, 0xf1, 0x9e, 0x31, 0x37, 0x2c, 0xd5, 0x61,
+            0x93, 0xae,
         ],
     },
 ];
@@ -173,6 +218,11 @@ pub enum OpenError {
     /// A language's place ([`language_place`]) whose data hold the game
     /// but not that language.
     NotThisLanguage(String),
+    /// The North-American CDs' set with volumes missing (another disc's):
+    /// their names (`data3.cab`, ...).
+    MissingDiscs(Vec<String>),
+    /// The CDs' InstallShield header cannot be read.
+    Installer(String),
 }
 
 impl std::fmt::Display for OpenError {
@@ -185,6 +235,12 @@ impl std::fmt::Display for OpenError {
             OpenError::Cabinet(e) => write!(f, "{DATA_CAB}: {e}"),
             OpenError::NoLanguage => write!(f, "no language's data (DATAS_<language>.cab)"),
             OpenError::NotThisLanguage(l) => write!(f, "no {l} data here (DATAS_{l}.cab)"),
+            OpenError::MissingDiscs(v) => write!(
+                f,
+                "the other CDs' files are missing ({}): the three CDs are needed together",
+                v.join(", ")
+            ),
+            OpenError::Installer(e) => write!(f, "{CD_HEADER}: {e}"),
         }
     }
 }
@@ -215,8 +271,13 @@ pub struct Atlantis5Source {
     chosen: Option<String>,
     /// The program beside the data, when there is one.
     exe: Option<Arc<dyn FileSource>>,
+    /// Its name there ([`EXE_NAME`], or [`CD_EXE`] on the CDs).
+    exe_name: &'static str,
     /// The disc's cabinets, when the data are read from them.
     cabs: Option<Arc<CabFiles>>,
+    /// The CDs' InstallShield set, when the data are read from it.
+    cd_set: Option<Arc<IsFiles>>,
+    edition: Edition,
 }
 
 impl Atlantis5Source {
@@ -249,18 +310,38 @@ impl Atlantis5Source {
             let img = DiscImage::open(path).ok_or(OpenError::NotTheGame)?;
             // Another disc's image: not the game (as for a folder), not
             // a cabinet that cannot be read.
-            if img.size(DATA_CAB).is_none() {
-                return Err(OpenError::NotTheGame);
+            if img.size(DATA_CAB).is_some() {
+                return Self::from_disc(Arc::new(img), Form::DiscImage);
             }
-            return Self::from_disc(Arc::new(img), Form::DiscImage);
+            if img.size(CD_HEADER).is_some() {
+                return Self::from_cds(Arc::new(img), Form::DiscImage);
+            }
+            return Err(OpenError::NotTheGame);
         }
-        match Self::from_folder(Arc::new(StdDir::new(path))) {
+        let own = Self::from_folder(Arc::new(StdDir::new(path)));
+        // One of the CDs (a drive, a copy of one disc): the others beside
+        // it (a folder per disc side by side) or copied already
+        // ([`set_cd_copy_dirs`]).
+        if matches!(own, Err(OpenError::NotTheGame | OpenError::MissingDiscs(_)))
+            && holds_cd_volumes(&StdDir::new(path))
+        {
+            if let Some(set) = cd_set_around(path) {
+                match Self::from_cds(set, Form::DiscFolder) {
+                    Err(OpenError::NotTheGame) => {}
+                    r => return r,
+                }
+            }
+        }
+        match own {
             Err(OpenError::NotTheGame) => {}
             r => return r,
         }
         if let Some(set) = DiscSet::open_folder(path) {
             if set.size(DATA_CAB).is_some() {
                 return Self::from_disc(Arc::new(set), Form::DiscImage);
+            }
+            if set.size(CD_HEADER).is_some() {
+                return Self::from_cds(Arc::new(set), Form::DiscImage);
             }
         }
         Err(OpenError::NotTheGame)
@@ -274,17 +355,24 @@ impl Atlantis5Source {
         let path = &place_root(path);
         if path.is_file() {
             let img = DiscImage::open(path)?;
-            return img.size(DATA_CAB).is_some().then(|| Arc::new(img) as _);
+            return (img.size(DATA_CAB).is_some() || holds_cd_volumes(&img))
+                .then(|| Arc::new(img) as _);
         }
-        let dir = StdDir::new(path);
+        let dir: Arc<dyn FileSource> = Arc::new(StdDir::new(path));
         if dir.size(DATA_CAB).is_some() {
-            return Some(Arc::new(dir));
+            return Some(dir);
+        }
+        if let Some(set) = cd_set(&dir) {
+            return Some(set);
+        }
+        if holds_cd_volumes(&*dir) {
+            return Some(dir);
         }
         if dir.has_dir("datas/scenes") || dir.has_dir("scenes") {
             return None;
         }
         let set = DiscSet::open_folder(path)?;
-        set.size(DATA_CAB).is_some().then(|| Arc::new(set) as _)
+        (set.size(DATA_CAB).is_some() || holds_cd_volumes(&set)).then(|| Arc::new(set) as _)
     }
 
     /// The data in folder `dir` (the disc's root or a copy of it, an
@@ -292,6 +380,9 @@ impl Atlantis5Source {
     pub fn from_folder(dir: Arc<dyn FileSource>) -> Result<Atlantis5Source, OpenError> {
         if dir.size(DATA_CAB).is_some() {
             return Self::from_disc(dir, Form::DiscFolder);
+        }
+        if let Some(set) = cd_set(&dir) {
+            return Self::from_cds(set, Form::DiscFolder);
         }
         if dir.has_dir("datas/scenes") && dir.has_dir("datas/warps") {
             return Self::from_tree(dir.clone(), "datas/", Some(dir));
@@ -340,14 +431,53 @@ impl Atlantis5Source {
         Ok(s)
     }
 
+    /// The North-American CDs' InstallShield set in `src` (`data1.hdr`
+    /// and the volumes `data<n>.cab` found there by name, the discs'
+    /// folders read as one), read in place; the program from
+    /// [`CD_EXE`] when `src` has it.
+    pub fn from_cds(src: Arc<dyn FileSource>, form: Form) -> Result<Atlantis5Source, OpenError> {
+        let cab = InstallShield::open(src.clone()).map_err(|e| match e {
+            IsError::NotInstallShield => OpenError::NotTheGame,
+            e => OpenError::Installer(e.to_string()),
+        })?;
+        let cab = Arc::new(cab);
+        let files = Arc::new(IsFiles::new(cab.clone()));
+        let set = files.clone();
+        // Another product's set: not the game.
+        if !files.has_dir("datas/scenes") || !files.has_dir("datas/warps") {
+            return Err(OpenError::NotTheGame);
+        }
+        let missing = cab.missing_volumes();
+        if !missing.is_empty() {
+            return Err(OpenError::MissingDiscs(missing));
+        }
+        let exe = src.size(CD_EXE).is_some().then_some(src);
+        let mut s = Self::new(files, "datas/", form, exe)?;
+        s.exe_name = CD_EXE;
+        s.edition = Edition::NorthAmericanCds;
+        s.cd_set = Some(set);
+        Ok(s)
+    }
+
     /// An unpacked tree: `inner`'s `prefix` holds `scenes/`, `warps/`, ...
     pub fn from_tree(
         inner: Arc<dyn FileSource>,
         prefix: &str,
         exe: Option<Arc<dyn FileSource>>,
     ) -> Result<Atlantis5Source, OpenError> {
-        let exe = exe.filter(|s| s.size(EXE_NAME).is_some());
-        Self::new(inner, prefix, Form::Tree, exe)
+        // The installed program's place: the DVD's (the install folder's
+        // top), else the CDs' `bin` folder.
+        let name = exe
+            .as_ref()
+            .and_then(|s| [EXE_NAME, CD_EXE].into_iter().find(|n| s.size(n).is_some()));
+        let exe = exe.filter(|_| name.is_some());
+        let mut s = Self::new(inner, prefix, Form::Tree, exe)?;
+        s.exe_name = name.unwrap_or(EXE_NAME);
+        // The North-American edition's tree: its own logo film.
+        if s.size(CD_LOGO).is_some() {
+            s.edition = Edition::NorthAmericanCds;
+        }
+        Ok(s)
     }
 
     fn new(
@@ -363,7 +493,10 @@ impl Atlantis5Source {
             languages: Vec::new(),
             chosen: None,
             exe,
+            exe_name: EXE_NAME,
             cabs: None,
+            cd_set: None,
+            edition: Edition::Dvd,
         };
         // The languages: the folders of `texts/menu/` (each language's
         // cabinet brings its `string_resources.xml` there).
@@ -387,6 +520,18 @@ impl Atlantis5Source {
 
     pub fn form(&self) -> Form {
         self.form
+    }
+
+    /// The CDs' InstallShield set the data are read from (its files'
+    /// descriptors: sizes, MD5), when they are.
+    pub fn installshield(&self) -> Option<&Arc<IsFiles>> {
+        self.cd_set.as_ref()
+    }
+
+    /// The edition: the DVDs', or the North-American CDs' (read from
+    /// their InstallShield set, or a tree holding [`CD_LOGO`]).
+    pub fn edition(&self) -> Edition {
+        self.edition
     }
 
     /// The languages present (folder names, lower case: `french`, ...).
@@ -424,7 +569,7 @@ impl Atlantis5Source {
 
     /// The program beside the data, identified; `None` without one.
     pub fn build(&self) -> Option<Result<&'static Build, ExeError>> {
-        let exe = self.exe.as_ref()?.read(EXE_NAME)?;
+        let exe = self.exe.as_ref()?.read(self.exe_name)?;
         Some(identify(&exe))
     }
 
@@ -524,12 +669,130 @@ pub fn language_cabinets(src: &dyn FileSource) -> Vec<String> {
 /// the edition, [`Atlantis5Source::build`]). Copied to a folder, they open
 /// as the disc's files ([`Form::DiscFolder`]).
 pub fn disc_files(src: &dyn FileSource) -> Vec<String> {
+    if src.size(DATA_CAB).is_none() && holds_cd_volumes(src) {
+        return cd_files(src);
+    }
     let mut names = vec![DATA_CAB.to_string()];
     names.extend(language_cabinets(src));
     if src.size(EXE_NAME).is_some() {
         names.push(EXE_NAME.to_string());
     }
     names
+}
+
+/// Whether `name` is an InstallShield set's header or volume name
+/// (`data1.hdr`, `data<n>.cab`, any case).
+fn is_cd_volume_name(name: &str) -> bool {
+    let l = name.to_ascii_lowercase();
+    if l == CD_HEADER {
+        return true;
+    }
+    l.strip_prefix("data")
+        .and_then(|r| r.strip_suffix(".cab"))
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// The North-American CDs' files in `src`'s top folder: `data1.hdr` and
+/// the volumes `data<n>.cab` there (InstallShield's, `ISc(`), and the
+/// program ([`CD_EXE`]) when there, in that order. A disc holds some of
+/// them; the three discs' copies hold all.
+pub fn cd_files(src: &dyn FileSource) -> Vec<String> {
+    let mut vols: Vec<(u32, String)> = src
+        .list("")
+        .into_iter()
+        .filter(|n| is_cd_volume_name(n) && !n.eq_ignore_ascii_case(CD_HEADER))
+        .filter(|n| src.read_at(n, 0, 4).is_some_and(|m| m == b"ISc("))
+        .filter_map(|n| {
+            let k = n[4..n.len() - 4].parse().ok()?;
+            Some((k, n))
+        })
+        .collect();
+    vols.sort();
+    let mut out = Vec::new();
+    if src.size(CD_HEADER).is_some() {
+        out.push(CD_HEADER.to_string());
+    }
+    out.extend(vols.into_iter().map(|v| v.1));
+    if src.size(CD_EXE).is_some() {
+        out.push(CD_EXE.to_string());
+    }
+    out
+}
+
+/// Whether `src`'s top folder holds the CDs' header or one of their
+/// volumes ([`cd_files`]).
+pub fn holds_cd_volumes(src: &dyn FileSource) -> bool {
+    cd_files(src)
+        .iter()
+        .any(|n| !n.eq_ignore_ascii_case(CD_EXE))
+}
+
+/// The North-American CDs in folder `dir`: `data1.hdr` at its top (the
+/// first disc or the three discs' files copied together), or in one of
+/// its folders (a folder per disc side by side: `CD1`, `CD2`, `CD3`);
+/// every folder holding volumes read as one ([`Layered`]). `None`
+/// without the header.
+pub fn cd_set(dir: &Arc<dyn FileSource>) -> Option<Arc<dyn FileSource>> {
+    let mut parts: Vec<(Arc<dyn FileSource>, String)> = Vec::new();
+    if holds_cd_volumes(&**dir) {
+        parts.push((dir.clone(), String::new()));
+    }
+    let mut subs: Vec<String> = dir
+        .list("")
+        .into_iter()
+        .filter(|n| dir.has_dir(n))
+        .collect();
+    subs.sort_by_key(|n| n.to_ascii_lowercase());
+    for sub in subs {
+        let part = Layered::new(vec![(dir.clone(), sub.clone())]);
+        if holds_cd_volumes(&part) {
+            parts.push((dir.clone(), sub));
+        }
+    }
+    let set = Layered::new(parts);
+    set.size(CD_HEADER).is_some().then(|| Arc::new(set) as _)
+}
+
+/// The folders where the CDs' files are copied by the program, looked at
+/// for the discs not in the drive ([`set_cd_copy_dirs`]).
+static CD_COPY_DIRS: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+
+/// Sets the folders where the North-American CDs' files are copied, one
+/// disc after the other: a folder holding one of the discs opens with the
+/// discs already copied there (the copy's next disc in the drive).
+pub fn set_cd_copy_dirs(dirs: Vec<PathBuf>) {
+    *CD_COPY_DIRS.lock().unwrap() = dirs;
+}
+
+/// The CDs around folder `path`, which holds some of their files: the
+/// folder itself, the folders beside it that hold the other discs' (a
+/// folder per disc side by side), and the copies ([`set_cd_copy_dirs`]).
+fn cd_set_around(path: &Path) -> Option<Arc<dyn FileSource>> {
+    let mut parts: Vec<(Arc<dyn FileSource>, String)> =
+        vec![(Arc::new(StdDir::new(path)), String::new())];
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        let mut siblings: Vec<PathBuf> = std::fs::read_dir(parent)
+            .map(|r| {
+                r.flatten()
+                    .map(|e| e.path())
+                    .filter(|p| p.is_dir())
+                    .collect()
+            })
+            .unwrap_or_default();
+        siblings.sort();
+        for s in siblings {
+            if s != path && holds_cd_volumes(&StdDir::new(&s)) {
+                parts.push((Arc::new(StdDir::new(s)), String::new()));
+            }
+        }
+    }
+    for d in CD_COPY_DIRS.lock().unwrap().iter() {
+        if d != path && holds_cd_volumes(&StdDir::new(d)) {
+            parts.push((Arc::new(StdDir::new(d)), String::new()));
+        }
+    }
+    let set = Layered::new(parts);
+    set.size(CD_HEADER).is_some().then(|| Arc::new(set) as _)
 }
 
 /// The installer's languages (the international DVD's `LangDLL` list,

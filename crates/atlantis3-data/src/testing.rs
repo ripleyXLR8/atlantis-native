@@ -135,6 +135,24 @@ pub fn a5_dvd_int() -> Option<PathBuf> {
     }
 }
 
+/// The variable naming the North-American CDs' folder: a copy of each
+/// disc's files in `CD1`, `CD2` and `CD3`.
+pub const A5_CD_US_VAR: &str = "ATLANTIS5_CD_US";
+
+/// The North-American CDs' folder from `ATLANTIS5_CD_US`; as
+/// [`a5_dvd_fr`], its absence never fails a test.
+pub fn a5_cd_us() -> Option<PathBuf> {
+    match std::env::var_os(A5_CD_US_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(std::io::stderr(), "SKIPPED {test}: {A5_CD_US_VAR} not set");
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

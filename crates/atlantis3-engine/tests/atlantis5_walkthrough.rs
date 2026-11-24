@@ -2037,6 +2037,45 @@ fn whole_game_international_english() {
     play_whole_game(w);
 }
 
+/// The whole game on the North-American CDs (`ATLANTIS5_CD_US`: a folder
+/// holding a copy of each disc's files in `CD1`, `CD2` and `CD3`, read
+/// in place from their InstallShield set; skipped when unset): the
+/// international DVD's English data, the same walk. Every file is first
+/// checked against the MD5 of its descriptor: a damaged copy of a disc
+/// is named as such rather than failing at the first sprite it breaks.
+#[test]
+fn whole_game_north_american_cds() {
+    use md5::{Digest, Md5};
+    let Some(d) = atlantis3_data::testing::a5_cd_us() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d).expect("the three discs");
+    let set = src.installshield().expect("the discs' set").clone();
+    let cab = set.cabinet();
+    let damaged: Vec<String> = cab
+        .installed_files()
+        .into_iter()
+        .filter(|&i| {
+            cab.read_file(i)
+                .is_none_or(|data| <[u8; 16]>::from(Md5::digest(&data)) != cab.files()[i].md5)
+        })
+        .map(|i| cab.files()[i].path())
+        .collect();
+    assert!(
+        damaged.is_empty(),
+        "{} files of the discs do not match their MD5 (a damaged copy of a disc: copy it again):\n{}",
+        damaged.len(),
+        damaged.join("\n")
+    );
+    let lang = src.language(None);
+    assert_eq!(lang, "english");
+    let src: Arc<dyn FileSource> = Arc::new(src);
+    let mut w = Walker::with_source(src, &lang);
+    w.play.new_game();
+    w.settle();
+    play_whole_game(w);
+}
+
 /// The nine chapters from a new game's first view, then the credits.
 fn play_whole_game(mut w: Walker) {
     for (i, body) in CHAPTERS.iter().enumerate() {
