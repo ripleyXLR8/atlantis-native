@@ -404,3 +404,38 @@ fn a_move_during_the_showdown_s_dialog_waits_for_the_next_move() {
     frames(&mut play, 1);
     assert_ne!(play.poker().map(|p| p.state), Some(0xd));
 }
+
+/// A move goes through the panel's buttons from the last made
+/// (@ 0x00452140 puts each new child at the head) and stops at the one it
+/// turns hot (@ 0x004523e0, @ 0x0044eb60): from `follow_bet` onto
+/// `stop_bet`, made after it, both stay hot until the next move, and a
+/// press would go to `stop_bet`, the first in that order.
+#[test]
+fn a_move_onto_a_later_button_leaves_the_earlier_one_hot() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_poker(&d);
+    for _ in 0..30_000 {
+        frames(&mut play, 1);
+        if !play.game.busy() && play.poker().is_some_and(|p| p.state == 3) {
+            break;
+        }
+    }
+    assert_eq!(play.poker().map(|p| p.state), Some(3));
+    let at = |play: &Play, n: &str| {
+        let st = play.stage();
+        play.poker().unwrap().point_of(n, &st.fonts).expect(n)
+    };
+    let (ix, iy) = at(&play, "follow_bet");
+    let (fx, fy) = at(&play, "stop_bet");
+    play.mouse_at(ix + 1, iy);
+    play.update(0.0);
+    play.mouse_at(ix, iy);
+    play.update(0.0);
+    assert_eq!(play.poker().unwrap().hot(), ["follow_bet"]);
+    play.mouse_at(fx, fy);
+    play.update(0.0);
+    assert_eq!(play.poker().unwrap().hot(), ["follow_bet", "stop_bet"]);
+    play.mouse_at(fx + 1, fy);
+    play.update(0.0);
+    assert_eq!(play.poker().unwrap().hot(), ["stop_bet"]);
+}

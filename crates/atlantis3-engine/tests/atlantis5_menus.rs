@@ -1101,3 +1101,50 @@ fn the_in_game_menu_is_composed_on_change_only() {
     assert_eq!(cache.composed() - start, 5);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A move goes through the elements from the last made (@ 0x00452140
+/// puts each new child at the list's head) and stops at the button it
+/// turns hot (@ 0x004523e0: a child that returns 1 takes the event;
+/// @ 0x0044eb60 returns 1 when +0x8c goes 0 → 1). In the in-game menu
+/// `option_graphic` is made after `save`, so a jump from `save` onto it
+/// leaves `save` hot too until the next move; a press clicks
+/// `option_graphic`, the first in that order.
+#[test]
+fn a_move_onto_a_later_button_leaves_the_earlier_one_hot() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("hover-walk");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    let at = |play: &Play, name: &str| {
+        let st = play.stage();
+        play.menus.point_of(name, &st.fonts).expect(name)
+    };
+    let (sx, sy) = at(&play, "save");
+    let (gx, gy) = at(&play, "option_graphic");
+    play.mouse_at(sx, sy);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["save"]);
+    play.mouse_at(gx, gy);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["save", "option_graphic"]);
+    // Still both while the mouse stays.
+    frames(&mut play, 3);
+    assert_eq!(play.menus.hot(), ["save", "option_graphic"]);
+    // The next move reaches `save` (nothing turns hot before it).
+    play.mouse_at(gx + 1, gy);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["option_graphic"]);
+    // Back onto `save`: `option_graphic` comes first and turns cold.
+    play.mouse_at(sx, sy);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["save"]);
+    play.mouse_at(gx, gy);
+    frames(&mut play, 1);
+    play.click();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::GRAPHIC));
+    let _ = std::fs::remove_dir_all(&dir);
+}

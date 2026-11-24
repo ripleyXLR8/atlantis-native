@@ -643,13 +643,15 @@ impl Menus {
         let f = "AtlFont_Default";
         let b =
             |name, key: &str| Element::button(name, f, self.string(key), 0x118, 0, 500).align(1);
+        // In the ctor's order (`evidence/m2/menu-in-game-ctor.trace`):
+        // `resume` after `exit`.
         let elements = vec![
-            Element::button("resume", f, self.string("back_to_game"), 0x118, 0x1c2, 500).align(2),
             b("save", "save_game"),
             b("option_graphic", "graphic_options"),
             b("option_sound", "sound_options"),
             b("option_control", "control_options"),
             b("exit", "quit_game"),
+            Element::button("resume", f, self.string("back_to_game"), 0x118, 0x1c2, 500).align(2),
             Element::text(
                 "confirm_exit_title",
                 f,
@@ -1465,6 +1467,24 @@ impl Menus {
             .collect()
     }
 
+    /// The buttons hot (tests): text buttons at 1 (+0x8c), sprite buttons
+    /// at 1 or 2 (+0x98), in the elements' order.
+    #[doc(hidden)]
+    pub fn hot(&self) -> Vec<&'static str> {
+        let Some(m) = &self.menu else {
+            return Vec::new();
+        };
+        m.elements
+            .iter()
+            .filter(|e| match &e.kind {
+                Kind::Text(t) => t.over,
+                Kind::Button(b) => b.state != 0,
+                Kind::Sprite(_) => false,
+            })
+            .map(|e| e.name)
+            .collect()
+    }
+
     /// The middle of element `name`'s box (tests and tools), if shown.
     pub fn point_of(&self, name: &str, fonts: &Fonts) -> Option<(i32, i32)> {
         let m = self.menu.as_ref()?;
@@ -1738,21 +1758,53 @@ impl Menu {
         }
     }
 
-    /// The mouse's moves (event kind 0, +0xc 2): a text button under the
-    /// mouse is 1, else 0; a sprite button at 0 under the mouse turns 1
-    /// (its focus loop from frame 0), at 1 away from it 0.
+    /// The order an event goes through the elements (@ 0x004523e0): the
+    /// background's children from the list's head, each new child put at
+    /// the head (@ 0x00452140 with index 0), so the last made first; an
+    /// element's own children before it (its process calls @ 0x004523e0
+    /// first); a hidden element and its children skipped (@ 0x004520f0).
+    /// The elements are kept in the ctors' order.
+    fn walk(&self) -> Vec<usize> {
+        fn under(m: &Menu, parent: Option<usize>, out: &mut Vec<usize>) {
+            for i in (0..m.elements.len()).rev() {
+                let e = &m.elements[i];
+                if e.parent != parent || !e.visible {
+                    continue;
+                }
+                under(m, Some(i), out);
+                out.push(i);
+            }
+        }
+        let mut out = Vec::new();
+        under(self, None, &mut out);
+        out
+    }
+
+    /// The mouse's moves (event kind 0, +0xc 2), through the elements in
+    /// the walk's order: a text button out of 0 under the mouse turns 1,
+    /// at 1 away from it 0 (@ 0x0044eb60); a sprite button at 0 under the
+    /// mouse turns 1 (its focus loop from frame 0), at 1 away from it 0
+    /// (@ 0x0044f0e0). A button that turns 1 returns 1 and the walk stops
+    /// there (@ 0x004523e0): the elements after it do not see the move,
+    /// so one hot before stays hot until the next move.
     fn hover(&mut self, mouse: (i32, i32)) {
-        let inside: Vec<bool> = (0..self.elements.len())
-            .map(|i| self.visible(i) && self.inside_cached(i, mouse))
-            .collect();
-        for (i, inside) in inside.into_iter().enumerate() {
-            let e = &mut self.elements[i];
-            match &mut e.kind {
-                Kind::Text(t) if t.hover.is_some() => t.over = e.visible && inside,
+        for i in self.walk() {
+            let inside = self.inside_cached(i, mouse);
+            match &mut self.elements[i].kind {
+                Kind::Text(t) if t.hover.is_some() => {
+                    if !t.over && inside {
+                        t.over = true;
+                        return;
+                    }
+                    if t.over && !inside {
+                        t.over = false;
+                    }
+                }
                 Kind::Button(b) => match b.state {
-                    0 if e.visible && inside => {
+                    0 if inside => {
                         b.state = 1;
                         b.time = 0.0;
+                        return;
                     }
                     1 if !inside => b.state = 0,
                     _ => {}
@@ -1786,14 +1838,13 @@ impl Menu {
         }
     }
 
-    /// A press of the left button: a text button at 1 is clicked; a
+    /// A press of the left button, through the elements in the walk's
+    /// order, the first that takes it: a text button at 1 is clicked; a
     /// sprite button at 1 turns 2 (its click played once from frame 0);
     /// a sprite button at 2 takes it too (@ 0x0044f0e0).
     fn press(&mut self) -> Press {
-        for e in &mut self.elements {
-            if !e.visible {
-                continue;
-            }
+        for i in self.walk() {
+            let e = &mut self.elements[i];
             match &mut e.kind {
                 Kind::Text(t) if t.over => return Press::Clicked(e.name),
                 Kind::Button(b) if b.state == 1 => {

@@ -422,6 +422,22 @@ impl Poker {
         })
     }
 
+    /// The text buttons at 1 (+0x8c), tests: in `increase_bet`,
+    /// `follow_bet`, `stop_bet`, `next_game` order.
+    #[doc(hidden)]
+    pub fn hot(&self) -> Vec<&'static str> {
+        [
+            (INCREASE, "increase_bet"),
+            (FOLLOW, "follow_bet"),
+            (STOP, "stop_bet"),
+            (NEXT_GAME, "next_game"),
+        ]
+        .into_iter()
+        .filter(|&(i, _)| matches!(self.els[i].kind, Kind::Text { over: true, .. }))
+        .map(|(_, n)| n)
+        .collect()
+    }
+
     /// A text element's text (tests).
     pub fn text_of(&self, name: &str) -> Option<String> {
         self.index(name).map(|i| self.text(i).1)
@@ -627,9 +643,12 @@ impl Poker {
         }
         self.last_mouse = Some(mouse);
         for _ in 0..clicks {
-            let hit = [INCREASE, FOLLOW, STOP, NEXT_GAME].into_iter().find(|&i| {
-                self.els[i].visible && matches!(self.els[i].kind, Kind::Text { over: true, .. })
-            });
+            // The press goes through the elements in the walk's order; the
+            // first text button at 1 takes it (@ 0x0044eb60).
+            let hit = self
+                .walk()
+                .into_iter()
+                .find(|&i| matches!(self.els[i].kind, Kind::Text { over: true, .. }));
             if let Some(i) = hit {
                 self.clicked(host, i);
             }
@@ -645,24 +664,48 @@ impl Poker {
     /// The text buttons' +0x8c (@ 0x0044eb60): 1 with the mouse in the
     /// box (both ends included, @ 0x00452020), else 0; a hidden button
     /// takes no event (@ 0x004523e0).
+    ///
+    /// The move goes through the shown elements in the walk's order and
+    /// stops at a button that turns 1 (it returns 1, @ 0x004523e0): the
+    /// buttons after it keep their state until the next move.
     fn hover(&mut self, (mx, my): (i32, i32), measure: &dyn Fn(&str, &str, i32, bool) -> i32) {
-        for i in [INCREASE, FOLLOW, STOP, NEXT_GAME] {
-            let shown = self.visible_path(i);
+        for i in self.walk() {
+            if !matches!(self.els[i].kind, Kind::Text { hover: Some(_), .. }) {
+                continue;
+            }
             let (x, y) = self.abs(i);
             let (font, text, w) = self.text(i);
             let h = measure(font, &text, w, true);
             let inside = (x..=x + w).contains(&mx) && (y..=y + h).contains(&my);
             if let Kind::Text { over, .. } = &mut self.els[i].kind {
-                if shown {
-                    *over = inside;
+                if !*over && inside {
+                    *over = true;
+                    return;
+                }
+                if *over && !inside {
+                    *over = false;
                 }
             }
         }
     }
 
-    fn visible_path(&self, i: usize) -> bool {
-        let e = &self.els[i];
-        e.visible && e.parent.is_none_or(|p| p == ROOT || self.visible_path(p))
+    /// The order an event goes through the elements (@ 0x004523e0): each
+    /// element's children from its list's head, a new child put at the
+    /// head (@ 0x00452140 with index 0), so the last made first, each
+    /// one's own children before it; a hidden one and its children
+    /// skipped (@ 0x004520f0). From the root's children.
+    fn walk(&self) -> Vec<usize> {
+        fn under(p: &Poker, i: usize, out: &mut Vec<usize>) {
+            for &c in p.els[i].children.iter().rev() {
+                if p.els[c].visible {
+                    under(p, c, out);
+                    out.push(c);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        under(self, ROOT, &mut out);
+        out
     }
 
     /// The buttons' handler (@ 0x004258b0, the clicked element's name).
