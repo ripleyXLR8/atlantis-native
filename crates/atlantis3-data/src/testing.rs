@@ -114,6 +114,27 @@ pub fn a5_dvd_fr() -> Option<PathBuf> {
     }
 }
 
+/// The variable naming the international DVD's folder: a copy of the
+/// pressed disc's files (`datas.cab`, `datas_english.cab`, ...).
+pub const A5_DVD_INT_VAR: &str = "ATLANTIS5_DVD_INT";
+
+/// The international DVD's folder from `ATLANTIS5_DVD_INT`; as
+/// [`a5_dvd_fr`], its absence never fails a test.
+pub fn a5_dvd_int() -> Option<PathBuf> {
+    match std::env::var_os(A5_DVD_INT_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(
+                std::io::stderr(),
+                "SKIPPED {test}: {A5_DVD_INT_VAR} not set"
+            );
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
