@@ -712,3 +712,39 @@ fn a_film_shows_its_first_and_last_decoded_frames() {
     assert!(!play.stage().film_playing());
     assert_eq!(last, Some(frames_n - 1), "drawn once at the end");
 }
+
+/// A playlist whose track is a RIFF WAVE file (PCM 16-bit stereo,
+/// 22050 Hz: `zep_engine.wav`, the only track of
+/// `zeppelin_working_engine_room`) plays as an Ogg one: the original opens
+/// every track with FMOD's `FSOUND_Stream_Open` (@ 0x0045acf0), which
+/// reads WAVE.
+#[test]
+fn a_wave_playlist_plays() {
+    use atlantis3_engine::audio::{Audio, CHANNEL_MUSIC_2004};
+    let Some(d) = dvd() else { return };
+    let src: Arc<dyn atlantis_data::FileSource> =
+        Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
+    let audio = Audio::new();
+    let mut play = Play::new(src, "french", Some(audio.clone())).expect("play");
+    play.new_game();
+    frames(&mut play, 3);
+    play.skip();
+    frames(&mut play, 3);
+    assert_eq!(play.game.state(), 4, "play");
+    assert!(play.game.run_string(
+        "return function() Atl_Music_StopAll(0) \
+         Atl_Music_Play(\"zeppelin_working_engine_room\", 3) end"
+    ));
+    // Past its 3 s fade-in.
+    frames(&mut play, 120);
+    let music: Vec<String> = play.stage().music().into_iter().map(|m| m.0).collect();
+    assert_eq!(music, ["zeppelin_working_engine_room"]);
+    assert!(audio.is_playing(CHANNEL_MUSIC_2004 + 3));
+    for (ch, other) in (0..5).map(|c| (c, CHANNEL_MUSIC_2004 + c)) {
+        assert_eq!(audio.is_playing(other), ch == 3, "channel {ch}");
+    }
+    let mut out = vec![0f32; 44100];
+    audio.fill(&mut out, 44100, 2);
+    let peak = out.iter().fold(0f32, |m, v| m.max(v.abs()));
+    assert!(peak > 0.01, "{peak}");
+}

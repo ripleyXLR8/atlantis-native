@@ -458,24 +458,110 @@ struct MusicChannel {
     queued: Vec<u8>,
 }
 
-/// A music stream: an Ogg file decoded ahead into an audio channel.
+/// A music stream: a track's file decoded ahead into an audio channel.
 struct MusicStream {
-    dec: VorbisStream,
+    dec: TrackDecoder,
     data: Vec<u8>,
     pushed: u64,
     done: bool,
+}
+
+/// A track's decoder. The original opens every track with FMOD's
+/// `FSOUND_Stream_Open(path, 0x22002, 0, 0)` (@ 0x0045acf0), which reads
+/// the file's own format with no test of its name: Ogg Vorbis, or RIFF
+/// WAVE PCM (11 of the French DVD's `Music` files, the only track of 15
+/// lists).
+enum TrackDecoder {
+    Vorbis(Box<VorbisStream>),
+    Pcm(PcmStream),
+}
+
+impl TrackDecoder {
+    fn open(data: &[u8]) -> Option<TrackDecoder> {
+        if data.starts_with(b"RIFF") {
+            return PcmStream::new(data).map(TrackDecoder::Pcm);
+        }
+        VorbisStream::new(data.to_vec())
+            .ok()
+            .map(|d| TrackDecoder::Vorbis(Box::new(d)))
+    }
+
+    fn rate(&self) -> u32 {
+        match self {
+            TrackDecoder::Vorbis(d) => d.rate(),
+            TrackDecoder::Pcm(d) => d.rate,
+        }
+    }
+
+    fn channels(&self) -> u16 {
+        match self {
+            #[allow(clippy::cast_possible_truncation)]
+            TrackDecoder::Vorbis(d) => d.channels() as u16,
+            TrackDecoder::Pcm(d) => d.channels,
+        }
+    }
+}
+
+impl MusicDecoder for TrackDecoder {
+    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize {
+        match self {
+            TrackDecoder::Vorbis(d) => d.read(out, max_frames),
+            TrackDecoder::Pcm(d) => d.read_frames(out, max_frames),
+        }
+    }
+}
+
+/// A RIFF WAVE file's PCM samples (8-bit unsigned or 16-bit signed),
+/// read frame by frame.
+struct PcmStream {
+    samples: std::sync::Arc<[u8]>,
+    pos: usize,
+    channels: u16,
+    rate: u32,
+    bytes: usize,
+}
+
+impl PcmStream {
+    fn new(data: &[u8]) -> Option<PcmStream> {
+        let i = atlantis4_data::audio::wav_info(data).ok()?;
+        if i.format != 1 || !(i.bits == 8 || i.bits == 16) || i.channels == 0 {
+            return None;
+        }
+        let bytes = usize::from(i.bits / 8);
+        let frame = bytes * usize::from(i.channels);
+        let len = i.data_len - i.data_len % frame;
+        Some(PcmStream {
+            samples: data[i.data_offset..i.data_offset + len].into(),
+            pos: 0,
+            channels: i.channels,
+            rate: i.sample_rate,
+            bytes,
+        })
+    }
+
+    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize {
+        let frame = self.bytes * usize::from(self.channels);
+        let n = ((self.samples.len() - self.pos) / frame).min(max_frames);
+        let part = &self.samples[self.pos..self.pos + n * frame];
+        if self.bytes == 2 {
+            out.extend(
+                part.as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|&b| i16::from_le_bytes(b)),
+            );
+        } else {
+            out.extend(part.iter().map(|&b| (i16::from(b) - 128) << 8));
+        }
+        self.pos += n * frame;
+        n
+    }
 }
 
 /// A source of a music stream's frames (interleaved, as `ov_read`).
 trait MusicDecoder {
     /// Up to `max_frames` frames appended to `out`; 0 at the end.
     fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize;
-}
-
-impl MusicDecoder for VorbisStream {
-    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize {
-        self.read(out, max_frames)
-    }
 }
 
 /// A music stream fed until `until` frames are pushed: at the file's end
@@ -1239,15 +1325,15 @@ impl Stage {
             log::warn!("{file}: not found");
             return;
         };
-        let Ok(dec) = VorbisStream::new(data.clone()) else {
-            log::warn!("{file}: not Ogg Vorbis");
+        let Some(dec) = TrackDecoder::open(&data) else {
+            log::warn!("{file}: neither Ogg Vorbis nor PCM WAVE");
             return;
         };
         if let Some(audio) = &self.audio {
             audio.start_stream(
                 CHANNEL_MUSIC_2004 + ch,
                 dec.rate(),
-                dec.channels() as u16,
+                dec.channels(),
                 if self.music_muted {
                     0.0
                 } else {
@@ -1363,7 +1449,7 @@ impl Stage {
                     &mut s.done,
                     &mut c.plays_left,
                     played + 44_100,
-                    || VorbisStream::new(data.clone()).ok(),
+                    || TrackDecoder::open(data),
                     |buf| audio.push(CHANNEL_MUSIC_2004 + ch, buf),
                 );
                 // @ 0x0045a640: each channel at master × its volume ×
