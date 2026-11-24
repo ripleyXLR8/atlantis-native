@@ -594,8 +594,11 @@ impl Game {
 
     /// A timer's end as @ 0x00405ae0 handles it: the `timer` event and
     /// the scene's `on_click` (the timers call it when their time is up).
+    /// No state test (the step @ 0x004353d0 and @ 0x00405ae0 have none):
+    /// a handler that opened a menu (`Atl_ExamineItem`, state 3) leaves
+    /// the timers due after it in the walk to run their handlers.
     pub fn timer_event(&mut self, name: &[u8]) -> bool {
-        if self.busy() || self.state != 4 {
+        if self.busy() {
             return false;
         }
         self.script.set_timer_event(name);

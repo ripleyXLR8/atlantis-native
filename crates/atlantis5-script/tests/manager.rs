@@ -238,6 +238,31 @@ fn timers_repeat_and_end() {
 }
 
 #[test]
+fn a_due_timer_runs_after_a_handler_opened_a_menu() {
+    // @ 0x004353d0 → 0x00405ae0: the `timer` event and the scene's
+    // script with no state test, so a handler's Atl_ExamineItem (the
+    // manager in state 3) does not stop the timers due after it in the walk.
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then local n = atl.event.timer.name \
+           if n == \"a\" then A = (A or 0) + 1 Atl_ExamineItem(\"x\") \
+           elseif n == \"b\" then B = (B or 0) + 1 end \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"a\", 1) Atl_Timer_Create(\"b\", 1, 1) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"make"));
+    g.update(1.0);
+    assert_eq!(g.script().global(b"A"), Value::Num(1.0));
+    assert_eq!(g.state(), 3);
+    assert_eq!(g.script().global(b"B"), Value::Num(1.0));
+    assert_eq!(g.timer_names(), [b"a".to_vec()]);
+}
+
+#[test]
 fn a_repeating_timer_keeps_its_overshoot() {
     let (mut g, probe) = game(BASE);
     g.new_game();
