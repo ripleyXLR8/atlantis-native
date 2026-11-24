@@ -378,6 +378,9 @@ pub struct Menus {
     /// synthetic move at the centre when a mode opens (@ 0x0041b780), then
     /// the player's moves.
     last_mouse: (i32, i32),
+    /// A move event this frame with the mouse where it was (a wheel turn,
+    /// lZ, @ 0x0047c8a0): the hover is tested all the same.
+    moved: bool,
     clicks: usize,
     /// The saves (a folder, the browser's storage).
     pub saves: Option<std::rc::Rc<dyn crate::atlantis5_saves::SaveFiles>>,
@@ -456,6 +459,7 @@ impl Menus {
             examine_item: Vec::new(),
             mouse: (W / 2, H / 2),
             last_mouse: (W / 2, H / 2),
+            moved: false,
             clicks: 0,
             saves: None,
             utc_offset: no_offset,
@@ -525,6 +529,12 @@ impl Menus {
     /// A press of the left button, taken at the next step.
     pub fn click(&mut self) {
         self.clicks += 1;
+    }
+
+    /// A mouse move event with the mouse where it was (a wheel turn),
+    /// taken at the next step: the hover is tested.
+    pub fn move_event(&mut self) {
+        self.moved = true;
     }
 
     /// The effects the last steps asked for.
@@ -999,6 +1009,7 @@ impl Menus {
     /// 1: the game manager takes its next request), if any.
     pub fn step(&mut self, dt: f64, fonts: &Fonts, config: &mut Config) -> Option<u32> {
         let mut opened = false;
+        let moved = std::mem::take(&mut self.moved);
         if self.menu.is_none() {
             let mode = self.queue.pop_front()?;
             match self.build(mode, config) {
@@ -1054,7 +1065,7 @@ impl Menus {
         // @ 0x0044f0e0 likewise): the opening frame's synthetic move, then
         // the player's moves. A button shown later is not hot until a move
         // (`Menu::set_visible`).
-        if opened || mouse != self.last_mouse {
+        if opened || mouse != self.last_mouse || moved {
             menu.hover(mouse);
             self.last_mouse = mouse;
         }

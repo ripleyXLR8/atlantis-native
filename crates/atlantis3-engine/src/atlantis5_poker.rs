@@ -618,11 +618,14 @@ impl Poker {
     /// the base handler @ 0x004523e0 hit-tests on a move event only), the
     /// clicks (@ 0x0040d920 → the buttons' handler), then the process
     /// (@ 0x004240b0). True when the board ends (its process returned 1).
+    /// `wheel`: the frame has a move event made by the wheel alone (lZ,
+    /// @ 0x0047c8a0), the hover tested with the mouse where it was.
     pub fn frame(
         &mut self,
         host: &mut dyn Host,
         mouse: (i32, i32),
         clicks: usize,
+        wheel: bool,
         measure: &dyn Fn(&str, &str, i32, bool) -> i32,
     ) -> bool {
         let moved = self.seen != Some(mouse);
@@ -638,7 +641,7 @@ impl Poker {
         // The hover on a move event of this frame only: not for the moves
         // made while a run held the process (the showdown's dialogs, after
         // state 0xc's put-back), nor for a put-back's place.
-        if moved && self.last_mouse.is_some_and(|m| m != mouse) {
+        if (moved && self.last_mouse.is_some_and(|m| m != mouse)) || wheel {
             self.hover(mouse, measure);
         }
         self.last_mouse = Some(mouse);

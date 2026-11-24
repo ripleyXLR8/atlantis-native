@@ -1238,3 +1238,27 @@ fn a_right_press_with_the_left_held_takes_a_page_button() {
     assert!(play.stage().inventory_open_now(), "taken by the button");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A wheel turn is a mouse move event (@ 0x0047c8a0: lZ not 0): the hover
+/// is tested with the mouse where it is. At the save page's first opening
+/// slot 4 is not hot at the centre (one-row boxes); after the opening
+/// frame's draw a wheel turn alone makes it hot.
+#[test]
+fn a_wheel_turn_tests_the_hover() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("wheel-hover");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 2);
+    assert!(play.click_menu("save"));
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    assert!(play.menus.hot().is_empty());
+    frames(&mut play, 3);
+    assert!(play.menus.hot().is_empty(), "no move, no test");
+    play.wheel();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["save_4"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}

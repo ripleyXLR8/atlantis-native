@@ -944,6 +944,29 @@ fn a_panorama_with_other_faces_is_refused() {
     assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
 }
 
+/// A wheel turn is a mouse move event (@ 0x0047c8a0 calls the move
+/// handler when lX, lY or lZ is not 0): in play @ 0x0042cdc0 zeroes the
+/// damping clock with the speeds unchanged, so the view glides on
+/// undamped while the wheel turns.
+#[test]
+fn a_wheel_turn_holds_the_view_s_glide() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    play.look(40.0, 0.0);
+    frames(&mut play, 1);
+    let s = play.stage().camera_speed();
+    assert!(s[0] != 0.0, "turning");
+    // dt · 20 = 2/3 a frame: the clock never passes 1 while it is zeroed
+    // every frame.
+    for _ in 0..5 {
+        play.wheel();
+        frames(&mut play, 1);
+        assert_eq!(play.stage().camera_speed(), s);
+    }
+    frames(&mut play, 1);
+    assert_ne!(play.stage().camera_speed(), s, "damped without the wheel");
+}
+
 /// A press of the third or fourth button is a press event whose buttons
 /// are the left and right buttons' state (@ 0x0047c8a0, @ 0x0043bbc0):
 /// with the right button held it is a right press (`== 4`) and opens the

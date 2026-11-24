@@ -661,6 +661,12 @@ impl ApplicationHandler for A5App {
                     play.other_press();
                 }
             }
+            // A wheel turn: a mouse move event with no move (lZ).
+            WindowEvent::MouseWheel { delta, .. } if wheel_turned(delta) => {
+                if let Some(play) = self.play.as_mut() {
+                    play.wheel();
+                }
+            }
             WindowEvent::KeyboardInput { event, .. }
                 if event.state == ElementState::Pressed && !event.repeat =>
             {
@@ -680,6 +686,14 @@ impl ApplicationHandler for A5App {
             }
             _ => {}
         }
+    }
+}
+
+/// Whether a wheel event turned the wheel (DirectInput's lZ not 0).
+fn wheel_turned(delta: winit::event::MouseScrollDelta) -> bool {
+    match delta {
+        winit::event::MouseScrollDelta::LineDelta(_, y) => y != 0.0,
+        winit::event::MouseScrollDelta::PixelDelta(p) => p.y != 0.0,
     }
 }
 

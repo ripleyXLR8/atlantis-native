@@ -309,6 +309,14 @@ impl PointerHold {
     }
 }
 
+/// Whether a wheel event turned the wheel (DirectInput's lZ not 0).
+fn wheel_turned(delta: winit::event::MouseScrollDelta) -> bool {
+    match delta {
+        winit::event::MouseScrollDelta::LineDelta(_, y) => y != 0.0,
+        winit::event::MouseScrollDelta::PixelDelta(p) => p.y != 0.0,
+    }
+}
+
 struct A5App {
     play: Option<Play>,
     start: Option<Start>,
@@ -710,6 +718,10 @@ impl ApplicationHandler for A5App {
                 button: MouseButton::Middle | MouseButton::Back,
                 ..
             } => play.other_press(),
+            // A wheel turn (lZ): a mouse move event with no move.
+            WindowEvent::MouseWheel { delta, .. } if self.focused && wheel_turned(delta) => {
+                play.wheel();
+            }
             WindowEvent::RedrawRequested => self.frame(el),
             _ => {}
         }

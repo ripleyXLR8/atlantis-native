@@ -1040,6 +1040,12 @@ impl Stage {
             .collect()
     }
 
+    /// The camera's yaw and pitch speeds (+0x14, +0x18; tests).
+    #[doc(hidden)]
+    pub fn camera_speed(&self) -> [f32; 2] {
+        self.speed
+    }
+
     /// The seconds played by `object`'s sprite (tests).
     #[doc(hidden)]
     pub fn sprite_time(&self, object: &[u8]) -> Option<f64> {
@@ -3140,13 +3146,14 @@ impl Stage {
     /// The page buttons on a move of the mouse (@ 0x0044f0e0, an event of
     /// kind 2; the mode's opening move at the centre first): at 0 under
     /// the mouse 1 (the focus from frame 0), at 1 away from it 0.
-    pub fn inventory_buttons_hover(&mut self) {
+    pub fn inventory_buttons_hover(&mut self, wheel: bool) {
         let hit = self.inventory_hit();
         let mouse = self.mouse;
         let Some(inv) = &mut self.inventory else {
             return;
         };
-        if inv.last_mouse == Some(mouse) {
+        // A move event (the mouse moved, or the wheel turned: lZ).
+        if inv.last_mouse == Some(mouse) && !wheel {
             return;
         }
         inv.last_mouse = Some(mouse);
@@ -4204,6 +4211,13 @@ pub struct Play {
     /// ([`Play::set_buttons`]).
     left_held: bool,
     right_held: bool,
+    /// A turn of the wheel since the last frame: the original's move
+    /// handler runs when lX, lY or lZ is not 0 (@ 0x0047c8a0), so a wheel
+    /// turn with a still mouse is a mouse move event (kind 2, lX = lY = 0).
+    wheel: bool,
+    /// This frame has a mouse move event made by the wheel alone (the
+    /// hover tests run on it although the mouse did not move).
+    wheel_now: bool,
     /// The inventory opened by a right press since the last frame: the
     /// next frame is its mode's opening (@ 0x0041b780), whose events are
     /// dropped.
@@ -4304,6 +4318,8 @@ impl Play {
             play_clicks: 0,
             left_held: false,
             right_held: false,
+            wheel: false,
+            wheel_now: false,
             inventory_fresh: false,
             hover: None,
             menus,
@@ -4449,6 +4465,7 @@ impl Play {
             self.clicks = 0;
             self.play_clicks = 0;
             self.moves = (0.0, 0.0);
+            self.wheel = false;
             self.stage.borrow_mut().update(dt, false, true);
             let ended = std::mem::take(&mut self.stage.borrow_mut().wait_ended);
             if ended && !self.stage().film_playing() {
@@ -4458,6 +4475,7 @@ impl Play {
         }
         self.game.set_fov(self.stage.borrow().fov);
         let play = self.game.state() == 4 && !self.game.busy();
+        self.wheel_now = std::mem::take(&mut self.wheel);
         let (dx, dy) = std::mem::take(&mut self.moves);
         let clicks = std::mem::take(&mut self.clicks);
         let play_clicks = std::mem::take(&mut self.play_clicks);
@@ -4466,7 +4484,9 @@ impl Play {
         // lX, lY or lZ is not 0), so the look's rule (a third of a speed
         // against the move taken off, the ±6 clamp, @ 0x0042cdc0) runs
         // once on the frame's whole move, whatever the mouse's report rate.
-        if play && (dx != 0.0 || dy != 0.0) {
+        // A wheel turn alone is a move event too: @ 0x0042cdc0 zeroes the
+        // damping clock with the speeds unchanged.
+        if play && (dx != 0.0 || dy != 0.0 || self.wheel_now) {
             #[allow(clippy::cast_possible_truncation)]
             self.stage.borrow_mut().look(dx, dy, dt as f32);
         }
@@ -4805,7 +4825,7 @@ impl Play {
                     stage: &self.stage,
                     menus: &self.menus,
                 };
-                poker.frame(&mut host, mouse, clicks, &measure)
+                poker.frame(&mut host, mouse, clicks, self.wheel_now, &measure)
             };
             // States 2, 0xa, 0xc: the mouse back at the cursor's place
             // (@ 0x0040d890).
@@ -4844,6 +4864,9 @@ impl Play {
         }
         for _ in 0..clicks {
             self.menus.click();
+        }
+        if self.wheel_now {
+            self.menus.move_event();
         }
         let was_up = self.menus.current().is_some();
         let ended = {
@@ -5051,7 +5074,8 @@ impl Play {
         } else {
             (clicks, held_clicks)
         };
-        self.stage.borrow_mut().inventory_buttons_hover();
+        let wheel = self.wheel_now;
+        self.stage.borrow_mut().inventory_buttons_hover(wheel);
         let mut taken = false;
         for _ in 0..clicks {
             let hit = self.stage.borrow().inventory_hit();
@@ -5200,6 +5224,15 @@ impl Play {
         } else if self.right_held {
             self.right_press();
         }
+    }
+
+    /// A turn of the mouse's wheel (DirectInput's lZ), taken at the next
+    /// frame as a mouse move event with no move (@ 0x0047c8a0 calls the
+    /// move handler when lX, lY or lZ is not 0, @ 0x0043bde0 makes the
+    /// event of kind 2): the menus' hover tests run on it, and in play
+    /// @ 0x0042cdc0 zeroes the damping clock.
+    pub fn wheel(&mut self) {
+        self.wheel = true;
     }
 
     /// The sound output was lost while the game played (the front end's
