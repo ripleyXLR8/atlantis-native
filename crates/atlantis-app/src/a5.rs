@@ -18,7 +18,7 @@
 use std::num::NonZeroU32;
 use std::path::Path;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -294,7 +294,11 @@ struct A5App {
     present_asked: bool,
     /// When the last present was.
     presented: Instant,
-    _audio: Option<cpal::Stream>,
+    /// The sound output (kept alive while it plays), the mixer it pulls
+    /// from, and the flag its stream sets when the device goes away.
+    audio_out: Option<cpal::Stream>,
+    mixer: Audio,
+    audio_lost: Arc<AtomicBool>,
     /// Why the game could not be made, for the caller.
     error: Option<String>,
 }
@@ -384,6 +388,27 @@ impl A5App {
         }
     }
 
+    /// The output's device gone while the game plays (a headset unplugged):
+    /// the default device opened again on the same mixer; when there is
+    /// none, the game goes on as without an output from the start
+    /// ([`mixer_for_play`], [`Play::drop_audio`]).
+    fn output_lost(&mut self) {
+        if !self.audio_lost.swap(false, Ordering::Relaxed) {
+            return;
+        }
+        log::warn!("audio output lost");
+        self.audio_out = None;
+        self.audio_out = open_output(&self.mixer, &self.audio_lost);
+        if self.audio_out.is_none() {
+            if let Some(play) = self.play.as_mut() {
+                play.drop_audio();
+            }
+            if let Some(s) = self.start.as_mut() {
+                s.audio = None;
+            }
+        }
+    }
+
     fn frame(&mut self, el: &ActiveEventLoop) {
         self.redraw_pending = false;
         self.next_frame = next_frame_after(self.next_frame, Instant::now());
@@ -391,6 +416,7 @@ impl A5App {
             self.present();
             return;
         }
+        self.output_lost();
         let Some(play) = self.play.as_mut() else {
             return;
         };
@@ -605,14 +631,16 @@ pub fn run_window_on(
     log::info!("{label}");
     let lang = language(&src);
     let audio = Audio::new();
-    let out = {
-        let a = audio.clone();
-        crate::audio_out::start_with(move |buf, rate, channels| a.fill(buf, rate, channels))
-    };
+    let audio_lost = Arc::new(AtomicBool::new(false));
+    let out = open_output(&audio, &audio_lost);
     let src = Arc::new(src);
     let mut app = A5App {
         play: None,
-        start: Some(start(src, lang, mixer_for_play(audio, out.is_some()))),
+        start: Some(start(
+            src,
+            lang,
+            mixer_for_play(audio.clone(), out.is_some()),
+        )),
         error: None,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
         title: format!(
@@ -632,7 +660,9 @@ pub fn run_window_on(
         cache: PictureCache::default(),
         present_asked: true,
         presented: Instant::now(),
-        _audio: out,
+        audio_out: out,
+        mixer: audio,
+        audio_lost,
     };
     el.run_app_on_demand(&mut app)
         .map_err(|e| format!("The window failed: {e}"))?;
@@ -640,6 +670,16 @@ pub fn run_window_on(
         return Err(e);
     }
     Ok(crate::a2::Ended::Quit)
+}
+
+/// The default output device's stream pulling from `audio`; `lost` set
+/// when the device goes away.
+fn open_output(audio: &Audio, lost: &Arc<AtomicBool>) -> Option<cpal::Stream> {
+    let a = audio.clone();
+    crate::audio_out::start_watched(
+        move |buf, rate, channels| a.fill(buf, rate, channels),
+        lost.clone(),
+    )
 }
 
 /// The mixer the game is given: none without a sound output, so that the

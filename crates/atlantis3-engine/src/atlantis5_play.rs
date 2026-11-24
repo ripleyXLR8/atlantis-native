@@ -5015,6 +5015,15 @@ impl Play {
         }
     }
 
+    /// The sound output was lost while the game played (the front end's
+    /// device went away and none could be opened again): the engine goes
+    /// on as without an output from the start, a voice, a sound or a film
+    /// timed by its length and the clock (the mixer's queues would drain
+    /// no more, so a voiced tirade would never end by itself).
+    pub fn drop_audio(&mut self) {
+        self.stage.borrow_mut().audio = None;
+    }
+
     /// Both mouse buttons' state now (the front end, at each press and
     /// release; both up when the window loses the focus). The original's
     /// press event carries both (@ 0x0047c8a0 sets 0x006b0b04 before the

@@ -816,3 +816,46 @@ fn the_3d_talker_moves_its_mouth_with_its_voice() {
         "{checked} frames, {talks} talk, {listens} listen"
     );
 }
+
+/// A sound output lost in mid-game (`Play::drop_audio`, the front end's
+/// device gone): the mixer no longer drains, so a voiced tirade given to
+/// it would never end; once dropped, the voice is timed by its length as
+/// without an output from the start.
+#[test]
+fn a_lost_sound_output_times_the_voices_by_their_length() {
+    use atlantis3_engine::audio::Audio;
+    let Some(d) = dvd() else { return };
+    let src: Arc<dyn atlantis_data::FileSource> =
+        Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
+    // A mixer no output drains.
+    let mut play = Play::new(src, "french", Some(Audio::new())).expect("play");
+    play.new_game();
+    frames(&mut play, 3);
+    play.skip();
+    frames(&mut play, 3);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    let (x, y) = play.stage().menu_subject_point(0).expect("subject 0");
+    play.mouse_at(x, y);
+    play.click();
+    frames(&mut play, 2);
+    let tirade = |play: &Play| play.stage().dialog_state().map(|s| s.1);
+    assert_eq!(tirade(&play), Some(0));
+    // A minute: the undrained voice still "plays".
+    frames(&mut play, 30 * 60);
+    assert_eq!(tirade(&play), Some(0), "held by the mixer");
+    play.drop_audio();
+    let mut steps = 0;
+    while tirade(&play) == Some(0) {
+        frames(&mut play, 1);
+        steps += 1;
+        assert!(steps < 30 * 60, "the tirade ends by its length");
+    }
+}
