@@ -456,6 +456,12 @@ pub enum Request {
     /// (@ 0x0042ffd0) and the menus asked for mode 1, the credits
     /// (@ 0x0041b5d0(1) at 0x0042f58d).
     GameEnded,
+    /// The engine's part of the end of a game (@ 0x0042ffd0: the scene
+    /// unloaded, the camera controller reset, the sounds and music
+    /// stopped, the configuration's defaults back) that the load state
+    /// (state 2, @ 0x0042f000 case 2) runs before it reads the save; no
+    /// credits.
+    GameReset,
     /// A click on a character with subjects and an empty hand: the
     /// original opens its subject menu (@ 0x004300d0: mode 9,
     /// @ 0x00410f80(name), state 3). The menu is the dialogs' milestone.

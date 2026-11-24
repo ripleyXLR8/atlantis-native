@@ -18,6 +18,7 @@ struct Probe {
     rejected: Vec<String>,
     seen: Vec<Call>,
     wait: bool,
+    saves: HashMap<String, Vec<u8>>,
 }
 
 impl Engine for Probe {
@@ -39,6 +40,23 @@ impl Engine for Probe {
 
     fn request(&mut self, r: &Request) {
         self.requests.push(r.clone());
+    }
+
+    fn write_save(&mut self, name: &str, data: &[u8]) -> bool {
+        self.saves.insert(name.to_string(), data.to_vec());
+        true
+    }
+
+    fn read_save(&mut self, name: &str) -> Option<Vec<u8>> {
+        self.saves.get(name).cloned()
+    }
+
+    /// One section that tells how many engine calls were made before it.
+    fn save_sections(&mut self) -> Vec<atlantis4_data::xml::Element> {
+        let mut e = atlantis5_script::save::element("PROBE");
+        e.attributes
+            .push(("calls".into(), self.seen.len().to_string()));
+        vec![e]
     }
 
     fn event(&mut self, e: &Event<'_>) {
@@ -489,4 +507,371 @@ fn ending_the_game_frees_the_runs_that_wait() {
     assert!(g.script().task_count() > 0);
     g.end_game();
     assert_eq!(g.script().task_count(), 0);
+}
+
+#[test]
+fn a_handler_s_set_duration_applies_one_period_late() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    // Quarter seconds keep the clock exact.
+    for _ in 0..5 {
+        g.update(0.25);
+    }
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then N = (N or 0) + 1 Atl_Timer_SetDuration(\"s\", 3) \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"s\", 1) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"make"));
+    // 0.25 s frames. Up at 1 s; the handler sets 3 s. The restart
+    // (@ 0x004353d0's second 0x00468060, then 0x004680c0) reads the new
+    // duration with the step's elapsed time: remaining = 3 − 1, start =
+    // now − 2, so the next end is 1 s later (the old period); the 3 s
+    // apply from then on.
+    let mut ticks = Vec::new();
+    for frame in 1..=40 {
+        g.update(0.25);
+        if let Value::Num(n) = g.script().global(b"N") {
+            if ticks.len() < n as usize {
+                ticks.push(frame);
+            }
+        }
+    }
+    assert_eq!(ticks, [4, 8, 20, 32]);
+}
+
+#[test]
+fn the_load_state_ends_the_game_before_the_read() {
+    let mut files = BASE.to_vec();
+    let atlantis = format!(
+        "{} function Atl_Address_GetCurrent() return \"deck\", 1 end",
+        files[0].1
+    );
+    files[0] = ("atlantis.lua", &atlantis);
+    let (mut g, probe) = game(&files);
+    g.new_game();
+    settle(&mut g, 5);
+    assert_eq!(g.state(), 4);
+    assert!(
+        probe.borrow().saves.contains_key("autoslot"),
+        "the chapter saved"
+    );
+    probe.borrow_mut().requests.clear();
+    // A request queued after Atl_Load: state 2 ends the game first
+    // (@ 0x0042f000 case 2 → 0x0042ffd0, which empties the queue), so it
+    // is dropped; the reader then queues play.
+    assert!(g.run_string(
+        "return function() Atl_Timer_Create(\"gone\", 100) Atl_Load() Atl_TerminateGame() end"
+    ));
+    settle(&mut g, 5);
+    assert_eq!(g.state(), 4);
+    assert!(g.timer_names().is_empty(), "{:?}", g.timer_names());
+    let p = probe.borrow();
+    let reset = p
+        .requests
+        .iter()
+        .position(|r| *r == Request::GameReset)
+        .expect("the game ended before the read");
+    let view = p
+        .requests
+        .iter()
+        .position(|r| matches!(r, Request::LoadView { .. }))
+        .expect("the saved view loaded");
+    assert!(reset < view);
+    assert!(!p.requests.contains(&Request::GameEnded));
+}
+
+#[test]
+fn the_chapter_runs_in_the_next_state_and_clears_its_number_after() {
+    let mut files = BASE.to_vec();
+    files[0] = (
+        "atlantis.lua",
+        "function InitChapter(Path, Chapter) CHS = (CHS or \"\") .. tostring(Chapter) .. \",\" \
+           if Chapter == 2 then Atl_InitChapter(5) end \
+           Atl_Video_Play(\"intro\") end",
+    );
+    let (mut g, probe) = game(&files);
+    probe.borrow_mut().wait = true;
+    g.new_game();
+    settle(&mut g, 2);
+    // @ 0x0042f000 case 1: the next request (4) is taken before the call.
+    assert!(g.waiting_for_engine());
+    assert_eq!(g.state(), 4);
+    g.finish_wait();
+    probe.borrow_mut().wait = false;
+    settle(&mut g, 5);
+    // +0x50 = 0 after the call: the nested Atl_InitChapter(5) lost its 5.
+    assert_eq!(g.script().global(b"CHS"), Value::Str(b"2,nil,".to_vec()));
+    assert_eq!(g.state(), 4);
+}
+
+#[test]
+fn play_walks_the_timers_before_it_takes_a_request() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then N = (N or 0) + 1 \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"due\", 0, 1) Atl_InitChapter(3) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"go"));
+    // @ 0x0042f000 case 4: the timers (@ 0x00435a70), then the request,
+    // in the same frame.
+    g.update(0.02);
+    assert_eq!(g.script().global(b"N"), Value::Num(1.0));
+    assert_eq!(g.state(), 1);
+}
+
+#[test]
+fn atl_save_takes_the_engine_s_sections_at_the_call() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().saves.clear();
+    let before = probe.borrow().seen.len();
+    // @ 0x00408fb0 → 0x0043ad90: the whole file is written inside the
+    // handler, so engine calls after Atl_Save are not in it.
+    assert!(g.run_string(
+        "return function() Atl_Sprite_Play(\"a\", \"z1\", \"loop\") Atl_Save() \
+         Atl_Sprite_Play(\"b\", \"z1\", \"loop\") end"
+    ));
+    let text = String::from_utf8(probe.borrow().saves["autoslot"].clone()).expect("text");
+    let calls = format!("calls=\"{}\"", before + 1);
+    assert!(text.contains(&calls), "{calls} in {text}");
+}
+
+/// The chapter of [`BASE`] with two timers made before its film.
+fn timed_chapter() -> Vec<(&'static str, String)> {
+    BASE.iter()
+        .map(|(n, s)| {
+            let s = if *n == "atlantis.lua" {
+                "require \"lib/util.lua\" \
+                 function InitChapter(Path, Chapter) Atl_Timer_Create(\"lightning\", 25) \
+                   Atl_Timer_Create(\"fountains\", 19) Atl_Video_Play(\"intro\") \
+                   Atl_Address_Go(\"deck\", 1, \"no_fx\") Atl_Save() end \
+                 function Atl_Address_GetCurrent() return \"deck\", 1 end"
+                    .to_string()
+            } else {
+                (*s).to_string()
+            };
+            (*n, s)
+        })
+        .collect()
+}
+
+fn saved_text(probe: &Rc<RefCell<Probe>>) -> String {
+    String::from_utf8(probe.borrow().saves["autoslot"].clone()).expect("text")
+}
+
+#[test]
+fn a_save_after_a_film_keeps_the_timers_whole() {
+    let files = timed_chapter();
+    let files: Vec<(&str, &str)> = files.iter().map(|(n, s)| (*n, s.as_str())).collect();
+    let (mut g, probe) = game(&files);
+    probe.borrow_mut().wait = true;
+    g.new_game();
+    // 10 s of film: the chapter's handler waits inside Atl_Video_Play,
+    // where no walk updates the timers' +0x10.
+    settle(&mut g, 500);
+    assert!(g.waiting_for_engine());
+    g.finish_wait();
+    probe.borrow_mut().wait = false;
+    settle(&mut g, 3);
+    assert_eq!(g.state(), 4);
+    // @ 0x00436f20 → 0x00468060 at +0x10: the remaining time of the
+    // timers' creation.
+    let text = saved_text(&probe);
+    assert!(
+        text.contains("name=\"lightning\" duration=\"25\" remaining_time=\"25\""),
+        "{text}"
+    );
+    assert!(
+        text.contains("name=\"fountains\" duration=\"19\" remaining_time=\"19\""),
+        "{text}"
+    );
+    // Read back: 19 s from the load, not 9.
+    assert!(g.run_string("return function() Atl_Load() end"));
+    settle(&mut g, 3);
+    assert_eq!(g.state(), 4);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "if atl.event.type == \"timer\" then FIRED = atl.event.timer.name end".to_string(),
+    );
+    for _ in 0..(18 * 50) {
+        g.update(0.02);
+    }
+    assert_eq!(g.script().global(b"FIRED"), Value::Nil, "not before 19 s");
+    for _ in 0..(2 * 50) {
+        g.update(0.02);
+    }
+    assert_eq!(
+        g.script().global(b"FIRED"),
+        Value::Str(b"fountains".to_vec())
+    );
+}
+
+#[test]
+fn a_menu_pauses_the_timers() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    // Quarter seconds keep the clock exact.
+    for _ in 0..5 {
+        g.update(0.25);
+    }
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then N = (N or 0) + 1 \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"t\", 2) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"make"));
+    g.update(0.25);
+    // A menu after 0.25 s: @ 0x0041b780 pauses the timers (@ 0x00435b70)
+    // when its mode opens and resumes them (@ 0x00435bd0) at its end.
+    g.open_menu();
+    for _ in 0..40 {
+        g.update(0.25);
+    }
+    assert_eq!(g.script().global(b"N"), Value::Nil);
+    // A save from the menu writes the time left at the pause.
+    probe.borrow_mut().saves.clear();
+    assert!(g.save_now("slot_0"));
+    let text = String::from_utf8(probe.borrow().saves["slot_0"].clone()).expect("text");
+    assert!(text.contains("remaining_time=\"1.75\""), "{text}");
+    g.menu_closed();
+    assert_eq!(g.state(), 4);
+    let mut frames = 0;
+    while g.script().global(b"N") == Value::Nil {
+        g.update(0.25);
+        frames += 1;
+        assert!(frames < 20);
+    }
+    assert_eq!(frames, 7, "1.75 s after the menu");
+    // A timer made while the menus are up starts paused (@ 0x00435770).
+    g.open_menu();
+    assert!(g.run_string("return function() Atl_Timer_Create(\"m\", 1, 1) end"));
+    for _ in 0..20 {
+        g.update(0.25);
+    }
+    g.menu_closed();
+    // One walk (+0x10 = now) after the menu: 0.25 s run.
+    g.update(0.25);
+    probe.borrow_mut().saves.clear();
+    assert!(g.save_now("slot_1"));
+    let text = String::from_utf8(probe.borrow().saves["slot_1"].clone()).expect("text");
+    assert!(
+        text.contains("name=\"m\" duration=\"1\" remaining_time=\"0.75\""),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_save_without_timers_has_no_timer_section() {
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    assert!(g.timer_names().is_empty());
+    // @ 0x00436f20: CALLBACK_SHOOTER_MANAGER only with a timer.
+    let text = saved_text(&probe);
+    assert!(!text.contains("CALLBACK_SHOOTER_MANAGER"), "{text}");
+    assert!(g.run_string("return function() Atl_Timer_Create(\"t\", 5) Atl_Save() end"));
+    let text = saved_text(&probe);
+    assert!(text.contains("<CALLBACK_SHOOTER_MANAGER>"), "{text}");
+}
+
+/// The fields of view the transitions asked for so far.
+fn fovs(probe: &Rc<RefCell<Probe>>) -> Vec<f32> {
+    probe
+        .borrow()
+        .requests
+        .iter()
+        .filter_map(|r| match r {
+            Request::TransitionFov { radians, .. } => Some(*radians),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn a_clicked_transition_shows_its_step_with_no_time_first() {
+    // The handler's loop (@ 0x00405390): the step with a time of 0, its
+    // picture, then a step per frame with the loop's own frame time. A
+    // click runs before the frame's update: that frame shows the step
+    // with 0, and the time runs from the next.
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    g.set_fov(1.0);
+    probe.borrow_mut().requests.clear();
+    assert!(g.click_zone(7, b""));
+    assert_eq!(fovs(&probe), [1.0]);
+    g.update(0.02);
+    assert_eq!(fovs(&probe), [1.0], "no time in the click's frame");
+    g.update(0.02);
+    let ninth = std::f32::consts::PI / 9.0;
+    let f = fovs(&probe);
+    assert_eq!(f.len(), 2);
+    assert!((f[1] - (1.0 - 0.08 * ninth)).abs() < 1e-5, "{f:?}");
+}
+
+#[test]
+fn a_view_change_is_shown_before_the_script_goes_on() {
+    // The loop's last step (no_fx's view change) is drawn and flipped
+    // before `Atl_Address_Go` returns to the script.
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "if atl.event.type == \"click_zone\" then \
+           Atl_Address_Go(\"deck\", 2, \"no_fx\") AFTER_GO = true end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b""));
+    assert_eq!(g.script().address(), (b"deck".to_vec(), 2));
+    assert_eq!(g.script().global(b"AFTER_GO"), Value::Nil);
+    // The click's frame: the new view's picture.
+    g.update(0.02);
+    assert_eq!(g.script().global(b"AFTER_GO"), Value::Nil);
+    assert!(g.busy());
+    // The next frame: the script goes on.
+    g.update(0.02);
+    assert_eq!(g.script().global(b"AFTER_GO"), Value::Bool(true));
+    assert!(!g.busy());
+}
+
+#[test]
+fn a_timer_handler_that_turns_ends_its_walk_before_the_next_click() {
+    // A timer's handler that ends through a transition: the walk goes on
+    // right after it (@ 0x00435a70, no event step in between), so the
+    // one-shot timer is gone once the game takes clicks again.
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then Atl_Address_Go(\"deck\", 3, \"zoom_and_fade\") \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"once\", 0.1, 1) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"make"));
+    let mut fired = false;
+    for _ in 0..200 {
+        g.update(0.02);
+        fired |= g.busy();
+        if fired && !g.busy() {
+            break;
+        }
+    }
+    assert!(fired);
+    assert!(!g.busy());
+    assert_eq!(g.script().address(), (b"deck".to_vec(), 3));
+    assert!(g.timer_names().is_empty(), "{:?}", g.timer_names());
 }

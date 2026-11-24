@@ -15,7 +15,7 @@ use std::sync::Arc;
 use atlantis3_data::atlantis5::Atlantis5Source;
 use atlantis3_engine::atlantis5::{VIEW_HEIGHT, VIEW_WIDTH};
 use atlantis3_engine::atlantis5_play::{Hover, Play};
-use atlantis5_script::Value;
+use atlantis5_script::{Value, LUA_MEMORY_LIMIT};
 
 fn dvd() -> Option<PathBuf> {
     match std::env::var_os("ATLANTIS5_DVD_FR") {
@@ -426,28 +426,60 @@ fn chessboard_lost() {
 
 /// `GetShortestPath(p, p)`, asked when the pawn moves onto the scarab's
 /// square (the lit squares do not exclude it): the breadth-first loop
-/// never meets `End` and adds an empty level per turn until Lua 5.0.3
-/// raises `table overflow` at its `MAXBITS` of 24 (the 2^25th level);
-/// without that limit rilua's 5.1 one (26) let it grow past 6 GB. It
-/// takes about 4 GB and 15 s, so it runs on demand (`--ignored`).
+/// never meets `End` and adds an empty level per turn. Lua 5.0.3 would
+/// raise `table overflow` at the 2^25th level (about 3.5 GB on a 64-bit
+/// build); the original, a 32-bit program, runs out of memory first, and
+/// so does Native's state at its bound ([`LUA_MEMORY_LIMIT`]): a Lua
+/// error the click's script logs, after which the game goes on. Here
+/// with a small bound, so that it is quick.
 #[test]
-#[ignore = "about 4 GB of memory"]
-fn chessboard_path_to_the_same_square_overflows() {
+fn chessboard_path_to_the_same_square_ends_on_a_memory_error() {
     let Some(d) = dvd() else { return };
     let mut play = chessboard_start(&d);
+    assert_eq!(play.game.script().lua_memory().1, LUA_MEMORY_LIMIT);
+    play.game.script().set_lua_memory_limit(64 << 20);
     run(
         &mut play,
         "chess_ok, chess_err = pcall(Atl_PuzzleChessboard_GetShortestPath, 13, 13)",
     );
     assert_eq!(lua(&mut play, "chess_ok"), Value::Bool(false));
-    let Value::Str(e) = lua(&mut play, "chess_err") else {
-        panic!("an error message")
-    };
-    assert!(
-        String::from_utf8_lossy(&e).ends_with("table overflow"),
-        "{}",
-        String::from_utf8_lossy(&e)
+    assert_eq!(lua(&mut play, "chess_err"), s("not enough memory"));
+    // The tree is garbage: the state works on and the game plays.
+    assert_eq!(
+        lua(&mut play, "string.len(string.rep(\"ab\", 3))"),
+        Value::Num(6.0)
     );
+    chess_move(&mut play, 3);
+    chess_move(&mut play, 9);
+    assert_eq!(
+        lua(&mut play, "Atl_Flag_Get(\"chessboard_game\")"),
+        s("lost")
+    );
+}
+
+/// The same at the real bound: how long and how much (run on demand,
+/// `--ignored --nocapture`).
+#[test]
+#[ignore = "about 1.5 GB of memory and 5 s"]
+fn chessboard_path_to_the_same_square_at_the_real_bound() {
+    let Some(d) = dvd() else { return };
+    let mut play = chessboard_start(&d);
+    let t = std::time::Instant::now();
+    run(
+        &mut play,
+        "chess_ok, chess_err = pcall(Atl_PuzzleChessboard_GetShortestPath, 13, 13)",
+    );
+    eprintln!(
+        "ended in {:.1} s, Lua memory {:?}",
+        t.elapsed().as_secs_f64(),
+        play.game.script().lua_memory()
+    );
+    assert_eq!(lua(&mut play, "chess_err"), s("not enough memory"));
+    assert_eq!(
+        lua(&mut play, "string.len(string.rep(\"ab\", 3))"),
+        Value::Num(6.0)
+    );
+    eprintln!("after: Lua memory {:?}", play.game.script().lua_memory());
 }
 
 /// A move list (the slots, 0..16, whose piece goes into the hole) that
@@ -730,6 +762,48 @@ fn sudoku() {
         Value::Bool(true)
     );
     assert_eq!(play.stage().address(), Some((b"ishtar".to_vec(), 27)));
+}
+
+/// A click's `Atl_Sprite_PlayRebound(.., "loop", 0, v − 1, v − 1)` (a
+/// new player at frame 0, @ 0x00448d00) is stepped to its figure before
+/// it is first drawn: state 4 runs the scene's update (@ 0x0044c380)
+/// after the frame's events (@ 0x0042f000 case 4).
+#[test]
+fn a_clicked_sudoku_figure_shows_its_frame_at_once() {
+    let Some(d) = dvd() else { return };
+    let mut play = chapter(&d, 8);
+    go(&mut play, "ishtar", 30);
+    let id = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1 == b"sudoku")
+        .map(|z| z.0)
+        .expect("a sudoku case");
+    let (x, y) = ((id - 1) % 9, (id - 1) / 9);
+    let name = format!(
+        "sudoku_{}{}",
+        3 * (y / 3) + x / 3 + 1,
+        3 * (y % 3) + x % 3 + 1
+    );
+    for _ in 0..3 {
+        assert!(play.aim_at_zone_named(id, b"sudoku"));
+        play.click();
+        // One frame: the click's script, then the scene's update, then the
+        // picture.
+        play.update(1.0 / 30.0);
+        assert!(!play.game.busy());
+        let v = int(&lua(&mut play, &format!("atl.puzzle.sudoku.grid[{id}]")));
+        let frame = play
+            .stage()
+            .sprites()
+            .into_iter()
+            .find(|s| s.0 == name)
+            .map(|s| s.2);
+        if v == 0 {
+            continue;
+        }
+        assert_eq!(frame, Some(usize::try_from(v - 1).unwrap()), "{name} = {v}");
+    }
 }
 
 #[test]

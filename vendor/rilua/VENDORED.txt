@@ -114,3 +114,17 @@ PATCHES
    `lua50_setlist_grows_the_array_of_a_table_with_hash_keys` of
    src/vm/table.rs and atlantis5-script's
    `a_constructor_with_hash_keys_and_a_call_builds`.
+
+10. src/vm/gc/collector.rs (`over_alloc_limit`), src/vm/execute.rs: past
+   the allocation limit (`set_alloc_limit`), a full collection runs
+   before `LuaError::Memory` is raised, at each of the four checks
+   (`gc_check`, `SETLIST`'s array growth, `table_set`, `vm_settable`).
+   Before, the count stayed over the limit after the error until the
+   incremental steps had swept the garbage, so every allocation after a
+   memory error failed too, even once the run that made the garbage had
+   ended; Lua 5.0's collector, a full one each time its threshold is met,
+   frees it first. Only states with a limit set see a difference
+   (atlantis5-script's, and testlib's `T.totalmem`). Reproducer:
+   crates/atlantis3-engine/tests/atlantis5_puzzles.rs
+   `chessboard_path_to_the_same_square_ends_on_a_memory_error` (the
+   state's next global set failed with `not enough memory`).

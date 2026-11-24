@@ -490,3 +490,225 @@ fn a_randomized_sprite_without_its_next_file_stays() {
     }
     assert_eq!(play.game.state(), 4);
 }
+
+/// The mouse's moves of a frame make one move (@ 0x0047c8a0: one
+/// `GetDeviceState` a frame), so the look's rule against an opposing
+/// speed (@ 0x0042cdc0: a third of it taken off) runs once a frame,
+/// whatever the number of system events.
+#[test]
+fn a_frame_s_mouse_moves_turn_the_camera_once() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    assert_eq!(play.game.state(), 4);
+    assert!(!play.game.busy());
+    play.look(1000.0, 0.0);
+    frames(&mut play, 1);
+    let s = play.stage().look_speed()[0];
+    assert!((s + 6.0).abs() < 1e-4, "at the clamp: {s}");
+    // A reversal as a 1000 Hz mouse gives it: 16 events of 1 count. One
+    // move of −16 counts: ax = 16 · dt · 0.3, minus a third of −6.
+    for _ in 0..16 {
+        play.look(-1.0, 0.0);
+    }
+    frames(&mut play, 1);
+    let dt = 1.0f32 / 30.0;
+    let want = -6.0 + (16.0 * dt * 0.3 + 6.0 * f32::from_bits(0x3eaa_aaab));
+    let s = play.stage().look_speed()[0];
+    assert!((s - want).abs() < 1e-3, "{s} against {want}");
+}
+
+/// `Atl_PersistantSprite_Stop` (@ 0x0040bdc0) on an object that is not
+/// persistent (@ 0x004421e0 false) only logs: its ordinary sprite stays.
+#[test]
+fn persistant_sprite_stop_leaves_an_ordinary_sprite() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    go(&mut play, 4);
+    let coin = |play: &Play| play.stage().sprites().into_iter().any(|s| s.0 == "coin");
+    assert!(coin(&play));
+    assert!(play
+        .game
+        .run_string("return function() Atl_PersistantSprite_Stop(\"coin\") end"));
+    frames(&mut play, 1);
+    assert!(coin(&play), "not persistent: kept");
+}
+
+/// State 4's frame ends with a second sprite pick when one was found
+/// (@ 0x0042f000 case 4, 0x0042f464..0x0042f471: +0x3c read after the
+/// sound, @ 0x00430b70 again, which clears it first): a sprite the
+/// sprites' step removed is not the next frame's click target.
+#[test]
+fn a_sprite_that_ends_is_not_the_next_click_target() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    go(&mut play, 4);
+    assert!(play.aim_at_sprite(b"coin"), "the coin under the centre");
+    frames(&mut play, 1);
+    assert!(matches!(play.hover(), Some(Hover::Sprite(o, _)) if o == b"coin"));
+    let coin = |play: &Play| play.stage().sprites().into_iter().find(|s| s.0 == "coin");
+    let animation = coin(&play).expect("the coin's sprite").1;
+    assert!(play.game.run_string(&format!(
+        "return function() Atl_Sprite_Play(\"coin\", \"{animation}\", \"stop\") end"
+    )));
+    for _ in 0..60 {
+        frames(&mut play, 1);
+        if coin(&play).is_none() {
+            break;
+        }
+    }
+    assert!(coin(&play).is_none(), "the coin's sprite ended");
+    assert!(
+        !matches!(play.hover(), Some(Hover::Sprite(o, _)) if o == b"coin"),
+        "{:?}",
+        play.hover()
+    );
+}
+
+/// `Atl_Video_Play` (both forms, before the open @ 0x0042aa90: also when
+/// the film is missing) and `Atl_Dialog_Play` (once the id is valid) zero
+/// the camera controller's look speeds and damping clock (@ 0x0042cd80 on
+/// [[0x0068a528]+0x30]+0x4c): the view does not glide after them.
+#[test]
+fn films_and_dialogs_stop_the_mouse_look() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    let swing = |play: &mut Play| {
+        play.look(1000.0, 0.0);
+        frames(play, 1);
+        assert!(play.stage().look_speed()[0] != 0.0);
+    };
+    for call in [
+        "Atl_Video_Play(\"no_such_film\")",
+        "Atl_Video_Play(\"no_such_film\", 144, 256, 432, 768)",
+        "Atl_Dialog_Play(1)",
+    ] {
+        swing(&mut play);
+        assert!(play
+            .game
+            .run_string(&format!("return function() {call} end")));
+        frames(&mut play, 1);
+        assert_eq!(play.stage().look_speed(), [0.0, 0.0], "{call}");
+        for _ in 0..600 {
+            if !play.game.busy() {
+                break;
+            }
+            if play.stage().film_playing() {
+                play.skip();
+            }
+            play.space();
+            frames(&mut play, 1);
+        }
+        assert!(!play.game.busy(), "{call}");
+    }
+    // An unknown dialog leaves them.
+    swing(&mut play);
+    let s = play.stage().look_speed();
+    assert!(play
+        .game
+        .run_string("return function() Atl_Dialog_Play(9999) end"));
+    assert_eq!(play.stage().look_speed(), s);
+}
+
+/// `Atl_Video_Play`'s loops (@ 0x0040c990) do not run the scene's
+/// update (@ 0x0044c380): the view's sprites are where they were when
+/// the film ends.
+#[test]
+fn a_film_freezes_the_view_s_sprites() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    go(&mut play, 17);
+    frames(&mut play, 5);
+    let before = play.stage().sprites();
+    assert!(play
+        .game
+        .run_string("return function() Atl_Video_Play(\"is0001\") end"));
+    frames(&mut play, 1);
+    assert!(play.stage().film_playing());
+    frames(&mut play, 60);
+    assert!(play.stage().film_playing());
+    assert_eq!(play.stage().sprites(), before);
+    play.skip();
+    for _ in 0..40 {
+        frames(&mut play, 1);
+    }
+    assert!(!play.stage().film_playing());
+    // Stepped again after it.
+    frames(&mut play, 60);
+    assert_ne!(play.stage().sprites(), before);
+}
+
+/// The scripts' `Atl_Address_Go` to a view of any scene, without a
+/// transition.
+fn go_to(play: &mut Play, scene: &str, view: i32) {
+    assert!(play.game.run_string(&format!(
+        "return function() Atl_Address_Go(\"{scene}\", {view}, \"no_fx\") end"
+    )));
+    for _ in 0..60 {
+        frames(play, 1);
+        if play.stage().address() == Some((scene.as_bytes().to_vec(), view)) && !play.game.busy() {
+            break;
+        }
+    }
+    assert_eq!(
+        play.stage().address(),
+        Some((scene.as_bytes().to_vec(), view))
+    );
+}
+
+/// A persistent sprite's record lives on through a view without its
+/// `z1` file (@ 0x004424d0: the next record, nothing erased) and is made
+/// even when the view of the call has none (@ 0x0040ba20 →
+/// 0x00442290 first): it shows again in the next view that has it.
+#[test]
+fn a_persistent_sprite_crosses_a_view_without_its_file() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    let lightning = |play: &Play| {
+        play.stage()
+            .sprites()
+            .iter()
+            .any(|s| s.0 == "floor12_lightning")
+    };
+    // etage12 view 3 has no floor12_lightning file; view 4 has one.
+    go_to(&mut play, "etage12", 3);
+    assert!(play
+        .game
+        .run_string("return function() Atl_PersistantSprite_Play(\"floor12_lightning\", 10) end"));
+    frames(&mut play, 1);
+    assert!(!lightning(&play));
+    go_to(&mut play, "etage12", 4);
+    assert!(
+        lightning(&play),
+        "the record made in view 3 shows in view 4"
+    );
+    go_to(&mut play, "etage12", 3);
+    assert!(!lightning(&play));
+    go_to(&mut play, "etage12", 4);
+    assert!(lightning(&play), "the record kept through view 3");
+}
+
+/// `Atl_Video_Play`'s loop (@ 0x0040c990) steps the film before its
+/// first draw and leaves after the draw of the iteration whose step
+/// reported the end (`FrameNum` = `Frames` − 1): the first picture is
+/// frame 1, and the frame decoded last is shown once.
+#[test]
+fn a_film_shows_its_first_and_last_decoded_frames() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    assert!(play
+        .game
+        .run_string("return function() Atl_Video_Play(\"is0001\") end"));
+    // Before any update: the first step was made at the call.
+    let (num, frames_n) = play.stage().film_frame().expect("a film");
+    assert_eq!(num, 2, "frame 1 decoded, FrameNum on 2");
+    let mut last = None;
+    for _ in 0..frames_n * 4 {
+        frames(&mut play, 1);
+        match play.stage().film_frame() {
+            Some(f) => last = Some(f.0),
+            None => break,
+        }
+    }
+    assert!(!play.stage().film_playing());
+    assert_eq!(last, Some(frames_n - 1), "drawn once at the end");
+}

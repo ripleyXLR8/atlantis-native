@@ -38,6 +38,11 @@ pub const GAP: Duration = Duration::from_millis(250);
 /// believed.
 pub const LOCK_GRACE: Duration = Duration::from_millis(600);
 
+/// How long after a refused pointer lock the page asks for it again: a
+/// browser refuses `requestPointerLock` for about a second after the
+/// player left the lock with Escape, which is no lack of a lock.
+pub const LOCK_RETRY: Duration = Duration::from_secs(2);
+
 /// The browser's state of the window.
 pub struct WebFront {
     pub gl: Option<GlPresenter>,
@@ -55,10 +60,11 @@ pub struct WebFront {
     pub audio_pending: bool,
     last_redraw: Option<Instant>,
     /// When the pointer lock was last asked for; whether the page has held
-    /// it since; whether a request was refused (no lock in this browser).
+    /// it since; when a request was last taken as refused (it may be
+    /// asked again after [`LOCK_RETRY`], [`WebFront::lock_refused`]).
     pub lock_asked: Option<Instant>,
     pub lock_seen: bool,
-    pub lock_refused: bool,
+    pub lock_refused_at: Option<Instant>,
     /// The last request was the game's own, without a click (after a
     /// menu): its refusal is not the browser's lack of a lock.
     pub lock_auto: bool,
@@ -82,6 +88,13 @@ impl Default for WebFront {
 }
 
 impl WebFront {
+    /// Whether a refused pointer lock still holds (less than
+    /// [`LOCK_RETRY`] ago).
+    pub fn lock_refused(&self) -> bool {
+        self.lock_refused_at
+            .is_some_and(|t| t.elapsed() < LOCK_RETRY)
+    }
+
     pub fn new() -> WebFront {
         WebFront {
             gl: None,
@@ -95,7 +108,7 @@ impl WebFront {
             last_redraw: None,
             lock_asked: None,
             lock_seen: false,
-            lock_refused: false,
+            lock_refused_at: None,
             lock_auto: false,
             in_menu: false,
             presented: (0, 0),

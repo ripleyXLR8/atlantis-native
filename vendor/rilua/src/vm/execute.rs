@@ -2188,7 +2188,7 @@ pub fn execute(state: &mut LuaState) -> LuaResult<()> {
                             state.gc.gc_state.total_bytes += mem_after - mem_before;
                         }
                     }
-                    if state.gc.gc_state.total_bytes > state.gc.gc_state.alloc_limit {
+                    if state.over_alloc_limit()? {
                         return Err(crate::LuaError::Memory);
                     }
 
@@ -2232,7 +2232,7 @@ fn table_set(state: &mut LuaState, table_ref: GcRef<Table>, key: Val, value: Val
         state.gc.gc_state.total_bytes += mem_after - mem_before;
     }
     // Check alloc limit after table growth.
-    if state.gc.gc_state.total_bytes > state.gc.gc_state.alloc_limit {
+    if state.over_alloc_limit()? {
         return Err(crate::LuaError::Memory);
     }
     state.gc.barrier_back(table_ref);
@@ -2403,7 +2403,7 @@ fn vm_settable(
                     if mem_after > mem_before {
                         state.gc.gc_state.total_bytes += mem_after - mem_before;
                     }
-                    if state.gc.gc_state.total_bytes > state.gc.gc_state.alloc_limit {
+                    if state.over_alloc_limit()? {
                         return Err(crate::LuaError::Memory);
                     }
                     state.gc.barrier_back(table_ref);

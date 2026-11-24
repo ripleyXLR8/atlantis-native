@@ -203,6 +203,12 @@ impl Cabinet {
             return Err(CabError::NotCabinet);
         }
         let t = CabError::Truncated;
+        // cbCabinet: a copy cut short (its data past the end would read as
+        // missing files) is refused here; a longer file (padding) is not.
+        let declared = u64::from(u32_at(&head, 8).ok_or(t.clone())?);
+        if size < declared {
+            return Err(t);
+        }
         let files_at = u64::from(u32_at(&head, 16).ok_or(t.clone())?);
         let (minor, major) = (head[24], head[25]);
         if (major, minor) != (1, 3) {
@@ -1004,6 +1010,19 @@ mod tests {
                 Err(CabError::Truncated)
             ));
         }
+        // Cut after the file list, in the data: the header's cbCabinet
+        // says more; padded after the end it opens.
+        let mut m = MemFiles::new();
+        m.insert("x.cab", cab[..cab.len() - 1].to_vec());
+        assert!(matches!(
+            Cabinet::open(Arc::new(m), "x.cab"),
+            Err(CabError::Truncated)
+        ));
+        let mut padded = cab.clone();
+        padded.extend([0u8; 100]);
+        let mut m = MemFiles::new();
+        m.insert("x.cab", padded);
+        assert!(Cabinet::open(Arc::new(m), "x.cab").is_ok());
         // A corrupt coffFiles far beyond the file.
         let mut bad = cab.clone();
         bad[16..20].copy_from_slice(&0x7fff_0000u32.to_le_bytes());
@@ -1203,6 +1222,8 @@ mod tests {
             cab.extend(payload);
         }
         cab[40..42].copy_from_slice(&2u16.to_le_bytes());
+        let total = cab.len() as u32;
+        cab[8..12].copy_from_slice(&total.to_le_bytes());
         let f = files(cab);
         assert_eq!(f.read("t.txt").unwrap(), text);
         assert_eq!(f.read_at("t.txt", 1500, 20).unwrap(), text[1500..1520]);

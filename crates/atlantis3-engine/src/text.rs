@@ -378,10 +378,41 @@ impl Glyphs {
         w: usize,
         h: usize,
     ) {
+        self.draw_in(gdi, lines, rgb, out, (0, 0, w, h), w, h);
+    }
+
+    /// The pixels the glyphs of `lines` may cover: (x0, y0, x1, y1), x1
+    /// and y1 past the last; `None` when no glyph has an outline.
+    pub fn bounds(&self, gdi: &GdiFont, lines: &[Line]) -> Option<(i32, i32, i32, i32)> {
+        let mut b: Option<(i32, i32, i32, i32)> = None;
+        self.each_glyph(gdi, lines, |og| {
+            let bb = og.px_bounds();
+            #[allow(clippy::cast_possible_truncation)]
+            let g = (
+                bb.min.x as i32,
+                bb.min.y as i32,
+                bb.max.x.ceil() as i32 + 1,
+                bb.max.y.ceil() as i32 + 1,
+            );
+            b = Some(match b {
+                None => g,
+                Some(a) => (a.0.min(g.0), a.1.min(g.1), a.2.max(g.2), a.3.max(g.3)),
+            });
+        });
+        b
+    }
+
+    /// Each glyph of `lines` with an outline, placed as [`Glyphs::draw`]
+    /// places it.
+    fn each_glyph(
+        &self,
+        gdi: &GdiFont,
+        lines: &[Line],
+        mut f: impl FnMut(ab_glyph::OutlinedGlyph),
+    ) {
         use ab_glyph::{Font, ScaleFont};
         let scale = ab_glyph::PxScale::from(gdi.tm_height as f32);
         let sf = self.font.as_scaled(scale);
-        let (r, g, b) = ((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
         for l in lines {
             let mut pen = l.x as f32;
             let base = (l.y + gdi.ascent) as f32;
@@ -394,23 +425,49 @@ impl Glyphs {
                 let id = sf.glyph_id(ch);
                 let glyph = id.with_scale_and_position(scale, ab_glyph::point(pen, base));
                 if let Some(og) = self.font.outline_glyph(glyph) {
-                    let bb = og.px_bounds();
-                    og.draw(|gx, gy, cov| {
-                        let x = bb.min.x as i32 + gx as i32;
-                        let y = bb.min.y as i32 + gy as i32;
-                        if x < 0 || y < 0 || x >= w as i32 || y >= h as i32 || cov <= 0.0 {
-                            return;
-                        }
-                        let px = &mut out[y as usize * w + x as usize];
-                        let a = cov.min(1.0);
-                        let [dr, dg, db] = px.rgb8();
-                        let mix = |s: u32, d: u8| (s as f32 * a + f32::from(d) * (1.0 - a)) as u8;
-                        *px = P::from_rgb8(mix(r, dr), mix(g, dg), mix(b, db));
-                    });
+                    f(og);
                 }
                 pen += d as f32;
             }
         }
+    }
+
+    /// [`Glyphs::draw`] on a `w` × `h` screen of which `out` holds only
+    /// the rectangle `rect` (x, y, width, height; row by row): the
+    /// glyphs placed and clipped on the screen, the pixels outside the
+    /// rectangle left out.
+    #[allow(clippy::too_many_arguments)]
+    pub fn draw_in<P: ScreenPixel>(
+        &self,
+        gdi: &GdiFont,
+        lines: &[Line],
+        rgb: u32,
+        out: &mut [P],
+        rect: (i32, i32, usize, usize),
+        w: usize,
+        h: usize,
+    ) {
+        let (r, g, b) = ((rgb >> 16) & 0xff, (rgb >> 8) & 0xff, rgb & 0xff);
+        let (rx, ry, rw, rh) = rect;
+        self.each_glyph(gdi, lines, |og| {
+            let bb = og.px_bounds();
+            og.draw(|gx, gy, cov| {
+                let x = bb.min.x as i32 + gx as i32;
+                let y = bb.min.y as i32 + gy as i32;
+                if x < 0 || y < 0 || x >= w as i32 || y >= h as i32 || cov <= 0.0 {
+                    return;
+                }
+                let (sx, sy) = (x - rx, y - ry);
+                if sx < 0 || sy < 0 || sx >= rw as i32 || sy >= rh as i32 {
+                    return;
+                }
+                let px = &mut out[sy as usize * rw + sx as usize];
+                let a = cov.min(1.0);
+                let [dr, dg, db] = px.rgb8();
+                let mix = |s: u32, d: u8| (s as f32 * a + f32::from(d) * (1.0 - a)) as u8;
+                *px = P::from_rgb8(mix(r, dr), mix(g, dg), mix(b, db));
+            });
+        });
     }
 }
 

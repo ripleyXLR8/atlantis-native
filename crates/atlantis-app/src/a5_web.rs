@@ -48,11 +48,11 @@ use winit::window::{Window, WindowId};
 use crate::a2_web;
 use crate::gl_present::GlPresenter;
 
-/// How long after a refused pointer lock a click asks for it again.
-const LOCK_RETRY: std::time::Duration = std::time::Duration::from_secs(2);
-
 /// The game's name in the page.
 const NAME: &str = "The Secrets of Atlantis";
+
+/// A game step's time: the desktop's (`a5.rs` FRAME), one frame at 60 Hz.
+const FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
 
 /// A frame's time for decoding the logos' folder before the game starts
 /// (the page answers between two).
@@ -146,10 +146,13 @@ pub fn start(src: Atlantis5Source, store: Rc<dyn SaveStore>) -> Result<(), JsVal
         audio: Audio::new(),
         out: None,
         audio_pending: true,
+        silent_frames: 0.0,
         window: None,
         gl: None,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
         last: None,
+        next_frame: Instant::now(),
+        shown_size: None,
         clock: 0.0,
         menu: false,
         lock_asked: None,
@@ -177,17 +180,25 @@ struct A5App {
     /// only then).
     out: Option<crate::audio_out::web_out::WebOutput>,
     audio_pending: bool,
+    /// The part of a frame not yet played out silently while there is no
+    /// output ([`A5App::play_silently`]).
+    silent_frames: f64,
     window: Option<Rc<Window>>,
     gl: Option<GlPresenter>,
     picture: Vec<u32>,
+    /// The last step's time.
     last: Option<Instant>,
+    /// When the next step is due ([`FRAME`] after the last one's).
+    next_frame: Instant,
+    /// The canvas's size at the last picture drawn.
+    shown_size: Option<winit::dpi::PhysicalSize<u32>>,
     /// The game's time (seconds).
     clock: f64,
     /// Whether a menu is up (the pointer is free).
     menu: bool,
     lock_asked: Option<Instant>,
     /// When a lock request was last taken as refused: a click asks again
-    /// once [`LOCK_RETRY`] has passed (a browser refuses for a moment
+    /// once [`a2_web::LOCK_RETRY`] has passed (a browser refuses for a moment
     /// after the player left the lock with Escape).
     lock_refused: Option<Instant>,
     /// The fractions of the pointer-lock motion not yet sent.
@@ -220,6 +231,23 @@ impl A5App {
         );
     }
 
+    /// Until the output exists (the first click or key; never on a page
+    /// that cannot make one) the mix is played out silently on the game's
+    /// clock, as Atlantis Evolution's page does (`Sounds::headless`): a
+    /// film's sound does not pile up to play late at the first click, and
+    /// a voice or a playlist still ends when its sound would.
+    fn play_silently(&mut self, dt: f64) {
+        if self.out.is_some() {
+            self.silent_frames = 0.0;
+            return;
+        }
+        self.silent_frames += dt * f64::from(AUDIO_RATE);
+        let n = self.silent_frames.floor();
+        self.silent_frames -= n;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        self.audio.play_silently(n as usize, AUDIO_RATE);
+    }
+
     /// Whether the page holds the pointer lock; a request not granted in
     /// time is taken as refused.
     fn locked(&mut self) -> bool {
@@ -246,7 +274,9 @@ impl A5App {
         !self.menu
             && !self.locked()
             && self.lock_asked.is_none()
-            && self.lock_refused.is_none_or(|t| t.elapsed() >= LOCK_RETRY)
+            && self
+                .lock_refused
+                .is_none_or(|t| t.elapsed() >= a2_web::LOCK_RETRY)
     }
 
     /// The picture's place in the canvas (x, y, width, height): 16:9,
@@ -256,17 +286,8 @@ impl A5App {
             return (0, 0, VIEW_WIDTH, VIEW_HEIGHT);
         };
         let size = window.inner_size();
-        let (ww, wh) = (size.width.max(1) as usize, size.height.max(1) as usize);
-        let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
-        let (dw, dh) = if ww * gh > wh * gw {
-            (wh * gw / gh, wh)
-        } else {
-            (ww, ww * gh / gw)
-        };
-        let (dw, dh) = (dw.max(1), dh.max(1));
-        ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
+        place_in(size.width as usize, size.height as usize)
     }
-
     /// A canvas position on the game's 1024 × 576 picture.
     fn to_picture(&self, p: PhysicalPosition<f64>) -> (i32, i32) {
         let (ox, oy, dw, dh) = self.place();
@@ -276,12 +297,14 @@ impl A5App {
     }
 
     fn present(&mut self) {
-        let (ox, oy, dw, dh) = self.place();
         let (Some(window), Some(gl)) = (&self.window, self.gl.as_mut()) else {
             return;
         };
+        // The canvas's size read once, for the placement and the draw.
         let size = window.inner_size();
+        self.shown_size = Some(size);
         let (ww, wh) = (size.width.max(1), size.height.max(1));
+        let (ox, oy, dw, dh) = place_in(ww as usize, wh as usize);
         for p in &mut self.picture {
             *p &= 0x00ff_ffff;
         }
@@ -379,27 +402,56 @@ impl A5App {
             }
             return;
         }
-        let t = Instant::now();
-        // As on the desktop: a pause longer than a quarter second (a
-        // hidden page, a long read) counts as a quarter second.
-        let dt = self.last.replace(t).map_or(0.0, |l| {
-            t.saturating_duration_since(l).as_secs_f64().min(0.25)
-        });
-        self.clock += dt;
+        // The desktop's pace (`a5.rs` FRAME, the original's frame at a
+        // 60 Hz refresh): a redraw per screen refresh runs the steps due
+        // since the last one, none on most redraws of a 120 or 144 Hz
+        // screen, two at 30 Hz. The look's rule is per frame and not
+        // linear in it (play.md § 2), so a step per redraw turned the view
+        // slower on a fast screen. As on the desktop, a pause longer than
+        // a quarter second (a hidden page, a long read) counts as a
+        // quarter second.
+        let now = Instant::now();
+        if self.last.is_none() {
+            // The game's first step: due now, not since the page opened.
+            self.next_frame = now;
+        }
+        let dts = crate::web_pace::step_dts(&mut self.next_frame, &mut self.last, now, FRAME, 0.25);
         let Some(play) = self.play.as_mut() else {
             return;
         };
         run_test_commands(play);
-        crate::audio_out::web_out::keep_ahead();
-        play.update(dt);
-        crate::audio_out::web_out::keep_ahead();
-        if play.quit_requested() {
-            self.done = true;
-            a2_web::exit_lock();
-            a2_web::quit();
-            el.exit();
+        if dts.is_empty() {
+            // Nothing due: the picture as it is (drawn again only when the
+            // canvas's size changed, which clears it).
+            if self.shown_size != Some(window.inner_size()) {
+                self.present();
+            }
+            window.request_redraw();
             return;
         }
+        for dt in dts {
+            self.clock += dt;
+            let Some(play) = self.play.as_mut() else {
+                return;
+            };
+            crate::audio_out::web_out::keep_ahead();
+            play.update(dt);
+            crate::audio_out::web_out::keep_ahead();
+            self.play_silently(dt);
+            let Some(play) = self.play.as_mut() else {
+                return;
+            };
+            if play.quit_requested() {
+                self.done = true;
+                a2_web::exit_lock();
+                a2_web::quit();
+                el.exit();
+                return;
+            }
+        }
+        let Some(play) = self.play.as_mut() else {
+            return;
+        };
         // A menu frees the pointer (the game draws its cursor); play
         // takes it again at the next click.
         let menu = play.in_menu();
@@ -643,4 +695,17 @@ fn record_state(play: &Play, clock: f64, audio: bool, locked: bool, warmed: bool
         crate::audio_out::underruns(),
     );
     STATE.with(|st| *st.borrow_mut() = s);
+}
+
+/// The picture's place in a canvas of `ww` × `wh` (x, y, width, height).
+fn place_in(ww: usize, wh: usize) -> (usize, usize, usize, usize) {
+    let (ww, wh) = (ww.max(1), wh.max(1));
+    let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
+    let (dw, dh) = if ww * gh > wh * gw {
+        (wh * gw / gh, wh)
+    } else {
+        (ww, ww * gh / gw)
+    };
+    let (dw, dh) = (dw.max(1), dh.max(1));
+    ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
 }

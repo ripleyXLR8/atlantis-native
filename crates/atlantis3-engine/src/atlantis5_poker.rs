@@ -377,6 +377,12 @@ impl Poker {
         (px + e.x, py + e.y)
     }
 
+    /// The place on the screen of element `name` (tests).
+    #[doc(hidden)]
+    pub fn place_of(&self, name: &str) -> Option<(i32, i32)> {
+        self.index(name).map(|i| self.abs(i))
+    }
+
     /// Whether element `name` is shown (tests): `increase_bet`,
     /// `follow_bet`, `stop_bet`, `next_game`, `winner_background`,
     /// `choice_background`.
@@ -562,7 +568,7 @@ impl Poker {
         host: &mut dyn Host,
         mouse: (i32, i32),
         clicks: usize,
-        measure: &dyn Fn(&str, &str, i32) -> i32,
+        measure: &dyn Fn(&str, &str, i32, bool) -> i32,
     ) -> bool {
         if !self.drain(host) {
             return false;
@@ -590,12 +596,12 @@ impl Poker {
     /// The text buttons' +0x8c (@ 0x0044eb60): 1 with the mouse in the
     /// box (both ends included, @ 0x00452020), else 0; a hidden button
     /// takes no event (@ 0x004523e0).
-    fn hover(&mut self, (mx, my): (i32, i32), measure: &dyn Fn(&str, &str, i32) -> i32) {
+    fn hover(&mut self, (mx, my): (i32, i32), measure: &dyn Fn(&str, &str, i32, bool) -> i32) {
         for i in [INCREASE, FOLLOW, STOP, NEXT_GAME] {
             let shown = self.visible_path(i);
             let (x, y) = self.abs(i);
             let (font, text, w) = self.text(i);
-            let h = measure(font, &text, w);
+            let h = measure(font, &text, w, true);
             let inside = (x..=x + w).contains(&mx) && (y..=y + h).contains(&my);
             if let Kind::Text { over, .. } = &mut self.els[i].kind {
                 if shown {
@@ -675,7 +681,11 @@ impl Poker {
 
     /// The process (@ 0x004240b0) for the state +0x74.
     #[allow(clippy::too_many_lines)]
-    fn process(&mut self, host: &mut dyn Host, measure: &dyn Fn(&str, &str, i32) -> i32) -> bool {
+    fn process(
+        &mut self,
+        host: &mut dyn Host,
+        measure: &dyn Fn(&str, &str, i32, bool) -> i32,
+    ) -> bool {
         match self.state {
             0 => {
                 self.layout(measure);
@@ -781,7 +791,7 @@ impl Poker {
     }
 
     /// State 0's places (@ 0x00424109..0x0042443f).
-    fn layout(&mut self, measure: &dyn Fn(&str, &str, i32) -> i32) {
+    fn layout(&mut self, measure: &dyn Fn(&str, &str, i32, bool) -> i32) {
         self.place(BUBBLE[0], 0xbe, 10);
         self.place(BUBBLE[1], 0x1d6, 10);
         self.place(BUBBLE[2], 0x2f8, 10);
@@ -793,8 +803,9 @@ impl Poker {
         self.place(CARD[3][1], W - 0xaa, H - 100);
         self.place(WINNER_BG, W / 2, H / 2);
         self.place(PIC_WINNER, -150, -15);
+        // @ 0x00461800(400, ..., 0) and (0x17c, ..., 0): not partitioned.
         let (f, t, _) = self.text(NEXT_GAME);
-        let h = measure(f, &t, 400);
+        let h = measure(f, &t, 400, false);
         self.place(NEXT_GAME, -200, -(h / 2));
         self.place(TEXT_WINNER, -180, 20);
         self.place(CASH[0], W - 100, H - 0x20);
@@ -806,7 +817,7 @@ impl Poker {
         // The second measure reads `increase_bet`'s text again (+0x68,
         // 0x0042439c).
         let (f, t, _) = self.text(INCREASE);
-        let h1 = measure(f, &t, 0x17c);
+        let h1 = measure(f, &t, 0x17c, false);
         self.place(FOLLOW, 0x14, h1 + 0x1e);
         self.place(STOP, 0x14, h1 + 0x1e + h1 + 10);
         self.place(POT, W / 2, H / 2 + 0x78);

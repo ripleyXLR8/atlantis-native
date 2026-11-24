@@ -1,7 +1,7 @@
 //! Where the game's files come from: a directory on desktop, files the
 //! player gives the browser on the web.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
@@ -47,13 +47,20 @@ pub trait FileSource: Send + Sync {
     }
 }
 
+/// How many files a [`StdDir`] keeps open for its ranged reads.
+const OPEN_FILES: usize = 16;
+
 /// Files of a directory on disk. Names are matched without regard to case
 /// (the game names its files in upper and lower case freely).
 pub struct StdDir {
     root: PathBuf,
     // lower-case relative path -> real path; filled on first use of a directory
     index: Mutex<HashMap<String, PathBuf>>,
-    open: Mutex<HashMap<PathBuf, File>>,
+    /// The files last read by parts, the most recent last: a film or a
+    /// cabinet read piece by piece keeps its handle, and a game that reads
+    /// thousands of files does not run out of descriptors (256 by default
+    /// on macOS, 1024 on Linux desktops).
+    open: Mutex<VecDeque<(PathBuf, File)>>,
 }
 
 impl StdDir {
@@ -61,7 +68,7 @@ impl StdDir {
         StdDir {
             root: root.into(),
             index: Mutex::new(HashMap::new()),
-            open: Mutex::new(HashMap::new()),
+            open: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -100,14 +107,30 @@ impl FileSource for StdDir {
     fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
         let p = self.resolve(name)?;
         let mut open = self.open.lock().unwrap();
-        if !open.contains_key(&p) {
-            open.insert(p.clone(), File::open(&p).ok()?);
-        }
-        let f = open.get_mut(&p)?;
+        let entry = match open.iter().position(|(q, _)| *q == p) {
+            Some(i) => open.remove(i)?,
+            None => {
+                if open.len() >= OPEN_FILES {
+                    open.pop_front();
+                }
+                (p.clone(), File::open(&p).ok()?)
+            }
+        };
+        open.push_back(entry);
+        let (_, f) = open.back_mut()?;
         f.seek(SeekFrom::Start(offset)).ok()?;
         let mut buf = vec![0; len];
         f.read_exact(&mut buf).ok()?;
         Some(buf)
+    }
+
+    /// The whole file, read without keeping it open.
+    fn read(&self, name: &str) -> Option<Vec<u8>> {
+        let p = self.resolve(name)?;
+        if !std::fs::metadata(&p).ok()?.is_file() {
+            return None;
+        }
+        std::fs::read(p).ok()
     }
 
     fn has_dir(&self, name: &str) -> bool {
@@ -174,5 +197,39 @@ impl FileSource for MemFiles {
         out.sort();
         out.dedup();
         out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn std_dir_keeps_few_files_open() {
+        let base =
+            std::env::var_os("ATLANTIS_NATIVE_DATA").map_or_else(std::env::temp_dir, PathBuf::from);
+        let dir = base.join(format!("an-stddir-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("Sub")).unwrap();
+        let n = OPEN_FILES * 3;
+        for i in 0..n {
+            std::fs::write(dir.join("Sub").join(format!("F{i}.BIN")), [i as u8; 8]).unwrap();
+        }
+        let d = StdDir::new(&dir);
+        for i in 0..n {
+            let name = format!("sub/f{i}.bin");
+            assert_eq!(d.read(&name), Some(vec![i as u8; 8]));
+            assert_eq!(d.read_at(&name, 2, 3), Some(vec![i as u8; 3]));
+        }
+        assert!(d.open.lock().unwrap().len() <= OPEN_FILES);
+        // The handles kept still read right, the oldest reopened.
+        assert_eq!(d.read_at("sub/f0.bin", 7, 1), Some(vec![0]));
+        assert_eq!(
+            d.read_at(&format!("sub/f{}.bin", n - 1), 0, 8),
+            Some(vec![(n - 1) as u8; 8])
+        );
+        assert_eq!(d.read_at("sub/f0.bin", 7, 2), None, "past the end");
+        assert_eq!(d.read("sub"), None, "a folder");
+        assert_eq!(d.read("sub/none.bin"), None);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

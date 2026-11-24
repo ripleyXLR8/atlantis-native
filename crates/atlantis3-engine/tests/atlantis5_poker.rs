@@ -67,9 +67,26 @@ fn num(v: &Value) -> i32 {
 /// A new game, chapter 7 (Macao), view 20 with the punter at the table
 /// and its `commencer_poker` subject; the subject picked: the board.
 fn to_poker(d: &std::path::Path) -> Play {
+    to_poker_saving(d, None)
+}
+
+/// [`to_poker`] with a save folder (the chapter's `Atl_Save` writes its
+/// `autoslot` there).
+fn to_poker_saving(d: &std::path::Path, saves: Option<PathBuf>) -> Play {
+    to_poker_with(d, saves, |_| {})
+}
+
+/// [`to_poker_saving`] with `before` run on the new [`Play`] first.
+fn to_poker_with(
+    d: &std::path::Path,
+    saves: Option<PathBuf>,
+    before: impl FnOnce(&mut Play),
+) -> Play {
     let src: Arc<dyn atlantis_data::FileSource> =
         Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
     let mut play = Play::new(src, "french", None).expect("play");
+    before(&mut play);
+    play.set_save_dir(saves);
     play.new_game();
     frames(&mut play, 6);
     assert!(play
@@ -176,6 +193,37 @@ fn play_board(play: &mut Play, choose: &dyn Fn(i32, i32) -> &'static str) -> Vec
     ended
 }
 
+/// The board's state 0 places `next_game` and the choice panel's buttons
+/// by heights measured with @ 0x00461800(400 / 0x17c, font, text, 0): not
+/// partitioned, so a text wider than its width counts as one line.
+#[test]
+fn the_board_places_its_buttons_by_their_own_lines() {
+    let Some(d) = dvd() else { return };
+    let wide = "abcdefgh ".repeat(60);
+    let mut play = to_poker_with(&d, None, |play| {
+        for (id, text) in &mut play.menus.strings.strings {
+            if id == "increase_bet" || id == "back_to_game" {
+                *text = wide.clone();
+            }
+        }
+    });
+    frames(&mut play, 2);
+    let (choice, cont, wrapped) = {
+        let st = play.stage();
+        (
+            st.fonts.text_height("AtlFont_PokerChoice", "x", 0x17c),
+            st.fonts.text_height("AtlFont_PokerContinue", "x", 400),
+            st.fonts.text_height("AtlFont_PokerChoice", &wide, 0x17c),
+        )
+    };
+    assert!(wrapped > choice, "the test's text wraps");
+    let poker = play.poker().expect("the board");
+    let at = |n: &str| poker.place_of(n).expect(n);
+    assert_eq!(at("follow_bet").1 - at("increase_bet").1, choice + 10);
+    assert_eq!(at("stop_bet").1 - at("follow_bet").1, choice + 10);
+    assert_eq!(at("next_game").1 - at("winner_background").1, -(cont / 2));
+}
+
 #[test]
 fn the_five_games_won() {
     let Some(d) = dvd() else { return };
@@ -214,7 +262,14 @@ fn the_five_games_won() {
 #[test]
 fn stopping_every_game_loses_the_last() {
     let Some(d) = dvd() else { return };
-    let mut play = to_poker(&d);
+    // With an autosave, as in a real game (chapter 7 calls `Atl_Save`):
+    // `OnLose(3)` (`Atl_GameOver`, then `Atl_Load`) runs in the board's
+    // last frame, and the death panel it asks comes before the load.
+    let saves = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("a5-poker-lost-saves");
+    let _ = std::fs::remove_dir_all(&saves);
+    std::fs::create_dir_all(&saves).expect("the save folder");
+    let mut play = to_poker_saving(&d, Some(saves.clone()));
+    assert!(saves.join("autoslot").is_file(), "the chapter saved");
     let ended = play_board(&mut play, &|_, _| "stop_bet");
     // Games 1 to 3 end with another winner; in game 4 the fisherman's
     // hand wins (the board's dialog 285, then OnLose(3)): the death

@@ -246,9 +246,10 @@ struct A3App {
     /// only then).
     audio: Option<cpal::Stream>,
     audio_pending: bool,
-    /// The pointer lock: when it was asked for, whether it was refused.
+    /// The pointer lock: when it was asked for, when it was last taken as
+    /// refused (a click asks again after [`a2_web::LOCK_RETRY`]).
     lock_asked: Option<Instant>,
-    lock_refused: bool,
+    lock_refused: Option<Instant>,
     /// The fractions of the pointer-lock motion not yet sent.
     motion_acc: (f64, f64),
     /// The page's pointer at the last move (canvas pixels).
@@ -282,7 +283,7 @@ impl A3App {
             audio: None,
             audio_pending: true,
             lock_asked: None,
-            lock_refused: false,
+            lock_refused: None,
             motion_acc: (0.0, 0.0),
             cursor: None,
             alt: false,
@@ -315,6 +316,7 @@ impl A3App {
     fn locked(&mut self) -> bool {
         if a2_web::pointer_locked() {
             self.lock_asked = None;
+            self.lock_refused = None;
             return true;
         }
         if self
@@ -322,10 +324,10 @@ impl A3App {
             .is_some_and(|t| t.elapsed() >= a2_web::LOCK_GRACE)
         {
             self.lock_asked = None;
-            if !self.lock_refused {
+            if self.lock_refused.is_none() {
                 log::info!("pointer lock refused: the page's pointer is the game's");
             }
-            self.lock_refused = true;
+            self.lock_refused = Some(Instant::now());
         }
         false
     }
@@ -561,7 +563,12 @@ impl ApplicationHandler for A3App {
                 }
                 match (state, button) {
                     (ElementState::Pressed, MouseButton::Left) => {
-                        if !self.locked() && !self.lock_refused && self.lock_asked.is_none() {
+                        if !self.locked()
+                            && self.lock_asked.is_none()
+                            && self
+                                .lock_refused
+                                .is_none_or(|t| t.elapsed() >= a2_web::LOCK_RETRY)
+                        {
                             if let Some(w) = &self.window {
                                 self.lock_asked = Some(Instant::now());
                                 a2_web::request_lock(w);

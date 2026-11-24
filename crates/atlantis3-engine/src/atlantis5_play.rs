@@ -466,6 +466,58 @@ struct MusicStream {
     done: bool,
 }
 
+/// A source of a music stream's frames (interleaved, as `ov_read`).
+trait MusicDecoder {
+    /// Up to `max_frames` frames appended to `out`; 0 at the end.
+    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize;
+}
+
+impl MusicDecoder for VorbisStream {
+    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize {
+        self.read(out, max_frames)
+    }
+}
+
+/// A music stream fed until `until` frames are pushed: at the file's end
+/// it starts again while plays are left (`plays_left` < 0: for ever),
+/// with a new decoder from `reopen`. A pass that gives no frame at all
+/// (a file with its headers and no sound) ends the stream instead of
+/// starting it again for ever.
+fn feed_music<D: MusicDecoder>(
+    dec: &mut D,
+    pushed: &mut u64,
+    done: &mut bool,
+    plays_left: &mut i32,
+    until: u64,
+    reopen: impl Fn() -> Option<D>,
+    mut push: impl FnMut(&[i16]),
+) {
+    let mut buf = Vec::new();
+    let mut empty_pass = false;
+    while !*done && *pushed < until {
+        buf.clear();
+        let n = dec.read_frames(&mut buf, 4096);
+        if n == 0 {
+            if !empty_pass && (*plays_left > 1 || *plays_left < 0) {
+                if *plays_left > 1 {
+                    *plays_left -= 1;
+                }
+                match reopen() {
+                    Some(d) => *dec = d,
+                    None => *done = true,
+                }
+                empty_pass = true;
+                continue;
+            }
+            *done = true;
+            break;
+        }
+        empty_pass = false;
+        push(&buf);
+        *pushed += n as u64;
+    }
+}
+
 /// The voice of a tirade: a type-2 sample (`FSOUND` channel 7,
 /// @ 0x004593d0(path, 0, 2, 0), played at 1.0 @ 0x00459630).
 struct Voice {
@@ -605,8 +657,9 @@ pub struct Stage {
     /// @ 0x0042cf80 or a turn's step, through the setters @ 0x004444c0 →
     /// 0x0048a5a0 / 0x0048aa90). `None`: the angles' rotation.
     cam_override: Option<Quat>,
-    /// Persistent sprites: object, priority, seconds played.
-    persistent: Vec<(Vec<u8>, i32, f64)>,
+    /// Persistent sprites' records (@ 0x00442290: the object and its
+    /// seconds played; no priority, they come back at 0).
+    persistent: Vec<(Vec<u8>, f64)>,
     music: [MusicChannel; MUSIC_CHANNELS],
     music_tick: f64,
     /// The program's own CRT `rand` (statically linked, `_rand`
@@ -621,6 +674,10 @@ pub struct Stage {
     film: Option<(Film, Option<FilmSound>)>,
     /// The film's own Bink audio track plays on [`CHANNEL_BINK`].
     film_bink_sound: bool,
+    /// The film's step reported its end (@ 0x00456cb0: `FrameNum` =
+    /// `Frames` − 1): the loop draws that frame once more, then ends at
+    /// the next update.
+    film_ending: bool,
     /// The film's subtitles (`kinematic_subtitles.xml`).
     film_subtitles: Option<FilmSubtitles>,
     /// The text tables of the language.
@@ -667,6 +724,12 @@ pub struct Stage {
     /// blended with `oldpaper.tga`) and the film's rectangle (left, top,
     /// right, bottom).
     film_paper: Option<(Vec<u32>, [i32; 4])>,
+    /// The rectangle (left, top, right, bottom; right and bottom
+    /// excluded, a `RECT`) a film without paper is stretched into: the
+    /// display's (0, 0, 1024, 576) for `Atl_Video_Play`'s 1-argument form
+    /// (0x0040d24d..0x0040d2f3), one less each way for the start's logos
+    /// (@ 0x0043d6a0: width − 1, height − 1).
+    film_dest: [i32; 4],
     /// Menus the scripts asked for: `Atl_GameOver`'s death panel with its
     /// text's key (@ 0x00405b70: @ 0x00410d00, mode 10), `Atl_ExamineItem`'s
     /// examine view with its item (@ 0x00405d70: @ 0x004137b0, mode 11).
@@ -731,6 +794,7 @@ impl Stage {
             sound: None,
             film: None,
             film_bink_sound: false,
+            film_ending: false,
             film_subtitles: None,
             dialogs: None,
             kinematic: None,
@@ -750,6 +814,7 @@ impl Stage {
             film_ducks: false,
             music_muted: false,
             film_paper: None,
+            film_dest: FULL_RECT,
             menu_requests: Vec::new(),
             wait_ended: false,
             clock: 0.0,
@@ -762,8 +827,12 @@ impl Stage {
     }
 
     /// The pitch setter @ 0x004447a0: clamped to the limits when set
-    /// (+0x125), else `fmod(angle, 360)`.
+    /// (+0x125), else `fmod(angle, 360)`. Both setters then rebuild the
+    /// camera node's rotation from the angles (0x00444806..0x004448b2),
+    /// which ends a rotation kept by `Atl_Camera_ActivateFx`'s
+    /// re-parenting (play.md § 2).
     fn set_pitch(&mut self, p: f32) {
+        self.cam_override = None;
         self.pitch = match self.pitch_limit {
             Some((lo, hi)) => p.min(hi).max(lo),
             None => libm::fmodf(p, 360.0),
@@ -772,6 +841,7 @@ impl Stage {
 
     /// The yaw setter @ 0x004448c0 (limits +0x114/+0x118, flag +0x124).
     fn set_yaw(&mut self, y: f32) {
+        self.cam_override = None;
         self.yaw = match self.yaw_limit {
             Some((lo, hi)) => y.min(hi).max(lo),
             None => libm::fmodf(y, 360.0),
@@ -844,6 +914,12 @@ impl Stage {
     }
 
     /// Whether a film plays.
+    /// The film's `FrameNum` (the frame its next step decodes, 1-based)
+    /// and `Frames`, for tests.
+    pub fn film_frame(&self) -> Option<(u32, u32)> {
+        self.film.as_ref().map(|(f, _)| (f.frame_num, f.frames()))
+    }
+
     pub fn film_playing(&self) -> bool {
         self.film.is_some()
     }
@@ -897,17 +973,20 @@ impl Stage {
         // change drops the sprites and the randomize records
         // (@ 0x0044b8d0 → 0x004421a0 → 0x00443730); the persistent ones
         // come back (@ 0x004424d0): each object's `z1` of the new view if
-        // the file exists, with its time played, while it is not over.
+        // the file exists, inserted with priority 0 and the persistent
+        // flag (0x00441830(file, 0, 1)), with its time played, while it is
+        // not over. A record whose file the view has not is kept
+        // (GetFileAttributesA = −1 goes to the next record, LAB_004426cf),
+        // its time still growing, for a later view that has it.
         if scene_changed {
             self.persistent.clear();
         }
         self.sprites.clear();
         self.randomized.clear();
-        let persistent = std::mem::take(&mut self.persistent);
-        for (object, priority, time) in persistent {
-            if let Some(s) = self.add_sprite(&object, b"z1", Mode::Stop, priority, true) {
+        let persistent = self.persistent.clone();
+        for (object, time) in persistent {
+            if let Some(s) = self.add_sprite(&object, b"z1", Mode::Stop, 0, true) {
                 s.time = time;
-                self.persistent.push((object, priority, time));
             }
         }
         Ok(())
@@ -1270,27 +1349,16 @@ impl Stage {
             for (ch, c) in self.music.iter_mut().enumerate() {
                 let Some(s) = &mut c.stream else { continue };
                 let played = audio.played(CHANNEL_MUSIC_2004 + ch).unwrap_or(0);
-                let mut buf = Vec::new();
-                while !s.done && s.pushed < played + 44_100 {
-                    buf.clear();
-                    let n = s.dec.read(&mut buf, 4096);
-                    if n == 0 {
-                        if c.plays_left > 1 || c.plays_left < 0 {
-                            if c.plays_left > 1 {
-                                c.plays_left -= 1;
-                            }
-                            match VorbisStream::new(s.data.clone()) {
-                                Ok(d) => s.dec = d,
-                                Err(_) => s.done = true,
-                            }
-                            continue;
-                        }
-                        s.done = true;
-                        break;
-                    }
-                    audio.push(CHANNEL_MUSIC_2004 + ch, &buf);
-                    s.pushed += n as u64;
-                }
+                let data = &s.data;
+                feed_music(
+                    &mut s.dec,
+                    &mut s.pushed,
+                    &mut s.done,
+                    &mut c.plays_left,
+                    played + 44_100,
+                    || VorbisStream::new(data.clone()).ok(),
+                    |buf| audio.push(CHANNEL_MUSIC_2004 + ch, buf),
+                );
                 // @ 0x0045a640: each channel at master × its volume ×
                 // the music level.
                 let g = if self.music_muted {
@@ -1409,6 +1477,7 @@ impl Stage {
                 self.film_bink_sound = true;
             }
         }
+        self.film_dest = FULL_RECT;
         let voice = format!("datas/sounds/video/{}/{}.ogg", self.language, lossy(name));
         let sound = match (&self.audio, self.read(&voice)) {
             // @ 0x00459630(name, 1.0): FMOD channel 7 at `ftol`(voice ×
@@ -1436,10 +1505,27 @@ impl Stage {
                 .map(|f| FilmSubtitles::new(f.subtitles.clone()))
         });
         self.film = Some((film, sound));
+        self.film_ending = false;
+        // The loop's first iteration steps the film before its first draw
+        // (@ 0x0040c990, @ 0x0043d6a0: the step @ 0x0042b0f0, then the draw
+        // @ 0x0042b220): the first picture is the film's first frame.
+        self.film_step();
         true
     }
 
+    /// One update of the film: its step, unless the last one reported
+    /// the end; the loop is then left at the next update, after the frame
+    /// decoded last was drawn once (`evidence/m5/video-play-rect.c`: step,
+    /// sound, draw, flip, then the loop's test).
     fn film_update(&mut self) {
+        if !self.film_ending {
+            self.film_step();
+        }
+    }
+
+    /// The loop's step (@ 0x0042b0f0): the film's own (@ 0x00456cb0) and
+    /// its subtitles; the end it reports is taken at the next update.
+    fn film_step(&mut self) {
         let now = self.clock;
         let Some((film, sound)) = &mut self.film else {
             return;
@@ -1468,11 +1554,12 @@ impl Stage {
             fs.step(frame, rate);
         }
         if over {
-            self.end_film();
+            self.film_ending = true;
         }
     }
 
     fn end_film(&mut self) {
+        self.film_ending = false;
         self.film_subtitles = None;
         if std::mem::take(&mut self.film_ducks) {
             self.music_unduck();
@@ -1666,6 +1753,19 @@ impl Stage {
         self.turn = Some(Turn::new(forward(self.pitch, self.yaw), to));
     }
 
+    /// @ 0x0042cd80 on the camera controller ([[0x0068a528]+0x30]+0x4c),
+    /// called by `Atl_Video_Play` (both forms, before the open:
+    /// 0x0040cdf5..0x0040ce01, 0x0040d2cf..0x0040d2da) and `Atl_Dialog_Play`
+    /// (once the id is valid, 0x00407c0f..0x00407c1b): +0x04..+0x10 set to
+    /// 0. In the free mode those are the look's speeds (+0x08, +0x0c) and
+    /// damping clock (+0x10), so the view does not glide on after the film
+    /// or dialog. In a turn (mode 2) the same words are the turn's time and
+    /// its start direction's x and y; Native leaves a turn as it is.
+    fn look_stop(&mut self) {
+        self.speed = [0.0; 2];
+        self.damping = 0.0;
+    }
+
     /// The controller's mode set back (0: @ 0x0042caa0, the free mode with
     /// the speeds and the damping clock 0; 1: @ 0x0042cab0).
     fn restore_mode(&mut self, mode: u32) {
@@ -1719,7 +1819,19 @@ impl Stage {
     /// One frame: camera, sprites (@ 0x00441c30) when `scene`, sound and
     /// music (@ 0x00459fd0), film.
     fn update(&mut self, dt: f64, play: bool, scene: bool) {
+        self.update_start(dt, play);
+        self.update_scene(dt, scene);
+    }
+
+    /// The frame's first part: the film's end, the camera, an animated
+    /// look's and a dialog's steps, the film's step.
+    fn update_start(&mut self, dt: f64, play: bool) {
         self.clock += dt;
+        // A film whose last step reported its end was drawn once: its loop
+        // is left, and the script goes on in this frame.
+        if self.film_ending {
+            self.end_film();
+        }
         #[allow(clippy::cast_possible_truncation)]
         if play {
             self.camera_step(dt as f32);
@@ -1737,16 +1849,30 @@ impl Stage {
         }
         // `Atl_Dialog_Play`'s loop: its checks, then the scene's update.
         self.dialog_update(dt);
+        self.film_update();
+    }
+
+    /// The scene's update (@ 0x0044c380: the sprites' step) and the sound
+    /// (@ 0x00459fd0), after the frame's scripts: state 4 (@ 0x0042f000
+    /// case 4) runs the events and the timers, then the pick and the
+    /// cursor, and only then the scene's update, so a sprite a click or a
+    /// timer made is stepped once before it is first drawn.
+    fn update_scene(&mut self, dt: f64, scene: bool) {
         // A randomized sprite's missing file throws out of the sprites'
         // step; `CGameManager::Process`'s catch (@ 0x0042f3c6) logs it
         // (`CGameManager :: Process -> %s`, 0x0066cc4c) and goes on after
         // its try (@ 0x0042f464): that frame the rest of the sprite list
         // and the sound update (@ 0x00459fd0) are skipped.
-        let thrown = scene && !self.sprites_step(dt);
+        //
+        // `Atl_Video_Play`'s two loops (@ 0x0040c990: events, the film's
+        // step @ 0x0042b0f0, the sound @ 0x00459fd0, the draw
+        // @ 0x0042b220, the flip) never call the scene's update
+        // @ 0x0044c380: the sprites, the persistent records' times and the
+        // randomize draws are frozen for the film's length.
+        let thrown = scene && self.film.is_none() && !self.sprites_step(dt);
         if !thrown {
             self.music_update(dt);
         }
-        self.film_update();
     }
 
     /// The sprites' step (@ 0x00441c30, from the scene's update
@@ -1754,7 +1880,7 @@ impl Stage {
     /// the throw ends the step there (the sprites after it not stepped).
     fn sprites_step(&mut self, dt: f64) -> bool {
         for p in &mut self.persistent {
-            p.2 += dt;
+            p.1 += dt;
         }
         // Each sprite in list order; one over goes on with its object's
         // randomize record (@ 0x004432c0), or is removed with its
@@ -1790,42 +1916,32 @@ impl Stage {
 
     /// The picture: the film while one plays, else the view with its
     /// sprites (drawn from the list's head to its tail, @ 0x0044bd30's
-    /// second pass: @ 0x00456a90 then @ 0x00456ad0) by the cube renderer.
+    /// second pass: @ 0x00456a90 then @ 0x00456ad0) by the cube renderer,
+    /// the subject menu, the inventory and the dialog.
     pub fn render(&self, out: &mut [u32]) {
+        self.render_with(out, true);
+    }
+
+    /// [`Stage::render`]; without `menus`, no subject menu nor inventory:
+    /// a script's handler loop (a dialog, @ 0x00407ac0's loop drawing only
+    /// @ 0x0044bd30 and @ 0x00433910; a film, a transition) draws its own
+    /// frame, not the menus' (@ 0x0041baa0 is state 3's display only).
+    pub fn render_with(&self, out: &mut [u32], menus: bool) {
         out.fill(0);
         if let Some((film, _)) = &self.film {
             let (w, h) = film.size();
-            if let Some((back, [l, t, r, b])) = &self.film_paper {
-                // The 5-argument form's frame: `back` blitted whole, then
-                // the film's frame `Blt` into the rectangle (@ 0x00456da0:
-                // stretched, 1:1 for the scripts' calls; nearest here, the
-                // filter [UNKNOWN: DirectDraw's]).
+            // The film's draw (@ 0x00456da0): its frame `Blt` from a
+            // surface of its own size into the player's rectangle (+0x08):
+            // stretched (1:1 for the scripts' films, which have their
+            // rectangle's size; the logos, 720 × 405 and 800 × 450, fill
+            // the picture). Nearest here, the filter [UNKNOWN:
+            // DirectDraw's].
+            if let Some((back, rect)) = &self.film_paper {
+                // The 5-argument form's frame: `back` blitted whole first.
                 out.copy_from_slice(back);
-                let (rw, rh) = (r - l, b - t);
-                #[allow(
-                    clippy::cast_possible_wrap,
-                    clippy::cast_sign_loss,
-                    clippy::cast_possible_truncation
-                )]
-                if rw > 0 && rh > 0 {
-                    for y in (*t).max(0)..(*b).min(VIEW_HEIGHT as i32) {
-                        let sy = ((y - t) as usize * h) / rh as usize;
-                        for x in (*l).max(0)..(*r).min(VIEW_WIDTH as i32) {
-                            let sx = ((x - l) as usize * w) / rw as usize;
-                            out[y as usize * VIEW_WIDTH + x as usize] = film.xrgb[sy * w + sx];
-                        }
-                    }
-                }
+                stretch_into(out, &film.xrgb, w, h, *rect);
             } else {
-                let (ox, oy) = (
-                    VIEW_WIDTH.saturating_sub(w) / 2,
-                    VIEW_HEIGHT.saturating_sub(h) / 2,
-                );
-                for y in 0..h.min(VIEW_HEIGHT) {
-                    for x in 0..w.min(VIEW_WIDTH) {
-                        out[(oy + y) * VIEW_WIDTH + ox + x] = film.xrgb[y * w + x];
-                    }
-                }
+                stretch_into(out, &film.xrgb, w, h, self.film_dest);
             }
             self.draw_film_subtitle(out);
             return;
@@ -1836,9 +1952,22 @@ impl Stage {
         if self.fade > 0.0 {
             darken(out, self.fade);
         }
-        self.draw_menu(out);
-        self.draw_inventory(out);
+        if menus {
+            self.draw_menu(out);
+            self.draw_inventory(out);
+        }
         self.draw_dialog(out);
+    }
+
+    /// The start's logos (@ 0x0043d6a0): the film's rectangle is
+    /// (0, 0, width − 1, height − 1) of the display.
+    fn logo_rect(&mut self) {
+        self.film_dest = [0, 0, FULL_RECT[2] - 1, FULL_RECT[3] - 1];
+    }
+
+    /// The film's rectangle without paper (tests).
+    pub fn film_dest(&self) -> [i32; 4] {
+        self.film_dest
     }
 
     /// The 5-argument film's `back` (@ 0x0040c990, its first loop frame):
@@ -2078,6 +2207,8 @@ impl Stage {
             lips: None,
             lip_banks: Vec::new(),
         };
+        // After @ 0x00432960, before the in-menu test (dialog-player.c).
+        self.look_stop();
         let in_menu = self.menu.is_some();
         if !in_menu {
             run.facing = true;
@@ -2365,6 +2496,12 @@ impl Stage {
     }
 
     /// Whether a dialog runs.
+    /// The camera's look speeds (yaw +0x0c, pitch +0x08; radians a
+    /// second), for tests.
+    pub fn look_speed(&self) -> [f32; 2] {
+        self.speed
+    }
+
     pub fn dialog_running(&self) -> bool {
         self.dialog.is_some()
     }
@@ -3059,6 +3196,7 @@ impl Stage {
         self.persistent.clear();
         self.randomized.clear();
         self.film = None;
+        self.film_ending = false;
         self.film_subtitles = None;
         self.dialog = None;
         self.menu = None;
@@ -3140,6 +3278,7 @@ impl Engine for Stage {
                     },
                     None => None,
                 };
+                self.look_stop();
                 if self.video_play(name) {
                     if paper.is_some() {
                         // It holds the half music level (@ 0x0040ce21)
@@ -3231,20 +3370,32 @@ impl Engine for Stage {
                 self.randomized.retain(|r| &r.object != object);
             }
             Call::PersistantSpritePlay { object, priority } => {
-                // @ 0x0040ba20: once only; the `z1` of the view played
-                // with the player's default mode (1, stop, @ 0x00448c30).
+                // @ 0x0040ba20: once only; the record made first
+                // (@ 0x00442290(name, 0), whether the view has the file or
+                // not), then the `z1` of the view inserted with the call's
+                // priority (@ 0x00441830) and the player's default mode
+                // (1, stop, @ 0x00448c30).
                 if self.persistent.iter().any(|p| &p.0 == object) {
                     log::info!("persistent sprite {} already", lossy(object));
-                } else if self
-                    .add_sprite(object, b"z1", Mode::Stop, *priority, true)
-                    .is_some()
-                {
-                    self.persistent.push((object.clone(), *priority, 0.0));
+                } else {
+                    self.persistent.push((object.clone(), 0.0));
+                    let _ = self.add_sprite(object, b"z1", Mode::Stop, *priority, true);
                 }
             }
             Call::PersistantSpriteStop { object } => {
-                self.persistent.retain(|p| &p.0 != object);
-                self.sprites.retain(|s| &s.object != object);
+                // @ 0x0040bdc0: an object that is not persistent
+                // (@ 0x004421e0 false) is only logged (0x0066af38);
+                // else its record dropped (@ 0x00442350) and its sprite
+                // removed (@ 0x004414d0, 0x00441a90).
+                if self.persistent.iter().any(|p| &p.0 == object) {
+                    self.persistent.retain(|p| &p.0 != object);
+                    self.sprites.retain(|s| &s.object != object);
+                } else {
+                    log::info!(
+                        "Atl_PersistantSprite_Stop -> le sprite persistant {} n'existe pas",
+                        lossy(object)
+                    );
+                }
             }
             Call::PersistantSpriteStopAll => {
                 // @ 0x00442460.
@@ -3411,6 +3562,11 @@ impl Engine for Stage {
                 self.config.reset_for_new_session();
                 self.menu_requests.push((menus::CREDITS, Vec::new()));
             }
+            Request::GameReset => {
+                // @ 0x0042ffd0's engine part before state 2's read.
+                self.end_game();
+                self.config.reset_for_new_session();
+            }
         }
     }
 
@@ -3466,7 +3622,7 @@ impl Engine for Stage {
             sound.children.push(p);
         }
         let mut ps = element("PERSISTANT_SPRITES");
-        for (object, _, time) in &self.persistent {
+        for (object, time) in &self.persistent {
             let mut e = element("PS");
             e.attributes
                 .push(("name".into(), atlantis4_data::xml::cp1252(object)));
@@ -3517,7 +3673,7 @@ impl Engine for Stage {
                 .children_named("PS")
                 .filter_map(|e| {
                     let name = atlantis4_data::xml::to_cp1252(e.attr("name")?);
-                    Some((name, 0, get_f64(e, "time").unwrap_or(0.0)))
+                    Some((name, get_f64(e, "time").unwrap_or(0.0)))
                 })
                 .collect();
         }
@@ -3613,6 +3769,32 @@ impl Engine for Stage {
 /// over the view with α = `__ftol`(k · 255.0) (0x00655750) by @ 0x0047a8a4
 /// (32 bits per pixel; MMX, c′ = (c · 256 + (s − c) · α) >> 8 with s = 0
 /// for the colour bytes): c′ = (c · (256 − α)) >> 8 on R, G and B.
+/// The display's rectangle (left, top, right, bottom).
+#[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+const FULL_RECT: [i32; 4] = [0, 0, VIEW_WIDTH as i32, VIEW_HEIGHT as i32];
+
+/// A `w` × `h` picture stretched into `rect` (left, top, right, bottom;
+/// right and bottom excluded) of the 1024 × 576 picture, nearest pixel,
+/// clipped to the picture.
+fn stretch_into(out: &mut [u32], src: &[u32], w: usize, h: usize, [l, t, r, b]: [i32; 4]) {
+    let (rw, rh) = (r - l, b - t);
+    if rw <= 0 || rh <= 0 || w == 0 || h == 0 {
+        return;
+    }
+    #[allow(
+        clippy::cast_possible_wrap,
+        clippy::cast_sign_loss,
+        clippy::cast_possible_truncation
+    )]
+    for y in t.max(0)..b.min(VIEW_HEIGHT as i32) {
+        let sy = ((y - t) as usize * h) / rh as usize;
+        for x in l.max(0)..r.min(VIEW_WIDTH as i32) {
+            let sx = ((x - l) as usize * w) / rw as usize;
+            out[y as usize * VIEW_WIDTH + x as usize] = src[sy * w + sx];
+        }
+    }
+}
+
 fn darken(out: &mut [u32], k: f32) {
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     let a = (f64::from(k) * 255.0) as u32;
@@ -3646,8 +3828,10 @@ pub enum Hover {
 pub struct Play {
     pub game: Game,
     stage: Rc<RefCell<Stage>>,
-    /// The mouse's moves (DirectInput lX, lY) since the last frame.
-    moves: Vec<(f32, f32)>,
+    /// The mouse's move (DirectInput lX, lY) since the last frame: the
+    /// sum of the system's moves, as the original reads the device's
+    /// state once per frame.
+    moves: (f32, f32),
     /// Left clicks since the last frame.
     clicks: usize,
     hover: Option<Hover>,
@@ -3735,7 +3919,7 @@ impl Play {
         Ok(Play {
             game,
             stage,
-            moves: Vec::new(),
+            moves: (0.0, 0.0),
             clicks: 0,
             hover: None,
             menus,
@@ -3769,8 +3953,11 @@ impl Play {
             self.menus.point_of(name, &st.fonts)
         };
         let Some((x, y)) = p else { return false };
+        // A move onto the button first (the hover is tested on moves
+        // only): from beside it, then onto it; then the press.
+        self.mouse_at(x + 1, y);
+        self.update(0.0);
         self.mouse_at(x, y);
-        // The move first (the hover), then the press.
         self.update(0.0);
         self.click();
         true
@@ -3826,7 +4013,9 @@ impl Play {
     /// The next logo, or the main menu once they have played.
     fn next_logo(&mut self) {
         while let Some(name) = self.logos.pop() {
-            if self.stage.borrow_mut().video_play(name.as_bytes()) {
+            let mut st = self.stage.borrow_mut();
+            if st.video_play(name.as_bytes()) {
+                st.logo_rect();
                 return;
             }
         }
@@ -3866,13 +4055,14 @@ impl Play {
     /// camera's step (@ 0x0042cf80), the clicks on what the last frame's
     /// pick found (@ 0x004300d0), the timers (@ 0x00435a70); then the pick
     /// for the next frame: the zone under the centre (@ 0x00430740) or,
-    /// with none, the sprite (@ 0x00430b70). Moves and clicks outside play
-    /// are dropped.
+    /// with none, the sprite (@ 0x00430b70), the cursor (@ 0x0042c030);
+    /// last the scene's update (@ 0x0044c380, the sprites' step) and the
+    /// sound (@ 0x00459fd0). Moves and clicks outside play are dropped.
     pub fn update(&mut self, dt: f64) {
         if self.logos_playing() {
             // The logos' loop (@ 0x0043d6a0): the film's steps only.
             self.clicks = 0;
-            self.moves.clear();
+            self.moves = (0.0, 0.0);
             self.stage.borrow_mut().update(dt, false, true);
             let ended = std::mem::take(&mut self.stage.borrow_mut().wait_ended);
             if ended && !self.stage().film_playing() {
@@ -3882,26 +4072,19 @@ impl Play {
         }
         self.game.set_fov(self.stage.borrow().fov);
         let play = self.game.state() == 4 && !self.game.busy();
-        let moves = std::mem::take(&mut self.moves);
+        let (dx, dy) = std::mem::take(&mut self.moves);
         let clicks = std::mem::take(&mut self.clicks);
-        if play {
+        // One move event a frame at most (@ 0x0047c8a0: one
+        // `GetDeviceState` of the mouse, the move handler called once when
+        // lX, lY or lZ is not 0), so the look's rule (a third of a speed
+        // against the move taken off, the ±6 clamp, @ 0x0042cdc0) runs
+        // once on the frame's whole move, whatever the mouse's report rate.
+        if play && (dx != 0.0 || dy != 0.0) {
             #[allow(clippy::cast_possible_truncation)]
-            let dtf = dt as f32;
-            let mut st = self.stage.borrow_mut();
-            for (dx, dy) in moves {
-                st.look(dx, dy, dtf);
-            }
+            self.stage.borrow_mut().look(dx, dy, dt as f32);
         }
         // The modes asked by the last frame's scripts.
-        let requests = std::mem::take(&mut self.stage.borrow_mut().menu_requests);
-        for (mode, arg) in requests {
-            if mode == menus::DEATH {
-                self.menus.set_death_text(&lossy(&arg));
-            } else if mode == menus::EXAMINE {
-                self.menus.set_examine_item(&arg);
-            }
-            self.menus.request(mode);
-        }
+        self.take_menu_requests();
         // State 3 (the menus' frame @ 0x0041b780): the mode's process
         // first, then the scene's update (@ 0x0044c380 → the sprites'
         // step @ 0x00441c30) for modes 8, 9 and 0xc only (the inventory,
@@ -3917,7 +4100,7 @@ impl Play {
         if self.stage.borrow().dialog_running() {
             self.stage.borrow_mut().clicks += clicks;
         }
-        self.stage.borrow_mut().update(dt, play, scene);
+        self.stage.borrow_mut().update_start(dt, play);
         if std::mem::take(&mut self.stage.borrow_mut().wait_ended) {
             self.game.finish_wait();
         }
@@ -3939,6 +4122,37 @@ impl Play {
             self.pick();
         }
         self.cursor_frame(dt);
+        // The scene's update and the sound last (@ 0x0042f000 case 4:
+        // after the events, the timers, the pick and the cursor).
+        self.stage.borrow_mut().update_scene(dt, scene);
+        // Then, on the normal path and after the catch alike
+        // (0x0042f464..0x0042f471), a sprite found by the pick (+0x3c)
+        // is picked again (@ 0x00430b70, which clears +0x3c first) on the
+        // frames the step just made: the next frame's clicks
+        // (@ 0x004300d0) never aim at a sprite gone or moved away.
+        if self.game.state() == 4
+            && !self.game.busy()
+            && matches!(self.hover, Some(Hover::Sprite(..)))
+        {
+            if let Some(cursor) = self.pick_sprite() {
+                self.stage.borrow_mut().cursor = Some(cursor);
+            }
+        }
+    }
+
+    /// The modes the scripts asked (`Atl_GameOver`, `Atl_ExamineItem`,
+    /// `Atl_PuzzlePoker_Start`), queued in the menus. The original's
+    /// handlers queue them in the menus at the call.
+    fn take_menu_requests(&mut self) {
+        let requests = std::mem::take(&mut self.stage.borrow_mut().menu_requests);
+        for (mode, arg) in requests {
+            if mode == menus::DEATH {
+                self.menus.set_death_text(&lossy(&arg));
+            } else if mode == menus::EXAMINE {
+                self.menus.set_examine_item(&arg);
+            }
+            self.menus.request(mode);
+        }
     }
 
     /// The game's cursor this frame. Loaded in state 4 (@ 0x0042fb90:
@@ -4050,18 +4264,23 @@ impl Play {
             self.hover = Some(Hover::Zone(id, name));
             return;
         }
-        let hit = st.sprite_at_centre();
-        let view = st.view_number().unwrap_or(0);
         drop(st);
-        self.hover = None;
-        let mut cursor = None;
-        if let Some((object, animation)) = hit {
-            if let Some(c) = self.game.sprite_cursor(&object, view) {
-                cursor = Some(c);
-                self.hover = Some(Hover::Sprite(object, animation));
-            }
-        }
+        let cursor = self.pick_sprite();
         self.stage.borrow_mut().cursor = cursor;
+    }
+
+    /// The sprite pick (@ 0x00430b70): the hover cleared, then the
+    /// sprite under the centre that is a target; its cursor type.
+    fn pick_sprite(&mut self) -> Option<i32> {
+        let (hit, view) = {
+            let st = self.stage.borrow();
+            (st.sprite_at_centre(), st.view_number().unwrap_or(0))
+        };
+        self.hover = None;
+        let (object, animation) = hit?;
+        let c = self.game.sprite_cursor(&object, view)?;
+        self.hover = Some(Hover::Sprite(object, animation));
+        Some(c)
     }
 
     /// State 3 (@ 0x0042f000 → @ 0x0041b780): the menu's process. The
@@ -4092,6 +4311,7 @@ impl Play {
             // A mode queued meanwhile (`Atl_PuzzlePoker_Start` from a
             // subject's script): the manager stays in state 3 and opens it
             // at the next frame (@ 0x0041b780).
+            self.take_menu_requests();
             if !self.menus.active() {
                 self.game.menu_closed();
             }
@@ -4142,7 +4362,15 @@ impl Play {
             let mouse = self.menus.mouse;
             let closed = {
                 let stage = self.stage.clone();
-                let measure = |f: &str, t: &str, w: i32| stage.borrow().fonts.text_height(f, t, w);
+                // @ 0x00461800's last argument: partitioned at `w` or not.
+                let measure = |f: &str, t: &str, w: i32, partition: bool| {
+                    let st = stage.borrow();
+                    if partition {
+                        st.fonts.text_height(f, t, w)
+                    } else {
+                        st.fonts.text_height_raw(f, t)
+                    }
+                };
                 let mut host = PokerHost {
                     game: &mut self.game,
                     stage: &self.stage,
@@ -4152,8 +4380,10 @@ impl Play {
             };
             if closed {
                 // Its process returned 1: mode 0xd; with a mode queued
-                // (the death panel of `Atl_GameOver`) the manager stays in
-                // state 3, else it takes its next request.
+                // (the death panel of `Atl_GameOver`, which the board's
+                // `OnLose` may have asked in this very frame) the manager
+                // stays in state 3, else it takes its next request.
+                self.take_menu_requests();
                 if !self.menus.active() {
                     self.game.menu_closed();
                 }
@@ -4194,6 +4424,7 @@ impl Play {
         // A save page's slot not written: its autosave copy is left as it
         // was too, so the slot and its `autoslot_<n>` stay a pair.
         let mut save_failed = false;
+        let mut load_failed = false;
         for e in self.menus.take_effects() {
             if save_failed && matches!(e, Effect::Delete(_) | Effect::Copy { .. }) {
                 continue;
@@ -4202,7 +4433,22 @@ impl Play {
                 save_failed = !self.game.save_now(file);
                 continue;
             }
+            if let Effect::Load(file) = &e {
+                load_failed = !self.game.load_file(file);
+                continue;
+            }
             self.menu_effect(e);
+        }
+        if let (true, Some(mode)) = (load_failed, ended) {
+            // A save that exists but cannot be read (empty, cut short,
+            // not an `ATL_FILE`): nothing is queued, and with the menu
+            // closed the manager would go round states 0 and 3 with no
+            // menu. The original closes the page after its reader
+            // whatever the read did (0x00418c29) and leaves the menus with
+            // no mode; Native opens the page again.
+            log::warn!("the save could not be read: its page again");
+            self.menus.request(mode);
+            return;
         }
         if ended.is_some() {
             if self.sound_held {
@@ -4360,6 +4606,19 @@ impl Play {
         self.menus.mouse_at(x, y);
     }
 
+    /// A relative move of the mouse in a menu (DirectInput's lX, lY,
+    /// @ 0x0047c8a0): the menus' mouse moved by it and kept within
+    /// 0..=1024, 0..=576 (@ 0x0040d890).
+    pub fn mouse_by(&mut self, dx: i32, dy: i32) {
+        let (x, y) = self.menus.mouse;
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
+        self.mouse_at(
+            x.saturating_add(dx).clamp(0, w),
+            y.saturating_add(dy).clamp(0, h),
+        );
+    }
+
     /// The drawn cursor moved where the stage put the mouse: a mode's
     /// initialize puts it at the screen's centre (menus.md: the subject
     /// menu's state 2, the inventory's open), where both the hit tests
@@ -4390,9 +4649,13 @@ impl Play {
     }
 
     /// A mouse move of (dx, dy) (DirectInput's relative lX, lY), taken at
-    /// the next frame.
+    /// the next frame: the moves of a frame add up into one, as the
+    /// device's state the original reads once per frame (@ 0x0047c8a0).
+    /// Every front end (mouse, pointer lock, touch drag) may call it once
+    /// per system event.
     pub fn look(&mut self, dx: f32, dy: f32) {
-        self.moves.push((dx, dy));
+        self.moves.0 += dx;
+        self.moves.1 += dy;
     }
 
     /// A press of the left button (the mouse event of kind 0 with the
@@ -4577,7 +4840,11 @@ impl Play {
     /// over the view, with the menus' cursor).
     pub fn render(&self, out: &mut [u32]) {
         let st = self.stage.borrow();
-        st.render(out);
+        // A script waiting in a handler's loop (a subject's or an
+        // inventory click's dialog, film or transition) draws that loop's
+        // frame: no menu, no menus' cursor.
+        let busy = self.game.busy();
+        st.render_with(out, !busy);
         if self.cursor_drawn() {
             self.cursor.draw(out, st.config.crosshair);
         }
@@ -4595,7 +4862,7 @@ impl Play {
                     self.menus.draw_cursor(out);
                 }
             }
-        } else if st.inventory_open_now() || st.menu_open_now() {
+        } else if !busy && (st.inventory_open_now() || st.menu_open_now()) {
             self.menus.draw_cursor(out);
             st.draw_inventory_over_cursor(out);
         }
@@ -4679,6 +4946,52 @@ mod tests {
 
     fn stage() -> Stage {
         Stage::new(Arc::new(NoFiles), "french", None)
+    }
+
+    #[test]
+    fn a_film_is_stretched_into_its_rectangle() {
+        // A 2 × 2 film into the logos' rectangle: each source pixel fills
+        // a quarter of (0, 0, 1023, 575); the last column and row stay.
+        let src = [1, 2, 3, 4];
+        let mut out = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        stretch_into(&mut out, &src, 2, 2, [0, 0, 1023, 575]);
+        let at = |x: usize, y: usize| out[y * VIEW_WIDTH + x];
+        assert_eq!(
+            (
+                at(0, 0),
+                at(510, 286),
+                at(512, 0),
+                at(0, 288),
+                at(1022, 574)
+            ),
+            (1, 1, 2, 3, 4)
+        );
+        assert_eq!((at(1023, 0), at(0, 575)), (0, 0));
+        // 1:1 into the display's rectangle.
+        let src: Vec<u32> = (0..VIEW_WIDTH * VIEW_HEIGHT).map(|i| i as u32).collect();
+        let mut out = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        stretch_into(&mut out, &src, VIEW_WIDTH, VIEW_HEIGHT, FULL_RECT);
+        assert_eq!(out, src);
+    }
+
+    #[test]
+    fn a_look_at_after_no_fx_shows_its_angles_at_once() {
+        let mut s = stage();
+        s.set_yaw(0.0);
+        // `Atl_Camera_ActivateFx("NoFx")` keeps the camera's rotation
+        // (@ 0x0042cd50) until the setters rebuild it: the 2-argument
+        // `Atl_Camera_LookAt` (@ 0x00406f00) calls them (@ 0x004447a0,
+        // @ 0x004448c0), so the next picture has its angles.
+        s.call(&Call::CameraActivateFx(CameraFx::NoFx));
+        s.call(&Call::CameraLookAt {
+            pitch: 0.0,
+            yaw: 270.0,
+            animated: false,
+        });
+        let mut want = stage();
+        want.set_pitch(0.0);
+        want.set_yaw(270.0);
+        assert_eq!(s.camera().q, want.camera().q);
     }
 
     #[test]
@@ -4854,6 +5167,61 @@ mod tests {
         assert_eq!((s.fov, s.fade), (1.0, 0.25));
         s.request(&Request::TransitionEnd);
         assert_eq!(s.fade, 0.0);
+    }
+
+    /// A decoder that gives `left` frames, then none.
+    struct Frames(usize);
+
+    impl MusicDecoder for Frames {
+        fn read_frames(&mut self, out: &mut Vec<i16>, max: usize) -> usize {
+            let n = self.0.min(max);
+            self.0 -= n;
+            out.extend(std::iter::repeat_n(0, 2 * n));
+            n
+        }
+    }
+
+    #[test]
+    fn a_music_file_without_sound_ends_even_played_for_ever() {
+        // 999 plays (for ever) of a file that gives no frame: the feed
+        // ends instead of opening it again without end.
+        let (mut pushed, mut done, mut plays) = (0, false, -1);
+        feed_music(
+            &mut Frames(0),
+            &mut pushed,
+            &mut done,
+            &mut plays,
+            44_100,
+            || Some(Frames(0)),
+            |_| {},
+        );
+        assert!(done);
+        assert_eq!(pushed, 0);
+        // A file with sound starts again for ever, and 3 plays end.
+        let (mut pushed, mut done) = (0, false);
+        feed_music(
+            &mut Frames(1000),
+            &mut pushed,
+            &mut done,
+            &mut plays,
+            44_100,
+            || Some(Frames(1000)),
+            |_| {},
+        );
+        assert!(!done);
+        assert!(pushed >= 44_100);
+        let (mut pushed, mut done, mut plays) = (0, false, 3);
+        feed_music(
+            &mut Frames(1000),
+            &mut pushed,
+            &mut done,
+            &mut plays,
+            44_100,
+            || Some(Frames(1000)),
+            |_| {},
+        );
+        assert!(done);
+        assert_eq!((pushed, plays), (3000, 1));
     }
 
     /// The half music level (@ 0x0045caf0 / 0x0045cb20): the first holder

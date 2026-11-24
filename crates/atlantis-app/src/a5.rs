@@ -174,7 +174,8 @@ fn language(src: &Atlantis5Source) -> String {
 struct Start {
     src: Arc<Atlantis5Source>,
     lang: String,
-    audio: Audio,
+    /// The mixer, none when no sound output could be opened.
+    audio: Option<Audio>,
     warm: std::thread::JoinHandle<()>,
     /// How far the films' folder is decoded (the bar on the black
     /// screen): (decoded up to, the logo's offset in it).
@@ -187,7 +188,7 @@ struct Start {
 /// about 460 MB with the French DVD, a step at a time: the port's own,
 /// the original plays from its install. Later runs start from the kept
 /// checkpoints, at once.
-fn start(src: Arc<Atlantis5Source>, lang: String, audio: Audio) -> Start {
+fn start(src: Arc<Atlantis5Source>, lang: String, audio: Option<Audio>) -> Start {
     let s = src.clone();
     let progress = Arc::new((AtomicU64::new(0), AtomicU64::new(0)));
     let p = progress.clone();
@@ -223,6 +224,28 @@ fn start(src: Arc<Atlantis5Source>, lang: String, audio: Audio) -> Start {
 /// (play.md § 6), at 60 Hz, the common refresh [INFERRED there].
 const FRAME: std::time::Duration = std::time::Duration::from_micros(16_667);
 
+/// Until when the event loop sleeps: the next frame's time, or, while a
+/// redraw asked for has not come (a hidden, minimised or covered window,
+/// whose redraws the system holds back), a frame from now: a wake per
+/// frame instead of a loop that never sleeps.
+fn wait_until(next_frame: Instant, redraw_pending: bool, now: Instant) -> Instant {
+    if redraw_pending && next_frame <= now {
+        now + FRAME
+    } else {
+        next_frame
+    }
+}
+
+/// The next frame's time after a frame run at `now`: [`FRAME`] after the
+/// last one's, not before `now` (fell behind: no catching up) and never
+/// past `now` + [`FRAME`]. Every redraw runs a frame, the system's own too
+/// (a live resize, an expose); without the bound, each one that comes
+/// before its time moved the schedule a further frame ahead, and after a
+/// burst of them the game stood still until that time came.
+fn next_frame_after(next_frame: Instant, now: Instant) -> Instant {
+    (next_frame + FRAME).clamp(now, now + FRAME)
+}
+
 /// The decoding's step before the game starts (uncompressed bytes).
 const WARM_STEP: u64 = 4 << 20;
 
@@ -234,14 +257,20 @@ struct A5App {
     fullscreen: bool,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// The picture's column of each window column ([`Self::present`]).
+    #[cfg(not(target_os = "android"))]
+    columns: Vec<usize>,
     last: Instant,
     /// When the next frame is due ([`FRAME`] after the last one's).
     next_frame: Instant,
+    /// A redraw was asked for and has not come yet.
+    redraw_pending: bool,
     /// Whether the window has the focus (the mouse's moves turn the view
-    /// only then).
+    /// or move the menus' mouse only then; the pointer is held only then).
     focused: bool,
-    /// Whether the mouse is free for a menu.
-    menu_cursor: bool,
+    /// The fractions of the mouse's relative moves not yet given to a
+    /// menu (some systems report them below a pixel).
+    menu_move: (f64, f64),
     _audio: Option<cpal::Stream>,
     /// Why the game could not be made, for the caller.
     error: Option<String>,
@@ -259,24 +288,6 @@ struct A5App {
 }
 
 impl A5App {
-    /// The picture's place in the window: (x, y, width, height).
-    #[cfg(not(target_os = "android"))]
-    fn place(&self) -> (usize, usize, usize, usize) {
-        let Some(window) = &self.window else {
-            return (0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-        };
-        let size = window.inner_size();
-        let (ww, wh) = (size.width.max(1) as usize, size.height.max(1) as usize);
-        let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
-        let (dw, dh) = if ww * gh > wh * gw {
-            (wh * gw / gh, wh)
-        } else {
-            (ww, ww * gh / gw)
-        };
-        let (dw, dh) = (dw.max(1), dh.max(1));
-        ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
-    }
-
     /// Android: the picture through [`crate::android_frame`] at its own
     /// size, scaled by the system's composer, with the bag and menu
     /// buttons in the black bars (not during a film).
@@ -316,10 +327,11 @@ impl A5App {
 
     #[cfg(not(target_os = "android"))]
     fn present(&mut self) {
-        let (ox, oy, dw, dh) = self.place();
         let (Some(window), Some(surface)) = (&self.window, self.surface.as_mut()) else {
             return;
         };
+        // The window's size read once: the placement and the buffer are
+        // both made from it (a second read may differ during a resize).
         let size = window.inner_size();
         let (ww, wh) = (size.width.max(1) as usize, size.height.max(1) as usize);
         let (Some(w), Some(h)) = (NonZeroU32::new(ww as u32), NonZeroU32::new(wh as u32)) else {
@@ -331,18 +343,25 @@ impl A5App {
         let Ok(mut buf) = surface.buffer_mut() else {
             return;
         };
-        // The picture at its proportions, black bars around, nearest
-        // pixel.
-        let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
-        buf.fill(0);
-        for y in 0..dh {
-            let row = &self.picture[(y * gh / dh) * gw..][..gw];
-            let out = &mut buf[(oy + y) * ww + ox..][..dw];
-            for (x, o) in out.iter_mut().enumerate() {
-                *o = row[x * gw / dw] & 0x00ff_ffff;
-            }
-        }
+        scale_into(&mut buf, (ww, wh), &self.picture, &mut self.columns);
         let _ = buf.present();
+    }
+
+    /// The pointer held in the window while it has the focus, in play and
+    /// in the menus alike (the original reads the mouse's relative moves
+    /// through DirectInput throughout), and let go when another program
+    /// takes the focus.
+    fn grab(&self) {
+        let Some(window) = &self.window else {
+            return;
+        };
+        if self.focused {
+            let _ = window
+                .set_cursor_grab(CursorGrabMode::Locked)
+                .or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined));
+        } else {
+            let _ = window.set_cursor_grab(CursorGrabMode::None);
+        }
     }
 
     /// The game, made once the start's reads end (black until then).
@@ -364,7 +383,7 @@ impl A5App {
             return false;
         };
         let _ = start.warm.join();
-        match Play::new(start.src, &start.lang, Some(start.audio)) {
+        match Play::new(start.src, &start.lang, start.audio) {
             Ok(mut play) => {
                 // The saves (`saves/autoslot`, `slot_<n>`) in the player's
                 // data folder; their dates in local time.
@@ -385,7 +404,8 @@ impl A5App {
     }
 
     fn frame(&mut self, el: &ActiveEventLoop) {
-        self.next_frame = (self.next_frame + FRAME).max(Instant::now());
+        self.redraw_pending = false;
+        self.next_frame = next_frame_after(self.next_frame, Instant::now());
         if !self.ready(el) {
             self.present();
             return;
@@ -410,19 +430,6 @@ impl A5App {
         if play.quit_requested() {
             el.exit();
             return;
-        }
-        // A menu frees the mouse (the game draws its cursor); play holds
-        // it. The system cursor stays hidden (ShowCursor(0), @ 0x0043c200).
-        let menu = play.in_menu();
-        if menu != self.menu_cursor {
-            self.menu_cursor = menu;
-            if let Some(w) = &self.window {
-                if menu {
-                    let _ = w.set_cursor_grab(CursorGrabMode::None);
-                } else if w.set_cursor_grab(CursorGrabMode::Locked).is_err() {
-                    let _ = w.set_cursor_grab(CursorGrabMode::Confined);
-                }
-            }
         }
         play.render(&mut self.picture);
         self.present();
@@ -475,23 +482,35 @@ impl ApplicationHandler for A5App {
         // The original hides the system cursor (ShowCursor(0) at start,
         // @ 0x0043c200) and reads the mouse's relative moves (DirectInput).
         window.set_cursor_visible(false);
-        if window.set_cursor_grab(CursorGrabMode::Locked).is_err() {
-            let _ = window.set_cursor_grab(CursorGrabMode::Confined);
-        }
         self.window = Some(window);
         self.focused = true;
         // (Android: a window made again, the app back from the
         // background: the game goes on where it was)
+        self.grab();
         self.last = Instant::now();
     }
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta } = event {
-            if self.focused {
+            if !self.focused {
+                return;
+            }
+            let Some(p) = self.play.as_mut() else {
+                return;
+            };
+            if p.in_menu() {
+                // The menus move their mouse by the relative moves
+                // (menus.md § 2: @ 0x0040d920, kind 2, through
+                // @ 0x0040d890), from the screen's centre where each mode
+                // starts it.
+                let (fx, fy) = (self.menu_move.0 + delta.0, self.menu_move.1 + delta.1);
+                let (ix, iy) = (fx.trunc(), fy.trunc());
+                self.menu_move = (fx - ix, fy - iy);
                 #[allow(clippy::cast_possible_truncation)]
-                if let Some(p) = self.play.as_mut() {
-                    p.look(delta.0 as f32, delta.1 as f32);
-                }
+                p.mouse_by(ix as i32, iy as i32);
+            } else {
+                #[allow(clippy::cast_possible_truncation)]
+                p.look(delta.0 as f32, delta.1 as f32);
             }
         }
     }
@@ -503,6 +522,7 @@ impl ApplicationHandler for A5App {
         if let StartCause::ResumeTimeReached { .. } = cause {
             if let Some(w) = &self.window {
                 w.request_redraw();
+                self.redraw_pending = true;
             }
         }
     }
@@ -527,7 +547,8 @@ impl ApplicationHandler for A5App {
             el.set_control_flow(ControlFlow::Wait);
             return;
         }
-        el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
+        let until = wait_until(self.next_frame, self.redraw_pending, Instant::now());
+        el.set_control_flow(ControlFlow::WaitUntil(until));
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -546,9 +567,16 @@ impl ApplicationHandler for A5App {
                 return;
             }
         }
+        // The focus in every phase, the start's bar included: the pointer
+        // let go when another program takes it, held again on its return.
+        if let WindowEvent::Focused(f) = event {
+            self.focused = f;
+            self.grab();
+            return;
+        }
         if self.play.is_none() {
-            // Black while the start's reads go on: only closing and the
-            // redraws that make the game once they end.
+            // Black while the start's reads go on: only closing, the focus
+            // (above) and the redraws that make the game once they end.
             match event {
                 WindowEvent::CloseRequested => el.exit(),
                 WindowEvent::RedrawRequested => self.frame(el),
@@ -561,7 +589,12 @@ impl ApplicationHandler for A5App {
         };
         match event {
             WindowEvent::CloseRequested => el.exit(),
-            WindowEvent::KeyboardInput { event, .. } if event.state == ElementState::Pressed => {
+            // A key's press, not the system's repeats of a held key: the
+            // original reads the keyboard's buffered DirectInput data
+            // (@ 0x0047c8a0, GetDeviceData), one event per transition.
+            WindowEvent::KeyboardInput { event, .. }
+                if event.state == ElementState::Pressed && !event.repeat =>
+            {
                 match event.logical_key {
                     // Escape (DIK 1): a film ends, or the in-game menu.
                     Key::Named(NamedKey::Escape) => play.escape(),
@@ -580,7 +613,6 @@ impl ApplicationHandler for A5App {
                     _ => {}
                 }
             }
-            WindowEvent::Focused(f) => self.focused = f,
             // A press of the left button: the original's mouse event of
             // kind 0 with the buttons 1 (@ 0x0043bbc0).
             WindowEvent::MouseInput {
@@ -593,22 +625,6 @@ impl ApplicationHandler for A5App {
                 button: MouseButton::Right,
                 ..
             } => play.right_press(),
-            // In a menu the mouse moves a cursor on the picture.
-            WindowEvent::CursorMoved { position, .. } => {
-                if let Some(w) = &self.window {
-                    let size = w.inner_size();
-                    let (ww, wh) = (f64::from(size.width.max(1)), f64::from(size.height.max(1)));
-                    #[allow(clippy::cast_precision_loss)]
-                    let (gw, gh) = (VIEW_WIDTH as f64, VIEW_HEIGHT as f64);
-                    let k = (ww / gw).min(wh / gh);
-                    let (ox, oy) = ((ww - gw * k) / 2.0, (wh - gh * k) / 2.0);
-                    #[allow(clippy::cast_possible_truncation)]
-                    play.mouse_at(
-                        ((position.x - ox) / k) as i32,
-                        ((position.y - oy) / k) as i32,
-                    );
-                }
-            }
             WindowEvent::RedrawRequested => self.frame(el),
             _ => {}
         }
@@ -654,7 +670,7 @@ pub fn run_source_on(
     let src = Arc::new(src);
     let mut app = A5App {
         play: None,
-        start: Some(start(src, lang, audio)),
+        start: Some(start(src, lang, mixer_for_play(audio, out.is_some()))),
         error: None,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
         title: format!(
@@ -664,10 +680,13 @@ pub fn run_source_on(
         fullscreen,
         window: None,
         surface: None,
+        #[cfg(not(target_os = "android"))]
+        columns: Vec::new(),
         last: Instant::now(),
         next_frame: Instant::now(),
+        redraw_pending: false,
         focused: false,
-        menu_cursor: false,
+        menu_move: (0.0, 0.0),
         _audio: out,
         #[cfg(target_os = "android")]
         frame: None,
@@ -684,6 +703,15 @@ pub fn run_source_on(
     Ok(crate::a2::Ended::Quit)
 }
 
+/// The mixer the game is given: none without a sound output, so that the
+/// engine times a voice, a sound or a music track by its length (the
+/// mixer's queues drain only in the output's callback: given the mixer,
+/// a voiced tirade would never end by itself and no playlist would move
+/// on).
+fn mixer_for_play(audio: Audio, output: bool) -> Option<Audio> {
+    output.then_some(audio)
+}
+
 /// The cabinets' checkpoint indexes: `atlantis5/cabinets` in the per-user
 /// data folder (about 26 MB for the French DVD once played through its
 /// largest folders; deleting it only makes the next run slower).
@@ -691,6 +719,55 @@ pub fn cab_index_dir() -> std::path::PathBuf {
     crate::desktop::data_dir()
         .join("atlantis5")
         .join("cabinets")
+}
+
+/// The picture's place in a window of `ww` × `wh`: (x, y, width,
+/// height), at its proportions, centred.
+#[cfg(not(target_os = "android"))]
+fn place(ww: usize, wh: usize) -> (usize, usize, usize, usize) {
+    let (ww, wh) = (ww.max(1), wh.max(1));
+    let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
+    let (dw, dh) = if ww * gh > wh * gw {
+        (wh * gw / gh, wh)
+    } else {
+        (ww, ww * gh / gw)
+    };
+    let (dw, dh) = (dw.max(1), dh.max(1));
+    ((ww - dw) / 2, (wh - dh) / 2, dw, dh)
+}
+
+/// The game's picture into a window buffer of `ww` × `wh` (row by row):
+/// at its proportions, black bars around, nearest pixel. Each window
+/// column's picture column is computed once per size in `columns` (a
+/// division a pixel is dear on a small ARM board). A buffer smaller than
+/// the size given is left alone rather than overrun.
+#[cfg(not(target_os = "android"))]
+fn scale_into(
+    buf: &mut [u32],
+    (ww, wh): (usize, usize),
+    picture: &[u32],
+    columns: &mut Vec<usize>,
+) {
+    let (gw, gh) = (VIEW_WIDTH, VIEW_HEIGHT);
+    if ww == 0 || wh == 0 || buf.len() < ww * wh || picture.len() < gw * gh {
+        return;
+    }
+    let (ox, oy, dw, dh) = place(ww, wh);
+    if columns.len() != dw {
+        *columns = (0..dw).map(|x| x * gw / dw).collect();
+    }
+    let buf = &mut buf[..ww * wh];
+    buf[..oy * ww].fill(0);
+    buf[(oy + dh) * ww..].fill(0);
+    for y in 0..dh {
+        let row = &picture[(y * gh / dh) * gw..][..gw];
+        let line = &mut buf[(oy + y) * ww..][..ww];
+        line[..ox].fill(0);
+        line[ox + dw..].fill(0);
+        for (o, &c) in line[ox..ox + dw].iter_mut().zip(columns.iter()) {
+            *o = row[c] & 0x00ff_ffff;
+        }
+    }
 }
 
 /// The player's saves: `atlantis5/saves` in the per-user data folder.
@@ -865,5 +942,77 @@ impl A5App {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn without_a_sound_output_the_game_times_its_sounds() {
+        assert!(mixer_for_play(Audio::new(), false).is_none());
+        assert!(mixer_for_play(Audio::new(), true).is_some());
+    }
+
+    #[test]
+    fn the_picture_fits_any_window_and_never_overruns_its_buffer() {
+        let picture: Vec<u32> = (0..VIEW_WIDTH * VIEW_HEIGHT)
+            .map(|i| 0xff00_0000 | i as u32)
+            .collect();
+        let mut columns = Vec::new();
+        // A window wider than 16:9: bars left and right.
+        let (ww, wh) = (1200, 576);
+        let mut buf = vec![0xdead_beef; ww * wh];
+        scale_into(&mut buf, (ww, wh), &picture, &mut columns);
+        assert_eq!(place(ww, wh), (88, 0, 1024, 576));
+        assert_eq!(buf[0], 0);
+        assert_eq!(buf[88], picture[0] & 0x00ff_ffff);
+        assert_eq!(buf[88 + 1024], 0);
+        // The size changed between the reads (a buffer of the new, smaller
+        // size given with the old size, and the other way): no panic, the
+        // columns follow the size actually drawn.
+        let mut small = vec![0xdead_beef; 900 * 506];
+        scale_into(&mut small, (1024, 576), &picture, &mut columns);
+        assert!(small.iter().all(|&p| p == 0xdead_beef));
+        let mut big = vec![0xdead_beef; 1024 * 576];
+        scale_into(&mut big, (900, 506), &picture, &mut columns);
+        assert_eq!(columns.len(), place(900, 506).2);
+        // Every size from 1 × 1 up, odd ones included.
+        for (ww, wh) in [(1, 1), (3, 1000), (1000, 3), (1023, 577), (2560, 1440)] {
+            let mut buf = vec![0xdead_beef; ww * wh];
+            scale_into(&mut buf, (ww, wh), &picture, &mut columns);
+            let (ox, oy, dw, dh) = place(ww, wh);
+            assert!(ox + dw <= ww && oy + dh <= wh, "{ww}x{wh}");
+            assert!(buf.iter().all(|&p| p != 0xdead_beef), "{ww}x{wh}");
+        }
+    }
+
+    #[test]
+    fn system_redraws_do_not_push_the_next_frame_away() {
+        let now = Instant::now();
+        // A live resize: 200 redraws in the same instant.
+        let mut next = now;
+        for _ in 0..200 {
+            next = next_frame_after(next, now);
+        }
+        assert_eq!(next, now + FRAME);
+        // On time: a frame after the last; late: from now.
+        assert_eq!(next_frame_after(now, now + FRAME / 2), now + FRAME);
+        let late = now + FRAME * 5;
+        assert_eq!(next_frame_after(now, late), late);
+    }
+
+    #[test]
+    fn a_redraw_that_does_not_come_does_not_spin_the_loop() {
+        let now = Instant::now();
+        let past = now - FRAME * 3;
+        let soon = now + FRAME / 2;
+        // A redraw asked for and not delivered: a frame from now.
+        assert_eq!(wait_until(past, true, now), now + FRAME);
+        // Otherwise the frame's own time.
+        assert_eq!(wait_until(soon, true, now), soon);
+        assert_eq!(wait_until(past, false, now), past);
+        assert_eq!(wait_until(soon, false, now), soon);
     }
 }

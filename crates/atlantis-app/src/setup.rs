@@ -665,6 +665,29 @@ mod tests {
     }
 
     #[test]
+    fn a_damaged_dvd_copy_is_still_the_fifth_game() {
+        // DATAS.cab cut short (an interrupted copy): the cabinet cannot
+        // be read, but the folder is The Secrets of Atlantis', and its
+        // error is the one the player is told.
+        let d = tmp("a5-damaged");
+        std::fs::write(d.join("DATAS.cab"), b"MSCF").unwrap();
+        assert_eq!(kind_of(&d), Some(GameKind::Atlantis5));
+        let e = atlantis3_data::atlantis5::Atlantis5Source::open(&d)
+            .err()
+            .expect("not readable");
+        assert!(matches!(
+            e,
+            atlantis3_data::atlantis5::OpenError::Cabinet(_)
+        ));
+        assert!(explain_atlantis5(&d, &e).contains("DATAS.cab"));
+        // Nothing of it: not the game.
+        let empty = tmp("a5-none");
+        assert_eq!(kind_of(&empty), None);
+        let _ = std::fs::remove_dir_all(&d);
+        let _ = std::fs::remove_dir_all(&empty);
+    }
+
+    #[test]
     fn finds_the_game_below_the_chosen_folder() {
         let d = tmp("root");
         touch(&d.join("Atlantis/game/ATLANTIS.EXE"));

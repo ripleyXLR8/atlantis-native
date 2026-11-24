@@ -86,7 +86,16 @@ struct Parser<'a> {
     at: usize,
     /// The bytes are UTF-8 (*Atlantis V*'s texts), not Windows-1252.
     utf8: bool,
+    /// The elements open around the one being read.
+    depth: usize,
 }
+
+/// The most elements open inside each other. The games' files nest fewer
+/// than ten; a damaged or made-up file nesting thousands (a few bytes a
+/// level) is an error here, where the recursion would have overflowed
+/// the stack and ended the program (a save's file would then not even be
+/// shown as unreadable).
+const MAX_DEPTH: usize = 256;
 
 /// Bytes of the file as text in its encoding. In UTF-8 mode the line
 /// ends are normalised to LF as XML 1.0 (§ 2.11) asks of every processor,
@@ -160,6 +169,16 @@ impl Parser<'_> {
     }
 
     fn element(&mut self) -> Result<Element, XmlError> {
+        if self.depth >= MAX_DEPTH {
+            return Err(self.err("elements nested too deep"));
+        }
+        self.depth += 1;
+        let el = self.element_in();
+        self.depth -= 1;
+        el
+    }
+
+    fn element_in(&mut self) -> Result<Element, XmlError> {
         // At '<'.
         self.at += 1;
         let mut el = Element {
@@ -228,14 +247,15 @@ impl Parser<'_> {
                 None => return Err(self.err("unterminated tag")),
             }
         }
-        // Content.
-        let mut text = Vec::new();
+        // Content: the text's parts with their entities decoded, and
+        // CDATA sections as they are.
+        let mut text = String::new();
         loop {
             let start = self.at;
             while self.at < self.s.len() && self.s[self.at] != b'<' {
                 self.at += 1;
             }
-            text.extend_from_slice(&self.s[start..self.at]);
+            text.push_str(&decode_entities(&self.s[start..self.at], self.utf8));
             if self.at == self.s.len() {
                 return Err(self.err("missing closing tag"));
             }
@@ -250,8 +270,33 @@ impl Parser<'_> {
                     return Err(self.err("'>' expected"));
                 }
                 self.at += 1;
-                el.text = decode_entities(&text, self.utf8).trim().to_string();
+                el.text = text.trim().to_string();
                 return Ok(el);
+            }
+            // MSXML (the UTF-8 files: *Atlantis V*'s texts and saves)
+            // gives a CDATA section's characters as text, unparsed. The
+            // TinyXML path keeps its skip of any `<!` markup.
+            if self.utf8 && self.starts(b"<![CDATA[") {
+                self.at += 9;
+                let start = self.at;
+                self.skip_past(b"]]>", "unterminated CDATA section")?;
+                text.push_str(&text_of(&self.s[start..self.at - 3], true));
+                continue;
+            }
+            if self.utf8 && self.starts(b"<!--") {
+                // One item only, so a CDATA section right after it is
+                // still read as text above, and the white space after it
+                // stays text.
+                self.skip_past(b"-->", "unterminated comment")?;
+                continue;
+            }
+            if self.utf8 && self.starts(b"<?") {
+                self.skip_past(b"?>", "unterminated declaration")?;
+                continue;
+            }
+            if self.utf8 && self.starts(b"<!") {
+                self.skip_past(b">", "unterminated markup")?;
+                continue;
             }
             if self.starts(b"<!--") || self.starts(b"<?") || self.starts(b"<!") {
                 self.skip_misc()?;
@@ -324,6 +369,7 @@ fn parse_in(data: &[u8], utf8: bool) -> Result<Vec<Element>, XmlError> {
         s: data,
         at: 0,
         utf8,
+        depth: 0,
     };
     let mut out = Vec::new();
     loop {
@@ -341,6 +387,21 @@ fn parse_in(data: &[u8], utf8: bool) -> Result<Vec<Element>, XmlError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn elements_nested_too_deep_are_an_error() {
+        let deep = |n: usize| {
+            let mut s = "<a>".repeat(n);
+            s.push_str(&"</a>".repeat(n));
+            s.into_bytes()
+        };
+        assert!(parse(&deep(MAX_DEPTH)).is_ok());
+        assert!(parse_utf8(&deep(MAX_DEPTH)).is_ok());
+        // Far deeper than any stack holds: an error, not an overflow.
+        let e = parse(&deep(1_000_000)).unwrap_err();
+        assert!(e.to_string().contains("nested too deep"), "{e}");
+        assert!(parse_utf8(&b"<a>".repeat(1_000_000)).is_err());
+    }
 
     #[test]
     fn a_rootless_file_gives_every_top_element() {
@@ -361,6 +422,26 @@ mod tests {
             parse_utf8("<d t=\"caf\u{e9}\">L\u{2019}Atlantide\u{2026}</d>".as_bytes()).unwrap();
         assert_eq!(els[0].attr("t"), Some("caf\u{e9}"));
         assert_eq!(els[0].text, "L\u{2019}Atlantide\u{2026}");
+    }
+
+    #[test]
+    fn msxml_files_read_cdata_as_text() {
+        let els = parse_utf8(
+            b"<S id=\"x\"><![CDATA[A > B &amp; <i>]]></S><T>a &amp; <![CDATA[b]]> c</T>",
+        )
+        .unwrap();
+        assert_eq!(els[0].text, "A > B &amp; <i>");
+        assert_eq!(els[1].text, "a & b c");
+        assert!(parse_utf8(b"<S><![CDATA[open</S>").is_err());
+        // After a comment or a processing instruction too, and the white
+        // space after a comment stays text.
+        let els = parse_utf8(
+            b"<S><!-- note --><![CDATA[a > b]]></S><T><?pi x?><![CDATA[c]]></T><U>a<!-- n --> b</U>",
+        )
+        .unwrap();
+        assert_eq!(els[0].text, "a > b");
+        assert_eq!(els[1].text, "c");
+        assert_eq!(els[2].text, "a b");
     }
 
     #[test]

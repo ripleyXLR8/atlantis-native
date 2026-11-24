@@ -265,6 +265,76 @@ fn a_failed_slot_save_leaves_its_autosave_copy() {
 }
 
 #[test]
+fn an_unreadable_save_keeps_its_page() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("unreadable");
+    // Present but not an `ATL_FILE`: an empty slot, a cut autosave.
+    std::fs::write(dir.join("slot_3"), b"").expect("slot_3");
+    std::fs::write(dir.join("autoslot"), b"<ATL_FILE type=\"").expect("autoslot");
+    let mut play = booted(&d, &dir);
+    assert_eq!(play.menus.current(), Some(menus::MAIN));
+    click(&mut play, "rescue_game");
+    frames(&mut play, 3);
+    assert_eq!(play.game.state(), 3);
+    assert_eq!(
+        play.menus.current(),
+        Some(menus::MAIN),
+        "the main menu again"
+    );
+    click(&mut play, "load_game");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::LOAD));
+    click(&mut play, "save_3");
+    frames(&mut play, 3);
+    assert_eq!(play.game.state(), 3);
+    assert_eq!(
+        play.menus.current(),
+        Some(menus::LOAD),
+        "the load page again"
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn a_save_whose_lua_db_fails_keeps_its_page() {
+    // @ 0x0043b210 is one try: a throw in `LUA_DB`'s read (@ 0x00439270,
+    // ReadTable @ 0x004393e0) or in `return Atl_Address_GetCurrent()`
+    // (@ 0x00454220) skips the queueing of 5 and 4 (0x0043b6f4..0x0043b7c1).
+    let Some(d) = dvd() else { return };
+    let dir = scratch("lua-db-fails");
+    let head = "<ATL_FILE type=\"atlantis_5_save\">";
+    // No `LUA_DB` at all.
+    std::fs::write(dir.join("autoslot"), format!("{head}</ATL_FILE>")).expect("autoslot");
+    // An element without its `v`.
+    std::fs::write(
+        dir.join("slot_3"),
+        format!("{head}<LUA_DB><N sk=\"x\"/></LUA_DB></ATL_FILE>"),
+    )
+    .expect("slot_3");
+    // A readable but empty `atl`: `Atl_Address_GetCurrent` raises.
+    std::fs::write(dir.join("slot_4"), format!("{head}<LUA_DB/></ATL_FILE>")).expect("slot_4");
+    let mut play = booted(&d, &dir);
+    assert_eq!(play.menus.current(), Some(menus::MAIN));
+    click(&mut play, "rescue_game");
+    frames(&mut play, 3);
+    assert_eq!(play.game.state(), 3);
+    assert_eq!(play.menus.current(), Some(menus::MAIN), "no LUA_DB");
+    for slot in ["save_3", "save_4"] {
+        click(&mut play, "load_game");
+        frames(&mut play, 1);
+        assert_eq!(play.menus.current(), Some(menus::LOAD));
+        click(&mut play, slot);
+        frames(&mut play, 3);
+        assert_eq!(play.game.state(), 3, "{slot}");
+        assert_eq!(play.menus.current(), Some(menus::LOAD), "{slot}");
+        // Back to the main menu for the next slot.
+        click(&mut play, "back");
+        frames(&mut play, 1);
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn the_option_pages_change_the_configuration() {
     let Some(d) = dvd() else { return };
     let dir = scratch("options");
@@ -393,6 +463,39 @@ fn the_examine_view_shows_an_item_and_scrolls() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// The credits page (@ 0x0040e750) measures `title` and `names` with
+/// @ 0x00461800(W, font, text, 0): not partitioned, so a line wider than
+/// the screen counts as one line for their places (the text is still
+/// drawn partitioned).
+#[test]
+fn the_credits_place_their_texts_by_their_own_lines() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("credits-wide");
+    let mut play = booted(&d, &dir);
+    let wide = "abcdefgh ".repeat(300);
+    for (id, text) in &mut play.menus.strings.strings {
+        if id == "_credits_start_name" || id == "_credits_start" {
+            *text = wide.clone();
+        }
+    }
+    click(&mut play, "credits");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::CREDITS));
+    let (one_name, one_title, wrapped) = {
+        let st = play.stage();
+        (
+            st.fonts.text_height("AtlFont_Credit", "x", 1024),
+            st.fonts.text_height("AtlFont_CreditTitle", "x", 1024),
+            st.fonts.text_height("AtlFont_Credit", &wide, 1024),
+        )
+    };
+    assert!(wrapped > one_name, "the test's line wraps");
+    let y = (VIEW_HEIGHT as i32 - one_name) / 2;
+    assert_eq!(element(&play, "names").3, y);
+    assert_eq!(element(&play, "title").3, y - one_title - 0x14);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_credits_turn_their_pages() {
     let Some(d) = dvd() else { return };
@@ -507,6 +610,8 @@ fn the_logos_play_before_the_main_menu() {
             if seen.last() != Some(&n) {
                 seen.push(n);
             }
+            // @ 0x0043d6a0: stretched into (0, 0, width − 1, height − 1).
+            assert_eq!(play.stage().film_dest(), [0, 0, 1023, 575]);
         }
         if play.menus.current() == Some(menus::MAIN) {
             break;
@@ -518,6 +623,26 @@ fn the_logos_play_before_the_main_menu() {
     assert_eq!(seen, ["Logo_Nobilis", "Logo_AIE"]);
     assert_eq!(play.menus.current(), Some(menus::MAIN));
     assert!(!play.logos_playing());
+}
+
+/// Each mode starts the menus' mouse at the screen's centre
+/// (@ 0x0041b780), and the mouse's relative moves move it from there,
+/// kept within the screen (@ 0x0040d890).
+#[test]
+fn a_menu_mouse_moves_from_the_centre() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("menu-mouse");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert_eq!(play.menus.mouse, (512, 288));
+    play.mouse_by(5, -3);
+    assert_eq!(play.menus.mouse, (517, 285));
+    play.mouse_by(-5000, 5000);
+    assert_eq!(play.menus.mouse, (0, 576));
+    let _ = std::fs::remove_dir_all(&dir);
 }
 
 /// The menus' cursor (`menu/cursor.spr`, @ 0x0040d9d0 drawn last) is on
@@ -571,10 +696,65 @@ fn the_logos_sound_plays() {
         audio.fill(&mut out, 44100, 2);
         let peak = out.iter().fold(0f32, |m, v| m.max(v.abs()));
         assert!(peak > 0.01, "{logo}: {peak}");
+        // Skipped: its sound stops at once. (The next logo opens in the
+        // next frame and its first step starts its own sound.)
         play.skip();
-        frames(&mut play, 1);
         assert!(!audio.is_playing(CHANNEL_BINK), "{logo} skipped");
+        frames(&mut play, 1);
     }
     frames(&mut play, 2);
     assert_eq!(play.menus.current(), Some(menus::MAIN));
+}
+
+/// A mode opens with one mouse move at the screen's centre (@ 0x0041b780:
+/// the frame's events emptied, @ 0x004546a0(2, 0, w >> 1, h >> 1, 0, 0)
+/// inserted before the mode's process), so the button under the centre
+/// is hot at once: a press without a move clicks it (the in-game menu's
+/// `option_control`, the save page's slot 4). A press in the opening
+/// frame itself is dropped with that frame's events.
+#[test]
+fn a_press_before_any_move_clicks_the_button_at_the_centre() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("still-mouse");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    play.click();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::CONTROL));
+    click(&mut play, "back");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    // A double click on `save`: the second press, on the page just
+    // opened, saves slot 4.
+    assert!(!dir.join("slot_4").exists());
+    assert!(play.click_menu("save"));
+    // The press's frame closes the in-game menu, the next opens the page.
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    play.click();
+    frames(&mut play, 2);
+    assert!(dir.join("slot_4").is_file(), "slot 4 written");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The opening frame's own presses are dropped (@ 0x0041b780 empties the
+/// frame's event list before it inserts the synthetic move).
+#[test]
+fn a_press_in_the_opening_frame_is_dropped() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("opening-press");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    // Escape and a press in the same frame: the menu opens, the press
+    // (on `option_control`, under the centre) is gone.
+    play.escape();
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    let _ = std::fs::remove_dir_all(&dir);
 }
