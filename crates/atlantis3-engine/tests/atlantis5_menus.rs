@@ -721,6 +721,51 @@ fn a_left_press_with_the_right_held_ends_the_inventory() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
+/// Between two chained menus (the in-game menu, then its sound page) the
+/// mode is 0xd for one frame: @ 0x0041baa0 draws neither the view (modes
+/// 8, 9, 0xc only) nor a menu, so the picture before stays and no game
+/// view shows between the pages.
+#[test]
+fn no_game_view_is_drawn_between_chained_menus() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("menu-chain");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    let mut cache = atlantis3_engine::atlantis5_play::PictureCache::default();
+    let mut px = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    assert!(play.click_menu("option_sound"));
+    let mut between = 0;
+    for _ in 0..30 {
+        play.update(1.0 / 60.0);
+        if play.menus.current().is_none() {
+            assert_eq!(play.menus.queued(), [menus::SOUND]);
+            assert_eq!(play.game.state(), 3);
+            let before = px.clone();
+            assert!(!play.render_cached(&mut px, &mut cache), "nothing drawn");
+            assert!(px == before, "the picture before kept");
+            let mut fresh = vec![0x0012_3456u32; VIEW_WIDTH * VIEW_HEIGHT];
+            play.render(&mut fresh);
+            assert!(fresh.iter().all(|&p| p == 0x0012_3456), "no view drawn");
+            between += 1;
+        } else {
+            play.render_cached(&mut px, &mut cache);
+        }
+        if play.menus.current() == Some(menus::SOUND) {
+            break;
+        }
+    }
+    assert_eq!(between, 1, "one frame between the pages");
+    assert_eq!(play.menus.current(), Some(menus::SOUND));
+    // The page's own picture next.
+    let mut full = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    play.render(&mut full);
+    assert!(px == full);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
 #[test]
 fn the_logos_play_before_the_main_menu() {
     let Some(d) = dvd() else { return };
@@ -889,15 +934,16 @@ fn a_press_in_the_opening_frame_is_dropped() {
 /// One 60 Hz frame of the desktop's loop: the step, then the picture
 /// composed only when it is not provably the one already drawn. True when
 /// it was composed; the picture is checked against a full render of
-/// every layer each time.
+/// every layer each time (over the picture before: between two chained
+/// menus nothing is drawn).
 fn frame_cached(
     play: &mut Play,
     px: &mut [u32],
     cache: &mut atlantis3_engine::atlantis5_play::PictureCache,
 ) -> bool {
     play.update(1.0 / 60.0);
+    let mut full = px.to_vec();
     let composed = play.render_cached(px, cache);
-    let mut full = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
     play.render_every_layer(&mut full);
     assert!(px == full.as_slice(), "the kept picture is the full render");
     composed
@@ -965,7 +1011,7 @@ fn an_idle_menu_is_not_composed_again() {
     // The sprite button `back`: its focus (one picture) composes once;
     // a press plays its click (two pictures at 15 a second): each new
     // picture composes, the frames between do not, until it closes the
-    // credits.
+    // credits (that frame, the main menu queued, draws nothing).
     let (x, y) = {
         let st = play.stage();
         play.menus.point_of("back", &st.fonts).expect("back")
@@ -985,7 +1031,7 @@ fn an_idle_menu_is_not_composed_again() {
     let pressed = cache.composed() - start;
     eprintln!("credits, back pressed: {pressed} compositions in {n} frames");
     assert_ne!(play.menus.current(), Some(menus::CREDITS), "closed");
-    assert!(pressed >= 3 && pressed < n, "{pressed} in {n}");
+    assert!(pressed >= 2 && pressed < n, "{pressed} in {n}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 

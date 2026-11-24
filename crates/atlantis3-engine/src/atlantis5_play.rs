@@ -5306,7 +5306,8 @@ impl Play {
 
     /// The picture (1024 × 576 x8r8g8b8): the view, then the menu up
     /// with the cursor (the subject menu and the inventory draw theirs
-    /// over the view, with the menus' cursor).
+    /// over the view, with the menus' cursor). In the frame between two
+    /// chained menus nothing is drawn: `out` keeps what it held.
     pub fn render(&self, out: &mut [u32]) {
         self.render_layers(out, true);
     }
@@ -5337,6 +5338,10 @@ impl Play {
     /// frame. `out` must not be written otherwise between the calls, or
     /// the cache be [`PictureCache::invalidate`]d.
     pub fn render_cached(&self, out: &mut [u32], cache: &mut PictureCache) -> bool {
+        // Nothing drawn this frame: `out` keeps the last picture.
+        if self.draws_nothing() && out.len() == VIEW_WIDTH * VIEW_HEIGHT {
+            return false;
+        }
         let key = self.picture();
         if key.is_some() && key == cache.shown && out.len() == VIEW_WIDTH * VIEW_HEIGHT {
             return false;
@@ -5347,7 +5352,30 @@ impl Play {
         true
     }
 
+    /// The menus' display draws nothing this frame: state 3 with the mode
+    /// 0xd (a mode ended, the next one queued and opened at the next
+    /// frame, @ 0x0041b780). @ 0x0041baa0 draws the view only for the
+    /// modes 8, 9 and 0xc and a menu only when the mode is not 0xd, so
+    /// between chained menus (the in-game menu and its pages, the
+    /// examine view and the inventory again, a board after a subject) no
+    /// game view is drawn: the picture before stays.
+    fn draws_nothing(&self) -> bool {
+        if self.game.state() != 3
+            || self.game.busy()
+            || self.poker.is_some()
+            || self.menus.current().is_some()
+            || !self.menus.active()
+        {
+            return false;
+        }
+        let st = self.stage.borrow();
+        !st.inventory_open_now() && !st.menu_open_now()
+    }
+
     fn render_layers(&self, out: &mut [u32], skip_covered: bool) {
+        if self.draws_nothing() {
+            return;
+        }
         let st = self.stage.borrow();
         // A menu whose background covers the screen: nothing drawn under
         // it shows (`Menus::render` copies the background over the whole
