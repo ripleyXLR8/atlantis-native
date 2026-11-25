@@ -2398,8 +2398,10 @@ fn compile_generic_for50(
 }
 
 /// Lua 5.0.3's `forbody`: the loop's variables active, a breakable block
-/// for the body, the jump before it patched to the loop's end, then
-/// `FORLOOP` (back to the body) or `TFORLOOP` and a jump back.
+/// holding the body's own block (`block`: its locals' `CLOSE` comes before
+/// the loop instruction, once per iteration), the jump before it patched
+/// to the loop's end, then `FORLOOP` (back to the body) or `TFORLOOP` and
+/// a jump back.
 fn for_body50(
     compiler: &mut Compiler,
     base: u32,
@@ -2411,7 +2413,7 @@ fn for_body50(
     compiler.activate_locals(nvars);
     compiler.enter_block(true);
     let prep = compiler.get_label();
-    compile_block(compiler, body)?;
+    compile_block_scoped(compiler, body)?;
     #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
     compiler.patch_to_here(prep as i32 - 1);
     if numeric {

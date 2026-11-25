@@ -89,3 +89,25 @@ fn other_chunks_are_refused() {
     cut.truncate(CHUNK.len() / 2);
     assert!(lua.load_bytes(&cut, "=x").is_err());
 }
+
+/// A local of a loop's body captured by a closure, in a state whose
+/// source is 5.0's: each iteration's closure keeps its own value (Lua
+/// 5.0.3's `forbody` compiles the body as a `block`, whose `CLOSE` comes
+/// before `FORLOOP`/`TFORLOOP`; its `lua` prints `2 4 6` and `10 20 30`).
+#[test]
+fn closures_over_a_body_local_see_each_iteration() {
+    let source = b"local fs = {}\n\
+        for i = 1, 3 do local x = i * 2; fs[i] = function() return x end end\n\
+        print(fs[1](), fs[2](), fs[3]())\n\
+        local gs = {}\n\
+        for k, v in {10, 20, 30} do local y = v; gs[k] = function() return y end end\n\
+        print(gs[1](), gs[2](), gs[3]())\n";
+    let got = run(source, |lua| {
+        let st = lua.state_mut();
+        st.gc.compile_lua50 = true;
+        st.gc.table_lua50 = true;
+        st.gc.table_max_bits = 24;
+    })
+    .expect("the 5.0 source runs");
+    assert_eq!(got, "2\t4\t6\n10\t20\t30");
+}

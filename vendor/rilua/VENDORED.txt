@@ -144,14 +144,19 @@ PATCHES
    changes the iteration, closures in the loop share it), a generic `for`
    that starts with `TForPrep50` (a table as the iterator is walked with
    `next`) and whose first variable is the control value (`TForLoop50`),
-   one breakable block for the body inside the variables' block. Lua 5.1
+   one breakable block for the body inside the variables' block, the
+   body's own block inside it (`block`: a local of the body that a
+   closure captures is closed before `ForLoop50`/`TForLoop50`, each
+   iteration, as 5.0.3's `luac` puts `CLOSE` there). Lua 5.1
    states compile as before. Atlantis V's international DVD ships its
    scripts as Lua 5.0 source (the French DVD as 5.0 chunks of the same
    sources); 6 loops iterate a table directly and failed with "attempt
    to call a table value". atlantis5-script's `Script::new` sets it.
    Reproducers: crates/atlantis5-script/tests/lua50.rs
    `a_50_source_runs_as_lua_503_runs_it` (semantics.lua run as source
-   prints what Lua 5.0.3's `lua` prints; as 5.1 source it fails) and
+   prints what Lua 5.0.3's `lua` prints; as 5.1 source it fails),
+   `closures_over_a_body_local_see_each_iteration` (2 4 6 and 10 20 30,
+   as Lua 5.0.3 prints them) and
    crates/atlantis5-script/tests/international_dvd.rs (each of the 66
    scripts' 638 functions has the loop instructions, on the same lines,
    that Lua 5.0's `luac` put in the French DVD's chunks).
