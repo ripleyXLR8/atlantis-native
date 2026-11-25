@@ -363,7 +363,7 @@ impl Atlantis5Source {
             return Some(dir);
         }
         let own = cd_set(&dir);
-        if holds_cd_volumes(&*dir) && !own.as_ref().is_some_and(|s| cds_complete(s)) {
+        if holds_cd_volumes(&*dir) && !own.as_ref().is_some_and(cds_complete) {
             // One of the discs' folders: with the other discs' folders
             // beside it, as [`Atlantis5Source::open`] reads it, but not
             // the copies ([`set_cd_copy_dirs`]): they are what it is
