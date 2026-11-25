@@ -247,6 +247,10 @@ pub struct InstallShield {
     pub major: u32,
     files: Vec<IsFile>,
     groups: Vec<FileGroup>,
+    /// Per volume, the first and last index of the files whose data start
+    /// in it (by their descriptors): a volume of this set lists them
+    /// between its header's first and last file ([`InstallShield::fits`]).
+    spans: HashMap<u16, (u32, u32)>,
     /// Volume number → its header, `None` when the volume is missing or
     /// unreadable; filled on first use.
     volumes: Mutex<HashMap<u16, Option<Volume>>>,
@@ -286,6 +290,11 @@ impl InstallShield {
         let n_files = u32_at(&d, 0x28).ok_or(t.clone())? as usize;
         let desc_off = u32_at(&d, 0x2c).ok_or(t.clone())? as usize;
         let table = d.get(table_at..).ok_or(t.clone())?;
+        // The counts bounded by the table first: a damaged header is
+        // refused, not taken for billions of entries.
+        if n_dirs > table.len() / 4 || n_files > table.len().saturating_sub(desc_off) / DESCRIPTOR {
+            return Err(t);
+        }
         let mut dirs = Vec::with_capacity(n_dirs);
         for i in 0..n_dirs {
             let at = u32_at(table, 4 * i).ok_or(t.clone())? as usize;
@@ -293,8 +302,13 @@ impl InstallShield {
         }
         let mut files = Vec::with_capacity(n_files);
         for i in 0..n_files {
-            let o = desc_off + i * DESCRIPTOR;
-            let r = table.get(o..o + DESCRIPTOR).ok_or(t.clone())?;
+            let o = i
+                .checked_mul(DESCRIPTOR)
+                .and_then(|o| o.checked_add(desc_off))
+                .ok_or(t.clone())?;
+            let r = table
+                .get(o..o.checked_add(DESCRIPTOR).ok_or(t.clone())?)
+                .ok_or(t.clone())?;
             let name_at = u32_at(r, 0x3a).ok_or(t.clone())? as usize;
             let dir = usize::from(u16_at(r, 0x3e).ok_or(t.clone())?);
             let name = if name_at == 0 {
@@ -322,13 +336,20 @@ impl InstallShield {
             // The lists are short: a loop in a damaged one stops.
             let mut guard = 0;
             while at != 0 && guard < 1024 {
-                let entry = d.get(at..at + 12).ok_or(t.clone())?;
+                let entry = d
+                    .get(at..at.checked_add(12).ok_or(t.clone())?)
+                    .ok_or(t.clone())?;
                 let g = u32_at(entry, 4).ok_or(t.clone())? as usize;
                 let name_at = u32_at(&d, g).ok_or(t.clone())? as usize;
+                let field = |k: usize| {
+                    g.checked_add(k)
+                        .and_then(|at| u32_at(&d, at))
+                        .ok_or(t.clone())
+                };
                 groups.push(FileGroup {
                     name: c_string(&d, name_at).ok_or(t.clone())?,
-                    first: u32_at(&d, g + 4 + 0x12).ok_or(t.clone())?,
-                    last: u32_at(&d, g + 8 + 0x12).ok_or(t.clone())?,
+                    first: field(4 + 0x12)?,
+                    last: field(8 + 0x12)?,
                 });
                 at = u32_at(entry, 8).ok_or(t.clone())? as usize;
                 guard += 1;
@@ -336,12 +357,23 @@ impl InstallShield {
         }
         let lower = hdr.to_ascii_lowercase();
         let prefix = hdr[..lower.rfind("1.hdr").unwrap_or(hdr.len())].to_string();
+        let mut spans: HashMap<u16, (u32, u32)> = HashMap::new();
+        for f in &files {
+            // Files with data of their own (not links, not empty).
+            if f.flags & FILE_INVALID != 0 || f.link_flags & LINK_PREV != 0 || f.size == 0 {
+                continue;
+            }
+            let s = spans.entry(f.volume).or_insert((f.index, f.index));
+            s.0 = s.0.min(f.index);
+            s.1 = s.1.max(f.index);
+        }
         Ok(InstallShield {
             src,
             prefix,
             major,
             files,
             groups,
+            spans,
             volumes: Mutex::new(HashMap::new()),
             parts: Mutex::new(VecDeque::new()),
             states: Mutex::new(HashMap::new()),
@@ -364,8 +396,9 @@ impl InstallShield {
         let mut out: Vec<usize> = self
             .groups
             .iter()
-            .filter(|g| g.installs())
-            .flat_map(|g| g.first..=g.last)
+            .filter(|g| g.installs() && !self.files.is_empty())
+            // A damaged group's range clamped to the table.
+            .flat_map(|g| g.first..=g.last.min(self.files.len() as u32 - 1))
             .map(|i| i as usize)
             .filter(|&i| {
                 self.files
@@ -384,7 +417,7 @@ impl InstallShield {
     }
 
     /// Volume `n`'s name as found, size and header; `None` when it is
-    /// missing or not a volume.
+    /// missing, not a volume, or another set's ([`InstallShield::fits`]).
     pub fn volume(&self, n: u16) -> Option<Volume> {
         let mut vols = self.volumes.lock().unwrap();
         vols.entry(n)
@@ -392,12 +425,34 @@ impl InstallShield {
                 let name = self.volume_name(n);
                 let size = self.src.size(&name)?;
                 let head = self.src.read_at(&name, 0, 84)?;
-                if head.get(..4)? != MAGIC {
-                    return None;
-                }
-                Some((name, size, VolumeHeader::parse(&head)?))
+                let h = self.volume_header(n, &head)?;
+                Some((name, size, h))
             })
             .clone()
+    }
+
+    /// The header of volume `n` from its first bytes `head`, when it is a
+    /// volume of this set ([`InstallShield::fits`]).
+    pub fn volume_header(&self, n: u16, head: &[u8]) -> Option<VolumeHeader> {
+        if head.get(..4)? != MAGIC {
+            return None;
+        }
+        let h = VolumeHeader::parse(head)?;
+        self.fits(n, &h).then_some(h)
+    }
+
+    /// Whether `h` is the header of this set's volume `n`: its first and
+    /// last file are in the file table, and every file whose descriptor
+    /// says its data start in volume `n` is between them (a volume of
+    /// another set, found by its name beside this one's, lists other
+    /// files).
+    pub fn fits(&self, n: u16, h: &VolumeHeader) -> bool {
+        if h.first_file > h.last_file || h.last_file as usize >= self.files.len() {
+            return false;
+        }
+        self.spans
+            .get(&n)
+            .is_none_or(|&(lo, hi)| h.first_file <= lo && hi <= h.last_file)
     }
 
     /// The volumes the installed files' data are in, in order: the
@@ -545,9 +600,15 @@ impl InstallShield {
 
     /// `len` bytes at `at` of file `i`'s stored bytes (`segs`).
     fn read_stored(&self, segs: &[Segment], at: u64, len: usize) -> Option<Vec<u8>> {
+        let end = at.checked_add(len as u64)?;
+        // Past the stored bytes (a damaged size): refused before anything
+        // is allocated.
+        let stored = segs.iter().try_fold(0u64, |a, s| a.checked_add(s.2))?;
+        if end > stored {
+            return None;
+        }
         let mut out = Vec::with_capacity(len);
         let mut pos = at;
-        let end = at.checked_add(len as u64)?;
         let mut base = 0u64;
         for &(v, off, seg_len) in segs {
             if pos >= end {
@@ -604,7 +665,9 @@ impl InstallShield {
         let stored: u64 = segs.iter().map(|s| s.2).sum();
         let state = self.state(r);
         let mut st = state.lock().unwrap();
-        let mut out = Vec::with_capacity(len);
+        // The output grows as the chunks decode: a damaged size does not
+        // decide the allocation.
+        let mut out = Vec::with_capacity(len.min(4 * MAX_CHUNK_OUT));
         let end = offset + len as u64;
         let mut pos = offset;
         while pos < end {
@@ -1182,6 +1245,114 @@ mod tests {
         // The first file is whole; the second runs on into data3.cab.
         assert_eq!(cab.read_file(0).unwrap(), specs[0].data);
         assert_eq!(cab.read_file(1), None);
+    }
+
+    #[test]
+    fn a_damaged_header_is_refused_not_aborted() {
+        let specs = [Spec {
+            dir: 0,
+            name: "a",
+            data: data(1000, 3),
+            compressed: true,
+        }];
+        let m = build(&specs, &[""], 50_000);
+        let hdr = m.read("data1.hdr").unwrap();
+        let cab1 = m.read("data1.cab").unwrap();
+        let open = |patch: &dyn Fn(&mut Vec<u8>)| {
+            let mut h = hdr.clone();
+            patch(&mut h);
+            let mut m = MemFiles::new();
+            m.insert("data1.hdr", h);
+            m.insert("data1.cab", cab1.clone());
+            InstallShield::open(Arc::new(m))
+        };
+        let put =
+            |h: &mut Vec<u8>, at: usize, v: u32| h[at..at + 4].copy_from_slice(&v.to_le_bytes());
+        // The descriptor is at 0x200: the file table's offset at +0x0c,
+        // directories at +0x1c, files at +0x28, the descriptors' offset
+        // at +0x2c.
+        for at in [0x20c, 0x21c, 0x228, 0x22c] {
+            assert!(
+                matches!(open(&|h| put(h, at, u32::MAX)), Err(IsError::Truncated)),
+                "{at:#x}"
+            );
+        }
+        // A group running past the table (its last file at +0x1a of its
+        // descriptor, at 0x240): its files clamped to the table.
+        let cab = open(&|h| put(h, 0x200 + 0x240 + 0x1a, u32::MAX)).unwrap();
+        assert_eq!(cab.installed_files(), [0, 1]);
+        // A file whose size is damaged (the table at 0x600: one directory
+        // offset, the names "\0a\0", then the first descriptor, its size
+        // at +2): a read past its data is refused, not allocated.
+        let size_at = 0x600 + 4 + 3 + 2;
+        let cab =
+            open(&|h| h[size_at..size_at + 8].copy_from_slice(&u64::MAX.to_le_bytes())).unwrap();
+        assert_eq!(cab.files()[0].size, u64::MAX);
+        assert_eq!(cab.read_file_at(0, 0, 1 << 40), None);
+        assert_eq!(
+            cab.read_file_at(0, 0, 100),
+            Some(specs[0].data[..100].to_vec())
+        );
+    }
+
+    #[test]
+    fn another_sets_volume_is_missing() {
+        let a = [
+            Spec {
+                dir: 0,
+                name: "a",
+                data: data(60_000, 3),
+                compressed: false,
+            },
+            Spec {
+                dir: 0,
+                name: "b",
+                data: data(60_000, 7),
+                compressed: false,
+            },
+        ];
+        let b = [
+            Spec {
+                dir: 0,
+                name: "x",
+                data: data(10_000, 1),
+                compressed: false,
+            },
+            Spec {
+                dir: 0,
+                name: "y",
+                data: data(10_000, 2),
+                compressed: false,
+            },
+            Spec {
+                dir: 0,
+                name: "z",
+                data: data(10_000, 4),
+                compressed: false,
+            },
+            Spec {
+                dir: 0,
+                name: "w",
+                data: data(60_000, 5),
+                compressed: false,
+            },
+        ];
+        let ma = build(&a, &[""], 50_000);
+        let mb = build(&b, &[""], 50_000);
+        let mut m = MemFiles::new();
+        for n in ["data1.hdr", "data1.cab", "data3.cab"] {
+            m.insert(n, ma.read(n).unwrap());
+        }
+        // The other set's second volume, found by its name.
+        m.insert("data2.cab", mb.read("data2.cab").unwrap());
+        let cab = InstallShield::open(Arc::new(m)).unwrap();
+        assert_eq!(cab.volume(2), None);
+        assert_eq!(cab.missing_volumes(), ["data2.cab"]);
+        assert_eq!(cab.read_file(1), None);
+        // Its own volumes fit.
+        let cab = InstallShield::open(Arc::new(ma)).unwrap();
+        assert!(cab.missing_volumes().is_empty());
+        assert_eq!(cab.read_file(1).unwrap(), a[1].data);
     }
 
     #[test]
