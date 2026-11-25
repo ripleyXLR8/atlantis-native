@@ -509,6 +509,11 @@ impl Game {
             .build()
             .map_or(atlantis3_data::Release::Gog2003, |b| b.release);
         script.a3_disc_test = release.disc_test();
+        // The save thumbnails' row scan: GOG.com's 2022 program's, but the
+        // 2015 / 2018 `Game.exe`'s and the CD's (`Build::thumb_rows`).
+        let thumb_rows = files
+            .build()
+            .map_or(atlantis3_data::spr_encode::RowScan::W10, |b| b.thumb_rows);
         let fpu = Fpu::Double;
         let mut renderer = Renderer::new(Variant::PII, fpu, width, height);
         let face = face_size(&files);
@@ -684,6 +689,7 @@ impl Game {
                 mu.set_music_volume(b, m);
             });
         }
+        game.menus.encoder.rows = thumb_rows;
         // `AtlScarabee_MainInit` (@ 0x004d67b0).
         game.scarab_reload_banks();
         if !game.with_script(|s, h| s.boot_a3(h)) {

@@ -1,37 +1,41 @@
-//! GOG.com's four languages: what changes with the install's language
-//! besides the texts, voices and films the game reads by name.
+//! GOG.com's four languages and the Italian *Atlantis Collection*: what
+//! changes with the install's language besides the texts, voices and
+//! films the game reads by name.
 //!
 //! - the edition's name, from the installer's registry `Language`;
-//! - the intro (@ 0x00459360): `intro.hnm` alone in each language (the
-//!   German branch's `intro_ger.hnm` is in no GOG.com depot);
+//! - the intro (@ 0x00459360): `intro.hnm` alone in each GOG.com language
+//!   (the German branch's `intro_ger.hnm` is in no GOG.com depot), then
+//!   `intro_ita.hnm` in Italian;
 //! - the fonts' character set (`font.txt`): Windows-1252 but in German,
 //!   Central European;
 //! - the scarab case's bank `Scarabee.spr`, which only the English and
 //!   German installs have under that name: the case's sprites are drawn
-//!   there and nowhere else.
+//!   there and nowhere else (the Italian install names it `Scarabée.SPR`,
+//!   as the French and Spanish).
 //!
 //! The story chain per language is `story.rs`'s
 //! `whole_story_other_languages` and `rhea_old_man_at_875_8_by_language`.
 //!
 //! Needs the games: `ATLANTIS3_DATA` (French) and `ATLANTIS3_GOG_EN`,
-//! `ATLANTIS3_GOG_DE`, `ATLANTIS3_GOG_ES`.
+//! `ATLANTIS3_GOG_DE`, `ATLANTIS3_GOG_ES`, `ATLANTIS3_IT_COLLECTION`.
 
 use std::path::{Path, PathBuf};
 
-use atlantis3_data::testing::{dir_of, install_dir, GOG_LANGUAGES};
+use atlantis3_data::testing::{dir_of, install_dir, it_collection, GOG_LANGUAGES};
 use atlantis3_data::A3Files;
 use atlantis3_engine::text::{FontId, Texts, CHARSET_EE};
 use atlantis3_engine::{Game, Mode};
 
-/// (variable, install, registry language, edition's language, charset,
-/// scarab bank).
+/// (variable, install, registry language, edition's name, charset,
+/// scarab bank, the intro's films).
 struct Install {
     var: &'static str,
     dir: PathBuf,
     code: &'static str,
-    name: &'static str,
+    label: String,
     charset: u8,
     scarab: bool,
+    intro: &'static [&'static str],
 }
 
 fn installs() -> Vec<Install> {
@@ -41,9 +45,10 @@ fn installs() -> Vec<Install> {
             var: "ATLANTIS3_DATA",
             dir,
             code: "fra",
-            name: "French",
+            label: "Atlantis III, GOG.com, French".into(),
             charset: 0,
             scarab: false,
+            intro: &["intro.hnm"],
         });
     }
     for (var, code) in GOG_LANGUAGES {
@@ -57,9 +62,21 @@ fn installs() -> Vec<Install> {
             var,
             dir,
             code,
-            name,
+            label: format!("Atlantis III, GOG.com, {name}"),
             charset,
             scarab,
+            intro: &["intro.hnm"],
+        });
+    }
+    if let Some(dir) = it_collection() {
+        out.push(Install {
+            var: "ATLANTIS3_IT_COLLECTION",
+            dir,
+            code: "ita",
+            label: "Atlantis III, Atlantis Collection, Italian".into(),
+            charset: 0,
+            scarab: false,
+            intro: &["intro.hnm", "intro_ita.hnm"],
         });
     }
     out
@@ -73,12 +90,7 @@ fn open(dir: &Path) -> Game {
 fn edition_names_and_languages() {
     for i in installs() {
         let (files, _) = A3Files::open_dir(&i.dir).unwrap();
-        assert_eq!(
-            files.edition_label().unwrap(),
-            format!("Atlantis III, GOG.com, {}", i.name),
-            "{}",
-            i.var
-        );
+        assert_eq!(files.edition_label().unwrap(), i.label, "{}", i.var);
         let g = open(&i.dir);
         let c = &g.startup.config;
         assert_eq!(
@@ -89,27 +101,50 @@ fn edition_names_and_languages() {
     }
 }
 
-/// `intro.hnm` alone, 327 frames at 15 a second, then nothing more.
+/// `intro.hnm` alone (327 frames, about 22 s), then `intro_ita.hnm` in
+/// Italian, then nothing more: each film to its last frame (a film with
+/// a sound track keeps the sound's time, `intro_ita.hnm`'s 172 frames
+/// about 7 s).
 #[test]
 fn intro_alone_in_every_language() {
     for i in installs() {
         let mut g = open(&i.dir);
+        let frames: Vec<u32> = i
+            .intro
+            .iter()
+            .map(|n| {
+                let d = g.files().read(&format!("hnm/{n}")).expect(n);
+                atlantis3_data::hnm_header::HnmHeader::parse(&d)
+                    .expect(n)
+                    .frame_count()
+            })
+            .collect();
         g.start_intro();
         assert_eq!(g.video().map(|v| v.0), Some("intro.hnm"), "{}", i.var);
         let mut t = 0.0;
         let mut names = vec!["intro.hnm".to_string()];
-        while t < 40.0 && g.mode() == Mode::Intro {
+        let mut shown = vec![0];
+        while t < 60.0 && g.mode() == Mode::Intro {
             t += 1.0 / 60.0;
             g.step(t);
-            if let Some((n, _)) = g.video() {
+            if let Some((n, f)) = g.video() {
                 if names.last().map(String::as_str) != Some(n) {
                     names.push(n.to_string());
+                    shown.push(0);
                 }
+                *shown.last_mut().unwrap() = f;
             }
         }
         assert_eq!(g.mode(), Mode::Idle, "{}", i.var);
-        assert_eq!(names, ["intro.hnm"], "{}", i.var);
-        assert!((21.0..23.0).contains(&t), "{}: intro took {t} s", i.var);
+        assert_eq!(names, i.intro, "{}", i.var);
+        for (k, (&s, &n)) in shown.iter().zip(&frames).enumerate() {
+            assert!(s + 1 >= n, "{} {}: {s} of {n} frames", i.var, i.intro[k]);
+        }
+        if i.intro.len() == 1 {
+            assert!((21.0..23.0).contains(&t), "{}: intro took {t} s", i.var);
+        } else {
+            assert!((27.0..31.0).contains(&t), "{}: intro took {t} s", i.var);
+        }
     }
 }
 
