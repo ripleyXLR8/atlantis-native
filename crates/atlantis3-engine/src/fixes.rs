@@ -27,6 +27,14 @@
 //!   the options page. With the fix a file without `PixelFormat` starts in
 //!   32 bits (x8r8g8b8), and the file then also keeps a 16-bit choice
 //!   (`PixelFormat = 16bits`, which the original reads too).
+//! - `fix_cfg_name` ([`Fixes::cfg_name`]): GOG.com's 2015 / 2018
+//!   `Game.exe` (the Italian *Atlantis Collection*'s) reads
+//!   `Datas\Atlantis4.cfg` at start-up (the reader's name @ 0x007148ec;
+//!   [`atlantis3_data::exe::Build::cfg_name`]) while its menus write
+//!   `datas\Atlantis3.cfg` (@ 0x00714ab0): no install has the first, so
+//!   every start is on the defaults, the shipped file and the player's
+//!   settings never read. GOG.com's 2022 file has the name fixed to
+//!   `Atlantis3.cfg`; with the fix every build reads that one.
 
 use atlantis3_data::cfg::Config;
 use atlantis3_data::A3Files;
@@ -54,6 +62,9 @@ pub struct Fixes {
     /// itself, its speeds, inertia and limits are unchanged; only the
     /// drawn orientation is interpolated ([`crate::Game`]'s render).
     pub smooth_turn: bool,
+    /// `fix_cfg_name`: the start-up reads `Atlantis3.cfg` whatever name
+    /// the build's reader has ([`crate::startup::Startup::read_with`]).
+    pub cfg_name: bool,
 }
 
 impl Default for Fixes {
@@ -63,6 +74,7 @@ impl Default for Fixes {
             warpres_cd: true,
             depth_32: true,
             smooth_turn: true,
+            cfg_name: true,
         }
     }
 }
@@ -74,6 +86,7 @@ impl Fixes {
             warpres_cd: false,
             depth_32: false,
             smooth_turn: false,
+            cfg_name: false,
         }
     }
 
@@ -89,10 +102,11 @@ impl Fixes {
     }
 
     /// The keys of `settings.ini`, with their fields.
-    const KEYS: [(&'static str, Field); 3] = [
+    const KEYS: [(&'static str, Field); 4] = [
         ("fix_warpres_cd", |f| &mut f.warpres_cd),
         ("fix_32bits", |f| &mut f.depth_32),
         ("fix_smooth_turn", |f| &mut f.smooth_turn),
+        ("fix_cfg_name", |f| &mut f.cfg_name),
     ];
 
     /// `key = value` lines over the defaults; unknown keys and bad values
@@ -198,6 +212,8 @@ mod tests {
         );
         assert!(!Fixes::parse("FIX_WARPRES_CD = off\nother = 1\n").warpres_cd);
         assert!(Fixes::parse("fix_warpres_cd = maybe\n").warpres_cd);
+        assert!(!Fixes::parse("fix_cfg_name = 0\n").cfg_name);
+        assert!(Fixes::default().to_text().contains("fix_cfg_name = 1\n"));
     }
 
     /// On: `Version = CD` (GOG.com) gives 512 and 640 x 480 at start-up,

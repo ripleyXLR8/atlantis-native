@@ -24,6 +24,8 @@
 //! The game folder is GOG.com's installation (`Game.exe` beside `Datas\`),
 //! in English, French, German or Spanish: one executable for the four
 //! ([`atlantis3_data::exe::KNOWN_BUILDS`]), the language is the data's;
+//! the Italian *Atlantis Collection*'s installation (GOG.com's earlier
+//! `Game.exe`, Italian data);
 //! or the French retail CD's installation (`Atlantis3.exe` beside
 //! `Datas\`) with its three discs (CD images or copies of the CDs) in it,
 //! in a folder inside it or in a `--discs <folder>`
@@ -817,6 +819,35 @@ mod tests {
         let shot = base.join("a3cd.png");
         headless(&dir, &[discs], &base, 30, Some(&shot), true, false).unwrap();
         assert!(std::fs::read(&shot).unwrap().starts_with(b"\x89PNG"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The Italian *Atlantis Collection*'s installed folder: its edition,
+    /// started to the start page; the player's `Atlantis3.cfg` read with
+    /// `fix_cfg_name`, the defaults with `--original` (the program's
+    /// reader opens `Atlantis4.cfg`).
+    #[test]
+    fn the_italian_collection() {
+        let Some(dir) = atlantis3_data::testing::it_collection() else {
+            return;
+        };
+        assert_eq!(
+            label(&dir).unwrap(),
+            "Atlantis III, Atlantis Collection, Italian"
+        );
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-itcoll-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(base.join("Atlantis3.cfg"), "Resolution\t= 1024 768\r\n").unwrap();
+        let (mut game, label) = open_in(&dir, &base, false).unwrap();
+        assert_eq!(label, "Atlantis III, Atlantis Collection, Italian");
+        assert_eq!(game.startup.config.resolution, (1024, 768));
+        assert_eq!(&game.startup.config.langue[..], b"ita");
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let (game, _) = open_in(&dir, &base, true).unwrap();
+        assert_eq!(game.startup.config.resolution, (800, 600));
         let _ = std::fs::remove_dir_all(&base);
     }
 

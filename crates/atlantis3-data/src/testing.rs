@@ -7,7 +7,9 @@
 //! and `ATLANTIS3_GOG_ES` ([`GOG_LANGUAGES`]); the French retail CD's
 //! tests read its installed folder (`Atlantis3.exe` and `Datas\`) from
 //! `ATLANTIS3_CD_FR` and the folder of its three discs (the CD images or
-//! copies of the CDs) from `ATLANTIS3_DISCS_FR` ([`cd_fr`]). Without it a
+//! copies of the CDs) from `ATLANTIS3_DISCS_FR` ([`cd_fr`]); the Italian
+//! *Atlantis Collection*'s installed folder from `ATLANTIS3_IT_COLLECTION`
+//! ([`it_collection`]). Without it a
 //! test must
 //! not pass as if it had run: [`missing`] fails it, unless
 //! `ATLANTIS3_SKIP_DATA_TESTS=1` (or `ATLANTIS2_SKIP_DATA_TESTS=1`, which a
@@ -80,6 +82,16 @@ pub const DISCS_FR_VAR: &str = "ATLANTIS3_DISCS_FR";
 /// (`ATLANTIS3_CD_FR`, `ATLANTIS3_DISCS_FR`), or `None` after [`missing`].
 pub fn cd_fr() -> Option<(PathBuf, PathBuf)> {
     Some((dir_of(CD_FR_VAR)?, dir_of(DISCS_FR_VAR)?))
+}
+
+/// The variable naming the Italian *Atlantis Collection*'s installed
+/// folder (`Game.exe` and `Datas\`, as its installer lays them out).
+pub const IT_COLLECTION_VAR: &str = "ATLANTIS3_IT_COLLECTION";
+
+/// The Italian *Atlantis Collection*'s installed folder
+/// (`ATLANTIS3_IT_COLLECTION`), or `None` after [`missing`].
+pub fn it_collection() -> Option<PathBuf> {
+    dir_of(IT_COLLECTION_VAR)
 }
 
 /// The installed game's folder from `ATLANTIS3_DATA`, or `None` after

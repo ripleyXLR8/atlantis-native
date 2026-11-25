@@ -2,14 +2,19 @@
 //!
 //! As for *Atlantis II* (`atlantis2_data::exe`), a build is recognised by
 //! its size and PE timestamp and confirmed by the MD5 of the whole file.
-//! Two builds are known: GOG.com's `Game.exe` (2003), the reference every
-//! address in this crate's comments belongs to, and the French retail
-//! CD's `Atlantis3.exe` (2001, [`Release::Cd2001`]). GOG's folder also
+//! Three builds are known: GOG.com's `Game.exe` (2003) as GOG ships it
+//! since 2022, the reference every address in this crate's comments
+//! belongs to; the French retail CD's `Atlantis3.exe` (2001,
+//! [`Release::Cd2001`]); and GOG's earlier `Game.exe` of the same program
+//! (its 2015 and 2018 builds), which the Italian *Atlantis Collection*
+//! DVD (2014) installs. GOG's folder also
 //! holds `Atlantis3.exe`, a launcher of the re-release that starts
 //! `Game.exe` ([`LAUNCHER_SIZE`]), and the two sprite libraries
 //! ([`SPR_DLLS`], the CD's are the same files).
 
 use md5::{Digest, Md5};
+
+use crate::spr_encode::RowScan;
 
 pub use atlantis2_data::exe::{bytes_at, pe_timestamp};
 
@@ -35,7 +40,11 @@ pub enum Release {
     /// for `gre` (@ 0x00458c40; GOG's table @ 0x00459360 has more
     /// languages).
     Cd2001,
-    /// GOG.com's `Game.exe` (2003-04-24), the reference.
+    /// GOG.com's `Game.exe` (2003-04-24), the reference; its 2015 / 2018
+    /// file too, the same program but for three edits of the 2022 file
+    /// ([`Build::cfg_name`], [`Build::thumb_rows`], and a window message
+    /// that changes nothing in the port: atlantis3-re
+    /// `binaries/atlantis3-gog-2018-3473408.md`).
     Gog2003,
 }
 
@@ -56,12 +65,23 @@ pub struct Build {
     pub exe_name: &'static str,
     /// The release of its code.
     pub release: Release,
+    /// The settings file the start-up's reader opens under `Datas\`
+    /// (@ 0x00406f75 `push 0x007148ec`): `Atlantis3.cfg`, but
+    /// `Atlantis4.cfg` in GOG.com's 2015 / 2018 file, whose 2022 file has
+    /// that one byte fixed. The writer (@ 0x00408f80) opens
+    /// `datas\Atlantis3.cfg` in every build.
+    pub cfg_name: &'static str,
+    /// How the save thumbnails' rows are scanned ([`RowScan`]).
+    pub thumb_rows: RowScan,
 }
 
 /// The builds this port knows. GOG.com's English, French, German and
 /// Spanish installs ship the first (the "1.0 w10" build, 2022); the
-/// French retail CD (three CDs, 2001) installs the second.
-pub const KNOWN_BUILDS: [Build; 2] = [
+/// French retail CD (three CDs, 2001) installs the second; the third is
+/// the `Game.exe` of GOG.com's builds "1.0" (2018-07-16) and gen-1 3511
+/// (2015-01-14), every language (GOG's manifests give this MD5), which the
+/// Italian *Atlantis Collection* DVD (2014) installs.
+pub const KNOWN_BUILDS: [Build; 3] = [
     Build {
         id: "atlantis3-gog-fr-3473408",
         label: "Atlantis III, GOG.com",
@@ -74,6 +94,8 @@ pub const KNOWN_BUILDS: [Build; 2] = [
         ],
         exe_name: "Game.exe",
         release: Release::Gog2003,
+        cfg_name: "Atlantis3.cfg",
+        thumb_rows: RowScan::W10,
     },
     Build {
         id: "atlantis3-cd-fr-3379200",
@@ -87,6 +109,23 @@ pub const KNOWN_BUILDS: [Build; 2] = [
         ],
         exe_name: "Atlantis3.exe",
         release: Release::Cd2001,
+        cfg_name: "Atlantis3.cfg",
+        thumb_rows: RowScan::Original,
+    },
+    Build {
+        id: "atlantis3-gog-2018-3473408",
+        label: "Atlantis III, GOG.com (2015 / 2018 build)",
+        size: 3_473_408,
+        // 2003-04-24 09:50:26 UTC, the 2022 file's.
+        pe_timestamp: 0x3ea7_b362,
+        md5: [
+            0x00, 0x68, 0xf6, 0xed, 0x52, 0xbc, 0xfe, 0xd7, 0x90, 0x8d, 0x7e, 0x65, 0xfb, 0x3d,
+            0xe3, 0xb1,
+        ],
+        exe_name: "Game.exe",
+        release: Release::Gog2003,
+        cfg_name: "Atlantis4.cfg",
+        thumb_rows: RowScan::Original,
     },
 ];
 
@@ -145,6 +184,28 @@ pub const SPR_DLLS: [SprDllBuild; 2] = [
 /// The size of GOG's `Atlantis3.exe`, the re-release's launcher (19,968
 /// bytes, PE timestamp 0x4c19e4d8).
 pub const LAUNCHER_SIZE: u64 = 19_968;
+
+/// The Italian *Atlantis Collection*'s `Atlantis3.exe` (2014), the
+/// shortcut's target: an AutoRun Architect launcher (PE timestamp
+/// 0x48681974) that starts `Game.exe` as `Launch\Settings.ini` says
+/// (atlantis3-re `discs/it-collection.md`). Its size and MD5 name the
+/// edition, whose `Game.exe` is GOG.com's 2015 / 2018 file.
+pub const COLLECTION_LAUNCHER_SIZE: u64 = 446_464;
+
+/// The MD5 of [`COLLECTION_LAUNCHER_SIZE`]'s file.
+pub const COLLECTION_LAUNCHER_MD5: [u8; 16] = [
+    0x89, 0x60, 0x82, 0xe4, 0x5d, 0xb7, 0x38, 0x86, 0x33, 0x85, 0xac, 0x50, 0x48, 0xd5, 0xcd, 0x38,
+];
+
+/// The edition's name, without the language, when the collection's
+/// launcher is beside `Game.exe`.
+pub const COLLECTION_LABEL: &str = "Atlantis III, Atlantis Collection";
+
+/// Whether `exe` is the Italian *Atlantis Collection*'s launcher.
+pub fn is_collection_launcher(exe: &[u8]) -> bool {
+    exe.len() as u64 == COLLECTION_LAUNCHER_SIZE
+        && <[u8; 16]>::from(Md5::digest(exe)) == COLLECTION_LAUNCHER_MD5
+}
 
 /// The file name of GOG.com's executable.
 pub const EXE_NAME: &str = "Game.exe";
@@ -236,11 +297,28 @@ mod tests {
             hex(&KNOWN_BUILDS[1].md5),
             "f81dd8d2e49003b2ba53b48b4a21c2ec"
         );
+        assert_eq!(
+            hex(&KNOWN_BUILDS[2].md5),
+            "0068f6ed52bcfed7908d7e65fb3de3b1"
+        );
+        assert_eq!(
+            KNOWN_BUILDS.map(|b| (b.cfg_name, b.thumb_rows)),
+            [
+                ("Atlantis3.cfg", RowScan::W10),
+                ("Atlantis3.cfg", RowScan::Original),
+                ("Atlantis4.cfg", RowScan::Original),
+            ]
+        );
         for b in KNOWN_BUILDS {
             assert!(EXE_NAMES.contains(&b.exe_name), "{}", b.id);
         }
         assert!(Release::Cd2001.disc_test() && !Release::Gog2003.disc_test());
         assert_eq!(Release::Cd2001.scarab_bank(), "Scarabée.spr");
+        assert_eq!(
+            hex(&COLLECTION_LAUNCHER_MD5),
+            "896082e45db738863385ac5048d5cd38"
+        );
+        assert!(!is_collection_launcher(&pe(0x4868_1974, 446_464)));
         assert_eq!(hex(&SPR_DLLS[0].md5), "72266c25b968fb5eaf21d41851027d7b");
         assert_eq!(hex(&SPR_DLLS[1].md5), "94cfb7cfaf577a3aeb94914e7769d552");
     }

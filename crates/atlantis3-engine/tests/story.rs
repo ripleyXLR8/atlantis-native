@@ -1185,14 +1185,16 @@ fn whole_story() {
     );
 }
 
-/// The whole story on GOG.com's English, German and Spanish installs,
-/// against the same chained golden: the scripts are the French install's
-/// but for `chapi054.con` (English and German), whose one changed line
-/// the walk does not reach; the voices, texts and films only change what
-/// is shown and heard.
+/// The whole story on GOG.com's English, German and Spanish installs
+/// and the Italian *Atlantis Collection*'s, against the same chained
+/// golden: the scripts are the French install's but for `chapi054.con`
+/// (English and German), whose one changed line the walk does not reach;
+/// the voices, texts and films only change what is shown and heard.
 #[test]
 fn whole_story_other_languages() {
-    for (var, code) in atlantis3_data::testing::GOG_LANGUAGES {
+    let mut installs: Vec<(&str, &str)> = atlantis3_data::testing::GOG_LANGUAGES.to_vec();
+    installs.push((atlantis3_data::testing::IT_COLLECTION_VAR, "ita"));
+    for (var, code) in installs {
         let Some(dir) = atlantis3_data::testing::dir_of(var) else {
             continue;
         };
@@ -1210,7 +1212,8 @@ fn whole_story_other_languages() {
 
 /// The one script line GOG.com's languages change (`chapi054.con`,
 /// Rhea's chapter 54): with `Flag875` = 8 (the Omega's dialog done) the
-/// French and Spanish scripts refuse the move to the old man (view 11:
+/// French, Spanish and Italian scripts (the Italian file is the French
+/// and Spanish one) refuse the move to the old man (view 11:
 /// `AbortDepart`, dialog 255, `Flag876` := 1), the English and German ones
 /// let it go. Segment 07's walk up to `FLAG875=8`, then `GO 11`.
 #[test]
@@ -1223,6 +1226,9 @@ fn rhea_old_man_at_875_8_by_language() {
         if let Some(d) = atlantis3_data::testing::dir_of(var) {
             installs.push((var, d, code == "esp"));
         }
+    }
+    if let Some(d) = atlantis3_data::testing::it_collection() {
+        installs.push((atlantis3_data::testing::IT_COLLECTION_VAR, d, true));
     }
     let (_, walk, golden) = SEGMENTS[6];
     let upto: Vec<&str> = walk

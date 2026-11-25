@@ -83,9 +83,12 @@ the Italian *Atlantis Collection* (2014).
 ## Atlantis III: The New World (2001)
 
 🟢 **Already supported or tried:** GOG.com (English, French, German,
-Spanish) and the French CD (Cryo, 2001, three CDs, Redump
-[22042](http://redump.org/disc/22042/)). Every other edition is unknown:
-its program is refused with its size and MD5.
+Spanish), the French CD (Cryo, 2001, three CDs, Redump
+[22042](http://redump.org/disc/22042/)) and the Italian *Atlantis
+Collection* DVD (2014; its installer's folder, whose `Game.exe` is GOG.com's
+2015 / 2018 one). Every other edition is unknown: its program is refused
+with its size and MD5. The Italian 3-CD re-release below would tell
+whether the Italian voices and films are the collection's.
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|

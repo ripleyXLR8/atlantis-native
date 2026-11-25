@@ -14,6 +14,12 @@
 //! `Game.exe` for all four (the same file in the build's
 //! language-independent depot): the language is the data's, and that
 //! registry value is what the game itself goes by.
+//!
+//! The Italian *Atlantis Collection* DVD (2014) installs the game with an
+//! Inno Setup installer that writes `Install` = `CD` and `Language` =
+//! `ita` (atlantis3-re `discs/it-collection.md`) and leaves no file of
+//! them: its `Datas\loc\text\` holds `ita` alone, which gives the same
+//! values.
 
 use crate::exe::Build;
 use crate::A3Files;
@@ -25,17 +31,19 @@ pub enum Language {
     French,
     German,
     Spanish,
+    Italian,
 }
 
 impl Language {
     /// The language of a registry `Language` value (`gbr`, `fra`, `ger`,
-    /// `esp`; the folder names of `loc\text\`, any case).
+    /// `esp`, `ita`; the folder names of `loc\text\`, any case).
     pub fn from_code(code: &[u8]) -> Option<Language> {
         match code.to_ascii_lowercase().as_slice() {
             b"gbr" => Some(Language::English),
             b"fra" => Some(Language::French),
             b"ger" => Some(Language::German),
             b"esp" => Some(Language::Spanish),
+            b"ita" => Some(Language::Italian),
             _ => None,
         }
     }
@@ -47,6 +55,7 @@ impl Language {
             Language::French => "French",
             Language::German => "German",
             Language::Spanish => "Spanish",
+            Language::Italian => "Italian",
         }
     }
 }
@@ -55,9 +64,14 @@ impl Language {
 /// ("Atlantis III, GOG.com, German"); an unknown language leaves the
 /// build's name alone.
 pub fn edition_label(build: &Build, language: Option<Language>) -> String {
+    named_label(build.label, language)
+}
+
+/// The edition `name` with the language, as [`edition_label`].
+pub fn named_label(name: &str, language: Option<Language>) -> String {
     match language {
-        Some(l) => format!("{}, {}", build.label, l.name()),
-        None => build.label.to_string(),
+        Some(l) => format!("{name}, {}", l.name()),
+        None => name.to_string(),
     }
 }
 
@@ -174,7 +188,12 @@ mod tests {
                 format!("Atlantis III, GOG.com, {name}")
             );
         }
-        assert_eq!(Language::from_code(b"ita"), None);
+        assert_eq!(Language::from_code(b"ITA"), Some(Language::Italian));
+        assert_eq!(Language::from_code(b"usa"), None);
         assert_eq!(edition_label(b, None), "Atlantis III, GOG.com");
+        assert_eq!(
+            named_label("Atlantis III, Atlantis Collection", Some(Language::Italian)),
+            "Atlantis III, Atlantis Collection, Italian"
+        );
     }
 }

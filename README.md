@@ -38,9 +38,10 @@ China, Yucatán and Xibalba, Shamballa and Atlantis, with every puzzle (see
 *Atlantis III: The New World* (2001) plays from start to end as well, on
 the desktop and in the browser: from the Hoggar desert through the Land
 of the Dead and the other worlds to the credits, with its dialogs,
-menus, saves and every puzzle. Two editions are known: GOG.com's, in
-English, French, German and Spanish, and the French retail CD (2001,
-three CDs) (see [Atlantis III](docs/GUIDE.md#atlantis-iii)). It has been
+menus, saves and every puzzle. Three editions are known: GOG.com's, in
+English, French, German and Spanish, the French retail CD (2001, three
+CDs) and the Italian *Atlantis Collection* DVD (2014) (see
+[Atlantis III](docs/GUIDE.md#atlantis-iii)). It has been
 checked mostly by automated replays against the original's code and by
 the developer's own play, not yet by many players: reports are welcome.
 
@@ -165,7 +166,8 @@ Atlantis Native contains none of them.</sub>
   images...) of the five games in one list, to choose the one to play at
   start-up or switch from F10.
 - 🏜️ **Atlantis III**: GOG.com's edition in English, French, German or
-  Spanish and the French retail CD, whole, with the original's own menus
+  Spanish, the French retail CD and the Italian *Atlantis Collection*'s
+  installed game, whole, with the original's own menus
   and options (640 x 480, 800 x 600 or 1024 x 768, 16 or 32 bits; 32 by
   default, a bug fix), its saves kept apart from the game's folder, F12
   screenshots; on the desktop and in the browser.
@@ -336,6 +338,7 @@ For *Atlantis III*:
 |---|---|---|
 | [GOG.com](https://www.gog.com/) (*Atlantis 3 - The New World*; `Game.exe` of 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`) | English, French, German, Spanish | the installation folder (the one holding `Game.exe` and `Datas`) |
 | French CD (Cryo, 2001, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `f81dd8d2e49003b2ba53b48b4a21c2ec`) | French | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (or copies of the CDs) in it or in a folder inside it, or beside it in the folder picked (in the browser too: the images are read a part at a time) |
+| *Atlantis Collection*, Italian DVD compilation (2014; *Atlantis 3 - Il Nuovo Mondo*; its `Game.exe` is GOG.com's earlier build of the same program, 3,473,408 bytes, MD5 `0068f6ed52bcfed7908d7e65fb3de3b1`) | Italian | the folder its installer creates (the one holding `Game.exe` and `Datas`; by default `Adventure Productions\Atlantis 3 - Il Nuovo Mondo` in the program files); the DVD itself is not read |
 
 GOG.com ships the same `Game.exe` in its four languages; the language is
 read from the installation (the language GOG.com's installer records),
@@ -344,9 +347,17 @@ French CD's program is older (2001) and differs in a few things the
 player sees, which Atlantis Native follows (the scarab case is drawn,
 the discs are asked for; see
 [Atlantis III](docs/GUIDE.md#atlantis-iii)); the game library names it
-"Atlantis III, CD, French". Other editions (the other retail CDs and the
-DVDs) are unknown and untested: their program is refused with its size
-and MD5, so that it can be reported and added.
+"Atlantis III, CD, French". The Italian *Atlantis Collection* installs
+GOG.com's 2015 / 2018 `Game.exe` (the one GOG shipped before 2022) with
+Italian texts, voices and films; the game library names it "Atlantis III,
+Atlantis Collection, Italian" (the same program in an older GOG.com
+installation: "Atlantis III, GOG.com (2015 / 2018 build)"). That program
+reads its settings from a file no installation has, so the original
+starts with its defaults every time and forgets the options chosen in
+its menus; a bug fix reads them as GOG.com's current build does (see
+[Atlantis III](docs/GUIDE.md#atlantis-iii)). Other editions (the other
+retail CDs and the DVDs) are unknown and untested: their program is
+refused with its size and MD5, so that it can be reported and added.
 
 For *Atlantis Evolution*:
 
@@ -421,7 +432,8 @@ inside it. From the terminal, give that folder (the CD images may stay
 elsewhere with `--discs <folder>`). See
 [Atlantis II](docs/GUIDE.md#atlantis-ii).
 
-*Atlantis III* (2001) too: GOG.com's installation folder, or the French
+*Atlantis III* (2001) too: GOG.com's installation folder, the folder the
+Italian *Atlantis Collection*'s installer created, or the French
 CD's with its three CD images (or copies) in it or in a folder inside it
 (`--discs <folder>` from the terminal), found by the game library or
 given on the command line. See
