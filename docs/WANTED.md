@@ -63,8 +63,9 @@ Perfect Edition and the Italian *Atlantis Collection* (2014). See
 🟢 **Already supported or tried:** the French CD (version 1.00), the
 official patch 1.01, the North American CD (*Beyond Atlantis*,
 DreamCatcher, 2000), the German CD (also in *Die Legende Atlantis I &
-II*, 2000), the Polish CD, GOG.com (English, French, German, Spanish) and
-the Italian *Atlantis Collection* (2014).
+II*, 2000), the Spanish CD (Friendware, 1999), the Polish CD, GOG.com
+(English, French, German, Spanish) and the Italian *Atlantis Collection*
+(2014).
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|
@@ -72,7 +73,6 @@ the Italian *Atlantis Collection* (2014).
 | 🔴 **most wanted** | *Atlantis II*, English | United Kingdom, Netherlands, Cryo UK | 1999 | 4 CD | AT2-ENCD1 … 4; barcode 3554540770024 (some boxes 3554540770048); Redump [86602](http://redump.org/disc/86602/)–86605, a later disc 1 [97850](http://redump.org/disc/97850/) |
 | 🟠 wanted | *Atlantis II*, Italian | Italy, CTO | 1999 | 4 CD | AT2-ITA 1 … 4; barcode 8015887002780; Redump [73260](http://redump.org/disc/73260/)–73263 |
 | 🟠 wanted | *Atlantis II*, Dutch | Netherlands, Belgium, Infogrames Benelux | 1999 | 4 CD | AT2-DUCD1 … 4; Redump [96354](http://redump.org/disc/96354/)–96357 |
-| 🟠 wanted | *Atlantis II*, Spanish | Spain, Friendware | 1999 | 4 CD | Spanish voices |
 | 🟠 wanted | *Atlantis II: Legenden fortsätter…* | Sweden, IQ Media Nordic | 1999 | 4 CD | Swedish voices |
 | 🟠 wanted | *Атлантида II* | Russia, 1C / Nival | 1999 | 4 CD | Version 3.15; Redump [95823](http://redump.org/disc/95823/)–95826 |
 | 🟠 wanted | *Atlantis II*, Czech (also *GAME4U Speciál 3*, 2002) | Czech Republic, Bohemia Interactive | 2000 | 4 CD | Czech voices |

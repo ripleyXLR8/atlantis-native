@@ -104,8 +104,8 @@ Italian, Swedish and Japanese; the drive, a copy of a side or the images
 of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 1.00), a CD installation with the official
 patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
-the German CD (1999, also in *Die Legende Atlantis I & II*), the Polish CD
-(1999), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
+the German CD (1999, also in *Die Legende Atlantis I & II*), the Spanish
+CD (1999, Friendware), the Polish CD (1999), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
 English, French, German or Spanish, the French CD (2001, three CDs) and
 the Italian *Atlantis Collection* DVD (installed);
@@ -310,7 +310,7 @@ What to pick:
 - *Atlantis II*, GOG.com or the Italian *Atlantis Collection*: the
   installation folder (the one holding `Game.exe` and `DATAS_A2`).
 - *Atlantis II*, CD (the French CD, also patched to 1.01, the North
-  American *Beyond Atlantis*, the German CD or the Polish CD): the folder of the
+  American *Beyond Atlantis*, the German, Spanish or Polish CD): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
   with the images of the four CDs (`.iso`, `.bin`, `.img`, `.mdf` or
   `.nrg`) in it or in a folder inside it, or copies of the CDs (for
@@ -648,6 +648,15 @@ program is the French CD's version 1.00 inside a copy protection: Atlantis
 Native recognises it and reads its tables but never runs it, and plays it
 as the French CD, with the German texts and voices; films 19, 55 and 66
 are in German too.
+
+The Spanish CD (1999, 4 CDs, Spanish, distributed in Spain by Friendware)
+installs and opens as the French CD does: the installed folder with the
+images or copies of its four CDs (Alcohol 120% `.mdf` images are read as
+they are). Its program is the Polish CD's inside a copy protection:
+Atlantis Native recognises it and reads its tables but never runs it, and
+plays it as the Polish CD, that is as version 1.01, with the Spanish texts
+and voices; films 19, 55 and 66 are in Spanish too, and the intro starts
+with Friendware's logo.
 
 The Italian *Atlantis Collection* (DVD, 2014) installs one folder as GOG.com's
 does, Italian only: point Atlantis Native at it (no disc is needed). Its

@@ -1196,8 +1196,8 @@ parts of 1 byte to 512 KB give the whole file's bytes, a part read ahead
 is the span then read, a raw read never over a batch), the layouts with
 images (`web_layout`'s tests), and the players' images on disk read as
 the browser reads them (`web_layout::tests::on_disk`: Atlantis II's
-French, Polish, German and North American CDs with
-`ATLANTIS2_DATA[_PL|_DE|_US]` / `ATLANTIS2_DISCS[_PL|_DE|_US]`, a cinematic of disc 1 by parts of 512 KB as
+French, Polish, German, Spanish and North American CDs with
+`ATLANTIS2_DATA[_PL|_DE|_ES|_US]` / `ATLANTIS2_DISCS[_PL|_DE|_ES|_US]`, a cinematic of disc 1 by parts of 512 KB as
 the desktop's whole read; Atlantis III's French CD with
 `ATLANTIS3_CD_FR` / `ATLANTIS3_DISCS_FR`, disc 2 for a new game; the
 first game's ISO, raw `.bin`, `.mdf` and Nero images with the
@@ -1564,7 +1564,23 @@ back) into `yucatan-*.png`.
   voices (GOG's German, byte for byte) and the German tracks of films 19,
   55 and 66 in `datas_a2\apc\`, where the films read them, so
   `fix_film_language` finds nothing to change (`tests/de_cd.rs`,
-  `tests/film_language.rs`). The languages differ only in data: `loc\` (texts,
+  `tests/film_language.rs`). The Spanish CD's `atlantis2.exe` (4 CDs,
+  1999, distributed by Friendware; `atlantis2-cd-es-2415963`, 2415963
+  bytes, MD5 `881e461cc4d0f765cb2942bd826aba8d`) is the Polish CD's
+  executable inside the same kind of wrapper: the same PE timestamp
+  0x3815d8ef and version string 3.15, `.rdata` and `.data` byte for byte
+  the Polish CD's at the same addresses and file offsets (atlantis2-re
+  `binaries/atlantis2-cd-es-2415963.md`). Told by its size and MD5, never
+  run: `Release::V101`, 1.01's listener table, no GOG patch. Its install
+  is the French CD's but for `atlantis2.exe` and `loc\` (Spanish texts,
+  Windows-1252, GOG's Spanish but for `Menu.txt`'s CD line, which names
+  the language; the Polish CD's `Font.txt`, with 1.01's heights; the
+  French CD's font); its discs are the Polish CD's layout (the spider's
+  textures renamed without accents, a distributor's logo as
+  `intro00.hnm` on disc 1 with no track, here Friendware's, GOG's
+  `INTROESP.HNM`; the two intro films as `intro01` and `intro02`) with
+  the Spanish voices (GOG's Spanish, byte for byte) and the Spanish
+  tracks of films 19, 55 and 66 in `datas_a2\apc\` (`tests/es_cd.rs`). The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
@@ -4942,6 +4958,17 @@ every letter a glyph, the German film tracks against GOG's German, a
 subtitle with its voices against GOG's German, the main menu's tooltip and a
 save, the browser's way of opening it; `tests/flow.rs`'s whole game with the
 mouse played again on it; `de-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_ES`, `ATLANTIS2_DISCS_ES` the Spanish CD's installed folder
+(`data1.cab` of its first disc extracted) and a folder holding its four CD
+images (`tests/es_cd.rs`: the executable by its MD5, its `.rdata` and
+`.data` against the Polish CD's, the edition's name and language, the `loc`
+files against GOG's Spanish, every subtitle laid out, every letter a glyph,
+the Spanish film tracks against GOG's Spanish, the spider's renamed textures
+and its web drawn as on the French CD, the intro with the distributor's
+logo, a subtitle with its voices against GOG's Spanish, the main menu's
+tooltip and a save, the browser's way of opening it; `tests/flow.rs`'s whole
+game with the mouse played again on it; `es-*.png` with
+`ATLANTIS2_PNG_DIR`),
 `ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
 German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
 `1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older
