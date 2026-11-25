@@ -352,7 +352,8 @@ What to pick:
   button, or pick the folder holding it), the DVD drive or a copy of the
   disc (the folder holding `DATAS.cab` and `DATAS_french.cab`, or
   `datas.cab` and the international DVD's four `datas_<language>.cab`), or the
-  folder where the game is installed (the one holding `Datas`). The
+  folder where the game is installed (the one holding `Datas`; the
+  Italian *Atlantis Collection*'s install too). The
   international DVD asks for the language to play (or `?lang=de`, `en`,
   `es` or `it` after the page's address chooses it). The
   image is read a part at a time, never whole. The browser cannot keep
@@ -1176,14 +1177,20 @@ Spanish), whose scripts are the same story as Lua 5.0 source, compiled
 as Lua 5.0 compiles it, and its North-American CDs (*The Secrets of
 Atlantis*, The Adventure Company, 2007, three CDs, English), whose data
 are the international DVD's English ones in an InstallShield set spread
-over the three discs, plus The Adventure Company's logo film. The game library shows the French DVD as *The
+over the three discs, plus The Adventure Company's logo film, and
+*The Secrets of Atlantis* from the Italian *Atlantis Collection* DVD
+(Anuman Interactive, 2014), whose installer puts the international
+DVD's files (the language chosen, of the four) beside its own
+unprotected program. The game library shows the French DVD as *The
 Secrets of Atlantis : L'Héritage sacré (2006), DVD, French*, and the
 international DVD once per language, *The Secrets of Atlantis: The
 Sacred Legacy (2006), DVD, English* (German, Italian, Spanish): the
 original's installer asks for one language and installs it, and the
 game has no language option of its own, so here each language is an
 entry to play. The CDs are *The Secrets of Atlantis (2007), 3 CDs,
-English*. The international DVD started from the command line
+English*, and the Italian *Atlantis Collection*'s install *The Secrets
+of Atlantis (2014), Italian Atlantis Collection, installed, Italian*
+(or the language installed). The international DVD started from the command line
 without a choice plays the system's language when it is one of the
 four, else English; its cabinet's path chooses one
 (`atlantis-native "D:\datas_german.cab"`).
@@ -1209,11 +1216,18 @@ disc in a folder of its own, side by side (`data1.hdr`, `data1.cab`,
 `data2.cab` and `bin\` from the first disc, `data3.cab` from the second,
 `data4.cab` from the third), the three discs' files copied together
 into one folder, the folder holding the three CD images, or the folder
-where the CDs' installer put the game; the game's files are spread over
+where the CDs' installer put the game. For the Italian *Atlantis
+Collection* DVD: the folder its installer (`Atlantis 5\Setup.exe`)
+created, by default `Anuman interactive\The Secrets of Atlantis` in the
+program files (the one with `The Secrets of Atlantis.exe` and `datas`);
+Atlantis Native does not read the installer's `setup-1.bin` to
+`setup-3.bin` itself, so install the game first (on Windows, or with
+Wine; `innoextract --language=it` gives the same files in its `app`
+folder), and it then plays in the language installed. The CDs' files are spread over
 the three discs, so one disc alone does not play (in a drive, copy the
 three, see below). The cabinets are read in place: nothing is unpacked, nothing
 is installed. Played from the DVD or its image, the game library offers
-to copy it to the computer once (see below). The DVD's program (`The secrets of Atlantis.exe`) and the CDs' (`bin\The Secrets of Atlantis.exe`) are never
+to copy it to the computer once (see below). The DVD's program (`The secrets of Atlantis.exe`), the CDs' (`bin\The Secrets of Atlantis.exe`) and the Collection's (`The Secrets of Atlantis.exe`) are never
 run nor read beyond their identification. From the command line:
 
     atlantis-native D:\

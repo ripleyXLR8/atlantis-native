@@ -66,7 +66,9 @@ pub fn open(path: &Path) -> Result<(Atlantis5Source, String), String> {
 /// "DVD image"; with an install or the extracted cabinets, "DVD,
 /// installed"; with the copy of the disc's files made by
 /// [`crate::a5_copy`], "DVD, copied to this computer" (the CDs: "CD
-/// images", "CDs, installed", "CDs, copied to this computer").
+/// images", "CDs, installed", "CDs, copied to this computer"); the
+/// Italian *Atlantis Collection*'s install, "The Secrets of Atlantis
+/// (2014), Italian Atlantis Collection, installed, Italian".
 pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError> {
     edition(path).map(|e| e.0)
 }
@@ -81,6 +83,9 @@ pub fn edition(path: &Path) -> Result<(String, bool), atlantis3_data::atlantis5:
     let copy = crate::a5_copy::is_copy(&atlantis3_data::atlantis5::place_root(path));
     let cds = src.edition() == Edition::NorthAmericanCds;
     let medium = match (src.form(), cds) {
+        _ if src.edition() == Edition::ItalianCollection => {
+            "Italian Atlantis Collection, installed"
+        }
         (Form::DiscFolder, false) if copy => "DVD, copied to this computer",
         (Form::DiscFolder, false) => "DVD",
         (Form::DiscImage, false) => "DVD image",
@@ -155,10 +160,15 @@ pub fn language(src: &Atlantis5Source) -> String {
 
 /// The edition's title: the French DVD's (French only) is *L'Héritage
 /// sacré*; the international DVD's (English, German, Italian, Spanish) is
-/// sold as *The Sacred Legacy*; the North-American CDs' as *The Secrets
-/// of Atlantis*, with no subtitle.
+/// sold as *The Sacred Legacy*; the North-American CDs' and the Italian
+/// *Atlantis Collection*'s (its installer's title) as *The Secrets of
+/// Atlantis*, with no subtitle.
 pub fn title(src: &Atlantis5Source) -> &'static str {
-    if src.edition() == atlantis3_data::atlantis5::Edition::NorthAmericanCds {
+    use atlantis3_data::atlantis5::Edition;
+    if matches!(
+        src.edition(),
+        Edition::NorthAmericanCds | Edition::ItalianCollection
+    ) {
         "The Secrets of Atlantis"
     } else if src.languages().iter().all(|l| l == "french") {
         crate::setup::GameKind::Atlantis5.name()
@@ -168,11 +178,12 @@ pub fn title(src: &Atlantis5Source) -> &'static str {
 }
 
 /// The edition's year: 2006 for the DVDs, 2007 for the North-American
-/// CDs.
+/// CDs, 2014 for the Italian *Atlantis Collection*.
 pub fn year(src: &Atlantis5Source) -> u16 {
     match src.edition() {
         atlantis3_data::atlantis5::Edition::NorthAmericanCds => 2007,
         atlantis3_data::atlantis5::Edition::Dvd => 2006,
+        atlantis3_data::atlantis5::Edition::ItalianCollection => 2014,
     }
 }
 

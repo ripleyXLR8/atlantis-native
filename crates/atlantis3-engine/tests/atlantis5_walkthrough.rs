@@ -2037,6 +2037,29 @@ fn whole_game_international_english() {
     play_whole_game(w);
 }
 
+/// The whole game on the Italian *Atlantis Collection*'s install
+/// (`ATLANTIS5_IT_COLLECTION`: the folder its installer fills in Italian;
+/// skipped when unset), in its one language: the international DVD's
+/// data, the same walk.
+#[test]
+fn whole_game_italian_collection() {
+    let Some(d) = atlantis3_data::testing::a5_it_collection() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d).expect("the install");
+    assert_eq!(
+        src.edition(),
+        atlantis3_data::atlantis5::Edition::ItalianCollection
+    );
+    let lang = src.language(None);
+    assert_eq!(lang, "italian");
+    let src: Arc<dyn FileSource> = Arc::new(src);
+    let mut w = Walker::with_source(src, &lang);
+    w.play.new_game();
+    w.settle();
+    play_whole_game(w);
+}
+
 /// The whole game on the North-American CDs (`ATLANTIS5_CD_US`: a folder
 /// holding a copy of each disc's files in `CD1`, `CD2` and `CD3`, read
 /// in place from their InstallShield set; skipped when unset): the

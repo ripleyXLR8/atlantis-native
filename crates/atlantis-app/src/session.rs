@@ -1059,6 +1059,78 @@ mod tests {
         assert_eq!(found[0].1.label(), want);
     }
 
+    /// The Secrets of Atlantis's Italian Atlantis Collection in the game
+    /// library (`ATLANTIS5_IT_COLLECTION`: the folder its installer fills
+    /// in Italian): one entry named with the edition and its language,
+    /// not offered to copy (an install), found by the search for
+    /// installations, played in Italian.
+    #[test]
+    fn the_library_lists_atlantis5s_italian_collection() {
+        let Some(root) = atlantis3_data::testing::a5_it_collection() else {
+            return;
+        };
+        let own = own_data_dir("atlantis5-it-collection");
+        let d = own.dir.clone();
+        let want =
+            "The Secrets of Atlantis (2014), Italian Atlantis Collection, installed, Italian";
+        assert_eq!(
+            crate::setup::kind_of(&root),
+            Some(crate::setup::GameKind::Atlantis5)
+        );
+        assert_eq!(crate::a5::label(&root).unwrap(), want);
+        let places = crate::desktop::game_folders_in(std::slice::from_ref(&root), &[], &[]);
+        assert_eq!(places, std::slice::from_ref(&root));
+        let e = crate::desktop::describe(&root);
+        assert!(e.found && !e.copyable, "{e:?}");
+        assert_eq!(e.label, want);
+        let found = crate::desktop::first_of_each_game(std::slice::from_ref(&root));
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].1.label(), want);
+        std::fs::write(d.join("games.txt"), format!("{}\n", root.display())).unwrap();
+        let mut app = app_with_library(&d);
+        app.show_launcher(None);
+        app.run_launcher_action(LauncherAction::Play(0));
+        assert_eq!(
+            app.session_mut().unwrap().take_atlantis5(),
+            Some(root.clone())
+        );
+        let (src, label) = crate::a5::open(&root).unwrap();
+        assert_eq!(crate::a5::language(&src), "italian");
+        assert!(
+            label.starts_with("The Secrets of Atlantis (2006), Italian Atlantis Collection; Tree;"),
+            "{label}"
+        );
+        assert!(
+            label.ends_with("languages italian; playing italian"),
+            "{label}"
+        );
+        // Every language extracted from the installer (innoextract
+        // without a language): a place per language, as the
+        // international DVD's, each named with the edition.
+        let all = d.join("all-languages");
+        // The installer's name for it (the DVD's: `The secrets of ...`).
+        let exe = "The Secrets of Atlantis.exe";
+        std::fs::create_dir_all(all.join("Datas/Scenes")).unwrap();
+        std::fs::create_dir_all(all.join("Datas/Warps")).unwrap();
+        std::fs::copy(root.join(exe), all.join(exe)).unwrap();
+        let menu = root.join("datas/Texts/Menu/italian/string_resources.xml");
+        for l in ["italian", "english"] {
+            let m = all.join(format!("Datas/Texts/Menu/{l}"));
+            std::fs::create_dir_all(&m).unwrap();
+            std::fs::copy(&menu, m.join("string_resources.xml")).unwrap();
+        }
+        let labels: Vec<String> = crate::desktop::game_folders_in(&[all], &[], &[])
+            .iter()
+            .map(|p| crate::desktop::describe(p).label)
+            .collect();
+        assert_eq!(
+            labels,
+            ["English", "Italian"].map(|l| format!(
+                "The Secrets of Atlantis (2014), Italian Atlantis Collection, installed, {l}"
+            ))
+        );
+    }
+
     /// The Secrets of Atlantis's international DVD in the game library
     /// (`ATLANTIS5_DVD_INT`: a copy of the disc's files): a place per
     /// language, each its own edition named with its language, in the

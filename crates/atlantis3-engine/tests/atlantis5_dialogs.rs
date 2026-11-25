@@ -1111,28 +1111,55 @@ fn a_2d_talkers_film_loops_through_a_long_tirade() {
 /// disc's files, read from its cabinets; skipped when unset) in German,
 /// opened from the German cabinet's place as the game library does: the
 /// new game's first view, then the gorilla's subject menu and dialog 1,
-/// its first tirade the German table's with its German voice.
+/// its first tirade the German table's with its German voice
+/// ([`first_dialog`]).
 #[test]
 fn the_international_dvd_in_german() {
-    use atlantis3_data::atlantis5_texts::Dialogs;
     let Some(d) = atlantis3_data::testing::a5_dvd_int() else {
         return;
     };
     let src = Atlantis5Source::open(&d.join("datas_german.cab")).expect("the German place");
     assert_eq!(src.chosen_language(), Some("german"));
+    first_dialog(src, "german", "int-german");
+}
+
+/// The Italian *Atlantis Collection*'s install (`ATLANTIS5_IT_COLLECTION`;
+/// skipped when unset), its one language played with no choice: the same
+/// first view and dialog 1 in Italian ([`first_dialog`]).
+#[test]
+fn the_italian_collection_in_italian() {
+    let Some(d) = atlantis3_data::testing::a5_it_collection() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d).expect("the install");
+    assert_eq!(src.chosen_language(), None);
+    assert_eq!(src.language(Some("en")), "italian");
+    first_dialog(src, "italian", "it-collection");
+}
+
+/// A new game in `src`, played in `language`: its first film skipped, the
+/// first view, then the gorilla's subject menu and dialog 1, its first
+/// tirade `language`'s table's with a voice of `language`'s (shots named
+/// `a5-<tag>-...`).
+fn first_dialog(src: Atlantis5Source, language: &str, tag: &str) {
+    use atlantis3_data::atlantis5_texts::Dialogs;
     let lang = src.language(None);
+    assert_eq!(lang, language);
     let src: Arc<dyn atlantis_data::FileSource> = Arc::new(src);
-    let table = Dialogs::parse(&src.read("datas/texts/dialog/german/dialogs.xml").unwrap())
-        .expect("the German dialogs");
+    let table = Dialogs::parse(
+        &src.read(&format!("datas/texts/dialog/{language}/dialogs.xml"))
+            .unwrap(),
+    )
+    .expect("the dialogs");
     let mut play = Play::new(src.clone(), &lang, None).expect("play");
-    play.set_save_dir(Some(scratch("int-german")));
+    play.set_save_dir(Some(scratch(tag)));
     play.new_game();
     frames(&mut play, 3);
     assert!(play.stage().film_playing(), "cine01 plays");
     play.skip();
     frames(&mut play, 3);
     assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
-    let view = shot(&play, "a5-int-german-first-view.png");
+    let view = shot(&play, &format!("a5-{tag}-first-view.png"));
     assert!(view.iter().any(|&p| p & 0xff_ffff != 0));
     go(&mut play, 17);
     assert!(play.aim_at_sprite(b"gorilla"));
@@ -1156,9 +1183,9 @@ fn the_international_dvd_in_german() {
     assert_eq!(play.stage().dialog_text(), Some(want.as_str()));
     assert!(src
         .size(&atlantis3_engine::atlantis5_dialog::voice_path(
-            "german", 1, 0
+            language, 1, 0
         ))
         .is_some_and(|n| n > 0));
-    let talk = shot(&play, "a5-int-german-dialog-1.png");
+    let talk = shot(&play, &format!("a5-{tag}-dialog-1.png"));
     assert!(talk != view);
 }

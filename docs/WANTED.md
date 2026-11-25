@@ -127,7 +127,9 @@ Atlantis.exe` of 3,883,008 bytes, MD5 `fcb357acdb6c16a76f3f4f6cb5a625c5`)
 and the North-American CDs (*The Secrets of Atlantis*, The Adventure
 Company, 2007, UPC 625904549518, serial PC0549CD; the program on the
 first disc `bin\The Secrets of Atlantis.exe` of 7,368,704 bytes, MD5
-`ad356540e6375bf19e31372cd56193ae`).
+`ad356540e6375bf19e31372cd56193ae`), and the Italian *Atlantis
+Collection* DVD (2014; installed, its `The Secrets of Atlantis.exe` of
+2,822,144 bytes, MD5 `7d3784a3e99013baed76ddb892a4701d`).
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|

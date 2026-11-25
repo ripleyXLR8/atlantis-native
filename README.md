@@ -77,7 +77,9 @@ desktop and in the browser: its drive, its files, its image or its
 installation, in the game library as *The Secrets of Atlantis :
 L'Héritage sacré (2006), DVD, French*, one entry per language, *The
 Secrets of Atlantis: The Sacred Legacy (2006), DVD, German*, or *The
-Secrets of Atlantis (2007), 3 CDs, English*; on the desktop the DVD (or the three CDs, one after the other) can be copied to the computer once
+Secrets of Atlantis (2007), 3 CDs, English*; the Italian *Atlantis
+Collection* DVD (2014) from its installed folder, as *The Secrets of
+Atlantis (2014), Italian Atlantis Collection, installed, Italian*; on the desktop the DVD (or the three CDs, one after the other) can be copied to the computer once
 (**Copy to this computer** in the game library), so that it plays from
 the hard disk. The DVD's own Lua 5.0 scripts (compiled on the French
 DVD, source on the international one) run as they are; the nine
@@ -179,7 +181,8 @@ Atlantis Native contains none of them.</sub>
   too, as a preview.
 - 🏛️ **The Secrets of Atlantis**: the French and international DVDs
   (2006) and the North-American CDs (2007), read from the discs, their
-  files, their images or the installation, nothing unpacked; its
+  files, their images or the installation, nothing unpacked; the
+  Italian *Atlantis Collection* DVD (2014) from its installation; its
   own scripts, menus and saves; full screen or windowed (F11); on the
   desktop (where the DVD can be copied to the computer once) and in the
   browser.
@@ -381,6 +384,7 @@ For *The Secrets of Atlantis*:
 | The French DVD of Nobilis (2006, *L'Héritage sacré*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `e5c43eb0411d1775e6242fec6d241f6e`, never run) | French | the DVD's drive or a copy of its files (the folder with `DATAS.cab`), its image (`.iso`) or the folder holding it, or the folder where its installer put the game (the one with `Datas`) |
 | The international DVD of Nobilis (2006, *The Sacred Legacy*, *Das heilige Vermächtnis*, *L'Eredità Sacra*, *El Legado Sagrado*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `fcb357acdb6c16a76f3f4f6cb5a625c5`, never run) | English, German, Italian, Spanish | the same forms (its files are `datas.cab` and `datas_english.cab`, `datas_german.cab`, `datas_italian.cab`, `datas_spanish.cab`); the game library lists one entry per language, the web page asks for the language |
 | The North-American CDs of The Adventure Company (2007, *The Secrets of Atlantis*, three CDs; `bin\The Secrets of Atlantis.exe` of 7,368,704 bytes on the first disc, MD5 `ad356540e6375bf19e31372cd56193ae`, never run) | English | a folder holding a copy of each disc (one folder per disc, side by side: `data1.hdr`, `data1.cab`, `data2.cab` on the first, `data3.cab` on the second, `data4.cab` on the third), the three discs' files copied into one folder, the folder holding the three CD images, or the folder where the CDs' installer put the game; one CD in a drive is copied with the others, one after the other (**Copy to this computer**) |
+| *Atlantis Collection*, Italian DVD compilation (2014; its `Atlantis 5\Setup.exe`, an Inno Setup installer in English, German, Italian or Spanish, installs the international DVD's files with an unprotected `The Secrets of Atlantis.exe` of 2,822,144 bytes, MD5 `7d3784a3e99013baed76ddb892a4701d`, never run) | the language installed (English, German, Italian or Spanish) | the folder its installer creates (by default `Anuman interactive\The Secrets of Atlantis` in the program files, the one with `datas`); the installer itself is not read |
 
 You need your own DVD or CDs (or their images, or the game installed from them).
 The original's installer asks for the language and installs that one
