@@ -373,8 +373,8 @@ pub fn explain_atlantis2(dir: &Path, err: &OpenError) -> String {
             "{shown} holds an Atlantis II program, {name}, that Atlantis Native does not \
              know ({error}): an edition of the game that is not supported yet.\n\n\
              Supported: the French CD (1999), the CD with patch 1.01, the German CD (1999), \
-             the Spanish CD (1999), the Polish CD (1999), the DreamCatcher CD (2000), GOG.com \
-             and the Italian Atlantis Collection."
+             the Spanish CD (1999), the Swedish CD (1999), the Polish CD (1999), the \
+             DreamCatcher CD (2000), GOG.com and the Italian Atlantis Collection."
         ),
         OpenError::NoExecutable => format!(
             "{shown} does not hold Atlantis II's program (atlantis2.exe, or GOG.com's \

@@ -110,9 +110,9 @@ fn gog_english_changes_nothing() {
 }
 
 /// The CDs (French, with or without 1.01, whose patch changes no disc,
-/// North American, German and Spanish, whose discs hold their language's
-/// tracks in `apc\`): no film track in `dial\` on any disc, so the fix
-/// finds none and the film plays the disc's track.
+/// North American, German, Spanish and Swedish, whose discs hold their
+/// language's tracks in `apc\`): no film track in `dial\` on any disc, so
+/// the fix finds none and the film plays the disc's track.
 #[test]
 fn the_cds_change_nothing() {
     for (install, discs) in [
@@ -120,6 +120,7 @@ fn the_cds_change_nothing() {
         ("ATLANTIS2_DATA_US", "ATLANTIS2_DISCS_US"),
         ("ATLANTIS2_DATA_DE", "ATLANTIS2_DISCS_DE"),
         ("ATLANTIS2_DATA_ES", "ATLANTIS2_DISCS_ES"),
+        ("ATLANTIS2_DATA_SV", "ATLANTIS2_DISCS_SV"),
     ] {
         let Some(files) = cd(install, discs) else {
             continue;

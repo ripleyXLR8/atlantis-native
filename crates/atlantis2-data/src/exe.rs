@@ -5,7 +5,7 @@
 //! are listed: another build is reported with its identifiers, so that it
 //! can be added once compared.
 //!
-//! Ten builds are known:
+//! Eleven builds are known:
 //!
 //! - the French CD's `atlantis2.exe` (1.00, version string 3.15), the
 //!   reference every address in the comments belongs to;
@@ -61,7 +61,13 @@
 //!   addresses and file offsets) inside the same kind of copy protection
 //!   wrapper as the German CD's. Read the same way, never run; every
 //!   behaviour is the Polish CD's, so 1.01's (atlantis2-re
-//!   `binaries/atlantis2-cd-es-2415963.md`).
+//!   `binaries/atlantis2-cd-es-2415963.md`);
+//! - the Swedish CD's `atlantis2.exe` (*Atlantis II: Legenden
+//!   fortsätter…*, 4 CDs, 1999, IQ Media Nordic): the 1.01 patch's
+//!   executable linked eight days earlier (1999-11-09). Every byte is
+//!   1.01's but the PE header's timestamp: version string 3.18, no copy
+//!   protection, every behaviour 1.01's (atlantis2-re
+//!   `binaries/atlantis2-cd-sv-2183168.md`).
 //!
 //! 1.01 moved most of the code and data (the linker order changed), so
 //! what the port reads from the executable is read at each build's own
@@ -141,7 +147,7 @@ const PLACE_SOUNDS_101: PlaceSoundTable = PlaceSoundTable {
 };
 
 /// The builds this port knows.
-pub const KNOWN_BUILDS: [Build; 10] = [
+pub const KNOWN_BUILDS: [Build; 11] = [
     Build {
         id: "atlantis2-cd-fr-2199552",
         label: "Atlantis II, French CD (1999)",
@@ -323,6 +329,24 @@ pub const KNOWN_BUILDS: [Build; 10] = [
         place_sounds: PLACE_SOUNDS_101,
         film_subtitles_blitted: false,
     },
+    Build {
+        id: "atlantis2-cd-sv-2183168",
+        label: "Atlantis II, Swedish CD (1999)",
+        size: 2_183_168,
+        // 1999-11-09 14:50:41 UTC, eight days before 1.01's.
+        pe_timestamp: 0x3828_34c1,
+        md5: [
+            0xd8, 0x79, 0x72, 0x6a, 0xb1, 0x78, 0x57, 0x0b, 0x5a, 0xb5, 0x06, 0x9b, 0xe9, 0x8f,
+            0x05, 0x70,
+        ],
+        version: "Atlantis 2 - Version 3.18 - 8/10/1999",
+        // 1.01's file but for the PE timestamp (bytes 0x108..0x10b): 1.01's
+        // code and tables at 1.01's addresses, no GOG patch.
+        release: Release::V101,
+        gog: false,
+        place_sounds: PLACE_SOUNDS_101,
+        film_subtitles_blitted: false,
+    },
 ];
 
 /// The sizes of the launchers that go by `atlantis2.exe` beside a
@@ -459,6 +483,7 @@ mod tests {
                 "f2b6f7bfa3c1952dceddfa1a662ebb84",
                 "8550d510492f7f992a15a623bbefd322",
                 "881e461cc4d0f765cb2942bd826aba8d",
+                "d879726ab178570b5ab5069be98f0570",
             ]
         );
         // The listener table is 5780 bytes in every build.
@@ -471,7 +496,7 @@ mod tests {
                 .iter()
                 .filter(|b| b.release == Release::V101)
                 .count(),
-            8
+            9
         );
         // Only the North American CD draws a film's subtitles before the
         // 800 x 600 enlargement.
@@ -507,6 +532,28 @@ mod tests {
                 pl.place_sounds
             )
         );
+        // The Swedish CD is 1.01's file under another PE timestamp.
+        let (patch, sv) = (&KNOWN_BUILDS[1], &KNOWN_BUILDS[10]);
+        assert_eq!(sv.id, "atlantis2-cd-sv-2183168");
+        assert_eq!(
+            (
+                sv.size,
+                sv.version,
+                sv.release,
+                sv.gog,
+                sv.place_sounds,
+                sv.film_subtitles_blitted
+            ),
+            (
+                patch.size,
+                patch.version,
+                patch.release,
+                patch.gog,
+                patch.place_sounds,
+                patch.film_subtitles_blitted
+            )
+        );
+        assert_ne!(sv.pe_timestamp, patch.pe_timestamp);
     }
 
     #[test]

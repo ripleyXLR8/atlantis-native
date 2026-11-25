@@ -17,7 +17,9 @@
 //! Italian's only known one: no GOG.com depot of Atlantis II holds Italian.
 //! The Polish CD's (1999) is Polish's only known one. The German CD's
 //! (1999) differs from GOG's German by one line (it asks for the CD), and
-//! so does the Spanish CD's (1999) from GOG's Spanish.
+//! so does the Spanish CD's (1999) from GOG's Spanish. The Swedish CD's
+//! (1999) is Swedish's only known one: no GOG.com depot of Atlantis II
+//! holds Swedish.
 //!
 //! The language also tells the code page the texts are read in
 //! ([`Language::text_code_page`]): the original passes the bytes of
@@ -42,6 +44,7 @@ pub enum Language {
     Spanish,
     Italian,
     Polish,
+    Swedish,
 }
 
 impl Language {
@@ -54,6 +57,7 @@ impl Language {
             Language::Spanish => "Spanish",
             Language::Italian => "Italian",
             Language::Polish => "Polish",
+            Language::Swedish => "Swedish",
         }
     }
 
@@ -61,7 +65,8 @@ impl Language {
     /// Windows the edition was sold for. Windows-1250 for Polish (the
     /// Polish CD's `loc\*.txt` use 0xb9 `ą`, 0xb3 `ł`, 0xbf `ż`, 0x9c `ś`,
     /// 0xe6 `ć`, 0xf1 `ń`, 0xea `ę`, 0x9f `ź`...), Windows-1252 for the
-    /// others.
+    /// others (the Swedish CD's use 0xe5 `å`, 0xe4 `ä`, 0xf6 `ö`, 0xc5 `Å`,
+    /// 0xc4 `Ä`, 0xd6 `Ö`).
     pub fn text_code_page(self) -> TextCodePage {
         match self {
             Language::Polish => TextCodePage::Windows1250,
@@ -69,7 +74,8 @@ impl Language {
             | Language::French
             | Language::German
             | Language::Spanish
-            | Language::Italian => TextCodePage::Windows1252,
+            | Language::Italian
+            | Language::Swedish => TextCodePage::Windows1252,
         }
     }
 }
@@ -82,7 +88,7 @@ pub fn text_code_page(language: Option<Language>) -> TextCodePage {
 }
 
 /// The known `loc\Menu.txt` files: size, MD5, language.
-pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 10] = [
+pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 11] = [
     // The French CD's (1999), installed.
     (
         1371,
@@ -176,6 +182,15 @@ pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 10] = [
         ],
         Language::Spanish,
     ),
+    // The Swedish CD (1999), installed (`loc\Menu.txt`).
+    (
+        1043,
+        [
+            0x04, 0x12, 0x55, 0x98, 0x0d, 0x18, 0xb1, 0xad, 0x86, 0x69, 0x11, 0xd5, 0x75, 0x30,
+            0x1f, 0x26,
+        ],
+        Language::Swedish,
+    ),
 ];
 
 /// The language of a `loc\Menu.txt`, `None` when it is no known file.
@@ -230,6 +245,7 @@ mod tests {
                 "12eb5e1c3379dac9e2ccb16156a971c1",
                 "db4a621ee8bee5c2c155cf43bfdc442a",
                 "0609b0b59904d1ea7e001fbc1986036b",
+                "041255980d18b1ad866911d575301f26",
             ]
         );
         // A file of a known size but other bytes names no language.
@@ -261,7 +277,7 @@ mod tests {
 
     #[test]
     fn labels() {
-        let [cd, patch, gog, w10, _, us, collection, pl, de, es] = &KNOWN_BUILDS;
+        let [cd, patch, gog, w10, _, us, collection, pl, de, es, sv] = &KNOWN_BUILDS;
         assert_eq!(
             edition_label(gog, Some(Language::German)),
             "Atlantis II, GOG.com, German (patch 1.01)"
@@ -302,6 +318,10 @@ mod tests {
             edition_label(es, Some(Language::Spanish)),
             "Atlantis II, Spanish CD (1999)"
         );
+        assert_eq!(
+            edition_label(sv, Some(Language::Swedish)),
+            "Atlantis II, Swedish CD (1999)"
+        );
     }
 
     #[test]
@@ -316,6 +336,7 @@ mod tests {
             Language::German,
             Language::Spanish,
             Language::Italian,
+            Language::Swedish,
         ] {
             assert_eq!(text_code_page(Some(l)), TextCodePage::Windows1252);
         }
@@ -326,5 +347,8 @@ mod tests {
             0xc6, 0xd1, 0xd3, 0x8f,
         ]);
         assert_eq!(pl, "ąęłżśćńóźĄĘŁŻŚĆŃÓŹ");
+        // The Swedish letters at their Windows-1252 bytes.
+        let sv = TextCodePage::Windows1252.decode(&[0xe5, 0xe4, 0xf6, 0xc5, 0xc4, 0xd6]);
+        assert_eq!(sv, "åäöÅÄÖ");
     }
 }
