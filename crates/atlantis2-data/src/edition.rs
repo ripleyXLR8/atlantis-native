@@ -19,7 +19,13 @@
 //! (1999) differs from GOG's German by one line (it asks for the CD), and
 //! so does the Spanish CD's (1999) from GOG's Spanish. The Swedish CD's
 //! (1999) is Swedish's only known one: no GOG.com depot of Atlantis II
-//! holds Swedish.
+//! holds Swedish. The Czech CD's (2000, reissued in 2002 as *GAME4U
+//! Speciál 3*) is Czech's only known one.
+//!
+//! The Czech CD ships the North American CD's executable byte for byte
+//! (atlantis2-re `binaries/atlantis2-cd-us-2199552.md`), so its build is
+//! that one; the language tells the edition apart, and [`edition_label`]
+//! names it after its own release ([`LANGUAGE_EDITIONS`]).
 //!
 //! The language also tells the code page the texts are read in
 //! ([`Language::text_code_page`]): the original passes the bytes of
@@ -27,8 +33,9 @@
 //! (`CreateFontA` @ 0x00404cc8; atlantis2-cd-pl-2183168 @ 0x0046f2a1), so
 //! they are read in the system's ANSI code page, the one each edition was
 //! made for: Windows-1252 for the Western ones, Windows-1250 for the
-//! Polish CD (atlantis2-re `binaries/atlantis2-cd-pl-2183168.md`, "Text
-//! code page").
+//! Polish and Czech CDs (atlantis2-re `binaries/atlantis2-cd-pl-2183168.md`,
+//! "Text code page"; the Czech CD's program makes its fonts the same way,
+//! `CreateFontA` with `DEFAULT_CHARSET`).
 
 use atlantis_data::TextCodePage;
 use md5::{Digest, Md5};
@@ -45,6 +52,7 @@ pub enum Language {
     Italian,
     Polish,
     Swedish,
+    Czech,
 }
 
 impl Language {
@@ -58,6 +66,7 @@ impl Language {
             Language::Italian => "Italian",
             Language::Polish => "Polish",
             Language::Swedish => "Swedish",
+            Language::Czech => "Czech",
         }
     }
 
@@ -66,10 +75,12 @@ impl Language {
     /// Polish CD's `loc\*.txt` use 0xb9 `ą`, 0xb3 `ł`, 0xbf `ż`, 0x9c `ś`,
     /// 0xe6 `ć`, 0xf1 `ń`, 0xea `ę`, 0x9f `ź`...), Windows-1252 for the
     /// others (the Swedish CD's use 0xe5 `å`, 0xe4 `ä`, 0xf6 `ö`, 0xc5 `Å`,
-    /// 0xc4 `Ä`, 0xd6 `Ö`).
+    /// 0xc4 `Ä`, 0xd6 `Ö`). Windows-1250 for Czech too (the Czech CD's use
+    /// 0x9a `š`, 0x9e `ž`, 0x9d `ť`, 0xe8 `č`, 0xec `ě`, 0xf8 `ř`, 0xf9 `ů`,
+    /// 0xef `ď`, 0xf2 `ň`...; its manual is `charset=windows-1250`).
     pub fn text_code_page(self) -> TextCodePage {
         match self {
-            Language::Polish => TextCodePage::Windows1250,
+            Language::Polish | Language::Czech => TextCodePage::Windows1250,
             Language::English
             | Language::French
             | Language::German
@@ -82,13 +93,13 @@ impl Language {
 
 /// The code page of the texts of a folder whose language is `language`:
 /// the language's, Windows-1252 when it is not known (every edition but
-/// the Polish CD).
+/// the Polish and Czech CDs).
 pub fn text_code_page(language: Option<Language>) -> TextCodePage {
     language.map_or(TextCodePage::Windows1252, Language::text_code_page)
 }
 
 /// The known `loc\Menu.txt` files: size, MD5, language.
-pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 11] = [
+pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 12] = [
     // The French CD's (1999), installed.
     (
         1371,
@@ -191,7 +202,28 @@ pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 11] = [
         ],
         Language::Swedish,
     ),
+    // The Czech CD (2000; *GAME4U Speciál 3*, 2002), installed
+    // (`loc\Menu.txt`, Windows-1250).
+    (
+        1207,
+        [
+            0xec, 0x3a, 0xf0, 0x76, 0x2a, 0x15, 0xb5, 0x7a, 0x95, 0xde, 0xad, 0xcf, 0xce, 0xb0,
+            0xbc, 0x87,
+        ],
+        Language::Czech,
+    ),
 ];
+
+/// Editions whose build is another edition's: (the build's id, the
+/// language, the edition's name). The Czech CD's `atlantis2.exe` is the
+/// North American CD's file (MD5 `0f634c46…`, linked 2000-04-05): its
+/// Czech `loc\` makes it the Czech CD, named after its own release and
+/// not DreamCatcher's.
+pub const LANGUAGE_EDITIONS: [(&str, Language, &str); 1] = [(
+    "atlantis2-cd-us-2199552",
+    Language::Czech,
+    "Atlantis II, Czech CD (2000)",
+)];
 
 /// The language of a `loc\Menu.txt`, `None` when it is no known file.
 pub fn language_of_menu_txt(data: &[u8]) -> Option<Language> {
@@ -209,8 +241,15 @@ pub fn language_of_menu_txt(data: &[u8]) -> Option<Language> {
 /// The edition's name: the build's, with the language after the
 /// release's name when the build's name does not say it already
 /// ("Atlantis II, GOG.com, German (patch 1.01)"; the French CD's build
-/// is French only).
+/// is French only); an edition that shares another's build by its own
+/// name ([`LANGUAGE_EDITIONS`]: "Atlantis II, Czech CD (2000)").
 pub fn edition_label(build: &Build, language: Option<Language>) -> String {
+    if let Some(&(_, _, name)) = LANGUAGE_EDITIONS
+        .iter()
+        .find(|&&(id, l, _)| id == build.id && Some(l) == language)
+    {
+        return name.to_string();
+    }
     let label = build.label;
     match (language, label.find(" (")) {
         (Some(l), Some(i)) if !label.contains(l.name()) => {
@@ -246,6 +285,7 @@ mod tests {
                 "db4a621ee8bee5c2c155cf43bfdc442a",
                 "0609b0b59904d1ea7e001fbc1986036b",
                 "041255980d18b1ad866911d575301f26",
+                "ec3af0762a15b57a95deadcfceb0bc87",
             ]
         );
         // A file of a known size but other bytes names no language.
@@ -302,6 +342,20 @@ mod tests {
             edition_label(us, Some(Language::English)),
             "Atlantis II, CD, English (DreamCatcher, 2000)"
         );
+        // The Czech CD: the North American CD's build, its own name.
+        assert_eq!(
+            edition_label(us, Some(Language::Czech)),
+            "Atlantis II, Czech CD (2000)"
+        );
+        assert_eq!(
+            edition_label(us, None),
+            "Atlantis II, CD (DreamCatcher, 2000)"
+        );
+        // Czech with another build: the build's name and the language.
+        assert_eq!(
+            edition_label(patch, Some(Language::Czech)),
+            "Atlantis II, patch 1.01, Czech (1999)"
+        );
         assert_eq!(
             edition_label(collection, Some(Language::Italian)),
             "Atlantis II, Italian Collection (patch 1.01)"
@@ -326,10 +380,9 @@ mod tests {
 
     #[test]
     fn code_pages() {
-        assert_eq!(
-            text_code_page(Some(Language::Polish)),
-            TextCodePage::Windows1250
-        );
+        for l in [Language::Polish, Language::Czech] {
+            assert_eq!(text_code_page(Some(l)), TextCodePage::Windows1250);
+        }
         for l in [
             Language::English,
             Language::French,
@@ -350,5 +403,11 @@ mod tests {
         // The Swedish letters at their Windows-1252 bytes.
         let sv = TextCodePage::Windows1252.decode(&[0xe5, 0xe4, 0xf6, 0xc5, 0xc4, 0xd6]);
         assert_eq!(sv, "åäöÅÄÖ");
+        // The Czech letters at their Windows-1250 bytes.
+        let cs = TextCodePage::Windows1250.decode(&[
+            0xe1, 0xe8, 0xef, 0xe9, 0xec, 0xed, 0xf2, 0xf3, 0xf8, 0x9a, 0x9d, 0xfa, 0xf9, 0xfd,
+            0x9e, 0xc8, 0xd8, 0x8a, 0x8e,
+        ]);
+        assert_eq!(cs, "áčďéěíňóřšťúůýžČŘŠŽ");
     }
 }

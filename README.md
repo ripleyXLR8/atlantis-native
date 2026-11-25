@@ -331,6 +331,7 @@ For *Atlantis II*:
 | CD, Spanish release (1999, 4 CDs, distributed by Friendware; the Polish CD's program, version 1.01's code, inside a copy protection, which Atlantis Native does not run) | Spanish | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
 | CD, Swedish release (*Legenden fortsätter…*, 1999, 4 CDs, IQ Media Nordic; version 1.01's program) | Swedish | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
 | CD, Polish release (1999, 4 CDs; its own program, version 1.01's code; texts in Windows-1250) | Polish | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
+| CD, Czech release (Bohemia Interactive, 2000, 4 CDs, also the 2002 budget re-issue *GAME4U Speciál 3*; the North American CD's program; texts in Windows-1250) | Czech | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
 | [GOG.com](https://www.gog.com/) (version 1.01; the builds of 2018, June 2022 and July 2022) | English, French, German, Spanish (one executable for all four) | the installation folder |
 | *Atlantis Collection*, Italian DVD compilation (2014; shown as *Italian Collection (patch 1.01)*, its program being version 1.01 patched almost as GOG's 2018 build) | Italian | the folder its installer creates for *Atlantis 2 - Beyond Atlantis* (with `Game.exe` and `DATAS_A2`) |
 

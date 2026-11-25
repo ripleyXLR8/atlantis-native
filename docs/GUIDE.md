@@ -106,7 +106,8 @@ of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
 the German CD (1999, also in *Die Legende Atlantis I & II*), the Spanish
 CD (1999, Friendware), the Swedish CD (1999, IQ Media Nordic), the Polish
-CD (1999), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
+CD (1999), the Czech CD (2000, Bohemia Interactive, also the 2002 *GAME4U
+Speciál 3*), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
 English, French, German or Spanish, the French CD (2001, three CDs) and
 the Italian *Atlantis Collection* DVD (installed);
@@ -311,7 +312,7 @@ What to pick:
 - *Atlantis II*, GOG.com or the Italian *Atlantis Collection*: the
   installation folder (the one holding `Game.exe` and `DATAS_A2`).
 - *Atlantis II*, CD (the French CD, also patched to 1.01, the North
-  American *Beyond Atlantis*, the German, Spanish, Swedish or Polish CD): the folder of the
+  American *Beyond Atlantis*, the German, Spanish, Swedish, Polish or Czech CD): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
   with the images of the four CDs (`.iso`, `.bin`, `.img`, `.mdf` or
   `.nrg`) in it or in a folder inside it, or copies of the CDs (for
@@ -667,6 +668,16 @@ earlier), so it plays as 1.01, with the Swedish texts (å ä ö) and voices;
 films 19, 55 and 66 are in Swedish too, and the intro starts with IQ
 Media's logo.
 
+The Czech CD (*Atlantis II*, 2000, 4 CDs, Czech, published by Bohemia
+Interactive; re-issued in 2002 with the magazine *GAME4U Speciál 3*)
+installs and opens as the French CD does: the installed folder with the
+images or copies of its four CDs (the re-issue's raw `.bin` images are
+read as they are). Its program is the North American CD's, so it plays as
+that one, with the Czech texts (á č ď é ě í ň ř š ť ú ů ý ž, read in the
+Central European code page as a Czech Windows does) and voices; films 19,
+55 and 66 are in Czech too, and the intro starts with Bohemia
+Interactive's logo.
+
 The Italian *Atlantis Collection* (DVD, 2014) installs one folder as GOG.com's
 does, Italian only: point Atlantis Native at it (no disc is needed). Its
 `atlantis2.exe` is a launcher, which is passed over for `Game.exe`, version
@@ -765,8 +776,8 @@ it. Its entries:
   - **800 x 600: subtitles over the films**: at 800 x 600 the French CD,
     the patch 1.01 and GOG.com's edition draw the subtitles of a dialog
     played over a film too late to be seen, so they never show; with the
-    fix they do. DreamCatcher's CD draws them in time: it shows them
-    either way.
+    fix they do. DreamCatcher's CD and the Czech CD (the same program)
+    draw them in time: they show them either way.
   - **Films: sound in the game's language**: three films (19, 55 and 66)
     read their sound from a folder that, on GOG.com, holds the English
     tracks whatever the language installed, and on the Italian collection

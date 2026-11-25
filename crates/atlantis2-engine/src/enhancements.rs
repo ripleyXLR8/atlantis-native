@@ -42,9 +42,9 @@ pub enum BugFix {
     /// as 1.00 and 1.01, they are drawn after the frame's enlargement
     /// (the film frame's FUN_00402c30 @ 0x0040bc65, then FUN_00480840
     /// @ 0x0040c08e), on the surface the next frame covers: never seen.
-    /// The North American CD draws them before it
-    /// ([`atlantis2_data::exe::Build::film_subtitles_blitted`]), so there
-    /// they show either way.
+    /// The North American CD's program (the Czech CD's too) draws them
+    /// before it ([`atlantis2_data::exe::Build::film_subtitles_blitted`]),
+    /// so there they show either way.
     FilmSubtitles,
     /// Films 19, 55 and 66 play the track of the language installed, when
     /// `datas_a2\\apc\\dial\\` holds one that fits

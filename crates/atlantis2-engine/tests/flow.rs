@@ -83,6 +83,9 @@ thread_local! {
     /// The test plays the Swedish CD (`ATLANTIS2_DATA_SV`,
     /// `ATLANTIS2_DISCS_SV`).
     static ON_SV: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the Czech CD (`ATLANTIS2_DATA_CS`,
+    /// `ATLANTIS2_DISCS_CS`).
+    static ON_CS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 fn game() -> Option<A2Files> {
@@ -129,6 +132,13 @@ fn game() -> Option<A2Files> {
         let discs = std::env::var_os("ATLANTIS2_DISCS_SV")?;
         let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)])
             .expect("the Swedish CD");
+        return Some(files);
+    }
+    if ON_CS.with(|c| c.get()) {
+        let dir = std::env::var_os("ATLANTIS2_DATA_CS")?;
+        let discs = std::env::var_os("ATLANTIS2_DISCS_CS")?;
+        let (files, _) =
+            A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("the Czech CD");
         return Some(files);
     }
     let (Some(dir), Some(discs)) = (
@@ -548,6 +558,8 @@ impl Run {
                 "es-"
             } else if ON_SV.with(|s| s.get()) {
                 "sv-"
+            } else if ON_CS.with(|c| c.get()) {
+                "cs-"
             } else {
                 ""
             };
@@ -6227,6 +6239,22 @@ fn the_whole_game_with_the_mouse_on_the_swedish_cd() {
     whole_game("a2-flow-whole-game-sv");
 }
 
+/// The whole game on the Czech CD (`ATLANTIS2_DATA_CS`,
+/// `ATLANTIS2_DISCS_CS`): the DreamCatcher CD's program with Czech texts
+/// (Windows-1250) and voices, the same play, the same chapters and lines.
+/// With `ATLANTIS2_PNG_DIR` its pictures are written there (`cs-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_czech_cd() {
+    if std::env::var_os("ATLANTIS2_DATA_CS").is_none()
+        || std::env::var_os("ATLANTIS2_DISCS_CS").is_none()
+    {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA_CS / ATLANTIS2_DISCS_CS not set");
+        return;
+    }
+    ON_CS.with(|c| c.set(true));
+    whole_game("a2-flow-whole-game-cs");
+}
+
 fn whole_game(scratch_name: &str) {
     let gog = ON_GOG.with(|g| g.get())
         || ON_US.with(|u| u.get())
@@ -6234,7 +6262,8 @@ fn whole_game(scratch_name: &str) {
         || ON_PL.with(|p| p.get())
         || ON_DE.with(|d| d.get())
         || ON_ES.with(|e| e.get())
-        || ON_SV.with(|s| s.get());
+        || ON_SV.with(|s| s.get())
+        || ON_CS.with(|c| c.get());
     let started = std::time::Instant::now();
     let dir = scratch(scratch_name);
     let mut r = Run::new(&dir);

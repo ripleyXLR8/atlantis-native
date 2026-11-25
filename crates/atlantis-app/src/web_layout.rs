@@ -1184,9 +1184,9 @@ mod tests {
             eprintln!("{}: {name}, {} bytes by parts", real.display(), whole.len());
         }
 
-        /// Atlantis II's CDs (French, Polish, German, Spanish, Swedish, North
-        /// American): the installed folder and the four images, picked
-        /// together.
+        /// Atlantis II's CDs (French, Polish, German, Spanish, Swedish,
+        /// Czech, North American): the installed folder and the four
+        /// images, picked together.
         #[test]
         fn atlantis2s_cd_images() {
             use atlantis2_data::files::find_exe;
@@ -1196,6 +1196,7 @@ mod tests {
                 ("ATLANTIS2_DATA_DE", "ATLANTIS2_DISCS_DE", "German"),
                 ("ATLANTIS2_DATA_ES", "ATLANTIS2_DISCS_ES", "Spanish"),
                 ("ATLANTIS2_DATA_SV", "ATLANTIS2_DISCS_SV", "Swedish"),
+                ("ATLANTIS2_DATA_CS", "ATLANTIS2_DISCS_CS", "Czech"),
                 ("ATLANTIS2_DATA_US", "ATLANTIS2_DISCS_US", "English"),
             ] {
                 let (Some(data), Some(discs)) = (var(data), var(discs)) else {

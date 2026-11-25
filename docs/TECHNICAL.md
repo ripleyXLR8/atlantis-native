@@ -1196,8 +1196,8 @@ parts of 1 byte to 512 KB give the whole file's bytes, a part read ahead
 is the span then read, a raw read never over a batch), the layouts with
 images (`web_layout`'s tests), and the players' images on disk read as
 the browser reads them (`web_layout::tests::on_disk`: Atlantis II's
-French, Polish, German, Spanish, Swedish and North American CDs with
-`ATLANTIS2_DATA[_PL|_DE|_ES|_SV|_US]` / `ATLANTIS2_DISCS[_PL|_DE|_ES|_SV|_US]`, a cinematic of disc 1 by parts of 512 KB as
+French, Polish, German, Spanish, Swedish, Czech and North American CDs with
+`ATLANTIS2_DATA[_PL|_DE|_ES|_SV|_CS|_US]` / `ATLANTIS2_DISCS[_PL|_DE|_ES|_SV|_CS|_US]`, a cinematic of disc 1 by parts of 512 KB as
 the desktop's whole read; Atlantis III's French CD with
 `ATLANTIS3_CD_FR` / `ATLANTIS3_DISCS_FR`, disc 2 for a new game; the
 first game's ISO, raw `.bin`, `.mdf` and Nero images with the
@@ -1546,7 +1546,7 @@ back) into `yucatan-*.png`.
   The port reads the code page from the language
   (`edition::Language::text_code_page`, `A2Files::text_code_page`):
   `SubtitleFont::load` looks each byte's glyph up in it, Windows-1250 for
-  Polish, Windows-1252 for every other edition (`tests/pl_cd.rs`). The
+  Polish and Czech, Windows-1252 for every other edition (`tests/pl_cd.rs`). The
   German CD's `atlantis2.exe` (4 CDs, 1999, the discs also in the
   compilation *Die Legende Atlantis I & II*, 2000;
   `atlantis2-cd-de-2432347`, 2432347 bytes, MD5
@@ -1594,7 +1594,26 @@ back) into `yucatan-*.png`.
   discs are the Polish CD's layout with the Swedish voices (no other
   edition's), the Swedish tracks of films 19, 55 and 66 in
   `datas_a2\apc\` and IQ Media's logo as `intro00.hnm` (60 frames, no
-  track; GOG's `INTROSWE.HNM`, which GOG ships unused) (`tests/sv_cd.rs`). The languages differ only in data: `loc\` (texts,
+  track; GOG's `INTROSWE.HNM`, which GOG ships unused) (`tests/sv_cd.rs`).
+  The Czech CD (Bohemia Interactive, 2000, 4 CDs; read from its 2002
+  re-issue with the magazine *GAME4U Speciál 3*, raw Mode 2 `.bin`
+  images) ships the North American CD's `atlantis2.exe` byte for byte
+  (MD5 `0f634c4620680dfea6782645c79dc84c`) and that CD's installed files
+  but `loc\`: so its build is `atlantis2-cd-us-2199552` and the edition is
+  told by the data, the only known Czech `Menu.txt` naming the language
+  (`Language::Czech`) and the pair (build, language) the edition's name
+  (`edition::LANGUAGE_EDITIONS`: "Atlantis II, Czech CD (2000)"). Its
+  `Font.txt` says `[Language] CZE`, which none of the build's language
+  branches tests (`jpn` for the line break; `dut`, `esp`, `ita`, `swe` for
+  the intro), so it plays as the North American CD. Its texts are
+  Windows-1250 (`š` 0x9a, `ž` 0x9e, `ť` 0x9d, `č` 0xe8, `ě` 0xec, `ř`
+  0xf8, `ů` 0xf9...): the program makes its fonts in `DEFAULT_CHARSET`, so
+  they are read in the system's code page, the one of the Czech Windows
+  it was sold for, as for the Polish CD; the font (GOG's `Atl_Font.ttf`)
+  has every Czech letter. Its discs hold the Czech voices (no other
+  edition's), the Czech tracks of films 19, 55 and 66 in `datas_a2\apc\`
+  and Bohemia Interactive's logo as `intro00.hnm` (90 frames, no track)
+  (`tests/cs_cd.rs`). The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
@@ -3773,7 +3792,7 @@ back) into `yucatan-*.png`.
   at start-up and when the display is set up, does to the word.
 - **Dialogs** (`dialog.rs`, `hnm_stream.rs`, `subtitle.rs`, `sound.rs`):
   a world's `loc\Dial<XX>.txt` (the texts, Windows-1252; Windows-1250 for
-  the Polish CD),
+  the Polish and Czech CDs),
   `scenar\com<XX>.txt` (speaker, mood, stand, camera, kind of each line)
   and `scenar\info<XX>.txt` (the speakers) are read with the world; a
   dialog collects its lines, loads each speaker's head per stand, and
@@ -4994,6 +5013,18 @@ distributor's logo (against GOG's French `INTROSWE.HNM`), a subtitle with
 its voices, none the Polish CD's, the main menu's tooltip and a save, the
 browser's way of opening it; `tests/flow.rs`'s whole game with the mouse
 played again on it; `sv-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_CS`, `ATLANTIS2_DISCS_CS` the Czech CD's installed folder
+(`data1.hdr` and `data1.cab` of its first disc extracted) and a folder
+holding its four CD images (`tests/cs_cd.rs`: the executable by its MD5
+and against the North American CD's, every installed file but `loc`'s
+against that CD's, the edition's name and language, the `loc` files
+against its lines and objects, every subtitle laid out, every letter a
+glyph in Windows-1250, the Czech film tracks, the spider and its web drawn
+as on the North American CD, the intro with Bohemia Interactive's logo, a
+subtitle with its voices, none the North American CD's, the main menu's
+tooltip and a save, the browser's way of opening it through the `.bin`
+images; `tests/flow.rs`'s whole game with the mouse played again on it;
+`cs-*.png` with `ATLANTIS2_PNG_DIR`),
 `ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
 German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
 `1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older

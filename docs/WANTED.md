@@ -64,8 +64,9 @@ Perfect Edition and the Italian *Atlantis Collection* (2014). See
 official patch 1.01, the North American CD (*Beyond Atlantis*,
 DreamCatcher, 2000), the German CD (also in *Die Legende Atlantis I &
 II*, 2000), the Spanish CD (Friendware, 1999), the Swedish CD (IQ Media
-Nordic, 1999), the Polish CD, GOG.com (English, French, German, Spanish)
-and the Italian *Atlantis Collection* (2014).
+Nordic, 1999), the Polish CD, the Czech CD (Bohemia Interactive, 2000;
+seen in its *GAME4U Speciál 3* re-issue, 2002), GOG.com (English, French,
+German, Spanish) and the Italian *Atlantis Collection* (2014).
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|
@@ -74,7 +75,6 @@ and the Italian *Atlantis Collection* (2014).
 | 🟠 wanted | *Atlantis II*, Italian | Italy, CTO | 1999 | 4 CD | AT2-ITA 1 … 4; barcode 8015887002780; Redump [73260](http://redump.org/disc/73260/)–73263 |
 | 🟠 wanted | *Atlantis II*, Dutch | Netherlands, Belgium, Infogrames Benelux | 1999 | 4 CD | AT2-DUCD1 … 4; Redump [96354](http://redump.org/disc/96354/)–96357 |
 | 🟠 wanted | *Атлантида II* | Russia, 1C / Nival | 1999 | 4 CD | Version 3.15; Redump [95823](http://redump.org/disc/95823/)–95826 |
-| 🟠 wanted | *Atlantis II*, Czech (also *GAME4U Speciál 3*, 2002) | Czech Republic, Bohemia Interactive | 2000 | 4 CD | Czech voices |
 | 🟠 wanted | *Atlantis II* | Japan, SEGA | 2000 | CD | Product code HCJ-0172 |
 | 🟠 wanted | 亞特蘭提斯 II, Chinese and English | Taiwan | 2000 | 4 CD | Redump [84581](http://redump.org/disc/84581/) (disc 3) |
 | 🟠 wanted | *Atlantis II*, collection "Aventure" | France | 2010 | 1 DVD | Barcode 3700455831538; Redump [22041](http://redump.org/disc/22041/) |

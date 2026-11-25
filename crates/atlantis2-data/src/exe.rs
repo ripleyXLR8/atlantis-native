@@ -31,7 +31,11 @@
 //!   DreamCatcher, 2000-04-05, version string 3.18 too): 1.01's code
 //!   relinked, whose additions an English `Font.txt` does not reach (a
 //!   Japanese line break, intros for four other languages), and one
-//!   change that shows: [`Build::film_subtitles_blitted`];
+//!   change that shows: [`Build::film_subtitles_blitted`]. The Czech CD
+//!   (2000; reissued in 2002 as *GAME4U Speciál 3*) ships this file byte
+//!   for byte with `[Language] CZE` in its `Font.txt`, which none of those
+//!   additions tests for: the same build, told apart by its texts
+//!   ([`crate::edition::LANGUAGE_EDITIONS`]);
 //! - the `Game.exe` of the Italian *Atlantis Collection* DVD (2014): 1.01
 //!   with four of the five patches of GOG's 2018 build, byte for byte. It
 //!   lacks the one that takes a fixed drive for the CD, so the original
