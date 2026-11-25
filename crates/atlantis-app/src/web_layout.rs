@@ -1184,7 +1184,7 @@ mod tests {
             eprintln!("{}: {name}, {} bytes by parts", real.display(), whole.len());
         }
 
-        /// Atlantis II's CDs (French, Polish, North American): the
+        /// Atlantis II's CDs (French, Polish, German, North American): the
         /// installed folder and the four images, picked together.
         #[test]
         fn atlantis2s_cd_images() {
@@ -1192,6 +1192,7 @@ mod tests {
             for (data, discs, label) in [
                 ("ATLANTIS2_DATA", "ATLANTIS2_DISCS", "French"),
                 ("ATLANTIS2_DATA_PL", "ATLANTIS2_DISCS_PL", "Polish"),
+                ("ATLANTIS2_DATA_DE", "ATLANTIS2_DISCS_DE", "German"),
                 ("ATLANTIS2_DATA_US", "ATLANTIS2_DISCS_US", "English"),
             ] {
                 let (Some(data), Some(discs)) = (var(data), var(discs)) else {

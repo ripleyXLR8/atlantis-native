@@ -5,7 +5,7 @@
 //! are listed: another build is reported with its identifiers, so that it
 //! can be added once compared.
 //!
-//! Eight builds are known:
+//! Nine builds are known:
 //!
 //! - the French CD's `atlantis2.exe` (1.00, version string 3.15), the
 //!   reference every address in the comments belongs to;
@@ -45,7 +45,16 @@
 //!   runtime's `strcpy` / `_mbslen` where 1.01 inlines them), so every
 //!   [`Release`] behaviour is 1.01's and none of GOG's patches is in it
 //!   (atlantis2-re `binaries/atlantis2-cd-pl-2183168.md`). Its texts are
-//!   Windows-1250 ([`crate::edition::Language::text_code_page`]).
+//!   Windows-1250 ([`crate::edition::Language::text_code_page`]);
+//! - the German CD's `atlantis2.exe` (4 CDs, 1999; also in the compilation
+//!   *Die Legende Atlantis I & II*, 2000): the French CD's executable (the
+//!   same PE timestamp, version string 3.15, `.rdata` and `.data` byte for
+//!   byte at the same addresses and file offsets) inside a copy
+//!   protection wrapper, which adds sections after `.data` and changes
+//!   import calls and a few C runtime pages of `.text`. The port reads
+//!   only the data tables, through the section table, and never runs the
+//!   program; every behaviour is 1.00's (atlantis2-re
+//!   `binaries/atlantis2-cd-de-2432347.md`).
 //!
 //! 1.01 moved most of the code and data (the linker order changed), so
 //! what the port reads from the executable is read at each build's own
@@ -125,7 +134,7 @@ const PLACE_SOUNDS_101: PlaceSoundTable = PlaceSoundTable {
 };
 
 /// The builds this port knows.
-pub const KNOWN_BUILDS: [Build; 8] = [
+pub const KNOWN_BUILDS: [Build; 9] = [
     Build {
         id: "atlantis2-cd-fr-2199552",
         label: "Atlantis II, French CD (1999)",
@@ -266,6 +275,28 @@ pub const KNOWN_BUILDS: [Build; 8] = [
         // The film frame and loop are 1.01's (@ 0x004033a0, 0x00403850).
         film_subtitles_blitted: false,
     },
+    Build {
+        id: "atlantis2-cd-de-2432347",
+        label: "Atlantis II, German CD (1999)",
+        size: 2_432_347,
+        // The French CD's: 1999-10-12 10:10:46 UTC.
+        pe_timestamp: 0x3803_0926,
+        md5: [
+            0x85, 0x50, 0xd5, 0x10, 0x49, 0x2f, 0x7f, 0x99, 0x2a, 0x15, 0xa6, 0x23, 0xbb, 0xef,
+            0xd3, 0x22,
+        ],
+        version: "Atlantis 2 - Version 3.15 - 8/10/1999",
+        // The French CD's code.
+        release: Release::V100,
+        gog: false,
+        // The French CD's table, at the same addresses (`.data` identical).
+        place_sounds: PlaceSoundTable {
+            names: 0x005d_d2c0,
+            rows: 0x005d_d370,
+            end: 0x005d_e954,
+        },
+        film_subtitles_blitted: false,
+    },
 ];
 
 /// The sizes of the launchers that go by `atlantis2.exe` beside a
@@ -400,6 +431,7 @@ mod tests {
                 "0f634c4620680dfea6782645c79dc84c",
                 "4534c355a9be896c3507b475e4b5a570",
                 "f2b6f7bfa3c1952dceddfa1a662ebb84",
+                "8550d510492f7f992a15a623bbefd322",
             ]
         );
         // The listener table is 5780 bytes in every build.
@@ -422,6 +454,13 @@ mod tests {
             .map(|b| b.id)
             .collect();
         assert_eq!(later, ["atlantis2-cd-us-2199552"]);
+        // The German CD is the French CD's code and data tables.
+        let (fr, de) = (&KNOWN_BUILDS[0], &KNOWN_BUILDS[8]);
+        assert_eq!(de.id, "atlantis2-cd-de-2432347");
+        assert_eq!(
+            (de.pe_timestamp, de.version, de.release, de.place_sounds),
+            (fr.pe_timestamp, fr.version, fr.release, fr.place_sounds)
+        );
     }
 
     #[test]

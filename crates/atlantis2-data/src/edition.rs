@@ -15,7 +15,8 @@
 //! on the four languages' installations. The North American CD's differs
 //! from GOG's English by one line. The Italian *Atlantis Collection*'s is
 //! Italian's only known one: no GOG.com depot of Atlantis II holds Italian.
-//! The Polish CD's (1999) is Polish's only known one.
+//! The Polish CD's (1999) is Polish's only known one. The German CD's
+//! (1999) differs from GOG's German by one line (it asks for the CD).
 //!
 //! The language also tells the code page the texts are read in
 //! ([`Language::text_code_page`]): the original passes the bytes of
@@ -80,7 +81,7 @@ pub fn text_code_page(language: Option<Language>) -> TextCodePage {
 }
 
 /// The known `loc\Menu.txt` files: size, MD5, language.
-pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 8] = [
+pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 9] = [
     // The French CD's (1999), installed.
     (
         1371,
@@ -154,6 +155,16 @@ pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 8] = [
         ],
         Language::Polish,
     ),
+    // The German CD (1999), installed (`loc\menu.txt`): GOG's German but
+    // for the line that asks for the CD.
+    (
+        1183,
+        [
+            0xdb, 0x4a, 0x62, 0x1e, 0xe8, 0xbe, 0xe5, 0xc2, 0xc1, 0x55, 0xcf, 0x43, 0xbf, 0xdc,
+            0x44, 0x2a,
+        ],
+        Language::German,
+    ),
 ];
 
 /// The language of a `loc\Menu.txt`, `None` when it is no known file.
@@ -206,6 +217,7 @@ mod tests {
                 "67bb8bd3b2dc54ec76676c0001dd1c7d",
                 "785dd7a466785197b81418b08c69bdef",
                 "12eb5e1c3379dac9e2ccb16156a971c1",
+                "db4a621ee8bee5c2c155cf43bfdc442a",
             ]
         );
         // A file of a known size but other bytes names no language.
@@ -237,7 +249,7 @@ mod tests {
 
     #[test]
     fn labels() {
-        let [cd, patch, gog, w10, _, us, collection, pl] = &KNOWN_BUILDS;
+        let [cd, patch, gog, w10, _, us, collection, pl, de] = &KNOWN_BUILDS;
         assert_eq!(
             edition_label(gog, Some(Language::German)),
             "Atlantis II, GOG.com, German (patch 1.01)"
@@ -269,6 +281,10 @@ mod tests {
         assert_eq!(
             edition_label(pl, Some(Language::Polish)),
             "Atlantis II, Polish CD (1999)"
+        );
+        assert_eq!(
+            edition_label(de, Some(Language::German)),
+            "Atlantis II, German CD (1999)"
         );
     }
 

@@ -104,7 +104,8 @@ Italian, Swedish and Japanese; the drive, a copy of a side or the images
 of the sides) and the Perfect Edition. For Atlantis II: the French CD (version
 1.00), a CD installation with the official
 patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
-the Polish CD (1999), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
+the German CD (1999, also in *Die Legende Atlantis I & II*), the Polish CD
+(1999), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
 English, French, German or Spanish, and the French CD (2001, three CDs);
 other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
@@ -307,7 +308,7 @@ What to pick:
 - *Atlantis II*, GOG.com or the Italian *Atlantis Collection*: the
   installation folder (the one holding `Game.exe` and `DATAS_A2`).
 - *Atlantis II*, CD (the French CD, also patched to 1.01, the North
-  American *Beyond Atlantis* or the Polish CD): the folder of the
+  American *Beyond Atlantis*, the German CD or the Polish CD): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
   with the images of the four CDs (`.iso`, `.bin`, `.img`, `.mdf` or
   `.nrg`) in it or in a folder inside it, or copies of the CDs (for
@@ -636,6 +637,14 @@ does too: the installed folder with the images or copies of its four CDs.
 Its program has 1.01's code, so it plays as 1.01. Its texts are drawn with
 the Polish letters (ą ć ę ł ń ó ś ź ż), as on the Polish Windows the edition
 was made for.
+
+The German CD (1999, 4 CDs, German; the same discs are in the compilation
+*Die Legende Atlantis I & II*, 2000) installs and opens as the French CD
+does: the installed folder with the images or copies of its four CDs. Its
+program is the French CD's version 1.00 inside a copy protection: Atlantis
+Native recognises it and reads its tables but never runs it, and plays it
+as the French CD, with the German texts and voices; films 19, 55 and 66
+are in German too.
 
 The Italian *Atlantis Collection* (DVD, 2014) installs one folder as GOG.com's
 does, Italian only: point Atlantis Native at it (no disc is needed). Its

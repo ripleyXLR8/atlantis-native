@@ -62,14 +62,14 @@ Perfect Edition and the Italian *Atlantis Collection* (2014). See
 
 🟢 **Already supported or tried:** the French CD (version 1.00), the
 official patch 1.01, the North American CD (*Beyond Atlantis*,
-DreamCatcher, 2000), the Polish CD, GOG.com (English, French, German,
-Spanish) and the Italian *Atlantis Collection* (2014).
+DreamCatcher, 2000), the German CD (also in *Die Legende Atlantis I &
+II*, 2000), the Polish CD, GOG.com (English, French, German, Spanish) and
+the Italian *Atlantis Collection* (2014).
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|
 | 🔴 **most wanted** | *Atlantis II*, European multilingual DVD | Europe, Cryo | 2000 | 1 DVD | Seven languages; serial AT2DVCD 2; barcode 3554540609102; Redump [104369](http://redump.org/disc/104369/) |
 | 🔴 **most wanted** | *Atlantis II*, English | United Kingdom, Netherlands, Cryo UK | 1999 | 4 CD | AT2-ENCD1 … 4; barcode 3554540770024 (some boxes 3554540770048); Redump [86602](http://redump.org/disc/86602/)–86605, a later disc 1 [97850](http://redump.org/disc/97850/) |
-| 🟠 wanted | *Atlantis II*, German | Germany, Cryo (also *Die Legende Atlantis I & II*, a Koch Media box) | 1999, 2000 | 4 CD | AT2-GRCD1 … 4; barcode 3554540770031 (compilation 3554540709185); Redump [9365](http://redump.org/disc/9365/)–9368 |
 | 🟠 wanted | *Atlantis II*, Italian | Italy, CTO | 1999 | 4 CD | AT2-ITA 1 … 4; barcode 8015887002780; Redump [73260](http://redump.org/disc/73260/)–73263 |
 | 🟠 wanted | *Atlantis II*, Dutch | Netherlands, Belgium, Infogrames Benelux | 1999 | 4 CD | AT2-DUCD1 … 4; Redump [96354](http://redump.org/disc/96354/)–96357 |
 | 🟠 wanted | *Atlantis II*, Spanish | Spain, Friendware | 1999 | 4 CD | Spanish voices |
