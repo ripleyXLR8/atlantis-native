@@ -760,20 +760,8 @@ fn cds_complete(set: &Arc<dyn FileSource>) -> bool {
 /// a header.
 fn layer_cds(parts: Vec<(Arc<dyn FileSource>, String)>) -> Option<Arc<dyn FileSource>> {
     let one = |p: &(Arc<dyn FileSource>, String)| Layered::new(vec![p.clone()]);
-    let headed: Vec<usize> = (0..parts.len())
-        .filter(|&i| one(&parts[i]).size(CD_HEADER).is_some())
-        .collect();
-    let game = headed
-        .iter()
-        .find_map(|&i| cds_header(Arc::new(one(&parts[i]))).ok().map(|f| (i, f)));
-    let Some((h, files)) = game else {
-        // No header of the game's: as found (the header's own error, or
-        // not the game).
-        let set = Layered::new(parts);
-        return set.size(CD_HEADER).is_some().then(|| Arc::new(set) as _);
-    };
-    let cab = files.cabinet();
-    let fits = |p: &(Arc<dyn FileSource>, String)| {
+    // Whether the volumes of part `p` are those of the set `cab`.
+    let fits = |cab: &InstallShield, p: &(Arc<dyn FileSource>, String)| {
         let part = one(p);
         cd_files(&part)
             .iter()
@@ -785,12 +773,33 @@ fn layer_cds(parts: Vec<(Arc<dyn FileSource>, String)>) -> Option<Arc<dyn FileSo
                     .is_some_and(|(k, head)| cab.volume_header(k, &head).is_some())
             })
     };
+    // The first part (the folder given) with a header of its own is that
+    // set; without one, the first header further on that is the game's
+    // and whose volumes the first part holds.
+    let first_headed = parts
+        .first()
+        .is_some_and(|p| one(p).size(CD_HEADER).is_some());
+    let headed: Vec<usize> = (0..parts.len())
+        .filter(|&i| one(&parts[i]).size(CD_HEADER).is_some())
+        .take(if first_headed { 1 } else { usize::MAX })
+        .collect();
+    let game = headed.iter().find_map(|&i| {
+        let files = cds_header(Arc::new(one(&parts[i]))).ok()?;
+        (i == 0 || fits(files.cabinet(), &parts[0])).then_some((i, files))
+    });
+    let Some((h, files)) = game else {
+        // No header of the game's: as found (the header's own error, or
+        // not the game).
+        let set = Layered::new(parts);
+        return set.size(CD_HEADER).is_some().then(|| Arc::new(set) as _);
+    };
+    let cab = files.cabinet();
     let mut kept = vec![parts[h].clone()];
     kept.extend(
         parts
             .iter()
             .enumerate()
-            .filter(|&(i, p)| i != h && fits(p))
+            .filter(|&(i, p)| i != h && fits(cab, p))
             .map(|(_, p)| p.clone()),
     );
     Some(Arc::new(Layered::new(kept)))

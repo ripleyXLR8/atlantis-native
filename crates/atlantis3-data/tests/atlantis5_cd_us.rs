@@ -254,3 +254,37 @@ fn another_set_s_volume_beside_the_discs_is_not_taken() {
     }
     let _ = std::fs::remove_dir_all(&root);
 }
+
+/// Another product's InstallShield 5 set (Atlantis III's French CDs'
+/// layout: a header and a volume per disc folder) while the game's CDs'
+/// copy is registered ([`set_cd_copy_dirs`]): not taken for the game,
+/// whose header in the copy belongs to another set.
+#[test]
+fn another_set_with_the_copy_registered_is_not_the_game() {
+    use atlantis3_data::atlantis5::set_cd_copy_dirs;
+    let Some(d) = cds() else { return };
+    let root = scratch("is5-with-copy");
+    let mut hdr = b"ISc(".to_vec();
+    hdr.extend(0x0100_5201u32.to_le_bytes());
+    hdr.extend(0x200u32.to_le_bytes());
+    hdr.resize(0x400, 0);
+    let mut cab = b"ISc(".to_vec();
+    cab.extend(0x0100_5201u32.to_le_bytes());
+    cab.resize(0x200, 0);
+    std::fs::create_dir_all(root.join("cd1")).unwrap();
+    std::fs::create_dir_all(root.join("cd2")).unwrap();
+    std::fs::write(root.join("cd1/data1.hdr"), &hdr).unwrap();
+    std::fs::write(root.join("cd1/data1.cab"), &cab).unwrap();
+    std::fs::write(root.join("cd2/data2.cab"), &cab).unwrap();
+    set_cd_copy_dirs(vec![d.join("CD1")]);
+    for p in [root.clone(), root.join("cd1"), root.join("cd2")] {
+        assert!(!holds_atlantis5(&p), "{}", p.display());
+    }
+    // The game's own second disc still opens with the copy.
+    assert!(matches!(
+        Atlantis5Source::open(&d.join("CD2")),
+        Ok(_) | Err(OpenError::MissingDiscs(_))
+    ));
+    set_cd_copy_dirs(Vec::new());
+    let _ = std::fs::remove_dir_all(&root);
+}
