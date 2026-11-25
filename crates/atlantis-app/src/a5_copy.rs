@@ -23,8 +23,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use atlantis3_data::atlantis5::{disc_files, holds_cd_volumes, Atlantis5Source, OpenError};
-use atlantis_data::FileSource;
+use atlantis3_data::atlantis5::{
+    disc_files, holds_cd_volumes, Atlantis5Source, OpenError, CD_HEADER,
+};
+use atlantis_data::{FileSource, StdDir};
 
 /// The bytes read and written at once.
 const CHUNK: usize = 8 << 20;
@@ -169,6 +171,15 @@ impl Plan {
         Ok(Plan { root, files })
     }
 
+    /// Whether the disc's files hold one of `names` (the files a copy
+    /// still needs: a volume in a CD image is not a file of the image's
+    /// folder, but the plan reads it).
+    pub fn holds_any(&self, names: &[String]) -> bool {
+        self.files
+            .iter()
+            .any(|(n, _)| names.iter().any(|m| m.eq_ignore_ascii_case(n)))
+    }
+
     /// The files still to copy into `dest` (those missing there or of
     /// another size) and their bytes.
     pub fn still_to_copy(&self, dest: &Path) -> (Vec<(String, u64)>, u64) {
@@ -258,6 +269,14 @@ impl Plan {
         match Atlantis5Source::open(dest) {
             Ok(_) => Ok(()),
             Err(OpenError::MissingDiscs(v)) => Err(CopyError::NextDisc(v)),
+            // The second or third CD copied first: their volumes, no
+            // header yet (it is on the first disc).
+            Err(OpenError::NotTheGame)
+                if holds_cd_volumes(&StdDir::new(dest))
+                    && StdDir::new(dest).size(CD_HEADER).is_none() =>
+            {
+                Err(CopyError::NextDisc(vec![CD_HEADER.to_string()]))
+            }
             Err(e) => Err(CopyError::Io(format!("{}: {e}", dest.display()))),
         }
     }
@@ -758,10 +777,13 @@ pub(crate) mod tests {
 
     /// The North-American CDs (`ATLANTIS5_CD_US`: a folder holding a copy
     /// of each disc's files in `CD1`, `CD2` and `CD3`; skipped when
-    /// unset) copied one disc after the other, as from one drive: the
-    /// first two ask for the next one, the third completes a copy that
-    /// opens as the discs, its program identified. About 1.5 GB written to
-    /// a scratch folder, removed after.
+    /// unset) copied one disc after the other, as from one drive (each
+    /// disc's files alone in a folder, no other disc beside it), the
+    /// second first: the first two ask for the next one (the header,
+    /// then the last volume), the third completes a copy that opens as
+    /// the discs, its program identified. About 1.5 GB written to a
+    /// scratch folder, removed after.
+    #[cfg(unix)]
     #[test]
     fn the_three_cds_one_after_the_other() {
         use atlantis3_data::atlantis5::{set_cd_copy_dirs, Edition, Form};
@@ -770,25 +792,33 @@ pub(crate) mod tests {
         };
         let d = tmp("cds");
         let dest = d.join("cds");
+        // Each disc in a drive of its own.
+        let drive = |disc: &str| {
+            let root = d.join("drives").join(disc).join("disc");
+            if !root.exists() {
+                std::fs::create_dir_all(&root).unwrap();
+                for e in std::fs::read_dir(cds.join(disc)).unwrap().flatten() {
+                    std::os::unix::fs::symlink(e.path(), root.join(e.file_name())).unwrap();
+                }
+            }
+            root
+        };
         set_cd_copy_dirs(vec![dest.clone()]);
         let copy = |disc: &str| {
-            let plan = Plan::of(&cds.join(disc)).expect(disc);
+            let plan = Plan::of(&drive(disc)).expect(disc);
             plan.copy_to(&dest, &Progress::default(), |_| Some(u64::MAX))
         };
         assert_eq!(
-            copy("CD1"),
-            Err(CopyError::NextDisc(vec![
-                "data3.cab".to_string(),
-                "data4.cab".to_string()
-            ]))
-        );
-        assert!(dest.join("bin/The Secrets of Atlantis.exe").is_file());
-        assert_eq!(
             copy("CD2"),
+            Err(CopyError::NextDisc(vec!["data1.hdr".to_string()]))
+        );
+        assert_eq!(
+            copy("CD1"),
             Err(CopyError::NextDisc(vec!["data4.cab".to_string()]))
         );
+        assert!(dest.join("bin/The Secrets of Atlantis.exe").is_file());
         // The second disc again: nothing left to copy from it.
-        let plan = Plan::of(&cds.join("CD2")).unwrap();
+        let plan = Plan::of(&drive("CD2")).unwrap();
         assert_eq!(plan.still_to_copy(&dest).1, 0);
         assert_eq!(copy("CD3"), Ok(()));
         let src = Atlantis5Source::open(&dest).unwrap();
@@ -797,5 +827,34 @@ pub(crate) mod tests {
         assert_eq!(src.build().unwrap().unwrap().id, "atlantis5-cd-us-7368704");
         set_cd_copy_dirs(Vec::new());
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// One CD's folder with the other discs' folders beside it (as
+    /// `ATLANTIS5_CD_US` holds them), the way it opens: one copy takes
+    /// the three discs' files.
+    #[test]
+    fn a_cd_folder_is_copied_with_the_discs_beside_it() {
+        let Some(cds) = atlantis3_data::testing::a5_cd_us() else {
+            return;
+        };
+        for disc in ["CD1", "CD2", "CD3"] {
+            let plan = Plan::of(&cds.join(disc)).expect(disc);
+            let mut names: Vec<&str> = plan.files.iter().map(|f| f.0.as_str()).collect();
+            names.sort_unstable();
+            assert_eq!(
+                names,
+                [
+                    "bin/The Secrets of Atlantis.exe",
+                    "data1.cab",
+                    "data1.hdr",
+                    "data2.cab",
+                    "data3.cab",
+                    "data4.cab"
+                ],
+                "{disc}"
+            );
+            assert!(plan.holds_any(&["DATA4.CAB".to_string()]));
+            assert!(!plan.holds_any(&["data5.cab".to_string()]));
+        }
     }
 }

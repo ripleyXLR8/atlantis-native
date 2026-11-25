@@ -325,7 +325,7 @@ impl Atlantis5Source {
         if matches!(own, Err(OpenError::NotTheGame | OpenError::MissingDiscs(_)))
             && holds_cd_volumes(&StdDir::new(path))
         {
-            if let Some(set) = cd_set_around(path) {
+            if let Some(set) = cd_set_around(path, true) {
                 match Self::from_cds(set, Form::DiscFolder) {
                     Err(OpenError::NotTheGame) => {}
                     r => return r,
@@ -362,11 +362,16 @@ impl Atlantis5Source {
         if dir.size(DATA_CAB).is_some() {
             return Some(dir);
         }
-        if let Some(set) = cd_set(&dir) {
-            return Some(set);
+        let own = cd_set(&dir);
+        if holds_cd_volumes(&*dir) && !own.as_ref().is_some_and(|s| cds_complete(s)) {
+            // One of the discs' folders: with the other discs' folders
+            // beside it, as [`Atlantis5Source::open`] reads it, but not
+            // the copies ([`set_cd_copy_dirs`]): they are what it is
+            // copied to.
+            return Some(cd_set_around(path, false).or(own).unwrap_or(dir));
         }
-        if holds_cd_volumes(&*dir) {
-            return Some(dir);
+        if let Some(set) = own {
+            return Some(set);
         }
         if dir.has_dir("datas/scenes") || dir.has_dir("scenes") {
             return None;
@@ -436,17 +441,9 @@ impl Atlantis5Source {
     /// folders read as one), read in place; the program from
     /// [`CD_EXE`] when `src` has it.
     pub fn from_cds(src: Arc<dyn FileSource>, form: Form) -> Result<Atlantis5Source, OpenError> {
-        let cab = InstallShield::open(src.clone()).map_err(|e| match e {
-            IsError::NotInstallShield => OpenError::NotTheGame,
-            e => OpenError::Installer(e.to_string()),
-        })?;
-        let cab = Arc::new(cab);
-        let files = Arc::new(IsFiles::new(cab.clone()));
+        let files = cds_header(src.clone())?;
+        let cab = files.cabinet().clone();
         let set = files.clone();
-        // Another product's set: not the game.
-        if !files.has_dir("datas/scenes") || !files.has_dir("datas/warps") {
-            return Err(OpenError::NotTheGame);
-        }
         let missing = cab.missing_volumes();
         if !missing.is_empty() {
             return Err(OpenError::MissingDiscs(missing));
@@ -719,6 +716,86 @@ pub fn cd_files(src: &dyn FileSource) -> Vec<String> {
     out
 }
 
+/// The North-American CDs' InstallShield set whose header is in `src`'s
+/// top folder, read from the header alone (its file table): an
+/// InstallShield set of another product is not the game, whether it is of
+/// a version this reader does not read (Atlantis II's and Atlantis III's
+/// CDs carry InstallShield 5 sets) or holds other files (the game's are
+/// `datas/scenes`, `datas/warps` and the edition's logo film,
+/// [`CD_LOGO`]). A header of the right version that cannot be read is the
+/// game's, damaged.
+fn cds_header(src: Arc<dyn FileSource>) -> Result<Arc<IsFiles>, OpenError> {
+    let cab = InstallShield::open(src).map_err(|e| match e {
+        IsError::NotInstallShield | IsError::Version(_) => OpenError::NotTheGame,
+        e => OpenError::Installer(e.to_string()),
+    })?;
+    let files = IsFiles::new(Arc::new(cab));
+    if !files.has_dir("datas/scenes")
+        || !files.has_dir("datas/warps")
+        || files.size(CD_LOGO).is_none()
+    {
+        return Err(OpenError::NotTheGame);
+    }
+    Ok(Arc::new(files))
+}
+
+/// Whether the InstallShield header in `src`'s top folder (`data1.hdr`)
+/// is the North-American CDs' ([`Atlantis5Source::from_cds`]), from the
+/// header alone: for the web page, which picks such a folder by its
+/// files' names.
+pub fn holds_atlantis5_cds_header(src: Arc<dyn FileSource>) -> bool {
+    !matches!(cds_header(src), Err(OpenError::NotTheGame))
+}
+
+/// Whether the CDs' set `set` holds every volume its files need.
+fn cds_complete(set: &Arc<dyn FileSource>) -> bool {
+    InstallShield::open(set.clone()).is_ok_and(|c| c.missing_volumes().is_empty())
+}
+
+/// The folders `parts` holding the CDs' files read as one ([`Layered`]),
+/// the header from the first holding the game's ([`cds_header`]), and
+/// without the folders holding volumes of another set (found by their
+/// names beside the game's: [`InstallShield::fits`]), so that the game's
+/// volume of that name is taken from a folder further on. `None` without
+/// a header.
+fn layer_cds(parts: Vec<(Arc<dyn FileSource>, String)>) -> Option<Arc<dyn FileSource>> {
+    let one = |p: &(Arc<dyn FileSource>, String)| Layered::new(vec![p.clone()]);
+    let headed: Vec<usize> = (0..parts.len())
+        .filter(|&i| one(&parts[i]).size(CD_HEADER).is_some())
+        .collect();
+    let game = headed
+        .iter()
+        .find_map(|&i| cds_header(Arc::new(one(&parts[i]))).ok().map(|f| (i, f)));
+    let Some((h, files)) = game else {
+        // No header of the game's: as found (the header's own error, or
+        // not the game).
+        let set = Layered::new(parts);
+        return set.size(CD_HEADER).is_some().then(|| Arc::new(set) as _);
+    };
+    let cab = files.cabinet();
+    let fits = |p: &(Arc<dyn FileSource>, String)| {
+        let part = one(p);
+        cd_files(&part)
+            .iter()
+            .filter(|n| !n.eq_ignore_ascii_case(CD_HEADER) && !n.eq_ignore_ascii_case(CD_EXE))
+            .all(|n| {
+                let k = n[4..n.len() - 4].parse::<u16>().ok();
+                let head = part.read_at(n, 0, 84);
+                k.zip(head)
+                    .is_some_and(|(k, head)| cab.volume_header(k, &head).is_some())
+            })
+    };
+    let mut kept = vec![parts[h].clone()];
+    kept.extend(
+        parts
+            .iter()
+            .enumerate()
+            .filter(|&(i, p)| i != h && fits(p))
+            .map(|(_, p)| p.clone()),
+    );
+    Some(Arc::new(Layered::new(kept)))
+}
+
 /// Whether `src`'s top folder holds the CDs' header or one of their
 /// volumes ([`cd_files`]).
 pub fn holds_cd_volumes(src: &dyn FileSource) -> bool {
@@ -749,8 +826,7 @@ pub fn cd_set(dir: &Arc<dyn FileSource>) -> Option<Arc<dyn FileSource>> {
             parts.push((dir.clone(), sub));
         }
     }
-    let set = Layered::new(parts);
-    set.size(CD_HEADER).is_some().then(|| Arc::new(set) as _)
+    layer_cds(parts)
 }
 
 /// The folders where the CDs' files are copied by the program, looked at
@@ -766,8 +842,9 @@ pub fn set_cd_copy_dirs(dirs: Vec<PathBuf>) {
 
 /// The CDs around folder `path`, which holds some of their files: the
 /// folder itself, the folders beside it that hold the other discs' (a
-/// folder per disc side by side), and the copies ([`set_cd_copy_dirs`]).
-fn cd_set_around(path: &Path) -> Option<Arc<dyn FileSource>> {
+/// folder per disc side by side), and with `copies` the copies
+/// ([`set_cd_copy_dirs`]).
+fn cd_set_around(path: &Path, copies: bool) -> Option<Arc<dyn FileSource>> {
     let mut parts: Vec<(Arc<dyn FileSource>, String)> =
         vec![(Arc::new(StdDir::new(path)), String::new())];
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
@@ -787,12 +864,11 @@ fn cd_set_around(path: &Path) -> Option<Arc<dyn FileSource>> {
         }
     }
     for d in CD_COPY_DIRS.lock().unwrap().iter() {
-        if d != path && holds_cd_volumes(&StdDir::new(d)) {
+        if copies && d != path && holds_cd_volumes(&StdDir::new(d)) {
             parts.push((Arc::new(StdDir::new(d)), String::new()));
         }
     }
-    let set = Layered::new(parts);
-    set.size(CD_HEADER).is_some().then(|| Arc::new(set) as _)
+    layer_cds(parts)
 }
 
 /// The installer's languages (the international DVD's `LangDLL` list,

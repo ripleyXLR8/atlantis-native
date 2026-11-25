@@ -603,9 +603,10 @@ fn copy_atlantis5_cds(first: &Path) -> Option<(Opened, PathBuf)> {
                 if !ask2(&text, "Copy", "Cancel") {
                     return None;
                 }
-                // The drive used so far, else any drive holding a file
-                // still needed.
-                let holds = |r: &Path| missing.iter().any(|n| StdDir::new(r).size(n).is_some());
+                // The drive or folder used so far (read again: an image
+                // of the next disc may have been put beside the first's),
+                // else any drive holding a file still needed.
+                let holds = |r: &Path| Plan::of(r).is_ok_and(|p| p.holds_any(&missing));
                 if let Some(r) = std::iter::once(from.clone())
                     .chain(setup::disc_roots())
                     .find(|r| holds(r))

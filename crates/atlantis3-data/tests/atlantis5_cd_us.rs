@@ -197,3 +197,60 @@ fn the_discs_from_a_file_source() {
     check_the_game(&s);
     let _ = Path::new("");
 }
+
+/// One disc's folder copied from (a5_copy's plan reads
+/// [`Atlantis5Source::disc_root`]): with the other discs' folders beside
+/// it, as it opens, so that one copy takes the three discs' files.
+#[test]
+fn a_disc_s_root_holds_the_discs_beside_it() {
+    let Some(d) = cds() else { return };
+    for disc in ["CD1", "CD2", "CD3"] {
+        let root = Atlantis5Source::disc_root(&d.join(disc)).expect(disc);
+        let mut names = atlantis3_data::atlantis5::disc_files(&*root);
+        names.sort();
+        assert_eq!(
+            names,
+            [
+                CD_EXE,
+                "data1.cab",
+                "data1.hdr",
+                "data2.cab",
+                "data3.cab",
+                "data4.cab"
+            ],
+            "{disc}"
+        );
+    }
+}
+
+/// A folder holding another InstallShield set's volume of the same name
+/// beside the discs' folders, sorted before them (a stand-in: the first
+/// disc's `data2.cab` named `data3.cab`, whose header lists other files):
+/// not taken for the game's volume, which is read from the second disc.
+#[cfg(unix)]
+#[test]
+fn another_set_s_volume_beside_the_discs_is_not_taken() {
+    let Some(d) = cds() else { return };
+    let root = scratch("foreign-volume");
+    for disc in ["CD1", "CD2", "CD3"] {
+        std::fs::create_dir_all(root.join(disc)).unwrap();
+        for e in std::fs::read_dir(d.join(disc)).unwrap().flatten() {
+            std::os::unix::fs::symlink(e.path(), root.join(disc).join(e.file_name())).unwrap();
+        }
+    }
+    std::fs::create_dir_all(root.join("AAA")).unwrap();
+    std::os::unix::fs::symlink(d.join("CD1/data2.cab"), root.join("AAA/data3.cab")).unwrap();
+    for p in [root.join("CD1"), root.join("CD3")] {
+        let s = Atlantis5Source::open(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()));
+        check_the_game(&s);
+        // The logo film is in the second disc's volume.
+        let logo = s.read(CD_LOGO).expect("the logo film");
+        assert_eq!(Some(logo.len() as u64), s.size(CD_LOGO));
+        let set = s.installshield().unwrap();
+        let k = set.file_index(CD_LOGO).unwrap();
+        use md5::{Digest, Md5};
+        let md5: [u8; 16] = Md5::digest(&logo).into();
+        assert!(set.cabinet().files()[k].md5 == md5);
+    }
+    let _ = std::fs::remove_dir_all(&root);
+}
