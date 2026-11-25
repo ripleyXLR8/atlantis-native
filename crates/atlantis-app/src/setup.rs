@@ -429,7 +429,8 @@ pub fn explain_atlantis5(dir: &Path, err: &atlantis3_data::atlantis5::OpenError)
          Choose the DVD's drive or a copy of its files (the folder with DATAS.cab and \
          DATAS_french.cab), the folder holding the DVD's image (.iso), a folder holding \
          copies of the three North-American CDs (data1.hdr and data1.cab to data4.cab), \
-         or the folder where the game was installed (the one with Datas).",
+         or the folder where the game was installed (the one with Datas; the Italian \
+         Atlantis Collection DVD's game is read from its install only).",
         dir.display()
     )
 }
@@ -486,11 +487,27 @@ pub fn candidate_folders() -> Vec<PathBuf> {
         ] {
             push_matching(&mut out, Path::new(base), "atlantis");
         }
+        // The Secrets of Atlantis's installers (the international DVD's
+        // and the Italian Atlantis Collection's) record the install
+        // folder as `Install_Dir` under Nobilis's key (32-bit
+        // installers: the WOW6432Node view on 64-bit Windows).
+        for key in [
+            r"HKLM\SOFTWARE\WOW6432Node\Nobilis\The Secrets of Atlantis",
+            r"HKLM\SOFTWARE\Nobilis\The Secrets of Atlantis",
+        ] {
+            if let Some(path) = reg_value(key, "Install_Dir") {
+                log::info!("{key} Install_Dir: {path}");
+                out.push(PathBuf::from(path));
+            }
+        }
         // The 2004 CD's installer: `The Adventure Company\Atlantis
-        // Evolution` in the program files.
+        // Evolution` in the program files; the Italian Atlantis
+        // Collection's: `Anuman interactive\The Secrets of Atlantis`.
         for base in [
             r"C:\Program Files\The Adventure Company",
             r"C:\Program Files (x86)\The Adventure Company",
+            r"C:\Program Files\Anuman interactive",
+            r"C:\Program Files (x86)\Anuman interactive",
         ] {
             push_matching(&mut out, Path::new(base), "atlantis");
         }
@@ -513,6 +530,8 @@ pub fn candidate_folders() -> Vec<PathBuf> {
                 ".wine/drive_c/GOG Games",
                 ".wine/drive_c/Program Files/The Adventure Company",
                 ".wine/drive_c/Program Files (x86)/The Adventure Company",
+                ".wine/drive_c/Program Files/Anuman interactive",
+                ".wine/drive_c/Program Files (x86)/Anuman interactive",
             ] {
                 push_matching(&mut out, &home.join(base), "atlantis");
             }

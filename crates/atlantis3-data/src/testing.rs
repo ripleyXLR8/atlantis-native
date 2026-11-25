@@ -153,6 +153,28 @@ pub fn a5_cd_us() -> Option<PathBuf> {
     }
 }
 
+/// The variable naming the Italian *Atlantis Collection*'s installed
+/// folder (`The Secrets of Atlantis.exe` beside `datas`).
+pub const A5_IT_COLLECTION_VAR: &str = "ATLANTIS5_IT_COLLECTION";
+
+/// The Italian *Atlantis Collection*'s installed folder from
+/// `ATLANTIS5_IT_COLLECTION`; as [`a5_dvd_fr`], its absence never fails a
+/// test.
+pub fn a5_it_collection() -> Option<PathBuf> {
+    match std::env::var_os(A5_IT_COLLECTION_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(
+                std::io::stderr(),
+                "SKIPPED {test}: {A5_IT_COLLECTION_VAR} not set"
+            );
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

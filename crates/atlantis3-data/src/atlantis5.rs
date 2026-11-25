@@ -32,6 +32,14 @@
 //! side (a folder holding them), their files copied into one folder, or
 //! their images.
 //!
+//! The Italian *Atlantis Collection* DVD (Anuman Interactive, 2014)
+//! holds the game as an Inno Setup installer (`Setup.exe` and
+//! `setup-1.bin` to `setup-3.bin`) which this port does not read: its
+//! installed folder is the international DVD's tree (every file the same,
+//! the languages' files only for the one installed) with an unprotected
+//! program, `The Secrets of Atlantis.exe` ([`COLLECTION_BUILD`]), which
+//! names the edition ([`Edition::ItalianCollection`]).
+//!
 //! The language is the installer's choice: the international DVD's
 //! (NSIS, `LangDLL`) offers English, Spanish, Italian and German and
 //! writes the chosen one's name (`ENGLISH`, ...) as `Language`; the
@@ -75,6 +83,12 @@ pub enum Edition {
     /// The Adventure Company's three CDs of 2007 (North America,
     /// English).
     NorthAmericanCds,
+    /// The Italian *Atlantis Collection* DVD (Anuman Interactive, 2014):
+    /// an Inno Setup installer of the international DVD's data (every
+    /// file the same) with an unprotected program
+    /// ([`COLLECTION_BUILD`]); its installed folder, known by that
+    /// program beside the tree.
+    ItalianCollection,
 }
 
 /// A known build of the program.
@@ -92,7 +106,7 @@ pub struct Build {
 
 /// The builds this port knows. Detection does not depend on them (the data
 /// decide); they name the edition.
-pub const KNOWN_BUILDS: [Build; 4] = [
+pub const KNOWN_BUILDS: [Build; 5] = [
     // The French DVD's pressed program (TAGES-encrypted).
     Build {
         id: "atlantis5-dvd-fr-3883008",
@@ -143,7 +157,26 @@ pub const KNOWN_BUILDS: [Build; 4] = [
             0x93, 0xae,
         ],
     },
+    // The Italian *Atlantis Collection* DVD's program (Inno Setup
+    // installer of 2014, the same for its four languages): not protected,
+    // the international DVD's pressed program's PE timestamp and code
+    // addresses, its data 0x5000 lower.
+    Build {
+        id: COLLECTION_BUILD,
+        label: "The Secrets of Atlantis (2006), Italian Atlantis Collection",
+        size: 2_822_144,
+        // 2006-10-25 12:23:52 UTC.
+        pe_timestamp: 0x453f_5758,
+        md5: [
+            0x7d, 0x37, 0x84, 0xa3, 0xe9, 0x90, 0x13, 0xba, 0xed, 0x76, 0xdd, 0xb8, 0x92, 0xa4,
+            0x70, 0x1d,
+        ],
+    },
 ];
+
+/// The Italian *Atlantis Collection*'s program's id in [`KNOWN_BUILDS`]
+/// (`The Secrets of Atlantis.exe` at the top of its install folder).
+pub const COLLECTION_BUILD: &str = "atlantis5-collection-it-2822144";
 
 /// Why a file is not a known build.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -477,6 +510,11 @@ impl Atlantis5Source {
         if s.size(CD_LOGO).is_some() {
             s.edition = Edition::NorthAmericanCds;
         }
+        // The Italian Collection's install: the international DVD's
+        // data, its own program beside them.
+        if matches!(s.build(), Some(Ok(b)) if b.id == COLLECTION_BUILD) {
+            s.edition = Edition::ItalianCollection;
+        }
         Ok(s)
     }
 
@@ -528,8 +566,10 @@ impl Atlantis5Source {
         self.cd_set.as_ref()
     }
 
-    /// The edition: the DVDs', or the North-American CDs' (read from
-    /// their InstallShield set, or a tree holding [`CD_LOGO`]).
+    /// The edition: the DVDs', the North-American CDs' (read from
+    /// their InstallShield set, or a tree holding [`CD_LOGO`]), or the
+    /// Italian Collection's (a tree with its program,
+    /// [`COLLECTION_BUILD`]).
     pub fn edition(&self) -> Edition {
         self.edition
     }
@@ -971,6 +1011,15 @@ mod tests {
         assert_eq!(
             hex(&KNOWN_BUILDS[2].md5),
             "3d0f55d33d271f6f5b12250d838a2b83"
+        );
+        assert_eq!(
+            hex(&KNOWN_BUILDS[3].md5),
+            "ad356540e6375bf19e31372cd56193ae"
+        );
+        assert_eq!(KNOWN_BUILDS[4].id, COLLECTION_BUILD);
+        assert_eq!(
+            hex(&KNOWN_BUILDS[4].md5),
+            "7d3784a3e99013baed76ddb892a4701d"
         );
         assert_eq!(identify(b"MZ"), Err(ExeError::NotPe));
     }
