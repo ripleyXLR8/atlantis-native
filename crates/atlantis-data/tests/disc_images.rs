@@ -50,8 +50,8 @@ fn german_cd_iso_images() {
     }
 }
 
-/// The German CD's first pressing: its four ISO images (only the `.iso`
-/// files of the folder `ATLANTIS_DATA_DE_MAY97` names), its May 1997 build
+/// The German CD's first pressing: the images of its four discs (the
+/// folder `ATLANTIS_DATA_DE_MAY97` names), its May 1997 build
 /// and its discs' archives.
 #[test]
 fn german_may_cd_iso_images() {
@@ -65,8 +65,8 @@ fn german_may_cd_iso_images() {
     assert!(data.len() > 1000);
 }
 
-/// The US retail CD (Interplay): its four ISO images (only the `.iso`
-/// files of the folder `ATLANTIS_DATA_EN_US97` names), its August 1997
+/// The US retail CD (Interplay): the images of its four discs (the folder
+/// `ATLANTIS_DATA_EN_US97` names), its August 1997
 /// build and its discs' archives (no `WAV\ATA0897D.APC`, as the other
 /// August 1997 discs).
 #[test]

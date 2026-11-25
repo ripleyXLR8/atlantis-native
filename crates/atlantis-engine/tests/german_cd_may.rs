@@ -7,10 +7,9 @@
 //! save and its load from the player screen and the LOAD list. The expected
 //! values are numbers and digests only.
 //!
-//! Needs the folder of the CD's images (`disc1.iso` .. `disc4.iso`):
-//! set `ATLANTIS_DATA_DE_MAY97`; without it the tests are skipped. Only the
-//! folder's `.iso` images are read (the folder may hold other copies of
-//! the discs).
+//! Needs the folder of the CD's images (the four discs as `.iso`,
+//! `.bin`/`.cue`, `.mdf` or `.nrg`, one copy of each): set
+//! `ATLANTIS_DATA_DE_MAY97`; without it the tests are skipped.
 
 use std::cell::RefCell;
 use std::collections::BTreeMap;
@@ -18,7 +17,7 @@ use std::path::Path;
 use std::rc::Rc;
 use std::sync::Arc;
 
-use atlantis_data::disc_image::{DiscImage, DiscSet};
+use atlantis_data::disc_image::DiscSet;
 use atlantis_data::saves::{epi_episode_name, Players};
 use atlantis_data::sprite::{limits, read_spr_file};
 use atlantis_data::{Game, TextCodePage};
@@ -50,18 +49,12 @@ fn md5_hex(b: &[u8]) -> String {
     Md5::digest(b).iter().map(|b| format!("{b:02x}")).collect()
 }
 
-/// The `.iso` images of `dir`, in name order.
-fn iso_set(dir: &Path) -> DiscSet {
-    let mut paths: Vec<_> = std::fs::read_dir(dir)
-        .expect("the images' folder")
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("iso")))
-        .collect();
-    paths.sort();
-    let images: Vec<DiscImage> = paths.iter().filter_map(|p| DiscImage::open(p)).collect();
-    assert_eq!(images.len(), 4, "four disc images in {}", dir.display());
-    DiscSet { images }
+/// The images of the four discs in `dir` (`.iso`, `.bin`/`.cue`, `.mdf` or
+/// `.nrg`, as the game library reads them), in name order.
+fn image_set(dir: &Path) -> DiscSet {
+    let set = DiscSet::open_folder(dir).expect("the disc images of the folder");
+    assert_eq!(set.images.len(), 4, "four disc images in {}", dir.display());
+    set
 }
 
 fn game(test: &str) -> Option<Game> {
@@ -69,7 +62,7 @@ fn game(test: &str) -> Option<Game> {
         eprintln!("{VAR} not set: {test} skipped");
         return None;
     };
-    let g = Game::open(Arc::new(iso_set(dir.as_ref()))).expect("the game from its images");
+    let g = Game::open(Arc::new(image_set(dir.as_ref()))).expect("the game from its images");
     assert_eq!(g.exe.build.name, BUILD);
     Some(g)
 }

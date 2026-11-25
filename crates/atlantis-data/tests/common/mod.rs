@@ -191,38 +191,28 @@ fn g9_matches_printf() {
 }
 
 /// The German retail CD's first pressing (the May 1997 build) from the
-/// `.iso` images in the folder `ATLANTIS_DATA_DE_MAY97` names (the folder
-/// may hold other copies of the discs), `None` (the test skipped) without
-/// it.
+/// images of its four discs in the folder `ATLANTIS_DATA_DE_MAY97` names
+/// (`.iso`, `.bin`/`.cue`, `.mdf` or `.nrg`, as the game library reads
+/// them), `None` (the test skipped) without it.
 pub fn game_de_may97(test: &str) -> Option<Game> {
-    iso_game("ATLANTIS_DATA_DE_MAY97", test)
+    image_game("ATLANTIS_DATA_DE_MAY97", test)
 }
 
-/// The US retail CD (Interplay, the August 1997 build) from the `.iso`
-/// images in the folder `ATLANTIS_DATA_EN_US97` names, `None` (the test
-/// skipped) without it.
+/// The US retail CD (Interplay, the August 1997 build) from the images of
+/// its four discs in the folder `ATLANTIS_DATA_EN_US97` names, `None` (the
+/// test skipped) without it.
 pub fn game_en_us97(test: &str) -> Option<Game> {
-    iso_game("ATLANTIS_DATA_EN_US97", test)
+    image_game("ATLANTIS_DATA_EN_US97", test)
 }
 
-/// The game of the four `.iso` images in the folder `var` names.
-fn iso_game(var: &str, test: &str) -> Option<Game> {
+/// The game of the four disc images in the folder `var` names.
+fn image_game(var: &str, test: &str) -> Option<Game> {
     let Some(dir) = std::env::var_os(var) else {
         eprintln!("{var} not set: {test} skipped");
         return None;
     };
-    let mut paths: Vec<_> = std::fs::read_dir(&dir)
-        .expect("the images' folder")
-        .flatten()
-        .map(|e| e.path())
-        .filter(|p| p.extension().is_some_and(|x| x.eq_ignore_ascii_case("iso")))
-        .collect();
-    paths.sort();
-    let images: Vec<atlantis_data::disc_image::DiscImage> = paths
-        .iter()
-        .filter_map(|p| atlantis_data::disc_image::DiscImage::open(p))
-        .collect();
-    assert_eq!(images.len(), 4, "four disc images");
-    let set = atlantis_data::disc_image::DiscSet { images };
+    let set = atlantis_data::disc_image::DiscSet::open_folder(dir.as_ref())
+        .expect("the disc images of the folder");
+    assert_eq!(set.images.len(), 4, "four disc images");
     Some(Game::open(Arc::new(set)).expect("the game from its images"))
 }
