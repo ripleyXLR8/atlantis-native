@@ -81,7 +81,8 @@ four discs itself.\n\
 \u{2022} Atlantis II on CD: the folder where the game is installed (the one with \
 atlantis2.exe), with the images of its four CDs (or copies of the CDs) in it or in a \
 folder inside it.\n\
-\u{2022} Atlantis III: GOG.com's installation folder (the one with Game.exe and Datas), or \
+\u{2022} Atlantis III: GOG.com's installation folder or the one the Italian Atlantis Collection \
+DVD's installer created (the one with Game.exe and Datas), or \
 the folder where the French CD installed it (the one with Atlantis3.exe and Datas), with the \
 images of its three CDs (or copies of the CDs) in it or in a folder inside it.\n\
 \u{2022} Atlantis Evolution: GOG.com's installation folder (the one with Atlantis Evolution.exe \
@@ -389,8 +390,9 @@ pub fn explain_atlantis3(dir: &Path, err: &atlantis3_data::files::OpenError) -> 
         atlantis3_data::files::OpenError::Exe(e) => format!(
             "{shown} holds an Atlantis III program that Atlantis Native does not know \
              ({e}): an edition of the game that is not supported yet.\n\n\
-             Supported: GOG.com's release (English, French, German or Spanish) and the French \
-             CD (2001, three CDs). Other editions are unknown to the \
+             Supported: GOG.com's release (English, French, German or Spanish), the French \
+             CD (2001, three CDs) and the Italian Atlantis Collection DVD (2014, installed). \
+             Other editions are unknown to the \
              project: an issue on GitHub with the program's size and MD5 helps."
         ),
         _ => format!(
@@ -477,6 +479,15 @@ pub fn candidate_folders() -> Vec<PathBuf> {
                 }
             }
         }
+        // The Italian Atlantis Collection's Atlantis III installer:
+        // `Adventure Productions\Atlantis 3 - Il Nuovo Mondo` in the
+        // program files.
+        for base in [
+            r"C:\Program Files\Adventure Productions",
+            r"C:\Program Files (x86)\Adventure Productions",
+        ] {
+            push_matching(&mut out, Path::new(base), "atlantis");
+        }
         for base in [
             r"C:\GOG Games",
             r"C:\Program Files (x86)\GOG Galaxy\Games",
@@ -507,6 +518,14 @@ pub fn candidate_folders() -> Vec<PathBuf> {
     {
         if let Some(home) = std::env::var_os("HOME") {
             let home = Path::new(&home);
+            // The Italian Atlantis Collection's Atlantis III installer
+            // under Wine.
+            for base in [
+                ".wine/drive_c/Program Files/Adventure Productions",
+                ".wine/drive_c/Program Files (x86)/Adventure Productions",
+            ] {
+                push_matching(&mut out, &home.join(base), "atlantis");
+            }
             for base in [
                 "GOG Games",
                 "Games",
