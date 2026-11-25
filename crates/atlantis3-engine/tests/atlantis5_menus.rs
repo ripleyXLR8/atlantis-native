@@ -79,9 +79,12 @@ fn element(play: &Play, name: &str) -> (String, bool, i32, i32) {
         .unwrap_or_else(|| panic!("no element {name}"))
 }
 
+/// A click on `name`, then its frame and the next: a click that closes
+/// the menu ends it in the frame after its own (the process returns 1
+/// when entered in state 2, `evidence/m2/menu-main.c` FUN_004289e0).
 fn click(play: &mut Play, name: &str) {
     assert!(play.click_menu(name), "{name} shown");
-    frames(play, 1);
+    frames(play, 2);
 }
 
 /// From the main menu, a new game to its first view (its film ended).
@@ -220,7 +223,8 @@ fn a_double_click_in_one_frame_clicks_once() {
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     assert!(play.click_menu("save"));
     play.click();
-    frames(&mut play, 2);
+    // The click's frame, the in-game menu's end, the page's opening.
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::SAVE));
     click(&mut play, "back");
     frames(&mut play, 1);
@@ -581,7 +585,7 @@ fn a_right_press_on_an_inventory_item_examines_it() {
     // Its end: the inventory again (mode 8 queued after it).
     play.mouse_at(5, 5);
     play.click();
-    frames(&mut play, 2);
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), None);
     assert!(play.stage().inventory_open_now());
     assert_eq!(play.game.state(), 3);
@@ -898,7 +902,7 @@ fn a_press_before_any_move_clicks_the_button_at_the_centre() {
     frames(&mut play, 1);
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     play.click();
-    frames(&mut play, 2);
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::CONTROL));
     click(&mut play, "back");
     frames(&mut play, 1);
@@ -907,8 +911,9 @@ fn a_press_before_any_move_clicks_the_button_at_the_centre() {
     // opened for the first time, finds slot 4 one row high, not hot.
     assert!(!dir.join("slot_4").exists());
     assert!(play.click_menu("save"));
-    // The press's frame closes the in-game menu, the next opens the page.
-    frames(&mut play, 2);
+    // The press's frame closes the in-game menu, the next ends it, the
+    // one after opens the page.
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::SAVE));
     play.click();
     frames(&mut play, 2);
@@ -922,7 +927,7 @@ fn a_press_before_any_move_clicks_the_button_at_the_centre() {
     frames(&mut play, 1);
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     assert!(play.click_menu("save"));
-    frames(&mut play, 2);
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::SAVE));
     play.click();
     frames(&mut play, 2);
@@ -1144,7 +1149,7 @@ fn a_move_onto_a_later_button_leaves_the_earlier_one_hot() {
     play.mouse_at(gx, gy);
     frames(&mut play, 1);
     play.click();
-    frames(&mut play, 2);
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::GRAPHIC));
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -1166,7 +1171,7 @@ fn a_right_press_with_the_left_held_clicks_a_menu_button() {
     play.set_buttons(true, false);
     play.set_buttons(true, true);
     play.right_press();
-    frames(&mut play, 2);
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::CONTROL));
     click(&mut play, "back");
     frames(&mut play, 1);
@@ -1182,7 +1187,7 @@ fn a_right_press_with_the_left_held_clicks_a_menu_button() {
     frames(&mut play, 1);
     play.set_buttons(true, false);
     play.other_press();
-    frames(&mut play, 2);
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::SOUND));
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -1252,7 +1257,7 @@ fn a_wheel_turn_tests_the_hover() {
     play.escape();
     frames(&mut play, 2);
     assert!(play.click_menu("save"));
-    frames(&mut play, 2);
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::SAVE));
     assert!(play.menus.hot().is_empty());
     frames(&mut play, 3);
@@ -1260,5 +1265,49 @@ fn a_wheel_turn_tests_the_hover() {
     play.wheel();
     frames(&mut play, 1);
     assert_eq!(play.menus.hot(), ["save_4"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A click that ends a menu: its process returns 0 in the click's frame
+/// (the handler's close only sets state 2) and 1 at the next, which reads
+/// no event (`evidence/m2/menu-main.c` FUN_004289e0, menu-handlers.c
+/// FUN_0041a680): the next page opens the frame after, and `resume`
+/// gives play back one frame after its click.
+#[test]
+fn a_menu_ends_the_frame_after_its_click() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("end-frame");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert!(play.click_menu("option_sound"));
+    frames(&mut play, 1);
+    assert_eq!(
+        play.menus.current(),
+        Some(menus::IN_GAME),
+        "the click's frame"
+    );
+    // A press in the end frame (the mouse still on `option_sound`) is not
+    // read.
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), None, "the end frame: mode 0xd");
+    assert_eq!(play.game.state(), 3);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::SOUND));
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::SOUND));
+    click(&mut play, "back");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert!(play.click_menu("resume"));
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 3, "still the menus in the click's frame");
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), None);
+    assert_eq!(play.game.state(), 4, "play the frame after");
     let _ = std::fs::remove_dir_all(&dir);
 }

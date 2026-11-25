@@ -476,6 +476,34 @@ fn moves_during_the_facing_do_not_move_the_subject_menu_s_cursor() {
     assert_eq!(play.menus.mouse, (to.0 + 1, to.1 + 1));
 }
 
+/// A wheel turn after moves made during the facing is a move event
+/// carrying the global mouse (play.md § 2, dialogs.md § 4): the menu's
+/// mouse and its cursor go there, where the next press is tested.
+#[test]
+fn a_wheel_turn_after_the_facing_moves_the_subject_menu_s_cursor() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 2);
+    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+    play.mouse_by(150, -100);
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    frames(&mut play, 1);
+    assert_eq!(play.menus.mouse, centre, "the cursor at the centre");
+    play.wheel();
+    frames(&mut play, 1);
+    let to = (centre.0 + 150, centre.1 - 100);
+    assert_eq!(play.menus.mouse, to);
+    assert_eq!(play.stage().mouse, to);
+}
+
 /// The frame the subject menu's process returns 1 (state 5: `unfacing`
 /// put in) makes the mode 0xd; with nothing queued @ 0x0041b780 returns 1
 /// before the scene's update (@ 0x0044c380) and the sound's: no sprite is

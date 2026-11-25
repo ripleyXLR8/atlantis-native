@@ -810,6 +810,9 @@ pub struct Stage {
     /// `Frames` − 1): the loop draws that frame once more, then ends at
     /// the next update.
     film_ending: bool,
+    /// A film opened since the last update: its clock starts again at the
+    /// next ([`Stage::film_update`]).
+    film_opened: bool,
     /// The film's subtitles (`kinematic_subtitles.xml`).
     film_subtitles: Option<FilmSubtitles>,
     /// The text tables of the language.
@@ -927,6 +930,7 @@ impl Stage {
             film: None,
             film_bink_sound: false,
             film_ending: false,
+            film_opened: false,
             film_subtitles: None,
             dialogs: None,
             kinematic: None,
@@ -1656,6 +1660,7 @@ impl Stage {
         });
         self.film = Some((film, sound));
         self.film_ending = false;
+        self.film_opened = true;
         // The loop's first iteration steps the film before its first draw
         // (@ 0x0040c990, @ 0x0043d6a0: the step @ 0x0042b0f0, then the draw
         // @ 0x0042b220): the first picture is the film's first frame.
@@ -1668,6 +1673,23 @@ impl Stage {
     /// decoded last was drawn once (`evidence/m5/video-play-rect.c`: step,
     /// sound, draw, flip, then the loop's test).
     fn film_update(&mut self) {
+        // The film is paced by Bink's own clock from its open (the step
+        // @ 0x00456cb0 is `BinkWait`, then `BinkDoFrame`; play.md § 7),
+        // not by the game's frame time (@ 0x00467fe0), and the voice is
+        // played at the open (@ 0x0042aa90: the film opened through its
+        // +0xc, then the voice loaded and played @ 0x004593d0,
+        // @ 0x00459630), so picture and voice start together; Bink reads
+        // the file as it plays [INFERRED: RAD's API]. Native reads the
+        // whole film and its voice in the call, and the next update's
+        // frame time holds that load: the film's clock starts at that
+        // update instead, so the picture does not run ahead of the voice
+        // by the load time (frame 1, drawn at the open, is at its time 0).
+        if std::mem::take(&mut self.film_opened) {
+            let now = self.clock;
+            if let Some((film, _)) = &mut self.film {
+                film.restart_clock(now);
+            }
+        }
         if !self.film_ending {
             self.film_step();
         }
@@ -2025,6 +2047,19 @@ impl Stage {
         // @ 0x0042b220, the flip) never call the scene's update
         // @ 0x0044c380: the sprites, the persistent records' times and the
         // randomize draws are frozen for the film's length.
+        //
+        // `Atl_Dialog_Play`'s loop (@ 0x00407ac0, both its branches:
+        // `evidence/m2/dialog-player.c`, dialogs.md § 2 step 5) runs the
+        // sound @ 0x00459fd0 before the scene's update @ 0x0044c380, in
+        // one try: a throw out of the sprites' step comes after that
+        // frame's sound update.
+        if self.dialog.is_some() && self.film.is_none() {
+            self.music_update(dt);
+            if let Some(t) = scene {
+                self.sprites_step(t);
+            }
+            return;
+        }
         let thrown = match scene {
             Some(t) if self.film.is_none() => !self.sprites_step(t),
             _ => false,
@@ -4520,6 +4555,15 @@ impl Play {
                 }
                 None => scene = self.scene_under_menu(),
             }
+        } else if self.menus.closing() {
+            // A menu closed by its click in the last frame, whose effect
+            // took the manager out of state 3 at once (Native runs a new
+            // game, a load or the game's end at the click; the original's
+            // manager stays in state 3 until the menu's process returns
+            // 1): its end frame still runs, as in state 3.
+            let queued = self.menus_step(dt).unwrap_or(false);
+            scene = false;
+            sound = queued;
         } else if let Some(p) = &mut self.poker {
             // The board's film or dialog runs in its own loop: the board's
             // process (and its cursor) does not see the moves.
@@ -4787,6 +4831,17 @@ impl Play {
             // events but its own move (@ 0x00410f90).
             return None;
         }
+        // A wheel turn is a move event too (kind 2, @ 0x0047c8a0 calls the
+        // move handler when lX, lY or lZ is not 0; play.md § 2), carrying
+        // the global mouse (@ 0x0043bde0): after moves made during the
+        // facing, it takes the menu's mouse and its cursor there
+        // (@ 0x0040d920 → 0x0040d890, for every kind-2 event; dialogs.md
+        // § 4), before the frame's press is tested.
+        if self.wheel_now && !self.stage.borrow().menu_facing() {
+            if let Some((x, y)) = self.menu_global {
+                self.mouse_at(x, y);
+            }
+        }
         for _ in 0..clicks {
             self.stage.borrow_mut().menu_click();
             let pick = self.stage.borrow_mut().menu_take_pick();
@@ -4878,6 +4933,13 @@ impl Play {
         if self.wheel_now {
             self.menus.move_event();
         }
+        self.menus_step(dt)
+    }
+
+    /// The menus' process (@ 0x0041b780 on the mode's), what it asked
+    /// done, and its end: `Some(queued)` the frame it returned 1 (a mode
+    /// queued or not), else `None`.
+    fn menus_step(&mut self, dt: f64) -> Option<bool> {
         let was_up = self.menus.current().is_some();
         let ended = {
             let mut st = self.stage.borrow_mut();
@@ -4911,16 +4973,18 @@ impl Play {
             }
             self.menu_effect(e);
         }
-        if let (true, Some(mode)) = (load_failed, ended) {
+        if load_failed && self.menus.queued().is_empty() {
             // A save that exists but cannot be read (empty, cut short,
             // not an `ATL_FILE`): nothing is queued, and with the menu
             // closed the manager would go round states 0 and 3 with no
             // menu. The original closes the page after its reader
             // whatever the read did (0x00418c29) and leaves the menus with
-            // no mode; Native opens the page again.
-            log::warn!("the save could not be read: its page again");
-            self.menus.request(mode);
-            return Some(true);
+            // no mode; Native opens the page again (queued now, made the
+            // frame after the page's end).
+            if let Some(mode) = self.menus.current() {
+                log::warn!("the save could not be read: its page again");
+                self.menus.request(mode);
+            }
         }
         if ended.is_some() {
             if self.sound_held {
@@ -5660,6 +5724,69 @@ mod tests {
             crate::atlantis5::check_faces("p", &small),
             Err(ViewError::Bad(_))
         ));
+    }
+
+    /// A randomized sprite whose next file is missing throws out of the
+    /// sprites' step: in play (@ 0x0042f000) that frame's sound update is
+    /// skipped; in `Atl_Dialog_Play`'s loop (@ 0x00407ac0) the sound runs
+    /// first, so it is not.
+    #[test]
+    fn a_randomize_throw_skips_the_sound_only_outside_a_dialog() {
+        let mut s = stage();
+        s.view = Some(ViewState {
+            scene: b"scene".to_vec(),
+            view: 1,
+            faces: Default::default(),
+            zones: Vec::new(),
+        });
+        let bank = Bank::parse(b"SPRCRYO \0\0\0\0\0\0\0\0", Depth::Xrgb8888).unwrap();
+        s.sprites.push(Sprite {
+            object: b"thing".to_vec(),
+            animation: b"Gone".to_vec(),
+            bank,
+            mode: Mode::Stop,
+            first: 0,
+            last: 0,
+            priority: 0,
+            time: 0.0,
+            frame: 0,
+            persistent: false,
+        });
+        s.randomized.push(Randomized {
+            object: b"thing".to_vec(),
+            tick1: 0.0,
+            tick2: 0.0,
+            held: false,
+        });
+        let fade = || LevelFade {
+            start: 1.0,
+            target: 0.5,
+            elapsed: 0.0,
+            time: 1.0,
+        };
+        let elapsed = |s: &Stage| s.music_fade.as_ref().map(|f| f.elapsed);
+        s.music_fade = Some(fade());
+        s.update_scene(0.1, Some(0.1), true);
+        assert_eq!(elapsed(&s), Some(0.0), "play: the sound skipped");
+        s.dialog = Some(DialogRun {
+            player: Player::new(1, 1),
+            talkers: Vec::new(),
+            tirades: Vec::new(),
+            facing: false,
+            faced: Vec::new(),
+            voice: None,
+            bubble: None,
+            portrait: None,
+            text_h: 0,
+            text: String::new(),
+            lips: None,
+            lip_banks: Vec::new(),
+        });
+        s.update_scene(0.1, Some(0.1), true);
+        assert!(
+            elapsed(&s).is_some_and(|e| (e - 0.1).abs() < 1e-6),
+            "the dialog's loop: the sound first"
+        );
     }
 
     #[test]

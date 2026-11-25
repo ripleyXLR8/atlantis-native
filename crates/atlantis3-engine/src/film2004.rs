@@ -90,6 +90,12 @@ impl Film {
         self.video.fps()
     }
 
+    /// The film's clock started again at `now` (the game's seconds): its
+    /// frames timed from there, as from the open.
+    pub fn restart_clock(&mut self, now: f64) {
+        self.start = now;
+    }
+
     /// `BinkWait` = 0: frame `frame_num` is not drawn yet and its time has
     /// come.
     pub fn due(&self, now: f64) -> bool {

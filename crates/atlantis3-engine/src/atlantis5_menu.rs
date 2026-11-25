@@ -506,6 +506,12 @@ impl Menus {
         self.menu.as_ref().map(|m| m.mode)
     }
 
+    /// Whether the menu up was closed by its handler: it ends at the next
+    /// step (its process's state 2).
+    pub fn closing(&self) -> bool {
+        self.menu.as_ref().is_some_and(|m| m.closed)
+    }
+
     /// Whether a menu is up or queued.
     pub fn active(&self) -> bool {
         self.menu.is_some() || !self.queue.is_empty()
@@ -1053,6 +1059,21 @@ impl Menus {
         }
         let clicks = std::mem::take(&mut self.clicks);
         let mut menu = self.menu.take()?;
+        // The frame after its close: the process entered in state 2 (the
+        // handler's close, vtable +0xc, only set it in the click's frame,
+        // whose process went on in state 1 and returned 0): it hides the
+        // cursor and the background and returns 1, reading no event, so
+        // that frame's presses are dropped (`evidence/m2/menu-main.c`
+        // FUN_004289e0, menu-handlers.c FUN_0041a680, menu-death-credits.c
+        // FUN_0040e510, menu-examine.c FUN_004138f0; menus.md § 1).
+        if menu.closed {
+            let mode = menu.mode;
+            if mode == CREDITS {
+                // @ 0x0040e510 state 2: the music stopped with a 1 s fade.
+                self.effects.push(Effect::MusicStopAll(1.0));
+            }
+            return self.queue.is_empty().then_some(mode);
+        }
         let mouse = self.mouse;
         menu.layout(fonts, self);
         // The texts' heights as last drawn (the draw @ 0x00451600 comes
@@ -1103,14 +1124,9 @@ impl Menus {
                 menu.laid_out = false;
             }
         }
-        if menu.closed {
-            let mode = menu.mode;
-            if mode == CREDITS {
-                // @ 0x0040e510 state 2: the music stopped with a 1 s fade.
-                self.effects.push(Effect::MusicStopAll(1.0));
-            }
-            return self.queue.is_empty().then_some(mode);
-        }
+        // A handler's close leaves the frame a state-1 one: the process
+        // returns 0 (the mode kept, the sound updated, the menu drawn);
+        // it ends at the next step.
         if menu.credits.is_some() && !menu.laid_out {
             self.credit_page(&mut menu, fonts);
         }

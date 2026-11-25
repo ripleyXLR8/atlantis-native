@@ -713,6 +713,31 @@ fn a_film_shows_its_first_and_last_decoded_frames() {
     assert_eq!(last, Some(frames_n - 1), "drawn once at the end");
 }
 
+/// The update after `Atl_Video_Play`'s call holds the film's load (Native
+/// reads the whole film and its voice in the call): it is not the film's
+/// time, which starts there (the original's film is paced by Bink's clock
+/// from its open, the voice played at the open: play.md § 7), so the
+/// picture does not run ahead of the voice.
+#[test]
+fn a_film_s_load_is_not_its_time() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    assert!(play
+        .game
+        .run_string("return function() Atl_Video_Play(\"is0001\") end"));
+    assert_eq!(play.stage().film_frame().expect("a film").0, 2);
+    // A long frame: the load.
+    play.update(0.25);
+    assert_eq!(
+        play.stage().film_frame().expect("a film").0,
+        2,
+        "frame 2's time not come"
+    );
+    // Then one frame period: frame 2.
+    play.update(0.1);
+    assert_eq!(play.stage().film_frame().expect("a film").0, 3);
+}
+
 /// A playlist whose track is a RIFF WAVE file (PCM 16-bit stereo,
 /// 22050 Hz: `zep_engine.wav`, the only track of
 /// `zeppelin_working_engine_room`) plays as an Ogg one: the original opens
