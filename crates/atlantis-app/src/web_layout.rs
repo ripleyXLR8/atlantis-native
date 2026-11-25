@@ -334,9 +334,13 @@ pub fn a4cd_install(paths: &[&str]) -> Option<String> {
 /// CDs' copies: the folder holding `data1.hdr` (the three discs' files
 /// together), or the folder above it when the other discs' volumes are
 /// in folders beside it (a folder per disc)
-/// ([`atlantis3_data::atlantis5::Atlantis5Source::from_folder`]). The
-/// DVD's image is found by reading it, not from the paths.
-pub fn a5_folder(paths: &[&str]) -> Option<String> {
+/// ([`atlantis3_data::atlantis5::Atlantis5Source::from_folder`]), when
+/// `cds(folder holding data1.hdr)` says the header there is the game's
+/// (`data1.hdr` is any InstallShield set's name: Atlantis II's and
+/// Atlantis III's CDs have one;
+/// [`atlantis3_data::atlantis5::holds_atlantis5_cds_header`]). The DVD's
+/// image is found by reading it, not from the paths.
+pub fn a5_folder(paths: &[&str], cds: impl Fn(&str) -> bool) -> Option<String> {
     const TEXTS: &str = "texts/menu/";
     const STRINGS: &str = "/string_resources.xml";
     let mut found: Vec<String> = Vec::new();
@@ -349,7 +353,7 @@ pub fn a5_folder(paths: &[&str]) -> Option<String> {
     };
     for p in paths {
         if let Some(dir) = p.strip_suffix("data1.hdr") {
-            if !(dir.is_empty() || dir.ends_with('/')) {
+            if !(dir.is_empty() || dir.ends_with('/')) || !cds(dir) {
                 continue;
             }
             let parent = dir
@@ -811,11 +815,15 @@ mod tests {
     /// extracted cabinets, `Datas` itself; the shallowest.
     #[test]
     fn atlantis5_folders() {
+        let yes = |_: &str| true;
         assert_eq!(
-            a5_folder(&["dvd/datas.cab", "dvd/datas_french.cab", "dvd/setup.exe"]),
+            a5_folder(
+                &["dvd/datas.cab", "dvd/datas_french.cab", "dvd/setup.exe"],
+                yes
+            ),
             Some("dvd/".to_string())
         );
-        assert_eq!(a5_folder(&["datas.cab"]), Some(String::new()));
+        assert_eq!(a5_folder(&["datas.cab"], yes), Some(String::new()));
         let tree = [
             "soa/the secrets of atlantis.exe",
             "soa/datas/scenes/zeppelin.wam",
@@ -823,32 +831,35 @@ mod tests {
             "soa/datas/texts/menu/french/string_resources.xml",
             "soa/datas/texts/menu/string_resources.xsd",
         ];
-        assert_eq!(a5_folder(&tree), Some("soa/".to_string()));
+        assert_eq!(a5_folder(&tree, yes), Some("soa/".to_string()));
         let datas = [
             "datas/scenes/zeppelin.wam",
             "datas/warps/ze0003.jp6",
             "datas/texts/menu/german/string_resources.xml",
         ];
-        assert_eq!(a5_folder(&datas), Some(String::new()));
+        assert_eq!(a5_folder(&datas, yes), Some(String::new()));
         let itself = [
             "x/scenes/zeppelin.wam",
             "x/warps/ze0003.jp6",
             "x/texts/menu/german/string_resources.xml",
         ];
-        assert_eq!(a5_folder(&itself), Some("x/".to_string()));
+        assert_eq!(a5_folder(&itself, yes), Some("x/".to_string()));
         assert_eq!(
-            a5_folder(&["a/b/datas.cab", "c/datas.cab"]),
+            a5_folder(&["a/b/datas.cab", "c/datas.cab"], yes),
             Some("c/".to_string())
         );
         // No warps: not the game; a cabinet of another name neither.
         assert_eq!(
-            a5_folder(&[
-                "g/datas/scenes/a.wam",
-                "g/datas/texts/menu/french/string_resources.xml"
-            ]),
+            a5_folder(
+                &[
+                    "g/datas/scenes/a.wam",
+                    "g/datas/texts/menu/french/string_resources.xml"
+                ],
+                yes
+            ),
             None
         );
-        assert_eq!(a5_folder(&["g/mydatas.cab", "soa-fr.iso"]), None);
+        assert_eq!(a5_folder(&["g/mydatas.cab", "soa-fr.iso"], yes), None);
         // The North-American CDs: a folder per disc, or together.
         let discs = [
             "soa/cd1/data1.hdr",
@@ -857,15 +868,33 @@ mod tests {
             "soa/cd2/data3.cab",
             "soa/cd3/data4.cab",
         ];
-        assert_eq!(a5_folder(&discs), Some("soa/".to_string()));
+        assert_eq!(a5_folder(&discs, yes), Some("soa/".to_string()));
         assert_eq!(
-            a5_folder(&["cds/data1.hdr", "cds/data1.cab", "cds/data3.cab"]),
+            a5_folder(&["cds/data1.hdr", "cds/data1.cab", "cds/data3.cab"], yes),
             Some("cds/".to_string())
         );
-        assert_eq!(a5_folder(&["data1.hdr"]), Some(String::new()));
+        assert_eq!(a5_folder(&["data1.hdr"], yes), Some(String::new()));
         assert_eq!(
-            a5_folder(&["x/cd1/data1.hdr", "x/notes.txt"]),
+            a5_folder(&["x/cd1/data1.hdr", "x/notes.txt"], yes),
             Some("x/cd1/".to_string())
+        );
+        // Another product's InstallShield header (Atlantis III's CD 1
+        // beside its install): not the game; the game's DVD copy in the
+        // same pick still found.
+        let a3 = [
+            "x/installed/atlantis3.exe",
+            "x/cd1/data1.hdr",
+            "x/cd1/data1.cab",
+        ];
+        assert_eq!(a5_folder(&a3, |_| false), None);
+        assert_eq!(a5_folder(&a3, |d| d != "x/cd1/"), None);
+        assert_eq!(
+            a5_folder(&["x/cd1/data1.hdr", "x/dvd/datas.cab"], |_| false),
+            Some("x/dvd/".to_string())
+        );
+        assert_eq!(
+            a5_folder(&discs, |d| d == "soa/cd1/"),
+            Some("soa/".to_string())
         );
     }
 

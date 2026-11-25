@@ -344,7 +344,14 @@ pub async fn start(
     let picked = crate::web_layout::picked(&paths);
     // The Secrets of Atlantis: a copy of its DVD, an install, or the
     // extracted cabinets, alone or chosen among the games of the folder.
-    if let Some(folder) = crate::web_layout::a5_folder(&paths) {
+    // A `data1.hdr` is the game's only when its header says so (any
+    // InstallShield set has one): read from the picked files.
+    let picked_index = std::cell::OnceCell::new();
+    let cds = |dir: &str| {
+        let index = picked_index.get_or_init(|| keep_picked(all.clone()));
+        atlantis3_data::atlantis5::holds_atlantis5_cds_header(Arc::new(PickedDir::new(index, dir)))
+    };
+    if let Some(folder) = crate::web_layout::a5_folder(&paths, cds) {
         use crate::web_layout::Picked;
         let mut others: Vec<&str> = match &picked {
             Picked::Both(_) => vec!["atlantis=Atlantis: The Lost Tales", "atlantis2=Atlantis II"],

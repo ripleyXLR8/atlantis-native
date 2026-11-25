@@ -410,16 +410,17 @@ pub fn explain_atlantis3_no_disc(dir: &Path) -> String {
     )
 }
 
-/// What to tell the player about an Atlantis Evolution folder that does
-/// not open.
 /// What to tell the player about a folder of The Secrets of Atlantis that
 /// does not open.
 pub fn explain_atlantis5(dir: &Path, err: &atlantis3_data::atlantis5::OpenError) -> String {
     if let atlantis3_data::atlantis5::OpenError::MissingDiscs(missing) = err {
         return format!(
-            "{} holds one of the three CDs of The Secrets of Atlantis (2007), whose files              are spread over the three discs ({} still needed).
-
-             Choose a folder holding a copy of each CD (one folder per disc, side by side,              or the three discs' files copied together), or the folder holding the three              CD images; or add this drive to the game library and choose Copy to this              computer, then insert each disc when asked.",
+            "{} holds one of the three CDs of The Secrets of Atlantis (2007), whose files \
+             are spread over the three discs ({} still needed).\n\n\
+             Choose a folder holding a copy of each CD (one folder per disc, side by side, \
+             or the three discs' files copied together), or the folder holding the three \
+             CD images; or add this drive to the game library and choose Copy to this \
+             computer, then insert each disc when asked.",
             dir.display(),
             missing.join(", ")
         );
@@ -434,6 +435,8 @@ pub fn explain_atlantis5(dir: &Path, err: &atlantis3_data::atlantis5::OpenError)
     )
 }
 
+/// What to tell the player about an Atlantis Evolution folder that does
+/// not open.
 pub fn explain_atlantis4(dir: &Path, err: &atlantis4_data::files::OpenError) -> String {
     use atlantis4_data::files::OpenError;
     let shown = dir.display();
@@ -672,6 +675,50 @@ mod tests {
     fn touch(p: &Path) {
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();
         std::fs::write(p, b"x").unwrap();
+    }
+
+    /// Atlantis III's French CD layout (its install beside copies of its
+    /// discs, CD 1 holding an InstallShield 5 `data1.hdr`, as Atlantis
+    /// II's US CD 1 does): not The Secrets of Atlantis' CDs, so the
+    /// install below is found.
+    #[test]
+    fn another_installshield_set_is_not_the_fifth_game() {
+        let d = tmp("is5");
+        let mut hdr = b"ISc(".to_vec();
+        // Version 0x01005201: major 5.
+        hdr.extend(0x0100_5201u32.to_le_bytes());
+        hdr.extend(0x200u32.to_le_bytes());
+        hdr.resize(0x400, 0);
+        let mut cab = b"ISc(".to_vec();
+        cab.extend(0x0100_5201u32.to_le_bytes());
+        cab.resize(0x200, 0);
+        std::fs::create_dir_all(d.join("cd1")).unwrap();
+        std::fs::write(d.join("cd1/data1.hdr"), &hdr).unwrap();
+        std::fs::write(d.join("cd1/data1.cab"), &cab).unwrap();
+        std::fs::create_dir_all(d.join("cd2")).unwrap();
+        std::fs::write(d.join("cd2/data2.cab"), &cab).unwrap();
+        fake_atlantis3_gog(&d.join("installed"));
+        for p in [d.clone(), d.join("cd1"), d.join("cd2")] {
+            assert!(
+                !atlantis3_data::atlantis5::holds_atlantis5(&p),
+                "{}",
+                p.display()
+            );
+            assert_eq!(kind_of(&p), None, "{}", p.display());
+        }
+        assert_eq!(
+            find_roots(&d, 2),
+            [(d.join("installed"), GameKind::Atlantis3)]
+        );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn the_missing_cds_message_has_no_runs_of_spaces() {
+        let e = atlantis3_data::atlantis5::OpenError::MissingDiscs(vec!["data3.cab".into()]);
+        let text = explain_atlantis5(Path::new("cd1"), &e);
+        assert!(!text.contains("  "), "{text:?}");
+        assert!(text.contains("(data3.cab still needed).\n\nChoose a folder"));
     }
 
     #[test]
