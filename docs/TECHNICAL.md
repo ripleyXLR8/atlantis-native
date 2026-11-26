@@ -11,7 +11,7 @@
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
-| `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe`, the French CD's `Atlantis3.exe` and the North American CD's `Beyond Atlantis 2.exe`, `Datas\` and the CDs' discs, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
+| `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe`, the French and Portuguese CDs' `Atlantis3.exe` and the North American CD's `Beyond Atlantis 2.exe`, `Datas\` and the CDs' discs, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
 | `atlantis3-engine` | Atlantis III: the start-up's settings, the intro and the cinematics with their sound, the chapter scripts, the panorama (`warpBFPII`, 16 and 32 bits), the place animations and sprites, the cursor, the moves with their travel videos, the dialogs with their 3D heads, the inventory, the menus and the saves, every puzzle and map, the ending and the credits; see [Atlantis III](#atlantis-iii) |
 | `atlantis4-data` | Atlantis Evolution: detection of GOG.com's `Atlantis Evolution.exe`, the language (`lang.ini`), warp packages, scenes, pictures (an exact JPEG decoder), fonts, texts, the Vorbis sounds and Theora videos decoded as the original decodes them |
 | `atlantis4-script` | Atlantis Evolution: its Lua 5.1 scripts (vendored `rilua`) and the engine's bindings |
@@ -4480,6 +4480,25 @@ its save, the scarab case drawn from `Scarabee.spr`, the Central European
 fonts) and `atlantis-app`'s `the_north_american_cd_with_its_discs`. The
 web page finds the program by `EXE_NAMES` as the desktop does; it has not
 been tried in a browser with this edition.
+
+**The Portuguese CD (2001).** atlantis3-cd-pt-3424256 (`Atlantis3.exe`,
+3,424,256 bytes, PE timestamp 2001-10-31, MD5 `e5e89f92...`),
+`Release::CdPt2001`. atlantis3-re `binaries/atlantis3-cd-pt-3424256.md`:
+the North American program rebuilt (about a thousand functions compiled
+otherwise: frames, temporaries, link order), with that program's code at
+every place `Release` distinguishes (the disc test, `Scarabee.spr`, the
+subject columns, the flip test, the Isis cursor reset, the CD's row
+scan), so its methods answer as for `CdUs2001`; its start-up reads
+`CRYO\ATLANTIS 3`, and its intro has a `bra` branch (`intro_bra.hnm`)
+that no data reaches and the port does not model. The data's language is
+`por` (`install::Language::Portuguese`), its `font.txt` the ANSI one.
+Tests (`ATLANTIS3_CD_PT` = a folder with `Atlantis III - O Novo
+Mundo\CD1..CD3\` holding the CloneCD images, and `installed\`;
+optional): `crates/atlantis3-data/tests/cd_pt.rs` (the build, edition,
+registry values, the discs, every file against atlantis3-re's inventory,
+the disc test's copies), `crates/atlantis3-engine/tests/cd_pt.rs` (the
+intro `intro.hnm`, a new game on disc 2 and its save, the scarab case,
+the ANSI fonts) and `atlantis-app`'s `the_portuguese_cd_with_its_discs`.
 
 The desktop's `a3::A3App` is its own `ApplicationHandler`, as Atlantis
 II's is: `setup::kind_of` tells Atlantis III by `Game.exe` (or the CD's
