@@ -468,7 +468,7 @@ pub async fn start(
         _ => None,
     };
     if let Some(layout) = a2 {
-        start_atlantis2(all, layout)?;
+        start_atlantis2(all, layout).await?;
         return Ok("atlantis2".into());
     }
     // The first game's CD images or Cryo's DVD's, when the folder holds no
@@ -1515,7 +1515,9 @@ fn start_atlantis4(
 /// Atlantis II from the picked files: its installed folder and discs
 /// ([`crate::web_layout::A2Layout`]), the saves in the browser's storage,
 /// the player menu under the start-up intro, as the desktop starts it.
-fn start_atlantis2(
+/// The Traditional Chinese CD's text font is fetched first, unless the
+/// folder holds the player's `mingliu.ttc`.
+async fn start_atlantis2(
     all: HashMap<String, File>,
     layout: crate::web_layout::A2Layout,
 ) -> Result<(), JsValue> {
@@ -1530,8 +1532,9 @@ fn start_atlantis2(
              know ({error}): an edition of the game that is not supported yet.\n\n\
              Supported: the French CD (1999), the CD with patch 1.01, the German CD (1999), \
              the Spanish CD (1999), the Swedish CD (1999), the Polish CD (1999), the \
-             Czech CD (Bohemia Interactive, 2000), the DreamCatcher CD (2000), GOG.com and the Italian \
-             Atlantis Collection."
+             Czech CD (Bohemia Interactive, 2000), the Traditional Chinese and English CDs \
+             (Interwise, 2000), the DreamCatcher CD (2000), GOG.com and the Italian Atlantis \
+             Collection."
         )),
         e => help(&e.to_string()),
     })?;
@@ -1547,6 +1550,27 @@ fn start_atlantis2(
     let missing: Vec<u8> = (1..=4).filter(|n| !found.contains(n)).collect();
     if !missing.is_empty() {
         return Err(help(&crate::web_layout::a2_missing_discs(&missing)));
+    }
+    // The Traditional Chinese CD's texts are drawn in the system's Big5
+    // face (`atlantis2_engine::subtitle::system_cjk_face`): the player's,
+    // else the port's, fetched beside the page.
+    let code_page = files.text_code_page();
+    let player_font = atlantis_engine::subtitles::player_font(code_page)
+        .is_some_and(|(name, _)| files.install().size(name).is_some());
+    if let Some(name) =
+        atlantis_engine::subtitles::cjk_font_file(code_page).filter(|_| !player_font)
+    {
+        let url = format!("fonts/{name}");
+        match fetch_url(&url).await {
+            Ok(data) => {
+                if atlantis_engine::subtitles::provide_cjk_font(code_page, data) {
+                    log::info!("text font: {url}");
+                } else {
+                    log::warn!("{url}: not a font");
+                }
+            }
+            Err(e) => log::warn!("{url}: {e:?}"),
+        }
     }
     let store: Rc<dyn SaveStore> = match WebStore::new("atlantis2") {
         Some(s) => Rc::new(s),

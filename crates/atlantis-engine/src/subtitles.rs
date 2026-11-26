@@ -373,6 +373,14 @@ impl FontFace {
     /// when no face reads or the face needs its hinting to draw right.
     pub fn player(code_page: TextCodePage, data: Vec<u8>) -> Option<FontFace> {
         let (_, family) = player_font(code_page)?;
+        FontFace::player_family(data, family)
+    }
+
+    /// The player's font file `data`: its face of `family` (or its first),
+    /// `None` when no face reads or the face needs its hinting to draw
+    /// right. Atlantis II's Traditional Chinese CD asks for a proportional
+    /// face, PMingLiU of the same `mingliu.ttc`.
+    pub fn player_family(data: Vec<u8>, family: &str) -> Option<FontFace> {
         let index = pick_face(&data, family)?;
         let face = ttf_parser::Face::parse(&data, index).ok()?;
         let name = face
@@ -417,6 +425,11 @@ impl FontFace {
         FontFace::bundled(code_page)
     }
 
+    /// The bytes of the file and the face's index in it.
+    pub fn file(&self) -> (&[u8], u32) {
+        (self.bytes(), self.index)
+    }
+
     /// The bytes of the file.
     fn bytes(&self) -> &[u8] {
         match &self.data {
@@ -448,7 +461,7 @@ impl FontFace {
     /// the player's face, whose cell is its em; for the port's, the top of
     /// its ideographs' em box (the typographic ascent, 0.88 em), where
     /// MingLiU's and SimSun's are (14 pixels).
-    fn cjk_ascent(&self, em_px: f32) -> Option<i32> {
+    pub fn cjk_ascent(&self, em_px: f32) -> Option<i32> {
         let face = ttf_parser::Face::parse(self.bytes(), self.index).ok()?;
         let os2 = face.tables().os2?;
         let units = match self.source() {

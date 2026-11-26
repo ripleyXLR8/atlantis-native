@@ -1185,19 +1185,35 @@ mod tests {
         }
 
         /// Atlantis II's CDs (French, Polish, German, Spanish, Swedish,
-        /// Czech, North American): the installed folder and the four
-        /// images, picked together.
+        /// Czech, North American, the Interwise release's Traditional
+        /// Chinese and English): the installed folder and the four images
+        /// (five for the Interwise release: its two disc 1s), picked
+        /// together.
         #[test]
         fn atlantis2s_cd_images() {
             use atlantis2_data::files::find_exe;
-            for (data, discs, label) in [
-                ("ATLANTIS2_DATA", "ATLANTIS2_DISCS", "French"),
-                ("ATLANTIS2_DATA_PL", "ATLANTIS2_DISCS_PL", "Polish"),
-                ("ATLANTIS2_DATA_DE", "ATLANTIS2_DISCS_DE", "German"),
-                ("ATLANTIS2_DATA_ES", "ATLANTIS2_DISCS_ES", "Spanish"),
-                ("ATLANTIS2_DATA_SV", "ATLANTIS2_DISCS_SV", "Swedish"),
-                ("ATLANTIS2_DATA_CS", "ATLANTIS2_DISCS_CS", "Czech"),
-                ("ATLANTIS2_DATA_US", "ATLANTIS2_DISCS_US", "English"),
+            // The Interwise release's folder holds its two disc 1s: the one
+            // whose installer is in the installed language is taken.
+            for (data, discs, label, disc1) in [
+                ("ATLANTIS2_DATA", "ATLANTIS2_DISCS", "French", ""),
+                ("ATLANTIS2_DATA_PL", "ATLANTIS2_DISCS_PL", "Polish", ""),
+                ("ATLANTIS2_DATA_DE", "ATLANTIS2_DISCS_DE", "German", ""),
+                ("ATLANTIS2_DATA_ES", "ATLANTIS2_DISCS_ES", "Spanish", ""),
+                ("ATLANTIS2_DATA_SV", "ATLANTIS2_DISCS_SV", "Swedish", ""),
+                ("ATLANTIS2_DATA_CS", "ATLANTIS2_DISCS_CS", "Czech", ""),
+                (
+                    "ATLANTIS2_DATA_ZH",
+                    "ATLANTIS2_DISCS_ZH",
+                    "Traditional Chinese",
+                    "XITOYCHA",
+                ),
+                (
+                    "ATLANTIS2_DATA_ZH_EN",
+                    "ATLANTIS2_DISCS_ZH",
+                    "English",
+                    "INGLIZCHA",
+                ),
+                ("ATLANTIS2_DATA_US", "ATLANTIS2_DISCS_US", "English", ""),
             ] {
                 let (Some(data), Some(discs)) = (var(data), var(discs)) else {
                     continue;
@@ -1229,6 +1245,13 @@ mod tests {
                 }
                 // A cinematic of disc 1 read by parts.
                 let origin = files.disc_origin(1).unwrap().to_string();
+                // (The browser's paths are lower case.)
+                assert!(
+                    origin
+                        .to_ascii_lowercase()
+                        .contains(&disc1.to_ascii_lowercase()),
+                    "{origin}"
+                );
                 let img = picked.source(&origin);
                 let film = some_file(img.as_ref(), "", ".hnm", 3).expect("a film");
                 by_parts_as_whole(&picked, img.as_ref(), &picked.real[&origin], &film);

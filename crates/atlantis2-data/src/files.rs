@@ -313,27 +313,31 @@ impl A2Files {
     /// The files of an install folder and of the disc candidates (folder
     /// copies or images, each with a name for the log). Candidates that
     /// are no Atlantis II disc are dropped; of two copies of one disc the
-    /// first is kept. The current disc starts as the lowest-numbered one:
+    /// first is kept, unless only the second's installer is in the
+    /// installed texts' language ([`installer_language`]: the Interwise
+    /// release's Traditional Chinese and English disc 1s, a port
+    /// addition). The current disc starts as the lowest-numbered one:
     /// the original starts on the first drive holding any disc
     /// (@ 0x0040e0e0).
     pub fn new(
         install: Arc<dyn FileSource>,
         candidates: impl IntoIterator<Item = (String, Arc<dyn FileSource>)>,
     ) -> A2Files {
-        let mut discs: Vec<Disc> = Vec::new();
-        for (origin, source) in candidates {
-            add_discs(&mut discs, origin, source);
-        }
-        discs.sort_by_key(|d| d.number);
-        let current = discs.first().map_or(0, |d| d.number);
-        A2Files {
+        let mut files = A2Files {
             install,
-            discs,
-            current,
+            discs: Vec::new(),
+            current: 0,
             roots: Vec::new(),
             exe: None,
             aliases: Mutex::new(HashMap::new()),
+        };
+        let language = files.language();
+        for (origin, source) in candidates {
+            add_discs(&mut files.discs, origin, source, language);
         }
+        files.discs.sort_by_key(|d| d.number);
+        files.current = files.discs.first().map_or(0, |d| d.number);
+        files
     }
 
     /// Opens a game folder: the executable ([`find_exe`]) and the install
@@ -410,10 +414,11 @@ impl A2Files {
     /// kept. True when a disc was added.
     pub fn refresh_discs(&mut self) -> bool {
         let mut added = false;
+        let language = self.language();
         for root in self.roots.clone() {
             for (origin, source) in disc_candidates(&root) {
                 let before = self.discs.len();
-                add_discs(&mut self.discs, origin, source);
+                add_discs(&mut self.discs, origin, source, language);
                 added |= self.discs.len() > before;
             }
         }
@@ -597,9 +602,31 @@ impl A2Files {
     }
 }
 
-/// The discs of a candidate added to `discs` (see [`disc_numbers_of`]),
-/// those already found left as they are.
-fn add_discs(discs: &mut Vec<Disc>, origin: String, source: Arc<dyn FileSource>) {
+/// The language an InstallShield disc's installer is made for: its
+/// `setup.lid`'s `Default=`, an InstallShield language id in hex (`0009`
+/// English, `0404` Traditional Chinese, `0005` Czech); `None` when the
+/// disc has no such file (discs 2 to 4).
+pub fn installer_language(src: &dyn FileSource) -> Option<u16> {
+    let data = src.read("setup.lid")?;
+    String::from_utf8_lossy(&data).lines().find_map(|l| {
+        let (k, v) = l.split_once('=')?;
+        if !k.trim().eq_ignore_ascii_case("Default") {
+            return None;
+        }
+        u16::from_str_radix(v.trim(), 16).ok()
+    })
+}
+
+/// The discs of a candidate added to `discs` (see [`disc_numbers_of`]).
+/// A disc already found is kept, but when its installer is not in
+/// `language` and the candidate's is: the Interwise release's two disc
+/// 1s, each with the installer of its language, in one folder.
+fn add_discs(
+    discs: &mut Vec<Disc>,
+    origin: String,
+    source: Arc<dyn FileSource>,
+    language: Option<Language>,
+) {
     let numbers = disc_numbers_of(source.as_ref());
     if numbers.is_empty() {
         log::debug!("{origin}: not an Atlantis II disc");
@@ -608,9 +635,20 @@ fn add_discs(discs: &mut Vec<Disc>, origin: String, source: Arc<dyn FileSource>)
     if numbers.len() > 1 {
         log::info!("{origin}: every disc's marker, the whole game (discs {numbers:?})");
     }
+    let wanted = language.map(Language::installer_id);
+    let in_language = |src: &dyn FileSource| wanted.is_some() && installer_language(src) == wanted;
     for number in numbers {
-        if discs.iter().any(|d| d.number == number) {
-            log::debug!("{origin}: disc {number} again, not used");
+        if let Some(kept) = discs.iter_mut().find(|d| d.number == number) {
+            if !in_language(kept.source.as_ref()) && in_language(source.as_ref()) {
+                log::info!(
+                    "disc {number}: {origin}, its installer in the installed language ({} not used)",
+                    kept.origin
+                );
+                kept.source = source.clone();
+                kept.origin = origin.clone();
+            } else {
+                log::debug!("{origin}: disc {number} again, not used");
+            }
             continue;
         }
         log::info!("disc {number}: {origin}");
@@ -689,6 +727,32 @@ mod tests {
             m.insert(name, data.to_vec());
         }
         Arc::new(m)
+    }
+
+    #[test]
+    fn disc_in_the_installed_language() {
+        let lid =
+            |code: &str| format!("[Languages]\r\nkey0={code}\r\nDefault={code}\r\ncount=1\r\n");
+        let (zh, en) = (lid("0404"), lid("0009"));
+        let zh = disc(1, &[("SETUP.LID", zh.as_bytes())]);
+        let en = disc(1, &[("setup.lid", en.as_bytes())]);
+        assert_eq!(installer_language(zh.as_ref()), Some(0x0404));
+        assert_eq!(installer_language(en.as_ref()), Some(0x0009));
+        assert_eq!(installer_language(disc(2, &[]).as_ref()), None);
+        let kept = |language: Option<Language>| {
+            let mut discs = Vec::new();
+            for (name, d) in [("zh", &zh), ("en", &en)] {
+                add_discs(&mut discs, name.to_string(), d.clone(), language);
+            }
+            assert_eq!(discs.len(), 1);
+            discs[0].origin.clone()
+        };
+        // The disc whose installer is in the installed texts' language;
+        // the first when neither is, or the language is not known.
+        assert_eq!(kept(Some(Language::English)), "en");
+        assert_eq!(kept(Some(Language::TraditionalChinese)), "zh");
+        assert_eq!(kept(Some(Language::French)), "zh");
+        assert_eq!(kept(None), "zh");
     }
 
     #[test]

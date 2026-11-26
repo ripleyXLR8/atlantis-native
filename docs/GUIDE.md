@@ -107,7 +107,8 @@ patch 1.01, the North American CD (*Beyond Atlantis*, DreamCatcher, 2000),
 the German CD (1999, also in *Die Legende Atlantis I & II*), the Spanish
 CD (1999, Friendware), the Swedish CD (1999, IQ Media Nordic), the Polish
 CD (1999), the Czech CD (2000, Bohemia Interactive, also the 2002 *GAME4U
-Speciál 3*), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
+Speciál 3*), the Traditional Chinese and English CDs of the Taiwanese
+release (亞特蘭提斯2, Interwise, 2000), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
 English, French, German or Spanish, the French CD (2001, three CDs) and
 the Italian *Atlantis Collection* DVD (installed);
@@ -312,7 +313,8 @@ What to pick:
 - *Atlantis II*, GOG.com or the Italian *Atlantis Collection*: the
   installation folder (the one holding `Game.exe` and `DATAS_A2`).
 - *Atlantis II*, CD (the French CD, also patched to 1.01, the North
-  American *Beyond Atlantis*, the German, Spanish, Swedish, Polish or Czech CD): the folder of the
+  American *Beyond Atlantis*, the German, Spanish, Swedish, Polish, Czech or
+  Taiwanese CD): the folder of the
   installed game (the one holding `atlantis2.exe`, `wam`, `scenar`...),
   with the images of the four CDs (`.iso`, `.bin`, `.img`, `.mdf` or
   `.nrg`) in it or in a folder inside it, or copies of the CDs (for
@@ -677,6 +679,22 @@ that one, with the Czech texts (á č ď é ě í ň ř š ť ú ů ý ž, read 
 Central European code page as a Czech Windows does) and voices; films 19,
 55 and 66 are in Czech too, and the intro starts with Bohemia
 Interactive's logo.
+
+The Taiwanese release (亞特蘭提斯2, Interwise, 2000, 4 CDs) has two disc
+1s, each with its own installer: a Traditional Chinese one and an English
+one; discs 2 to 4 serve both. Each installs and opens as the French CD
+does: the installed folder with the images or copies of the four CDs.
+When the folder holds both disc 1s, Atlantis Native uses the one whose
+installer is in the language installed. The Traditional Chinese install
+plays as version 1.01 with Chinese subtitles, menus and object names and
+the English voices; the intro starts with Interwise's logo. Its texts
+are drawn as a Traditional Chinese Windows draws them: the game asks for
+a Japanese font it ships, which has no Chinese character set, so Windows
+uses its own Chinese font, MingLiU. Put your `mingliu.ttc` (from a
+Windows `Fonts` folder) in the installed folder to get those glyphs;
+without it Atlantis Native draws the texts in Noto Serif TC, a font of
+the same style it brings with it. The English install plays as the
+Polish CD's program with English texts and voices.
 
 The Italian *Atlantis Collection* (DVD, 2014) installs one folder as GOG.com's
 does, Italian only: point Atlantis Native at it (no disc is needed). Its

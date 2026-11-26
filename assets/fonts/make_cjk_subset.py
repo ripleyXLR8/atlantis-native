@@ -4,7 +4,9 @@ NotoSerifSC-Subset.otf and NotoSansJP-Subset.otf next to this script: Noto
 Serif TC / SC Regular and Noto Sans JP Regular (SIL Open Font License 1.1,
 no Reserved Font Name) cut down to the characters of the Chinese and
 Japanese releases' chapter scripts and of the subtitle rows their breakers
-cut, plus ASCII and the punctuation.
+cut, plus ASCII and the punctuation. Noto Serif TC also holds the
+characters of Atlantis II's Traditional Chinese CD (its installed
+`loc/*.txt`, Big5), which draws its texts in the same face.
 
 The fonts come from the official releases of
 https://github.com/notofonts/noto-cjk: Serif2.003 (14_NotoSerifSC.zip,
@@ -16,7 +18,8 @@ the game is kept here).
 
     python3 assets/fonts/make_cjk_subset.py \\
         --tc NotoSerifTC-Regular.otf --sc NotoSerifSC-Regular.otf \\
-        --tw <Traditional Chinese CD folder> --cn <Simplified Chinese CD folder>
+        --tw <Traditional Chinese CD folder> --cn <Simplified Chinese CD folder> \\
+        --tw2 <Atlantis II Traditional Chinese CD, installed>
     python3 assets/fonts/make_cjk_subset.py \\
         --jp NotoSansJP-Regular.otf --ja <the DVD's side B>/FACE_B/JAP
 
@@ -53,6 +56,18 @@ def con_chars(folder):
     return out.stdout.strip()
 
 
+def loc_chars(folder):
+    """The characters of an Atlantis II installation's `loc/*.txt` but
+    `Font.txt`, read as code page 950 (Big5); the pairs it leaves
+    undefined are skipped."""
+    loc = next(p for p in Path(folder).iterdir() if p.name.lower() == "loc")
+    chars = set()
+    for p in sorted(loc.iterdir()):
+        if p.suffix.lower() == ".txt" and p.name.lower() != "font.txt":
+            chars |= set(p.read_bytes().decode("cp950", errors="ignore"))
+    return "".join(sorted(c for c in chars if ord(c) > 0x7f))
+
+
 def subset(src, chars, dst, unicodes=UNICODES):
     with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".txt", delete=False) as f:
         f.write(chars)
@@ -84,11 +99,13 @@ def main():
     p.add_argument("--sc", help="NotoSerifSC-Regular.otf")
     p.add_argument("--tw", help="the Traditional Chinese CD (files or disc images)")
     p.add_argument("--cn", help="the Simplified Chinese CD (files or disc images)")
+    p.add_argument("--tw2", help="Atlantis II's Traditional Chinese CD, installed")
     p.add_argument("--jp", help="NotoSansJP-Regular.otf")
     p.add_argument("--ja", help="the Japanese DVD's language folder (FACE_B/JAP of side B)")
     a = p.parse_args()
     if a.tc and a.tw:
-        subset(a.tc, con_chars(a.tw), HERE / "NotoSerifTC-Subset.otf")
+        chars = con_chars(a.tw) + (loc_chars(a.tw2) if a.tw2 else "")
+        subset(a.tc, chars, HERE / "NotoSerifTC-Subset.otf")
     if a.sc and a.cn:
         subset(a.sc, con_chars(a.cn), HERE / "NotoSerifSC-Subset.otf")
     if a.jp and a.ja:

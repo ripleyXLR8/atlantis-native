@@ -49,7 +49,11 @@
 //!   runtime's `strcpy` / `_mbslen` where 1.01 inlines them), so every
 //!   [`Release`] behaviour is 1.01's and none of GOG's patches is in it
 //!   (atlantis2-re `binaries/atlantis2-cd-pl-2183168.md`). Its texts are
-//!   Windows-1250 ([`crate::edition::Language::text_code_page`]);
+//!   Windows-1250 ([`crate::edition::Language::text_code_page`]). The
+//!   English disc 1 of the Interwise release (2000) installs this file
+//!   byte for byte with English texts, and its Traditional Chinese disc 1
+//!   the 1.01 patch's with Big5 texts: the same builds, told apart by
+//!   their texts ([`crate::edition::LANGUAGE_EDITIONS`]);
 //! - the German CD's `atlantis2.exe` (4 CDs, 1999; also in the compilation
 //!   *Die Legende Atlantis I & II*, 2000): the French CD's executable (the
 //!   same PE timestamp, version string 3.15, `.rdata` and `.data` byte for

@@ -20,12 +20,18 @@
 //! so does the Spanish CD's (1999) from GOG's Spanish. The Swedish CD's
 //! (1999) is Swedish's only known one: no GOG.com depot of Atlantis II
 //! holds Swedish. The Czech CD's (2000, reissued in 2002 as *GAME4U
-//! Speciál 3*) is Czech's only known one.
+//! Speciál 3*) is Czech's only known one. The Traditional Chinese CD's
+//! (Interwise, 2000) is Traditional Chinese's only known one; the English
+//! disc 1 sold with it installs GOG's English but for the line that asks
+//! for the CD ("any Atlantis 2 CD").
 //!
 //! The Czech CD ships the North American CD's executable byte for byte
 //! (atlantis2-re `binaries/atlantis2-cd-us-2199552.md`), so its build is
 //! that one; the language tells the edition apart, and [`edition_label`]
-//! names it after its own release ([`LANGUAGE_EDITIONS`]).
+//! names it after its own release ([`LANGUAGE_EDITIONS`]). So do the two
+//! disc 1s of the Interwise release: the Traditional Chinese one installs
+//! the 1.01 patch's executable byte for byte, the English one the Polish
+//! CD's (atlantis2-re `binaries/atlantis2-cd-zh-tw-2183168.md`).
 //!
 //! The language also tells the code page the texts are read in
 //! ([`Language::text_code_page`]): the original passes the bytes of
@@ -35,7 +41,8 @@
 //! made for: Windows-1252 for the Western ones, Windows-1250 for the
 //! Polish and Czech CDs (atlantis2-re `binaries/atlantis2-cd-pl-2183168.md`,
 //! "Text code page"; the Czech CD's program makes its fonts the same way,
-//! `CreateFontA` with `DEFAULT_CHARSET`).
+//! `CreateFontA` with `DEFAULT_CHARSET`), code page 950 (Big5) for the
+//! Traditional Chinese CD, whose `Font.txt` says `[CharacterSet] MBCS`.
 
 use atlantis_data::TextCodePage;
 use md5::{Digest, Md5};
@@ -53,6 +60,7 @@ pub enum Language {
     Polish,
     Swedish,
     Czech,
+    TraditionalChinese,
 }
 
 impl Language {
@@ -67,6 +75,26 @@ impl Language {
             Language::Polish => "Polish",
             Language::Swedish => "Swedish",
             Language::Czech => "Czech",
+            Language::TraditionalChinese => "Traditional Chinese",
+        }
+    }
+
+    /// The InstallShield language id an installer made for it writes in
+    /// its disc's `setup.lid` (`Default=`): the Windows primary language
+    /// (`0009` on the English disc 1 of the Interwise release, `0005` on
+    /// the Czech CD), the whole language id for Traditional Chinese
+    /// (`0404`, its Chinese disc 1).
+    pub fn installer_id(self) -> u16 {
+        match self {
+            Language::English => 0x0009,
+            Language::French => 0x000c,
+            Language::German => 0x0007,
+            Language::Spanish => 0x000a,
+            Language::Italian => 0x0010,
+            Language::Polish => 0x0015,
+            Language::Swedish => 0x001d,
+            Language::Czech => 0x0005,
+            Language::TraditionalChinese => 0x0404,
         }
     }
 
@@ -78,9 +106,14 @@ impl Language {
     /// 0xc4 `Ä`, 0xd6 `Ö`). Windows-1250 for Czech too (the Czech CD's use
     /// 0x9a `š`, 0x9e `ž`, 0x9d `ť`, 0xe8 `č`, 0xec `ě`, 0xf8 `ř`, 0xf9 `ů`,
     /// 0xef `ď`, 0xf2 `ň`...; its manual is `charset=windows-1250`).
+    /// Code page 950 (Big5) for Traditional Chinese: the Traditional Chinese CD's
+    /// texts are Big5 pairs (lead bytes 0xa1..0xf9; its `Font.txt` breaks
+    /// lines at A1 41 `，`, A1 43 `。`, A1 48 `？`, A1 49 `！`), drawn on a
+    /// Traditional Chinese Windows.
     pub fn text_code_page(self) -> TextCodePage {
         match self {
             Language::Polish | Language::Czech => TextCodePage::Windows1250,
+            Language::TraditionalChinese => TextCodePage::Windows950,
             Language::English
             | Language::French
             | Language::German
@@ -93,13 +126,13 @@ impl Language {
 
 /// The code page of the texts of a folder whose language is `language`:
 /// the language's, Windows-1252 when it is not known (every edition but
-/// the Polish and Czech CDs).
+/// the Polish, Czech and Traditional Chinese CDs).
 pub fn text_code_page(language: Option<Language>) -> TextCodePage {
     language.map_or(TextCodePage::Windows1252, Language::text_code_page)
 }
 
 /// The known `loc\Menu.txt` files: size, MD5, language.
-pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 12] = [
+pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 14] = [
     // The French CD's (1999), installed.
     (
         1371,
@@ -212,18 +245,54 @@ pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 12] = [
         ],
         Language::Czech,
     ),
+    // The Traditional Chinese CD (Interwise, 2000), installed from its
+    // Chinese disc 1 (`loc\Menu.txt`, Big5).
+    (
+        928,
+        [
+            0x6e, 0x3f, 0xdc, 0x9a, 0x71, 0xde, 0x77, 0xe6, 0x77, 0xf3, 0x58, 0x76, 0x34, 0x38,
+            0x3d, 0x6a,
+        ],
+        Language::TraditionalChinese,
+    ),
+    // The same release's English disc 1, installed (`loc\Menu.txt`): GOG's
+    // English but for line 72 (asks for "any Atlantis 2 CD").
+    (
+        1143,
+        [
+            0x7c, 0x62, 0x42, 0xd7, 0x95, 0xdb, 0xab, 0x5d, 0x3d, 0x67, 0xde, 0x81, 0xc4, 0x92,
+            0x09, 0x6a,
+        ],
+        Language::English,
+    ),
 ];
 
 /// Editions whose build is another edition's: (the build's id, the
 /// language, the edition's name). The Czech CD's `atlantis2.exe` is the
 /// North American CD's file (MD5 `0f634c46…`, linked 2000-04-05): its
 /// Czech `loc\` makes it the Czech CD, named after its own release and
-/// not DreamCatcher's.
-pub const LANGUAGE_EDITIONS: [(&str, Language, &str); 1] = [(
-    "atlantis2-cd-us-2199552",
-    Language::Czech,
-    "Atlantis II, Czech CD (Bohemia Interactive, 2000)",
-)];
+/// not DreamCatcher's. The Interwise release (Taiwan, 2000) has two disc 1s, each
+/// with its installer, and discs 2 to 4 shared (the North American CD's
+/// files): the Traditional Chinese one installs the 1.01 patch's
+/// `atlantis2.exe` (MD5 `255310e7…`) with Big5 texts, the English one the
+/// Polish CD's (MD5 `f2b6f7bf…`) with English texts.
+pub const LANGUAGE_EDITIONS: [(&str, Language, &str); 3] = [
+    (
+        "atlantis2-cd-us-2199552",
+        Language::Czech,
+        "Atlantis II, Czech CD (Bohemia Interactive, 2000)",
+    ),
+    (
+        "atlantis2-patch101-2183168",
+        Language::TraditionalChinese,
+        "Atlantis II, Traditional Chinese CD (Interwise, 2000)",
+    ),
+    (
+        "atlantis2-cd-pl-2183168",
+        Language::English,
+        "Atlantis II, English CD (Interwise, 2000)",
+    ),
+];
 
 /// The language of a `loc\Menu.txt`, `None` when it is no known file.
 pub fn language_of_menu_txt(data: &[u8]) -> Option<Language> {
@@ -286,6 +355,8 @@ mod tests {
                 "0609b0b59904d1ea7e001fbc1986036b",
                 "041255980d18b1ad866911d575301f26",
                 "ec3af0762a15b57a95deadcfceb0bc87",
+                "6e3fdc9a71de77e677f3587634383d6a",
+                "7c6242d795dbab5d3d67de81c492096a",
             ]
         );
         // A file of a known size but other bytes names no language.
@@ -376,6 +447,21 @@ mod tests {
             edition_label(sv, Some(Language::Swedish)),
             "Atlantis II, Swedish CD (1999)"
         );
+        // The Interwise release's two disc 1s: the 1.01 patch's build in
+        // Traditional Chinese, the Polish CD's in English.
+        assert_eq!(
+            edition_label(patch, Some(Language::TraditionalChinese)),
+            "Atlantis II, Traditional Chinese CD (Interwise, 2000)"
+        );
+        assert_eq!(
+            edition_label(pl, Some(Language::English)),
+            "Atlantis II, English CD (Interwise, 2000)"
+        );
+        assert_eq!(
+            edition_label(patch, Some(Language::English)),
+            "Atlantis II, patch 1.01, English (1999)"
+        );
+        assert_eq!(edition_label(pl, None), "Atlantis II, Polish CD (1999)");
     }
 
     #[test]
@@ -409,5 +495,13 @@ mod tests {
             0x9e, 0xc8, 0xd8, 0x8a, 0x8e,
         ]);
         assert_eq!(cs, "áčďéěíňóřšťúůýžČŘŠŽ");
+        // Traditional Chinese: code page 950, the line breaks of its
+        // `Font.txt` (A1 41, A1 43, A1 48, A1 49).
+        let zh = text_code_page(Some(Language::TraditionalChinese));
+        assert_eq!(zh, TextCodePage::Windows950);
+        assert_eq!(
+            zh.decode(&[0xa1, 0x41, 0xa1, 0x43, 0xa1, 0x48, 0xa1, 0x49]),
+            "，。？！"
+        );
     }
 }

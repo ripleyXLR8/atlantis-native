@@ -1197,7 +1197,10 @@ is the span then read, a raw read never over a batch), the layouts with
 images (`web_layout`'s tests), and the players' images on disk read as
 the browser reads them (`web_layout::tests::on_disk`: Atlantis II's
 French, Polish, German, Spanish, Swedish, Czech and North American CDs with
-`ATLANTIS2_DATA[_PL|_DE|_ES|_SV|_CS|_US]` / `ATLANTIS2_DISCS[_PL|_DE|_ES|_SV|_CS|_US]`, a cinematic of disc 1 by parts of 512 KB as
+`ATLANTIS2_DATA[_PL|_DE|_ES|_SV|_CS|_US]` / `ATLANTIS2_DISCS[_PL|_DE|_ES|_SV|_CS|_US]`
+and the Taiwanese release's two installs with `ATLANTIS2_DATA_ZH`,
+`ATLANTIS2_DATA_ZH_EN` / `ATLANTIS2_DISCS_ZH` (the disc 1 in each one's
+language taken), a cinematic of disc 1 by parts of 512 KB as
 the desktop's whole read; Atlantis III's French CD with
 `ATLANTIS3_CD_FR` / `ATLANTIS3_DISCS_FR`, disc 2 for a new game; the
 first game's ISO, raw `.bin`, `.mdf` and Nero images with the
@@ -1546,7 +1549,8 @@ back) into `yucatan-*.png`.
   The port reads the code page from the language
   (`edition::Language::text_code_page`, `A2Files::text_code_page`):
   `SubtitleFont::load` looks each byte's glyph up in it, Windows-1250 for
-  Polish and Czech, Windows-1252 for every other edition (`tests/pl_cd.rs`). The
+  Polish and Czech, code page 950 for Traditional Chinese, Windows-1252
+  for every other edition (`tests/pl_cd.rs`). The
   German CD's `atlantis2.exe` (4 CDs, 1999, the discs also in the
   compilation *Die Legende Atlantis I & II*, 2000;
   `atlantis2-cd-de-2432347`, 2432347 bytes, MD5
@@ -1613,7 +1617,46 @@ back) into `yucatan-*.png`.
   has every Czech letter. Its discs hold the Czech voices (no other
   edition's), the Czech tracks of films 19, 55 and 66 in `datas_a2\apc\`
   and Bohemia Interactive's logo as `intro00.hnm` (90 frames, no track)
-  (`tests/cs_cd.rs`). The languages differ only in data: `loc\` (texts,
+  (`tests/cs_cd.rs`). The Taiwanese release (亞特蘭提斯2, Interwise, 2000,
+  4 CDs) has two disc 1s, each with its InstallShield installer
+  (`setup.lid` `0404` and `0009`), and discs 2 to 4 shared, the North
+  American CD's files; the voices and film tracks are English on every
+  disc. The Traditional Chinese disc 1 installs the 1.01 patch's
+  `atlantis2.exe` byte for byte (MD5 `255310e7d6bd7f823f680e2bd3be8b7f`)
+  with the Polish CD's files but `loc\` and `scenar\chapi083.con`; the
+  English one installs the Polish CD's program (MD5
+  `f2b6f7bfa3c1952dceddfa1a662ebb84`) with GOG's English texts (its
+  `Menu.txt` asks for "any Atlantis 2 CD") and the French CD's font. Both
+  are told by their `Menu.txt` (`Language::TraditionalChinese`,
+  `Language::English`) and named by `LANGUAGE_EDITIONS` ("Atlantis II,
+  Traditional Chinese CD (Interwise, 2000)", "Atlantis II, English CD
+  (Interwise, 2000)"). Of two images of one disc, `A2Files` keeps the one
+  whose `setup.lid` names the installed language (`installer_language`,
+  a port addition: the original reads the disc in the drive). The
+  Chinese texts are Big5 with `[CharacterSet] MBCS` and
+  `[PartitionCode] 0x20,0xA148,0xA141,0xA143,0xA149` (comma-separated,
+  which 1.01's parser reads as five codes: the space, `？`, `，`, `。`,
+  `！`). Their `Font.txt` names the face of the shipped `atl_font.ttf`,
+  "HG-Gothic-M Medium", a Japanese font (code pages Latin 1 and JIS, 94
+  of the texts' 1350 ideographs missing); the fonts are made in
+  `DEFAULT_CHARSET`, which a Traditional Chinese Windows takes for Big5,
+  so GDI's mapper answers with the system's Big5 face, `VARIABLE_PITCH`
+  asked: PMingLiU (inferred, as for the first game's Chinese CDs).
+  `SubtitleFont::load` then draws with `system_cjk_face`: the player's
+  `mingliu.ttc` beside the game's files (its PMingLiU face), else the
+  bundled Noto Serif TC (cut to both games' Chinese characters); `Height`
+  pixels per em in a cell of `Height` (MingLiU's em is its cell), lines
+  `Height` + 1 apart, each lead byte read with the next as one character
+  in the measure and the drawing; code page 950's user-defined pairs (four
+  Windows-1252 apostrophes before a letter in `Credits.txt`) have no
+  glyph. The line breaking is 1.01's MBCS path, checked against the
+  original under emulation with a model of MingLiU's widths
+  (`golden/subtitles_101_zh.txt`: all 1214 lines; a row may end one
+  ideograph past W − 20 when that one is a break, 40 rows touch the
+  screen's edge so). The disc's `intro00.hnm` is Interwise's logo (90
+  frames, no track) before the European `intro01` and `intro02`; the
+  English disc 1 holds those two films alone, as `intro00` and `intro01`
+  (`tests/zh_cd.rs`). The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
@@ -3792,7 +3835,7 @@ back) into `yucatan-*.png`.
   at start-up and when the display is set up, does to the word.
 - **Dialogs** (`dialog.rs`, `hnm_stream.rs`, `subtitle.rs`, `sound.rs`):
   a world's `loc\Dial<XX>.txt` (the texts, Windows-1252; Windows-1250 for
-  the Polish and Czech CDs),
+  the Polish and Czech CDs, Big5 for the Traditional Chinese CD),
   `scenar\com<XX>.txt` (speaker, mood, stand, camera, kind of each line)
   and `scenar\info<XX>.txt` (the speakers) are read with the world; a
   dialog collects its lines, loads each speaker's head per stand, and
@@ -5025,6 +5068,20 @@ subtitle with its voices, none the North American CD's, the main menu's
 tooltip and a save, the browser's way of opening it through the `.bin`
 images; `tests/flow.rs`'s whole game with the mouse played again on it;
 `cs-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_ZH`, `ATLANTIS2_DATA_ZH_EN`, `ATLANTIS2_DISCS_ZH` the
+Taiwanese release's installed folders (`data1.cab` of its Traditional
+Chinese and of its English disc 1 extracted) and a folder holding its five
+CD images (`tests/zh_cd.rs`: the executables by their MD5, the Chinese
+one against the 1.01 patch's, every installed file against the Polish
+CD's, the editions' names and languages, each half's own disc 1 taken,
+the `loc` files against the North American CD's lines and objects, the
+shipped font's code pages and missing ideographs, every subtitle against
+the 1.01 executable's layout under emulation, every character a glyph of
+the port's Noto Serif TC, the English voices and film tracks, both disc
+1s' intros with Interwise's logo, a subtitle on four rows, the main menu's
+tooltip and a save, the browser's way of opening both halves;
+`tests/flow.rs`'s whole game with the mouse played again on each half;
+`zh-*.png` with `ATLANTIS2_PNG_DIR`),
 `ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
 German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
 `1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older
