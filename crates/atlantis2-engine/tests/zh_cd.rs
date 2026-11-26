@@ -50,10 +50,10 @@ use md5::{Digest, Md5};
 
 /// The 1.01 patch's build: the Chinese disc 1's program is that file.
 const ID: &str = "atlantis2-patch101-2183168";
-const LABEL: &str = "Atlantis II, Traditional Chinese CD (Interwise, 2000)";
+const LABEL: &str = "Atlantis II, Taiwanese CD, Traditional Chinese (Interwise, 2000)";
 /// The Polish CD's build: the English disc 1's program.
 const ID_EN: &str = "atlantis2-cd-pl-2183168";
-const LABEL_EN: &str = "Atlantis II, English CD (Interwise, 2000)";
+const LABEL_EN: &str = "Atlantis II, Taiwanese CD, English (Interwise, 2000)";
 const WORLDS: [&str; 5] = ["CH", "IR", "SH", "TI", "YU"];
 const CP: TextCodePage = TextCodePage::Windows950;
 /// The 1.01 executable's subtitle layout (@ 0x0045a2f0) on this CD's

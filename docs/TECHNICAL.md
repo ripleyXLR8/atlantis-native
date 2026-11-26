@@ -1629,10 +1629,11 @@ back) into `yucatan-*.png`.
   `Menu.txt` asks for "any Atlantis 2 CD") and the French CD's font. Both
   are told by their `Menu.txt` (`Language::TraditionalChinese`,
   `Language::English`) and named by `LANGUAGE_EDITIONS` ("Atlantis II,
-  Traditional Chinese CD (Interwise, 2000)", "Atlantis II, English CD
-  (Interwise, 2000)"). Of two images of one disc, `A2Files` keeps the one
-  whose `setup.lid` names the installed language (`installer_language`,
-  a port addition: the original reads the disc in the drive). The
+  Taiwanese CD, Traditional Chinese (Interwise, 2000)", "Atlantis II,
+  Taiwanese CD, English (Interwise, 2000)"). Of two images of one disc,
+  `A2Files` keeps the one whose `setup.lid` names the installed language
+  (`installer_language`, a port addition: the original reads the disc in
+  the drive). The
   Chinese texts are Big5 with `[CharacterSet] MBCS` and
   `[PartitionCode] 0x20,0xA148,0xA141,0xA143,0xA149` (comma-separated,
   which 1.01's parser reads as five codes: the space, `？`, `，`, `。`,

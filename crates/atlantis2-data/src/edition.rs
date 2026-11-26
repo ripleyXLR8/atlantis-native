@@ -285,12 +285,12 @@ pub const LANGUAGE_EDITIONS: [(&str, Language, &str); 3] = [
     (
         "atlantis2-patch101-2183168",
         Language::TraditionalChinese,
-        "Atlantis II, Traditional Chinese CD (Interwise, 2000)",
+        "Atlantis II, Taiwanese CD, Traditional Chinese (Interwise, 2000)",
     ),
     (
         "atlantis2-cd-pl-2183168",
         Language::English,
-        "Atlantis II, English CD (Interwise, 2000)",
+        "Atlantis II, Taiwanese CD, English (Interwise, 2000)",
     ),
 ];
 
@@ -451,11 +451,11 @@ mod tests {
         // Traditional Chinese, the Polish CD's in English.
         assert_eq!(
             edition_label(patch, Some(Language::TraditionalChinese)),
-            "Atlantis II, Traditional Chinese CD (Interwise, 2000)"
+            "Atlantis II, Taiwanese CD, Traditional Chinese (Interwise, 2000)"
         );
         assert_eq!(
             edition_label(pl, Some(Language::English)),
-            "Atlantis II, English CD (Interwise, 2000)"
+            "Atlantis II, Taiwanese CD, English (Interwise, 2000)"
         );
         assert_eq!(
             edition_label(patch, Some(Language::English)),
