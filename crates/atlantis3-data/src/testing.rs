@@ -141,6 +141,18 @@ pub fn cd_pt() -> Option<(PathBuf, PathBuf)> {
     ))
 }
 
+/// The variable naming the Swedish CD's folder (*Den nya världen*,
+/// Toptronics, 2002): its three ISO images and `installed\` (the first
+/// disc's `data1.cab` extracted).
+pub const CD_SV_VAR: &str = "ATLANTIS3_CD_SV";
+
+/// The Swedish CD's installed folder and its discs' folder (from
+/// `ATLANTIS3_CD_SV`); its absence never fails a test ([`optional_dir`]).
+pub fn cd_sv() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_SV_VAR)?;
+    Some((dir.join("installed"), dir))
+}
+
 /// The installed game's folder from `ATLANTIS3_DATA`, or `None` after
 /// [`missing`].
 pub fn install_dir() -> Option<PathBuf> {

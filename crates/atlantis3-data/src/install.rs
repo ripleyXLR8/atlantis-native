@@ -29,7 +29,9 @@
 //!
 //! The Portuguese CD (*O Novo Mundo*, Playgames, 2001) has Cryo's
 //! installer of the French CD with a list of 15 language codes
-//! (`setup.ins`); its `Datas\loc\text\` holds `por` alone.
+//! (`setup.ins`); its `Datas\loc\text\` holds `por` alone. The Swedish
+//! CD (*Den nya världen*, Toptronics, 2002) has the same installer, and
+//! `swe`.
 
 use crate::exe::Build;
 use crate::A3Files;
@@ -43,6 +45,7 @@ pub enum Language {
     Spanish,
     Italian,
     Portuguese,
+    Swedish,
 }
 
 impl Language {
@@ -58,6 +61,7 @@ impl Language {
             b"esp" => Some(Language::Spanish),
             b"ita" => Some(Language::Italian),
             b"por" => Some(Language::Portuguese),
+            b"swe" => Some(Language::Swedish),
             _ => None,
         }
     }
@@ -71,6 +75,7 @@ impl Language {
             Language::Spanish => "Spanish",
             Language::Italian => "Italian",
             Language::Portuguese => "Portuguese",
+            Language::Swedish => "Swedish",
         }
     }
 }
@@ -231,6 +236,7 @@ mod tests {
         assert_eq!(Language::from_code(b"ITA"), Some(Language::Italian));
         assert_eq!(Language::from_code(b"USA"), Some(Language::English));
         assert_eq!(Language::from_code(b"por"), Some(Language::Portuguese));
+        assert_eq!(Language::from_code(b"SWE"), Some(Language::Swedish));
         assert_eq!(Language::from_code(b"rus"), None);
         assert_eq!(edition_label(b, None), "Atlantis III, GOG.com");
         assert_eq!(
