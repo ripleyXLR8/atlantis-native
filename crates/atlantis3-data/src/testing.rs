@@ -187,6 +187,29 @@ pub fn a5_it_collection() -> Option<PathBuf> {
     }
 }
 
+/// The variable naming *Atlantis Evolution*'s Italian *Atlantis
+/// Collection* installed folder (the 2004 program: `Atlantis
+/// Evolution.exe` beside `cd0` .. `cd4`, as its Inno Setup installer lays
+/// them out).
+pub const A4_IT_COLLECTION_VAR: &str = "ATLANTIS4_IT_COLLECTION";
+
+/// That folder from `ATLANTIS4_IT_COLLECTION`; as [`a5_dvd_fr`], its
+/// absence never fails a test.
+pub fn a4_it_collection() -> Option<PathBuf> {
+    match std::env::var_os(A4_IT_COLLECTION_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(
+                std::io::stderr(),
+                "SKIPPED {test}: {A4_IT_COLLECTION_VAR} not set"
+            );
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
