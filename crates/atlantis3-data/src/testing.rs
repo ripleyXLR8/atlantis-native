@@ -153,6 +153,18 @@ pub fn cd_sv() -> Option<(PathBuf, PathBuf)> {
     Some((dir.join("installed"), dir))
 }
 
+/// The variable naming the Czech CD's folder (GAME4U Speciál 10, 2003):
+/// its three `.bin` / `.cue` images and `installed\` (the first disc's
+/// `data1.cab` extracted).
+pub const CD_CS_VAR: &str = "ATLANTIS3_CD_CS";
+
+/// The Czech CD's installed folder and its discs' folder (from
+/// `ATLANTIS3_CD_CS`); its absence never fails a test ([`optional_dir`]).
+pub fn cd_cs() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_CS_VAR)?;
+    Some((dir.join("installed"), dir))
+}
+
 /// The installed game's folder from `ATLANTIS3_DATA`, or `None` after
 /// [`missing`].
 pub fn install_dir() -> Option<PathBuf> {

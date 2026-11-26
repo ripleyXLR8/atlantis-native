@@ -2,13 +2,14 @@
 //!
 //! As for *Atlantis II* (`atlantis2_data::exe`), a build is recognised by
 //! its size and PE timestamp and confirmed by the MD5 of the whole file.
-//! Five builds are known: GOG.com's `Game.exe` (2003) as GOG ships it
+//! Six builds are known: GOG.com's `Game.exe` (2003) as GOG ships it
 //! since 2022, the reference every address in this crate's comments
 //! belongs to; the French retail CD's `Atlantis3.exe` (2001,
 //! [`Release::Cd2001`]); the North American CD's `Beyond Atlantis 2.exe`
 //! (*Beyond Atlantis II*, DreamCatcher, 2001, [`Release::CdUs2001`]); the
 //! Portuguese CD's `Atlantis3.exe` (*O Novo Mundo*, 2001,
-//! [`Release::CdPt2001`]); and
+//! [`Release::CdPt2001`]); the Czech CD's `Atlantis3.exe` (GAME4U
+//! Speciál 10, [`Release::CdCs2001`]); and
 //! GOG's earlier `Game.exe` of the same program (its 2015 and 2018
 //! builds), which the Italian *Atlantis Collection* DVD (2014) installs.
 //! GOG's folder also
@@ -70,6 +71,14 @@ pub enum Release {
     /// the CD's thumbnail row scan (@ 0x006a6a30). The Swedish CD has the
     /// same file (atlantis3-re `discs/cd-sv.md`).
     CdPt2001,
+    /// The Czech CD's program (GAME4U Speciál 10, 2003; built 2001-10-10;
+    /// atlantis3-re `binaries/atlantis3-cd-cs-3379200.md`): the North
+    /// American program's game code a week before it (9687 of its 9709
+    /// functions the same, masked), the French CD's C runtime and size, its
+    /// start-up reading `CRYO\ATLANTIS 3` or `DreamCatcher\BEYOND
+    /// ATLANTIS 2`. Every behaviour Native follows is the North American
+    /// program's.
+    CdCs2001,
     /// GOG.com's `Game.exe` (2003-04-24), the reference; its 2015 / 2018
     /// file too, the same program but for three edits of the 2022 file
     /// ([`Build::cfg_name`], [`Build::thumb_rows`], and a window message
@@ -113,8 +122,9 @@ pub struct Build {
 /// Italian *Atlantis Collection* DVD (2014) installs; the North American
 /// CD (*Beyond Atlantis II*, three CDs, 2001) installs the fourth; the
 /// Portuguese CD (*O Novo Mundo*, three CDs, 2001) and the Swedish CD
-/// (*Den nya världen*, three CDs, 2002) the fifth.
-pub const KNOWN_BUILDS: [Build; 5] = [
+/// (*Den nya världen*, three CDs, 2002) the fifth; the Czech CD (GAME4U
+/// Speciál 10, three CDs, 2003) the sixth.
+pub const KNOWN_BUILDS: [Build; 6] = [
     Build {
         id: "atlantis3-gog-fr-3473408",
         label: "Atlantis III, GOG.com",
@@ -193,6 +203,22 @@ pub const KNOWN_BUILDS: [Build; 5] = [
         // The North American CD's encoder (@ 0x006a6a30).
         thumb_rows: RowScan::Original,
     },
+    Build {
+        id: "atlantis3-cd-cs-3379200",
+        label: "Atlantis III, CD (GAME4U Speciál 10)",
+        size: 3_379_200,
+        // 2001-10-10 10:49:42 UTC.
+        pe_timestamp: 0x3bc4_27c6,
+        md5: [
+            0x34, 0x4f, 0x21, 0x49, 0xce, 0x56, 0x09, 0x6f, 0x19, 0x88, 0xb1, 0x62, 0x1a, 0x00,
+            0xbc, 0x10,
+        ],
+        exe_name: "Atlantis3.exe",
+        release: Release::CdCs2001,
+        cfg_name: "Atlantis3.cfg",
+        // The North American CD's encoder.
+        thumb_rows: RowScan::Original,
+    },
 ];
 
 impl Release {
@@ -201,7 +227,7 @@ impl Release {
     pub fn disc_test(self) -> bool {
         matches!(
             self,
-            Release::Cd2001 | Release::CdUs2001 | Release::CdPt2001
+            Release::Cd2001 | Release::CdUs2001 | Release::CdPt2001 | Release::CdCs2001
         )
     }
 
@@ -245,7 +271,9 @@ impl Release {
             Release::Cd2001 => "Scarab\u{e9}e.spr",
             // The North American CD's program has the 2003 name
             // (@ 0x00700884); its data has both files.
-            Release::CdUs2001 | Release::CdPt2001 | Release::Gog2003 => "Scarabee.spr",
+            Release::CdUs2001 | Release::CdPt2001 | Release::CdCs2001 | Release::Gog2003 => {
+                "Scarabee.spr"
+            }
         }
     }
 }
@@ -413,11 +441,16 @@ mod tests {
             "e5e89f926f80be9ce06a324f27018e89"
         );
         assert_eq!(
+            hex(&KNOWN_BUILDS[5].md5),
+            "344f2149ce56096f1988b1621a00bc10"
+        );
+        assert_eq!(
             KNOWN_BUILDS.map(|b| (b.cfg_name, b.thumb_rows)),
             [
                 ("Atlantis3.cfg", RowScan::W10),
                 ("Atlantis3.cfg", RowScan::Original),
                 ("Atlantis4.cfg", RowScan::Original),
+                ("Atlantis3.cfg", RowScan::Original),
                 ("Atlantis3.cfg", RowScan::Original),
                 ("Atlantis3.cfg", RowScan::Original),
             ]
@@ -437,6 +470,10 @@ mod tests {
         assert!(pt.disc_test() && pt.isis_cursor_reset());
         assert!(!pt.cd_intro_table() && !pt.cd_subject_columns() && !pt.flips_after_video());
         assert_eq!(pt.scarab_bank(), "Scarabee.spr");
+        let cs = Release::CdCs2001;
+        assert!(cs.disc_test() && cs.isis_cursor_reset());
+        assert!(!cs.cd_intro_table() && !cs.cd_subject_columns() && !cs.flips_after_video());
+        assert_eq!(cs.scarab_bank(), "Scarabee.spr");
         let cd = Release::Cd2001;
         assert!(cd.cd_intro_table() && cd.cd_subject_columns() && cd.flips_after_video());
         assert!(!cd.isis_cursor_reset() && Release::Gog2003.isis_cursor_reset());
