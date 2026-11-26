@@ -113,7 +113,8 @@ release (亞特蘭提斯2, Interwise, 2000), the GOG.com edition and the Italian
 English, French, German or Spanish, the French CD (2001, three CDs), the
 North American CD (*Beyond Atlantis II*, DreamCatcher, 2001, three CDs), the
 Portuguese CD (*O Novo Mundo*, Playgames, 2001, three CDs), the Swedish
-CD (*Den nya världen*, Toptronics, 2002, three CDs) and
+CD (*Den nya världen*, Toptronics, 2002, three CDs), the Czech CD (GAME4U
+Speciál 10, 2003, three CDs) and
 the Italian *Atlantis Collection* DVD (installed);
 other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
 GOG.com's release, in English, French, German, Italian and Spanish, and
@@ -182,10 +183,11 @@ it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 German*, *Atlantis III, CD, French*, *Atlantis III, CD, English
 (DreamCatcher, 2001)*, *Atlantis III, Portuguese CD, Portuguese
 (Playgames, 2001)*, *Atlantis III, Swedish CD, Swedish (Toptronics,
-2002)*, *Atlantis III, Atlantis Collection, Italian*, *Atlantis
-Evolution, GOG.com, English* or *Atlantis Evolution (2004), CD, English*
-or *Atlantis Evolution (2004), Atlantis Collection, Italian* (the
-original 2004 program, in progress: see
+2002)*, *Atlantis III, Czech CD, Czech (GAME4U Speciál 10, 2003)*,
+*Atlantis III, Atlantis Collection, Italian*, *Atlantis Evolution,
+GOG.com, English* or *Atlantis Evolution (2004), CD, English* or
+*Atlantis Evolution (2004), Atlantis Collection, Italian* (the original
+2004 program, in progress: see
 [The 2004 CD](#the-2004-cd-in-progress)) or *The Secrets of Atlantis :
 L'Héritage sacré (2006), DVD image, French*, and its folder: the
 game's name in gold capitals, the edition beside it (why the folder does
@@ -336,7 +338,7 @@ What to pick:
   Italian *Atlantis Collection*: the installation folder (the one
   holding `Game.exe` and `Datas`).
 - *Atlantis III*, the French, North American (*Beyond Atlantis II*),
-  Portuguese or Swedish CD (2001 / 2002, three CDs): the folder of the installed game (the
+  Portuguese, Swedish or Czech CD (2001 to 2003, three CDs): the folder of the installed game (the
   one holding `Atlantis3.exe`, or `Beyond Atlantis 2.exe`, and `Datas`), with the
   images of the three CDs (`.iso`, `.bin`, `.img`, `.mdf` or `.nrg`) in
   it or in a folder inside it, or copies of the CDs (for example folders
@@ -997,6 +999,16 @@ and data but for the Swedish voices, texts and films. It installs and
 opens the same way (ISO images); the game library shows it as *Atlantis
 III, Swedish CD, Swedish (Toptronics, 2002)*, telling it from the
 Portuguese CD by the language of its installed data.
+
+**The Czech CD.** *Atlantis 3* as the magazine GAME4U's *Speciál 10*
+(2003, three CDs) installs and opens as the French CD does (the `.bin`
+images of a dump are read as they are). The game library shows it as
+*Atlantis III, Czech CD, Czech (GAME4U Speciál 10, 2003)*. Its voices and texts are
+Czech (drawn in the Central European character set) and its intro ends
+with a Czech part (`intro_cze.hnm`); the rest is the North American CD's
+data. Its program (3,379,200 bytes like the French CD's, but another
+file: MD5 `344f2149ce56096f1988b1621a00bc10`) is the North American CD's
+game code a week earlier, and Atlantis Native plays it as that one.
 
 **How it was checked.** The port follows the original program's code,
 address by address, and automated tests replay what that code computed
