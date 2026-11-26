@@ -84,7 +84,7 @@ atlantis2.exe), with the images of its four CDs (or copies of the CDs) in it or 
 folder inside it.\n\
 \u{2022} Atlantis III: GOG.com's installation folder or the one the Italian Atlantis Collection \
 DVD's installer created (the one with Game.exe and Datas), or \
-the folder where the French CD installed it (the one with Atlantis3.exe and Datas) or the \
+the folder where the French or Portuguese CD installed it (the one with Atlantis3.exe and Datas) or the \
 North American CD (Beyond Atlantis II, the one with Beyond Atlantis 2.exe and Datas), with the \
 images of its three CDs (or copies of the CDs) in it or in a folder inside it.\n\
 \u{2022} Atlantis Evolution: GOG.com's installation folder (the one with Atlantis Evolution.exe \
@@ -398,7 +398,8 @@ pub fn explain_atlantis3(dir: &Path, err: &atlantis3_data::files::OpenError) -> 
              ({e}): an edition of the game that is not supported yet.\n\n\
              Supported: GOG.com's release (English, French, German or Spanish), the French \
              CD (2001, three CDs), the North American CD (Beyond Atlantis II, DreamCatcher, \
-             2001, three CDs) and the Italian Atlantis Collection DVD (2014, installed). \
+             2001, three CDs), the Portuguese CD (O Novo Mundo, Playgames, 2001, three CDs) \
+             and the Italian Atlantis Collection DVD (2014, installed). \
              Other editions are unknown to the \
              project: an issue on GitHub with the program's size and MD5 helps."
         ),

@@ -950,6 +950,33 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 
+    /// The Portuguese CD (*O Novo Mundo*): its installed folder refused
+    /// without its discs, opened with the folder of its three CloneCD
+    /// images and started to the start page.
+    #[test]
+    fn the_portuguese_cd_with_its_discs() {
+        let Some((dir, discs)) = atlantis3_data::testing::cd_pt() else {
+            return;
+        };
+        let name = "Atlantis III, CD (October 2001 build), Portuguese";
+        assert_eq!(label(&dir).unwrap(), name);
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-cdpt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let e = open_in(&dir, &base, false).err().unwrap();
+        assert!(e.contains("none of its discs"), "{e}");
+        let (mut game, label) =
+            open_in_with_discs(&dir, std::slice::from_ref(&discs), &base, false).unwrap();
+        assert_eq!(label, name);
+        assert_eq!(
+            game.files().discs().map(|d| d.disc_numbers()),
+            Some(vec![1, 2, 3])
+        );
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
     /// The Italian *Atlantis Collection*'s installed folder: its edition,
     /// started to the start page; the player's `Atlantis3.cfg` read with
     /// `fix_cfg_name`, the defaults with `--original` (the program's

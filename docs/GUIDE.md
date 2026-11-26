@@ -111,7 +111,8 @@ Speciál 3*), the Traditional Chinese and English CDs of the Taiwanese
 release (亞特蘭提斯2, Interwise, 2000), the GOG.com edition and the Italian *Atlantis Collection* DVD (see
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
 English, French, German or Spanish, the French CD (2001, three CDs), the
-North American CD (*Beyond Atlantis II*, DreamCatcher, 2001, three CDs) and
+North American CD (*Beyond Atlantis II*, DreamCatcher, 2001, three CDs), the
+Portuguese CD (*O Novo Mundo*, Playgames, 2001, three CDs) and
 the Italian *Atlantis Collection* DVD (installed);
 other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
 GOG.com's release, in English, French, German, Italian and Spanish, and
@@ -178,10 +179,11 @@ Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
 German*, *Atlantis III, CD, French*, *Atlantis III, CD, English
-(DreamCatcher, 2001)*, *Atlantis III, Atlantis Collection, Italian*,
-*Atlantis Evolution, GOG.com, English* or *Atlantis Evolution (2004),
-CD, English* or *Atlantis Evolution (2004), Atlantis Collection,
-Italian* (the original 2004 program, in progress: see
+(DreamCatcher, 2001)*, *Atlantis III, CD (October 2001 build),
+Portuguese*, *Atlantis III, Atlantis Collection, Italian*, *Atlantis
+Evolution, GOG.com, English* or *Atlantis Evolution (2004), CD, English*
+or *Atlantis Evolution (2004), Atlantis Collection, Italian* (the
+original 2004 program, in progress: see
 [The 2004 CD](#the-2004-cd-in-progress)) or *The Secrets of Atlantis :
 L'Héritage sacré (2006), DVD image, French*, and its folder: the
 game's name in gold capitals, the edition beside it (why the folder does
@@ -331,8 +333,8 @@ What to pick:
 - *Atlantis III*, GOG.com (English, French, German or Spanish) or the
   Italian *Atlantis Collection*: the installation folder (the one
   holding `Game.exe` and `Datas`).
-- *Atlantis III*, the French CD or the North American CD (*Beyond
-  Atlantis II*; 2001, three CDs): the folder of the installed game (the
+- *Atlantis III*, the French, North American (*Beyond Atlantis II*) or
+  Portuguese CD (2001, three CDs): the folder of the installed game (the
   one holding `Atlantis3.exe`, or `Beyond Atlantis 2.exe`, and `Datas`), with the
   images of the three CDs (`.iso`, `.bin`, `.img`, `.mdf` or `.nrg`) in
   it or in a folder inside it, or copies of the CDs (for example folders
@@ -973,6 +975,19 @@ Native plays it so:
   intro are GOG.com's program's: the case is drawn (the data has the
   pictures under both names), a ninth subject is clickable, the pointer
   is reset in the Isis views, the intro is `intro_usa.hnm` alone.
+
+**The Portuguese CD.** *Atlantis III: O Novo Mundo* (Playgames, 2001,
+three CDs) installs and opens as the French CD does (the folder with
+`Atlantis3.exe` and `Datas`, the three CD images in it or in a folder
+inside it; a CloneCD dump's `.img` files are read as they are). The game
+library shows it as *Atlantis III, CD (October 2001 build), Portuguese*. Its
+voices, texts and films are Portuguese, the rest GOG.com's data (its
+English scripts and films where GOG.com's French and English differ). Its
+program (3,424,256 bytes, MD5 `e5e89f926f80be9ce06a324f27018e89`) is the
+North American CD's rebuilt two weeks later, and Atlantis Native plays it
+as that one: the discs asked for as on the French CD, the scarab case,
+the subjects menu, the Isis puzzle's pointer and the intro (`intro.hnm`)
+as GOG.com's program.
 
 **How it was checked.** The port follows the original program's code,
 address by address, and automated tests replay what that code computed
