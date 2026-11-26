@@ -114,7 +114,8 @@ English, French, German or Spanish, the French CD (2001, three CDs) and
 the Italian *Atlantis Collection* DVD (installed);
 other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
 GOG.com's release, in English, French, German, Italian and Spanish, and
-the 2004 CD (English, in progress) (see
+the 2004 CD (English, in progress) and the Italian *Atlantis Collection*
+DVD's 2004 program (installed, with the English CD's second disc) (see
 [Atlantis Evolution](#atlantis-evolution)). For The Secrets of Atlantis:
 the French DVD (2006) and the international DVD (English, German,
 Italian, Spanish), their drive, files, image or installation (see
@@ -177,7 +178,8 @@ it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
 German*, *Atlantis III, CD, French*, *Atlantis III, Atlantis Collection,
 Italian*, *Atlantis Evolution, GOG.com, English* or *Atlantis Evolution
-(2004), CD, English* (the original 2004 program, in progress: see
+(2004), CD, English* or *Atlantis Evolution (2004), Atlantis Collection,
+Italian* (the original 2004 program, in progress: see
 [The 2004 CD](#the-2004-cd-in-progress)) or *The Secrets of Atlantis :
 L'Héritage sacré (2006), DVD image, French*, and its folder: the
 game's name in gold capitals, the edition beside it (why the folder does
@@ -350,7 +352,9 @@ What to pick:
   to `cd4`, about 4 GB, read a part at a time). Its saves and
   `Atlantis4.cfg` are kept in the browser under
   `atlantis-native/atlantis-evolution-2004/`; its controls are the
-  desktop's (see [The 2004 CD](#the-2004-cd-in-progress)).
+  desktop's (see [The 2004 CD](#the-2004-cd-in-progress)). The Italian
+  *Atlantis Collection*'s install is taken the same way once the English
+  CD's `cd2` folder is copied into it.
 - *The Secrets of Atlantis*, the French or the international DVD: the DVD's image (an
   `.iso`: pick it with *or choose the CD image files* under the folder
   button, or pick the folder holding it), the DVD drive or a copy of the
@@ -1213,6 +1217,35 @@ in its first two seconds goes back to the library's screen.
 options) are in `atlantis-evolution-2004/` in the per-user data folder;
 until its menus write the player's own, the installation's
 `datas\Atlantis4.cfg` is read. The game's folder is never written.
+
+#### The Italian Atlantis Collection (2004 program)
+
+The Italian DVD compilation of 2014 (*Atlantis Collection*) holds
+*Atlantis Evolution* in its `Atlantis 4` folder as an installer
+(`setup.exe` and `setup-1.bin` to `setup-4.bin`): the 2004 program, not
+GOG.com's, rebuilt on 2004-10-07 (`Atlantis Evolution.exe` of 3,022,848
+bytes, MD5 `13c57a6750a2e56ef187116a9c031ac5`), with Italian texts,
+voices and films. The game library shows it as *Atlantis Evolution
+(2004), Atlantis Collection, Italian*; it plays as the CD does (above).
+
+**The second CD is missing.** The collection's installer does not
+install the places, films and music of the game's second CD: its
+`cd2\datas\` holds only the Italian films (`loc\bink\ita`), and the
+story moves to that disc at chapter 10. Atlantis Native says so when
+the folder is chosen, and does not start it. The English 2004 CD
+(The Adventure Company, or the European English CD) holds those files:
+install it (on Windows, or with Wine), then copy the `cd2` folder of
+its installation into the collection's installation folder, merging it
+with the `cd2` folder already there (the Italian `cd2\datas\loc\bink\ita`
+stays; the English `loc\bink\gbr` it brings is not used). The English
+CD's other three discs hold the same language-free files as the
+collection's but for seven (the language menu's pictures, one chapter
+script and one subtitle timing file), so its second disc is the closest
+copy known of the one the collection lacks. Its eleven films with
+Italian voices then take their subtitle timings from the English disc
+(the collection retimed one such file on the third disc, so the Italian
+second disc may have differed there). Then add the folder to the
+library again.
 
 ## The Secrets of Atlantis
 

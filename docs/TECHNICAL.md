@@ -4775,6 +4775,36 @@ below it) and the folder picker explains them
 line opens it; `--headless <folder>` runs its logos and start page
 without a window; `--evolution2004 <folder>` is the development entry.
 
+**The Italian *Atlantis Collection* (2014).** Its Inno Setup installer
+(`Atlantis 4\setup.exe`, one language) installs the same layout and
+registry values (`Install` = `FLA`, `Language` = `ita`) with the
+2004 program rebuilt on 2004-10-07, atlantis4-collection-it-3022848
+(3,022,848 bytes, PE timestamp 0x41654813, MD5
+`13c57a6750a2e56ef187116a9c031ac5`), the second entry of
+`evolution2004::KNOWN_BUILDS`: *Atlantis Evolution (2004), Atlantis
+Collection, Italian* (the label of *Atlantis III*'s collection, the
+build's name then its language). Function by function it is the CD's
+program but for three changes (atlantis4-re `binaries/README.md`): its
+version line, a key test in the logos (Escape or Space ends the logo
+playing, as Native already does for the CD), and Czech (`tch`) among the
+languages whose font character set follows the language. The language
+comes from `loc\text\ita\` alone (`install::install_registry`), as for
+the CD. Its installer leaves out disc 2's world data: `cd2\datas\`
+holds only `loc\bink\ita\`, not the 1142 files of `spw`, `warp`,
+`binkdial`, `bink`, `music`, `binktraj`, `spf` and `map`, which the
+scripts need from chapter 10 (`changecd=2`).
+`evolution2004::missing_disc2` names the missing folders and
+`check_disc2` (`MissingDisc2`) explains them: `a3::open_evolution_2004`,
+the folder picker and the browser's `start_evolution_2004` refuse the
+install with that text. The English CD's installation holds those files
+under the same names, none of them already in the collection's install,
+and the two editions' other discs share every file outside `loc` but
+seven (the language menu's pictures, one chapter script and one subtitle
+timing file): the player copies its `cd2` folder into the collection's,
+and the merged folder opens (`tests/evolution2004_it_collection.rs`, the
+app's `the_italian_collection_of_evolution_2004`, with
+`ATLANTIS4_IT_COLLECTION` and `ATLANTIS4_CD`).
+
 **In the browser.** `web_layout::a4cd_install` finds the install among
 the picked files (`atlantis evolution.exe` beside `cd0/datas/scenar/`),
 and `a3_web::start_evolution_2004` runs it in *Atlantis III*'s page

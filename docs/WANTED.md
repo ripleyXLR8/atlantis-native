@@ -110,13 +110,15 @@ languages), the 2004 North American CD of The Adventure Company
 in progress) and the European English CD (ATLEENCD1 … 4, Redump
 [111784](http://redump.org/disc/111784/)–111787), whose four discs hold
 the North American discs' files byte for byte (checked on a dump that
-matches Redump's).
+matches Redump's), and the Italian *Atlantis Collection* DVD (2014),
+whose installer leaves out the second CD's world data (supported with
+the English CD's second disc).
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|
 | 🔴 **most wanted** | *Atlantis Evolution*, French | France | 2004 | 4 CD | French voices and texts; no dump of the first edition is known |
 | 🟠 wanted | *Atlantis Evolution*, Hits Collection | France | — | 4 CD | Barcode 5390102491123; Redump [22045](http://redump.org/disc/22045/)–22048 |
-| 🟠 wanted | *Atlantis Evolution*, Italian | Italy | 2004 | 4 CD | Redump [113743](http://redump.org/disc/113743/)–113746 |
+| 🟠 wanted | *Atlantis Evolution*, Italian | Italy | 2004 | 4 CD | Redump [113743](http://redump.org/disc/113743/)–113746. Its second disc would complete the Italian *Atlantis Collection*'s install, which lacks it, with the Italian edition's own files |
 | 🟠 wanted | *Atlantis Evolution*, Atari Real Value | Italy | — | 1 DVD | Barcode 8033064531045; Redump [71146](http://redump.org/disc/71146/) |
 | 🟠 wanted | *Atlantis Evolution*, German, Spanish or other languages | — | 2004 | CD | Any box: their program has never been seen |
 
