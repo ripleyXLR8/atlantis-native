@@ -1071,8 +1071,7 @@ mod tests {
         };
         let own = own_data_dir("atlantis5-it-collection");
         let d = own.dir.clone();
-        let want =
-            "The Secrets of Atlantis (2014), Italian Atlantis Collection, installed, Italian";
+        let want = "The Secrets of Atlantis (2014), Atlantis Collection, installed, Italian";
         assert_eq!(
             crate::setup::kind_of(&root),
             Some(crate::setup::GameKind::Atlantis5)
@@ -1097,7 +1096,7 @@ mod tests {
         let (src, label) = crate::a5::open(&root).unwrap();
         assert_eq!(crate::a5::language(&src), "italian");
         assert!(
-            label.starts_with("The Secrets of Atlantis (2006), Italian Atlantis Collection; Tree;"),
+            label.starts_with("The Secrets of Atlantis (2006), Atlantis Collection; Tree;"),
             "{label}"
         );
         assert!(
@@ -1126,7 +1125,7 @@ mod tests {
         assert_eq!(
             labels,
             ["English", "Italian"].map(|l| format!(
-                "The Secrets of Atlantis (2014), Italian Atlantis Collection, installed, {l}"
+                "The Secrets of Atlantis (2014), Atlantis Collection, installed, {l}"
             ))
         );
     }

@@ -1272,7 +1272,7 @@ original's installer asks for one language and installs it, and the
 game has no language option of its own, so here each language is an
 entry to play. The CDs are *The Secrets of Atlantis (2007), 3 CDs,
 English*, and the Italian *Atlantis Collection*'s install *The Secrets
-of Atlantis (2014), Italian Atlantis Collection, installed, Italian*
+of Atlantis (2014), Atlantis Collection, installed, Italian*
 (or the language installed). The international DVD started from the command line
 without a choice plays the system's language when it is one of the
 four, else English; its cabinet's path chooses one

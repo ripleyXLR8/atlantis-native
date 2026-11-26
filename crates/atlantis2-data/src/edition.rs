@@ -429,7 +429,7 @@ mod tests {
         );
         assert_eq!(
             edition_label(collection, Some(Language::Italian)),
-            "Atlantis II, Italian Collection (patch 1.01)"
+            "Atlantis II, Atlantis Collection, Italian (patch 1.01)"
         );
         assert_eq!(
             edition_label(pl, Some(Language::Polish)),

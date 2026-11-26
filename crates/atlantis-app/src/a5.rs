@@ -68,7 +68,7 @@ pub fn open(path: &Path) -> Result<(Atlantis5Source, String), String> {
 /// [`crate::a5_copy`], "DVD, copied to this computer" (the CDs: "CD
 /// images", "CDs, installed", "CDs, copied to this computer"); the
 /// Italian *Atlantis Collection*'s install, "The Secrets of Atlantis
-/// (2014), Italian Atlantis Collection, installed, Italian".
+/// (2014), Atlantis Collection, installed, Italian".
 pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError> {
     edition(path).map(|e| e.0)
 }
@@ -83,9 +83,7 @@ pub fn edition(path: &Path) -> Result<(String, bool), atlantis3_data::atlantis5:
     let copy = crate::a5_copy::is_copy(&atlantis3_data::atlantis5::place_root(path));
     let cds = src.edition() == Edition::NorthAmericanCds;
     let medium = match (src.form(), cds) {
-        _ if src.edition() == Edition::ItalianCollection => {
-            "Italian Atlantis Collection, installed"
-        }
+        _ if src.edition() == Edition::ItalianCollection => "Atlantis Collection, installed",
         (Form::DiscFolder, false) if copy => "DVD, copied to this computer",
         (Form::DiscFolder, false) => "DVD",
         (Form::DiscImage, false) => "DVD image",

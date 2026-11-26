@@ -260,7 +260,7 @@ pub const KNOWN_BUILDS: [Build; 11] = [
     },
     Build {
         id: "atlantis2-collection-it-2183168",
-        label: "Atlantis II, Italian Collection (patch 1.01)",
+        label: "Atlantis II, Atlantis Collection (patch 1.01)",
         size: 2_183_168,
         pe_timestamp: 0x3832_8ed1,
         md5: [

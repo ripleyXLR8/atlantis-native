@@ -34,7 +34,7 @@ fn the_install_opens_in_italian_with_its_program() {
     assert_eq!(build.pe_timestamp, 0x453f_5758);
     assert_eq!(
         build.label,
-        "The Secrets of Atlantis (2006), Italian Atlantis Collection"
+        "The Secrets of Atlantis (2006), Atlantis Collection"
     );
     assert_eq!(s.edition(), Edition::ItalianCollection);
     // One language: no place per language.

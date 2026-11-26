@@ -84,7 +84,7 @@ L'Héritage sacré (2006), DVD, French*, one entry per language, *The
 Secrets of Atlantis: The Sacred Legacy (2006), DVD, German*, or *The
 Secrets of Atlantis (2007), 3 CDs, English*; the Italian *Atlantis
 Collection* DVD (2014) from its installed folder, as *The Secrets of
-Atlantis (2014), Italian Atlantis Collection, installed, Italian*; on the desktop the DVD (or the three CDs, one after the other) can be copied to the computer once
+Atlantis (2014), Atlantis Collection, installed, Italian*; on the desktop the DVD (or the three CDs, one after the other) can be copied to the computer once
 (**Copy to this computer** in the game library), so that it plays from
 the hard disk. The DVD's own Lua 5.0 scripts (compiled on the French
 DVD, source on the international one) run as they are; the nine
@@ -341,7 +341,7 @@ For *Atlantis II*:
 | CD, Taiwanese release (亞特蘭提斯2, Interwise, 2000, 4 CDs with two disc 1s): the Traditional Chinese disc 1 (the patch 1.01 program; texts in Big5) | Traditional Chinese subtitles and menus, English voices | the same as the French CD; the subtitles are drawn with the player's `mingliu.ttc` when it is in the installed folder, else with the bundled Noto Serif TC |
 | CD, the same release's English disc 1 (the Polish CD's program) | English | the same as the French CD; with both disc 1s in the folder, the one in the installed language is used |
 | [GOG.com](https://www.gog.com/) (version 1.01; the builds of 2018, June 2022 and July 2022) | English, French, German, Spanish (one executable for all four) | the installation folder |
-| *Atlantis Collection*, Italian DVD compilation (2014; shown as *Italian Collection (patch 1.01)*, its program being version 1.01 patched almost as GOG's 2018 build) | Italian | the folder its installer creates for *Atlantis 2 - Beyond Atlantis* (with `Game.exe` and `DATAS_A2`) |
+| *Atlantis Collection*, Italian DVD compilation (2014; shown as *Atlantis II, Atlantis Collection, Italian (patch 1.01)*, its program being version 1.01 patched almost as GOG's 2018 build) | Italian | the folder its installer creates for *Atlantis 2 - Beyond Atlantis* (with `Game.exe` and `DATAS_A2`) |
 
 Another executable is refused with its identifiers, so that it can be
 added.

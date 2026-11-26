@@ -29,7 +29,7 @@ use atlantis_data::TextCodePage;
 use md5::{Digest, Md5};
 
 const ID: &str = "atlantis2-collection-it-2183168";
-const LABEL: &str = "Atlantis II, Italian Collection (patch 1.01)";
+const LABEL: &str = "Atlantis II, Atlantis Collection, Italian (patch 1.01)";
 const GOLDEN: &str = include_str!("golden/subtitles_101_it_collection.txt");
 const WORLDS: [(&str, i32); 5] = [("CH", 3), ("IR", 1), ("SH", 4), ("TI", 5), ("YU", 2)];
 

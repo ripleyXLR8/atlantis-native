@@ -163,7 +163,7 @@ pub const KNOWN_BUILDS: [Build; 5] = [
     // addresses, its data 0x5000 lower.
     Build {
         id: COLLECTION_BUILD,
-        label: "The Secrets of Atlantis (2006), Italian Atlantis Collection",
+        label: "The Secrets of Atlantis (2006), Atlantis Collection",
         size: 2_822_144,
         // 2006-10-25 12:23:52 UTC.
         pe_timestamp: 0x453f_5758,
