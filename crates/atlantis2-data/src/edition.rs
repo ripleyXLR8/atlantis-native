@@ -222,7 +222,7 @@ pub const KNOWN_MENU_TXT: [(u64, [u8; 16], Language); 12] = [
 pub const LANGUAGE_EDITIONS: [(&str, Language, &str); 1] = [(
     "atlantis2-cd-us-2199552",
     Language::Czech,
-    "Atlantis II, Czech CD (2000)",
+    "Atlantis II, Czech CD (Bohemia Interactive, 2000)",
 )];
 
 /// The language of a `loc\Menu.txt`, `None` when it is no known file.
@@ -242,7 +242,7 @@ pub fn language_of_menu_txt(data: &[u8]) -> Option<Language> {
 /// release's name when the build's name does not say it already
 /// ("Atlantis II, GOG.com, German (patch 1.01)"; the French CD's build
 /// is French only); an edition that shares another's build by its own
-/// name ([`LANGUAGE_EDITIONS`]: "Atlantis II, Czech CD (2000)").
+/// name ([`LANGUAGE_EDITIONS`]: "Atlantis II, Czech CD (Bohemia Interactive, 2000)").
 pub fn edition_label(build: &Build, language: Option<Language>) -> String {
     if let Some(&(_, _, name)) = LANGUAGE_EDITIONS
         .iter()
@@ -345,7 +345,7 @@ mod tests {
         // The Czech CD: the North American CD's build, its own name.
         assert_eq!(
             edition_label(us, Some(Language::Czech)),
-            "Atlantis II, Czech CD (2000)"
+            "Atlantis II, Czech CD (Bohemia Interactive, 2000)"
         );
         assert_eq!(
             edition_label(us, None),

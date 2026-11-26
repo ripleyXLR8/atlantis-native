@@ -43,7 +43,7 @@ use md5::{Digest, Md5};
 
 /// The North American CD's build: the Czech CD's program is that file.
 const ID: &str = "atlantis2-cd-us-2199552";
-const LABEL: &str = "Atlantis II, Czech CD (2000)";
+const LABEL: &str = "Atlantis II, Czech CD (Bohemia Interactive, 2000)";
 const WORLDS: [&str; 5] = ["CH", "IR", "SH", "TI", "YU"];
 
 fn folders() -> Option<(PathBuf, PathBuf)> {

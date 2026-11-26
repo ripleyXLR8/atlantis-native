@@ -1602,7 +1602,7 @@ back) into `yucatan-*.png`.
   but `loc\`: so its build is `atlantis2-cd-us-2199552` and the edition is
   told by the data, the only known Czech `Menu.txt` naming the language
   (`Language::Czech`) and the pair (build, language) the edition's name
-  (`edition::LANGUAGE_EDITIONS`: "Atlantis II, Czech CD (2000)"). Its
+  (`edition::LANGUAGE_EDITIONS`: "Atlantis II, Czech CD (Bohemia Interactive, 2000)"). Its
   `Font.txt` says `[Language] CZE`, which none of the build's language
   branches tests (`jpn` for the line break; `dut`, `esp`, `ita`, `swe` for
   the intro), so it plays as the North American CD. Its texts are
