@@ -445,7 +445,7 @@ pub const A2_DISCS_ONLY: &str = "This folder holds the discs of Atlantis II, not
 /// folder.
 pub const A3_DISCS_ONLY: &str = "This folder holds the discs of Atlantis III, not the \
     installed game.\n\nChoose the folder where Atlantis III is installed (the one with \
-    Atlantis3.exe and Datas), with the images of the three CDs (.iso, .bin, .mdf, .nrg...) \
+    Atlantis3.exe, or Beyond Atlantis 2.exe, and Datas), with the images of the three CDs (.iso, .bin, .mdf, .nrg...) \
     or copies of them in it or in a folder inside it; or a folder that holds both the \
     installed game and the discs.";
 

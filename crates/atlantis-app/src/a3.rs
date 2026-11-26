@@ -27,7 +27,8 @@
 //! the Italian *Atlantis Collection*'s installation (GOG.com's earlier
 //! `Game.exe`, Italian data);
 //! or the French retail CD's installation (`Atlantis3.exe` beside
-//! `Datas\`) with its three discs (CD images or copies of the CDs) in it,
+//! `Datas\`) or the North American CD's (`Beyond Atlantis 2.exe`) with
+//! its three discs (CD images or copies of the CDs) in it,
 //! in a folder inside it or in a `--discs <folder>`
 //! ([`atlantis3_data::discs`]).
 //!
@@ -918,6 +919,34 @@ mod tests {
         let shot = base.join("a3cd.png");
         headless(&dir, &[discs], &base, 30, Some(&shot), true, false).unwrap();
         assert!(std::fs::read(&shot).unwrap().starts_with(b"\x89PNG"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The North American CD (*Beyond Atlantis II*): its installed folder
+    /// (`Beyond Atlantis 2.exe`) refused without its discs, opened with
+    /// the folder of its three `.bin` images and started to the start
+    /// page.
+    #[test]
+    fn the_north_american_cd_with_its_discs() {
+        let Some((dir, discs)) = atlantis3_data::testing::cd_us() else {
+            return;
+        };
+        let name = "Atlantis III, CD (DreamCatcher, 2001), English";
+        assert_eq!(label(&dir).unwrap(), name);
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-cdus-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let e = open_in(&dir, &base, false).err().unwrap();
+        assert!(e.contains("none of its discs"), "{e}");
+        let (mut game, label) =
+            open_in_with_discs(&dir, std::slice::from_ref(&discs), &base, false).unwrap();
+        assert_eq!(label, name);
+        assert_eq!(
+            game.files().discs().map(|d| d.disc_numbers()),
+            Some(vec![1, 2, 3])
+        );
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
         let _ = std::fs::remove_dir_all(&base);
     }
 

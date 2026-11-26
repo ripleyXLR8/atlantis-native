@@ -26,7 +26,8 @@ pub enum GameKind {
     /// Atlantis II (`atlantis2.exe`, or GOG.com's `Game.exe`:
     /// [`atlantis2_data::files::holds_atlantis2`]).
     Atlantis2,
-    /// Atlantis III (GOG.com's `Game.exe` beside `Datas\scenar\defnames.con`:
+    /// Atlantis III (GOG.com's `Game.exe`, or a CD's program, beside
+    /// `Datas\scenar\defnames.con`:
     /// [`atlantis3_data::files::holds_atlantis3`]).
     Atlantis3,
     /// Atlantis Evolution (GOG.com's `Atlantis Evolution.exe` beside
@@ -83,7 +84,8 @@ atlantis2.exe), with the images of its four CDs (or copies of the CDs) in it or 
 folder inside it.\n\
 \u{2022} Atlantis III: GOG.com's installation folder or the one the Italian Atlantis Collection \
 DVD's installer created (the one with Game.exe and Datas), or \
-the folder where the French CD installed it (the one with Atlantis3.exe and Datas), with the \
+the folder where the French CD installed it (the one with Atlantis3.exe and Datas) or the \
+North American CD (Beyond Atlantis II, the one with Beyond Atlantis 2.exe and Datas), with the \
 images of its three CDs (or copies of the CDs) in it or in a folder inside it.\n\
 \u{2022} Atlantis Evolution: GOG.com's installation folder (the one with Atlantis Evolution.exe \
 and 3D), or the folder where its 2004 CD or the Italian Atlantis Collection DVD installed it \
@@ -395,13 +397,15 @@ pub fn explain_atlantis3(dir: &Path, err: &atlantis3_data::files::OpenError) -> 
             "{shown} holds an Atlantis III program that Atlantis Native does not know \
              ({e}): an edition of the game that is not supported yet.\n\n\
              Supported: GOG.com's release (English, French, German or Spanish), the French \
-             CD (2001, three CDs) and the Italian Atlantis Collection DVD (2014, installed). \
+             CD (2001, three CDs), the North American CD (Beyond Atlantis II, DreamCatcher, \
+             2001, three CDs) and the Italian Atlantis Collection DVD (2014, installed). \
              Other editions are unknown to the \
              project: an issue on GitHub with the program's size and MD5 helps."
         ),
         _ => format!(
             "{shown} does not hold Atlantis III ({err}): choose the folder where the game \
-             is installed, the one with Game.exe (GOG.com's) or Atlantis3.exe (the CD's) and Datas."
+             is installed, the one with Game.exe (GOG.com's), Atlantis3.exe (the French CD's) or \
+             Beyond Atlantis 2.exe (the North American CD's) and Datas."
         ),
     }
 }
@@ -977,7 +981,8 @@ mod tests {
     fn explains_atlantis3_folders() {
         let d = Path::new("/games/Atlantis 3");
         let e = explain_atlantis3(d, &atlantis3_data::files::OpenError::NoDatas);
-        assert!(e.contains("Game.exe (GOG.com's) or Atlantis3.exe"), "{e}");
+        assert!(e.contains("Game.exe (GOG.com's), Atlantis3.exe"), "{e}");
+        assert!(e.contains("Beyond Atlantis 2.exe"), "{e}");
         let e = explain_atlantis3_no_disc(d);
         assert!(e.contains("three discs"), "{e}");
         assert_eq!(GameKind::Atlantis3.name(), "Atlantis III");
