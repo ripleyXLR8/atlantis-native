@@ -67,7 +67,8 @@ pub enum Release {
     /// the North American CD's: the disc test (`CHANGECD` @ 0x0044a612),
     /// `Scarabee.spr`, the 2003 program's subject columns (@ 0x0043c0a0),
     /// warp flip test (@ 0x00440570) and Isis cursor reset (@ 0x004d1c40),
-    /// the CD's thumbnail row scan (@ 0x006a6a30).
+    /// the CD's thumbnail row scan (@ 0x006a6a30). The Swedish CD has the
+    /// same file (atlantis3-re `discs/cd-sv.md`).
     CdPt2001,
     /// GOG.com's `Game.exe` (2003-04-24), the reference; its 2015 / 2018
     /// file too, the same program but for three edits of the 2022 file
@@ -111,7 +112,8 @@ pub struct Build {
 /// (2015-01-14), every language (GOG's manifests give this MD5), which the
 /// Italian *Atlantis Collection* DVD (2014) installs; the North American
 /// CD (*Beyond Atlantis II*, three CDs, 2001) installs the fourth; the
-/// Portuguese CD (*O Novo Mundo*, three CDs, 2001) the fifth.
+/// Portuguese CD (*O Novo Mundo*, three CDs, 2001) and the Swedish CD
+/// (*Den nya världen*, three CDs, 2002) the fifth.
 pub const KNOWN_BUILDS: [Build; 5] = [
     Build {
         id: "atlantis3-gog-fr-3473408",
