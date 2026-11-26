@@ -84,7 +84,10 @@ Traditional Chinese / English CDs (亞特蘭提斯2, Interwise, 2000), GOG.com
 
 🟢 **Already supported or tried:** GOG.com (English, French, German,
 Spanish), the French CD (Cryo, 2001, three CDs, Redump
-[22042](http://redump.org/disc/22042/)) and the Italian *Atlantis
+[22042](http://redump.org/disc/22042/)), the North American CD (*Beyond
+Atlantis II: New Worlds Await You…*, DreamCatcher, 2001, three CDs, Redump
+[62557](http://redump.org/disc/62557/)–62559; its own program,
+`Beyond Atlantis 2.exe`) and the Italian *Atlantis
 Collection* DVD (2014; its installer's folder, whose `Game.exe` is GOG.com's
 2015 / 2018 one). Every other edition is unknown: its program is refused
 with its size and MD5. The Italian 3-CD re-release below would tell
@@ -93,7 +96,6 @@ whether the Italian voices and films are the collection's.
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|
 | 🔴 **most wanted** | *Atlantis III: The New World* | Europe, Cryo | 2001 | 3 CD | AT3ENCD1 … 3; barcode 3554540163024; Redump [71007](http://redump.org/disc/71007/) |
-| 🔴 **most wanted** | *Beyond Atlantis II: New Worlds Await You…* | USA, DreamCatcher | 2001 | 3 CD | UPC 625904328205; ISBN 1-55345-098-1; Redump [62557](http://redump.org/disc/62557/)–62559 |
 | 🔴 **most wanted** | any DVD edition | — | — | DVD | The program knows a DVD with larger (1024-pixel) panoramas; which box holds it is not known. A disc with a file named `Atlantis1024.dvd` at its root is the one |
 | 🟠 wanted | *Atlantis III: Die neue Welt*, re-release | Germany | — | 1 DVD | Barcode 4019393958269; Redump [65418](http://redump.org/disc/65418/) |
 | 🟠 wanted | *Atlantis III: The New World*, version 1.11 | Europe, Dice | — | 3 CD | DCG 901660; barcode 8711539016609; Redump [70768](http://redump.org/disc/70768/) |
