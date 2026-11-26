@@ -4505,6 +4505,10 @@ registry values, the discs, every file against atlantis3-re's inventory,
 the disc test's copies), `crates/atlantis3-engine/tests/cd_pt.rs` (the
 intro `intro.hnm`, a new game on disc 2 and its save, the scarab case,
 the ANSI fonts) and `atlantis-app`'s `the_portuguese_cd_with_its_discs`.
+The Swedish CD (2002) has the same `Atlantis3.exe` and the same data but
+`loc\…\swe\` (`install::Language::Swedish`); its tests are the same on
+`ATLANTIS3_CD_SV` (its three ISO images and `installed\`): `cd_sv.rs` in
+both crates, `the_swedish_cd_with_its_discs`.
 
 The desktop's `a3::A3App` is its own `ApplicationHandler`, as Atlantis
 II's is: `setup::kind_of` tells Atlantis III by `Game.exe` (or the CD's
