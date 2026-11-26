@@ -88,8 +88,9 @@ Spanish), the French CD (Cryo, 2001, three CDs, Redump
 Atlantis II: New Worlds Await You…*, DreamCatcher, 2001, three CDs, Redump
 [62557](http://redump.org/disc/62557/)–62559; its own program,
 `Beyond Atlantis 2.exe`), the Portuguese CD (*Atlantis III: O Novo
-Mundo*, Playgames, 2001, three CDs; its own build of `Atlantis3.exe`) and
-the Italian *Atlantis Collection* DVD (2014; its installer's folder, whose `Game.exe` is GOG.com's
+Mundo*, Playgames, 2001, three CDs; its own build of `Atlantis3.exe`), the
+Swedish CD (*Atlantis 3: Den nya världen*, Toptronics, 2002, three CDs; the
+Portuguese CD's program) and the Italian *Atlantis Collection* DVD (2014; its installer's folder, whose `Game.exe` is GOG.com's
 2015 / 2018 one). Every other edition is unknown: its program is refused
 with its size and MD5. The Italian 3-CD re-release below would tell
 whether the Italian voices and films are the collection's.
