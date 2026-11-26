@@ -86,8 +86,9 @@ DVD's installer created (the one with Game.exe and Datas), or \
 the folder where the French CD installed it (the one with Atlantis3.exe and Datas), with the \
 images of its three CDs (or copies of the CDs) in it or in a folder inside it.\n\
 \u{2022} Atlantis Evolution: GOG.com's installation folder (the one with Atlantis Evolution.exe \
-and 3D), or the folder where its 2004 CD installed it (the one with Atlantis Evolution.exe \
-and cd0 to cd4).\n\
+and 3D), or the folder where its 2004 CD or the Italian Atlantis Collection DVD installed it \
+(the one with Atlantis Evolution.exe and cd0 to cd4; the collection's with the English CD's \
+cd2 folder copied into it).\n\
 \u{2022} The Secrets of Atlantis (French DVD): the DVD's drive or a copy of its files (the one \
 with DATAS.cab), the folder holding the DVD's image (.iso), or the folder where it was \
 installed.\n\n\
@@ -450,8 +451,9 @@ pub fn explain_atlantis4(dir: &Path, err: &atlantis4_data::files::OpenError) -> 
         OpenError::Exe(e) => format!(
             "{shown} holds an Atlantis Evolution program that Atlantis Native does not \
              know ({e}): an edition of the game that is not supported yet.\n\n\
-             Supported: GOG.com's release (English, French, German, Italian, Spanish) and \
-             the 2004 CD (The Adventure Company, English). Other editions are unknown to the project: an issue on GitHub with the \
+             Supported: GOG.com's release (English, French, German, Italian, Spanish), \
+             the 2004 CD (The Adventure Company, English) and the Italian Atlantis \
+             Collection DVD (2014, installed). Other editions are unknown to the project: an issue on GitHub with the \
              program's size and MD5 helps."
         ),
         OpenError::NoExe => format!(
@@ -486,9 +488,10 @@ pub fn candidate_folders() -> Vec<PathBuf> {
                 }
             }
         }
-        // The Italian Atlantis Collection's Atlantis III installer:
-        // `Adventure Productions\Atlantis 3 - Il Nuovo Mondo` in the
-        // program files.
+        // The Italian Atlantis Collection's Atlantis III and Atlantis
+        // Evolution installers: `Adventure Productions\Atlantis 3 - Il
+        // Nuovo Mondo` and `Adventure Productions\Atlantis Evolution`
+        // (atlantis4-re `discs/it-collection.md`) in the program files.
         for base in [
             r"C:\Program Files\Adventure Productions",
             r"C:\Program Files (x86)\Adventure Productions",

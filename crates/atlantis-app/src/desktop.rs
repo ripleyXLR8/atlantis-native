@@ -875,6 +875,17 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
         if kind == GameKind::Atlantis4 {
             match crate::a4::label(&root) {
                 Ok(label) => {
+                    // The 2004 program without disc 2's world data (the
+                    // Italian Atlantis Collection's install): what to add.
+                    if let Some(text) = crate::a3::evolution_2004_incomplete(&root) {
+                        log::warn!("{text}");
+                        match ask(&text, "Choose another folder", "Help", give_up) {
+                            Choice::First => {}
+                            Choice::Second => setup::open_url(setup::HELP_URL_A4),
+                            Choice::Third => return None,
+                        }
+                        continue;
+                    }
                     log::info!("game folder {} ({label})", root.display());
                     return Some(vec![(Opened::Atlantis4(label), root)]);
                 }

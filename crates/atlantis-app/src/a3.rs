@@ -708,11 +708,26 @@ pub fn evolution_2004_data_dir() -> PathBuf {
     crate::desktop::data_dir().join("atlantis-evolution-2004")
 }
 
+/// Why the 2004 program's install in `dir` cannot be played to its end,
+/// for the player: disc 2's world data missing (the Italian *Atlantis
+/// Collection*'s installer leaves them out,
+/// [`atlantis3_data::evolution2004::check_disc2`]); `None` when they are
+/// there or the program is not a known build.
+pub fn evolution_2004_incomplete(dir: &Path) -> Option<String> {
+    use atlantis3_data::evolution2004::{check_disc2, identify_dir};
+    let build = identify_dir(dir)?.ok()?;
+    check_disc2(&StdDir::new(dir), build).map(|e| format!("{}: {e}", dir.display()))
+}
+
 /// The 2004 program's game in `dir`, its saves and `Atlantis4.cfg` in
 /// `base` (the install's `datas\Atlantis4.cfg` until the menus write the
-/// player's own).
+/// player's own); refused when disc 2's world data are missing
+/// ([`evolution_2004_incomplete`]).
 pub fn open_evolution_2004(dir: &Path, base: &Path) -> Result<Game, String> {
     use atlantis3_data::evolution2004::Evolution2004Source;
+    if let Some(why) = evolution_2004_incomplete(dir) {
+        return Err(why);
+    }
     let _ = std::fs::create_dir_all(base);
     let cfg_path = base.join("Atlantis4.cfg");
     let src = Evolution2004Source::new(Arc::new(WithCfg {
@@ -789,6 +804,90 @@ mod tests {
         let shot = base.join("a3.png");
         headless(&dir, &[], &base, 30, Some(&shot), true, false).unwrap();
         assert!(std::fs::read(&shot).unwrap().starts_with(b"\x89PNG"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// *Atlantis Evolution*'s Italian *Atlantis Collection* install
+    /// (`ATLANTIS4_IT_COLLECTION`): named in the library, refused as its
+    /// installer leaves it (disc 2's world data missing), in Italian, and,
+    /// with the English CD's install's `cd2` world folders beside its own
+    /// (`ATLANTIS4_CD`, linked into a scratch folder as a player's merged
+    /// copy has them), opened and started to the start page.
+    #[test]
+    fn the_italian_collection_of_evolution_2004() {
+        let Some(dir) = atlantis3_data::testing::a4_it_collection() else {
+            return;
+        };
+        let label = "Atlantis Evolution (2004), Atlantis Collection, Italian";
+        assert_eq!(crate::a4::label(&dir).unwrap(), label);
+        assert_eq!(evolution_2004_label(&dir).unwrap(), label);
+        let why = evolution_2004_incomplete(&dir).expect("disc 2 missing");
+        assert!(
+            why.contains(label) && why.contains("English 2004 CD"),
+            "{why}"
+        );
+        let base = std::env::temp_dir().join(format!("atlantis-a4it-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        assert_eq!(
+            open_evolution_2004(&dir, &base.join("data")).err(),
+            Some(why)
+        );
+        // The registry's `Language` = `ita` (from `loc\\text\\`): texts and
+        // voices in Italian.
+        let src =
+            atlantis3_data::evolution2004::Evolution2004Source::new(Arc::new(StdDir::new(&dir)));
+        let startup =
+            atlantis3_engine::startup::Startup::read(&A3Files::evolution_2004(Arc::new(src)));
+        assert_eq!(
+            (startup.text_language(), startup.voice_language()),
+            ("ita".to_string(), "ita".to_string())
+        );
+        #[cfg(unix)]
+        {
+            let Some(cd) = std::env::var_os("ATLANTIS4_CD").map(PathBuf::from) else {
+                eprintln!("SKIPPED the_italian_collection_of_evolution_2004 (merged): ATLANTIS4_CD not set");
+                let _ = std::fs::remove_dir_all(&base);
+                return;
+            };
+            let link = |t: &Path, l: &Path| {
+                std::fs::create_dir_all(l.parent().unwrap()).unwrap();
+                std::os::unix::fs::symlink(t, l).unwrap();
+            };
+            let merged = base.join("install");
+            for e in std::fs::read_dir(&dir).unwrap().flatten() {
+                if e.file_name() != "cd2" {
+                    link(&e.path(), &merged.join(e.file_name()));
+                }
+            }
+            link(&dir.join("cd2/datas/loc"), &merged.join("cd2/datas/loc"));
+            for f in atlantis3_data::evolution2004::DISC2_FOLDERS {
+                let theirs = std::fs::read_dir(cd.join("cd2/datas"))
+                    .unwrap()
+                    .flatten()
+                    .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(f))
+                    .unwrap_or_else(|| panic!("the CD's cd2/datas/{f}"));
+                link(
+                    &theirs.path(),
+                    &merged.join("cd2/datas").join(theirs.file_name()),
+                );
+            }
+            assert_eq!(evolution_2004_incomplete(&merged), None);
+            assert_eq!(crate::a4::label(&merged).unwrap(), label);
+            let mut game = open_evolution_2004(&merged, &base.join("data")).unwrap();
+            game.start_logos_2004();
+            let mut t = 0.0;
+            while game.logos_running_2004() && t < 60.0 {
+                game.skip();
+                t += 0.04;
+                game.step(t);
+            }
+            for _ in 0..25 {
+                t += 0.04;
+                game.step(t);
+            }
+            assert!(!game.logos_running_2004());
+            assert_eq!(game.mode(), Mode::Menu);
+        }
         let _ = std::fs::remove_dir_all(&base);
     }
 

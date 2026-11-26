@@ -188,13 +188,19 @@ pub fn start_evolution_2004(
     install: Arc<dyn FileSource>,
     store: Rc<dyn SaveStore>,
 ) -> Result<(), JsValue> {
-    use atlantis3_data::evolution2004::{edition_label, identify, Evolution2004Source, EXE_NAME};
+    use atlantis3_data::evolution2004::{
+        check_disc2, edition_label, identify, Evolution2004Source, EXE_NAME,
+    };
     let exe = install
         .read(EXE_NAME)
         .ok_or_else(|| JsValue::from(format!("Atlantis Evolution (2004): no {EXE_NAME}")))?;
-    let label = identify(&exe)
-        .map(edition_label)
-        .map_err(|e| JsValue::from(format!("Atlantis Evolution (2004): {e}")))?;
+    let build =
+        identify(&exe).map_err(|e| JsValue::from(format!("Atlantis Evolution (2004): {e}")))?;
+    // The Italian Atlantis Collection's install lacks disc 2's world data.
+    if let Some(e) = check_disc2(&*install, build) {
+        return Err(JsValue::from(e.to_string()));
+    }
+    let label = edition_label(build);
     let cfg = store.read(CFG_KEY_2004);
     let src = Evolution2004Source::new(Arc::new(WithCfg {
         install,
