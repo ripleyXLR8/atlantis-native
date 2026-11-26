@@ -372,7 +372,7 @@ For *Atlantis Evolution*:
 | Release | Languages | What to point it at |
 |---|---|---|
 | [GOG.com](https://www.gog.com/) (`Atlantis Evolution.exe` of 2,363,910 bytes, MD5 `f2de382af52f1d89e32ed7c286be8b4f`; one program for all five languages) | English, French, German, Italian, Spanish (the one GOG.com's client installed, or another chosen in `settings.ini`) | the installation folder (the one holding `Atlantis Evolution.exe` and `3D`) |
-| The 2004 CD of The Adventure Company, four discs (`Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `2199bc93d2ac3f8b4279e0db898559e8`; **a preview**, not yet played through from start to end) | English | the folder where its installer put the game (the one holding `Atlantis Evolution.exe` and `cd0` to `cd4`; by default `C:\Program Files\The Adventure Company\Atlantis Evolution`) |
+| The 2004 CD of The Adventure Company, four discs, and the European English CD, whose discs hold the same files (`Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `2199bc93d2ac3f8b4279e0db898559e8`; **a preview**, not yet played through from start to end) | English | the folder where its installer put the game (the one holding `Atlantis Evolution.exe` and `cd0` to `cd4`; by default `C:\Program Files\The Adventure Company\Atlantis Evolution`) |
 
 GOG.com's edition is a 2012 program (Tetraedge Engine); the CD's is the
 original 2004 program, played by the *Atlantis III* engine. The CDs

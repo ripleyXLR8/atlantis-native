@@ -1173,6 +1173,9 @@ The original program of 2004, sold on four CDs by The Adventure Company
 grown from *Atlantis III*'s, not GOG.com's 2012 program: Atlantis Native
 plays it with its *Atlantis III* engine. The game library shows it as
 *Atlantis Evolution (2004), CD, English*, beside GOG.com's edition.
+The European English CD (Redump 111784 to 111787) holds the same four
+discs' files, byte for byte, as far as a public copy of its files shows:
+it installs the same program and plays the same.
 
 **Status.** Its logos, start page and menus, the saves, the panoramas
 and chapter scripts, the dialogs and voices, the inventory, the music,
