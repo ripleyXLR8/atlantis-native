@@ -740,9 +740,10 @@ pub(super) fn view_isis(h: &mut Hx) {
     if h.g.puzzles.ldmorts.held.is_some() {
         log::warn!("PuzzleIsis_Init(): Carreau en main pas NULL");
     }
-    // The cursor reset (@ 0x004287f0) is GOG's program's: the CD's
-    // (atlantis3-cd-fr-3379200 @ 0x004c7210) leaves the cursor as it is.
-    if h.g.release == atlantis3_data::Release::Gog2003 {
+    // The cursor reset (@ 0x004287f0) is GOG's program's and the North
+    // American CD's: the French CD's (atlantis3-cd-fr-3379200 @ 0x004c7210)
+    // leaves the cursor as it is.
+    if h.g.release.isis_cursor_reset() {
         h.g.reset_warp_cursor();
     }
     h.g.puzzles.ldmorts.held = None;

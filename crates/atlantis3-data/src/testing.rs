@@ -9,7 +9,9 @@
 //! `ATLANTIS3_CD_FR` and the folder of its three discs (the CD images or
 //! copies of the CDs) from `ATLANTIS3_DISCS_FR` ([`cd_fr`]); the Italian
 //! *Atlantis Collection*'s installed folder from `ATLANTIS3_IT_COLLECTION`
-//! ([`it_collection`]). Without it a
+//! ([`it_collection`]). The North American CD's folder
+//! (`ATLANTIS3_CD_US`, [`cd_us`]) is optional: without it its tests write
+//! `SKIPPED` and pass. Without the others a
 //! test must
 //! not pass as if it had run: [`missing`] fails it, unless
 //! `ATLANTIS3_SKIP_DATA_TESTS=1` (or `ATLANTIS2_SKIP_DATA_TESTS=1`, which a
@@ -92,6 +94,35 @@ pub const IT_COLLECTION_VAR: &str = "ATLANTIS3_IT_COLLECTION";
 /// (`ATLANTIS3_IT_COLLECTION`), or `None` after [`missing`].
 pub fn it_collection() -> Option<PathBuf> {
     dir_of(IT_COLLECTION_VAR)
+}
+
+/// The folder named by `var`, or `None` after writing `SKIPPED <test>:
+/// <var> not set`: the editions added later, whose absence never fails a
+/// test (as [`a5_dvd_fr`]).
+pub fn optional_dir(var: &str) -> Option<PathBuf> {
+    match std::env::var_os(var) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(std::io::stderr(), "SKIPPED {test}: {var} not set");
+            None
+        }
+    }
+}
+
+/// The variable naming the North American CD's folder (*Beyond Atlantis
+/// II*, DreamCatcher, 2001): its three CD images, and `installed\` (the
+/// first disc's `data1.cab` extracted: `Beyond Atlantis 2.exe` and the
+/// files of `Datas\` the installer copies).
+pub const CD_US_VAR: &str = "ATLANTIS3_CD_US";
+
+/// The North American CD's installed folder and its discs' folder (from
+/// `ATLANTIS3_CD_US`: `<folder>/installed`, `<folder>`); its absence never
+/// fails a test ([`optional_dir`]).
+pub fn cd_us() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_US_VAR)?;
+    Some((dir.join("installed"), dir))
 }
 
 /// The installed game's folder from `ATLANTIS3_DATA`, or `None` after

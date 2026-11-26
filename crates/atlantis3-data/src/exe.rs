@@ -2,12 +2,14 @@
 //!
 //! As for *Atlantis II* (`atlantis2_data::exe`), a build is recognised by
 //! its size and PE timestamp and confirmed by the MD5 of the whole file.
-//! Three builds are known: GOG.com's `Game.exe` (2003) as GOG ships it
+//! Four builds are known: GOG.com's `Game.exe` (2003) as GOG ships it
 //! since 2022, the reference every address in this crate's comments
 //! belongs to; the French retail CD's `Atlantis3.exe` (2001,
-//! [`Release::Cd2001`]); and GOG's earlier `Game.exe` of the same program
-//! (its 2015 and 2018 builds), which the Italian *Atlantis Collection*
-//! DVD (2014) installs. GOG's folder also
+//! [`Release::Cd2001`]); the North American CD's `Beyond Atlantis 2.exe`
+//! (*Beyond Atlantis II*, DreamCatcher, 2001, [`Release::CdUs2001`]); and
+//! GOG's earlier `Game.exe` of the same program (its 2015 and 2018
+//! builds), which the Italian *Atlantis Collection* DVD (2014) installs.
+//! GOG's folder also
 //! holds `Atlantis3.exe`, a launcher of the re-release that starts
 //! `Game.exe` ([`LAUNCHER_SIZE`]), and the two sprite libraries
 //! ([`SPR_DLLS`], the CD's are the same files).
@@ -40,6 +42,19 @@ pub enum Release {
     /// for `gre` (@ 0x00458c40; GOG's table @ 0x00459360 has more
     /// languages).
     Cd2001,
+    /// The North American CD's program (*Beyond Atlantis II*, 2001-10-17;
+    /// atlantis3-re `binaries/atlantis3-cd-us-3366912.md`): the French
+    /// CD's program with five of the 2003 program's changes. It keeps the
+    /// disc test (`CHANGECD` @ 0x00449942 compares and calls
+    /// `Menu_TestChangeCD` @ 0x00457a60) and the CD's code where the 2003
+    /// program differs from it otherwise (no JPEG cube faces, the CD's
+    /// thumbnail row scan), but has GOG's scarab bank `Scarabee.spr`
+    /// (@ 0x00700884), subject columns (@ 0x0043b460), warp flip test
+    /// (@ 0x0043f930), Isis cursor reset (@ 0x004c7a10 → 0x00428830) and
+    /// intro table (@ 0x00458d80, `intro_usa.hnm` for `usa`); its
+    /// start-up reads `HKLM\Software\DreamCatcher\BEYOND ATLANTIS 2`
+    /// (@ 0x004d5950) instead of `CRYO\ATLANTIS 3`.
+    CdUs2001,
     /// GOG.com's `Game.exe` (2003-04-24), the reference; its 2015 / 2018
     /// file too, the same program but for three edits of the 2022 file
     /// ([`Build::cfg_name`], [`Build::thumb_rows`], and a window message
@@ -80,8 +95,9 @@ pub struct Build {
 /// French retail CD (three CDs, 2001) installs the second; the third is
 /// the `Game.exe` of GOG.com's builds "1.0" (2018-07-16) and gen-1 3511
 /// (2015-01-14), every language (GOG's manifests give this MD5), which the
-/// Italian *Atlantis Collection* DVD (2014) installs.
-pub const KNOWN_BUILDS: [Build; 3] = [
+/// Italian *Atlantis Collection* DVD (2014) installs; the North American
+/// CD (*Beyond Atlantis II*, three CDs, 2001) installs the fourth.
+pub const KNOWN_BUILDS: [Build; 4] = [
     Build {
         id: "atlantis3-gog-fr-3473408",
         label: "Atlantis III, GOG.com",
@@ -127,13 +143,61 @@ pub const KNOWN_BUILDS: [Build; 3] = [
         cfg_name: "Atlantis4.cfg",
         thumb_rows: RowScan::Original,
     },
+    Build {
+        id: "atlantis3-cd-us-3366912",
+        label: "Atlantis III, CD (DreamCatcher, 2001)",
+        size: 3_366_912,
+        // 2001-10-17 10:21:18 UTC.
+        pe_timestamp: 0x3bcd_5b9e,
+        md5: [
+            0xdf, 0x6f, 0xaa, 0x0c, 0xde, 0x44, 0x78, 0x94, 0x33, 0x07, 0xe9, 0x0a, 0xed, 0x65,
+            0x97, 0x9d,
+        ],
+        exe_name: "Beyond Atlantis 2.exe",
+        release: Release::CdUs2001,
+        cfg_name: "Atlantis3.cfg",
+        // The CD's row scan (@ 0x0069c9f0, the same function as
+        // atlantis3-cd-fr-3379200's): no 2022 trampoline.
+        thumb_rows: RowScan::Original,
+    },
 ];
 
 impl Release {
-    /// Whether `CHANGECD=n` runs the disc test (the CD's program) rather
+    /// Whether `CHANGECD=n` runs the disc test (the CDs' programs) rather
     /// than storing the variable (GOG's, patched).
     pub fn disc_test(self) -> bool {
+        matches!(self, Release::Cd2001 | Release::CdUs2001)
+    }
+
+    /// Whether the intro is the French CD's short table
+    /// (atlantis3-cd-fr-3379200 @ 0x00458c40) rather than the 2003
+    /// program's (@ 0x00459360; the North American CD's @ 0x00458d80).
+    pub fn cd_intro_table(self) -> bool {
         self == Release::Cd2001
+    }
+
+    /// Whether the subject menu's hit test has `count / 5 + 1` columns
+    /// (atlantis3-cd-fr-3379200 @ 0x0043b3c0) rather than the 2003
+    /// program's 1 to 3 (@ 0x0043ba40; the North American CD's
+    /// @ 0x0043b460).
+    pub fn cd_subject_columns(self) -> bool {
+        self == Release::Cd2001
+    }
+
+    /// Whether a warp frame that started a video is still flipped
+    /// (atlantis3-cd-fr-3379200 @ 0x0043f840 tests the dialog only; the
+    /// 2003 program @ 0x0043ff20 and the North American CD's
+    /// @ 0x0043f930 test the video too).
+    pub fn flips_after_video(self) -> bool {
+        self == Release::Cd2001
+    }
+
+    /// Whether entering the Isis puzzle's views resets the warp cursor
+    /// (the 2003 program @ 0x004c7f40 → 0x004287f0, the North American
+    /// CD's @ 0x004c7a10 → 0x00428830; not atlantis3-cd-fr-3379200
+    /// @ 0x004c7210).
+    pub fn isis_cursor_reset(self) -> bool {
+        self != Release::Cd2001
     }
 
     /// The scarab case's sprite bank (`AtlScarabee_MainInit`,
@@ -143,7 +207,9 @@ impl Release {
     pub fn scarab_bank(self) -> &'static str {
         match self {
             Release::Cd2001 => "Scarab\u{e9}e.spr",
-            Release::Gog2003 => "Scarabee.spr",
+            // The North American CD's program has the 2003 name
+            // (@ 0x00700884); its data has both files.
+            Release::CdUs2001 | Release::Gog2003 => "Scarabee.spr",
         }
     }
 }
@@ -211,9 +277,10 @@ pub fn is_collection_launcher(exe: &[u8]) -> bool {
 pub const EXE_NAME: &str = "Game.exe";
 
 /// The executables' names, in the order a folder is searched: GOG's
-/// `Game.exe`, then the CD's `Atlantis3.exe` (in GOG's folder that name
-/// is the launcher).
-pub const EXE_NAMES: [&str; 2] = [EXE_NAME, "Atlantis3.exe"];
+/// `Game.exe`, then the French CD's `Atlantis3.exe` (in GOG's folder that
+/// name is the launcher), then the North American CD's
+/// `Beyond Atlantis 2.exe`.
+pub const EXE_NAMES: [&str; 3] = [EXE_NAME, "Atlantis3.exe", "Beyond Atlantis 2.exe"];
 
 /// Why an executable is not a known build.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -302,11 +369,16 @@ mod tests {
             "0068f6ed52bcfed7908d7e65fb3de3b1"
         );
         assert_eq!(
+            hex(&KNOWN_BUILDS[3].md5),
+            "df6faa0cde4478943307e90aed65979d"
+        );
+        assert_eq!(
             KNOWN_BUILDS.map(|b| (b.cfg_name, b.thumb_rows)),
             [
                 ("Atlantis3.cfg", RowScan::W10),
                 ("Atlantis3.cfg", RowScan::Original),
                 ("Atlantis4.cfg", RowScan::Original),
+                ("Atlantis3.cfg", RowScan::Original),
             ]
         );
         for b in KNOWN_BUILDS {
@@ -314,6 +386,14 @@ mod tests {
         }
         assert!(Release::Cd2001.disc_test() && !Release::Gog2003.disc_test());
         assert_eq!(Release::Cd2001.scarab_bank(), "Scarabée.spr");
+        // The North American CD: the disc test, the rest the 2003 program's.
+        let us = Release::CdUs2001;
+        assert!(us.disc_test() && us.isis_cursor_reset());
+        assert!(!us.cd_intro_table() && !us.cd_subject_columns() && !us.flips_after_video());
+        assert_eq!(us.scarab_bank(), "Scarabee.spr");
+        let cd = Release::Cd2001;
+        assert!(cd.cd_intro_table() && cd.cd_subject_columns() && cd.flips_after_video());
+        assert!(!cd.isis_cursor_reset() && Release::Gog2003.isis_cursor_reset());
         assert_eq!(
             hex(&COLLECTION_LAUNCHER_MD5),
             "896082e45db738863385ac5048d5cd38"
