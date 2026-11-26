@@ -125,6 +125,22 @@ pub fn cd_us() -> Option<(PathBuf, PathBuf)> {
     Some((dir.join("installed"), dir))
 }
 
+/// The variable naming the Portuguese CD's folder (*Atlantis III: O Novo
+/// Mundo*, Playgames, 2001): `Atlantis III - O Novo Mundo\CD1..CD3\`
+/// with the CloneCD images, and `installed\` (the first disc's
+/// `data1.cab` extracted).
+pub const CD_PT_VAR: &str = "ATLANTIS3_CD_PT";
+
+/// The Portuguese CD's installed folder and its discs' folder (from
+/// `ATLANTIS3_CD_PT`); its absence never fails a test ([`optional_dir`]).
+pub fn cd_pt() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_PT_VAR)?;
+    Some((
+        dir.join("installed"),
+        dir.join("Atlantis III - O Novo Mundo"),
+    ))
+}
+
 /// The installed game's folder from `ATLANTIS3_DATA`, or `None` after
 /// [`missing`].
 pub fn install_dir() -> Option<PathBuf> {
