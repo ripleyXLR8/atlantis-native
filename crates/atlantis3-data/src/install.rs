@@ -20,6 +20,12 @@
 //! `ita` (atlantis3-re `discs/it-collection.md`) and leaves no file of
 //! them: its `Datas\loc\text\` holds `ita` alone, which gives the same
 //! values.
+//!
+//! The North American CD (*Beyond Atlantis II*, DreamCatcher, 2001)
+//! writes them under `HKLM\Software\DreamCatcher\BEYOND ATLANTIS 2`,
+//! the key its program reads (atlantis3-cd-us-3366912 @ 0x004d5950):
+//! `Language` = `usa` and `Install` = `CD` (its `setup.ins`); its
+//! `Datas\loc\text\` holds `usa` alone, which gives the same values.
 
 use crate::exe::Build;
 use crate::A3Files;
@@ -36,10 +42,12 @@ pub enum Language {
 
 impl Language {
     /// The language of a registry `Language` value (`gbr`, `fra`, `ger`,
-    /// `esp`, `ita`; the folder names of `loc\text\`, any case).
+    /// `esp`, `ita`; the folder names of `loc\text\`, any case). The
+    /// North American CD's `usa` is English too: its own texts and
+    /// voices, the program's `usa` branches (the intro `intro_usa.hnm`).
     pub fn from_code(code: &[u8]) -> Option<Language> {
         match code.to_ascii_lowercase().as_slice() {
-            b"gbr" => Some(Language::English),
+            b"gbr" | b"usa" => Some(Language::English),
             b"fra" => Some(Language::French),
             b"ger" => Some(Language::German),
             b"esp" => Some(Language::Spanish),
@@ -189,7 +197,8 @@ mod tests {
             );
         }
         assert_eq!(Language::from_code(b"ITA"), Some(Language::Italian));
-        assert_eq!(Language::from_code(b"usa"), None);
+        assert_eq!(Language::from_code(b"USA"), Some(Language::English));
+        assert_eq!(Language::from_code(b"rus"), None);
         assert_eq!(edition_label(b, None), "Atlantis III, GOG.com");
         assert_eq!(
             named_label("Atlantis III, Atlantis Collection", Some(Language::Italian)),

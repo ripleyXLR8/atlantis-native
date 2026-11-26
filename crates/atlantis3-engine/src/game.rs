@@ -1150,9 +1150,10 @@ impl Game {
     /// branch: GOG.com's German install has no `intro_ger.hnm`, so it
     /// plays `intro.hnm` alone, like the other languages.
     pub fn start_intro(&mut self) {
-        let mut videos = match self.release {
-            atlantis3_data::Release::Cd2001 => intro_videos_cd(&self.startup.config.langue),
-            atlantis3_data::Release::Gog2003 => intro_videos(&self.startup.config.langue),
+        let mut videos = if self.release.cd_intro_table() {
+            intro_videos_cd(&self.startup.config.langue)
+        } else {
+            intro_videos(&self.startup.config.langue)
         };
         videos.reverse();
         self.intro_next = videos;
@@ -1489,7 +1490,7 @@ impl Game {
             crate::subjects::Layout::for_width_2004(self.width).0
         } else {
             crate::subjects::Layout {
-                cd_columns: self.release == atlantis3_data::Release::Cd2001,
+                cd_columns: self.release.cd_subject_columns(),
                 ..crate::subjects::Layout::for_width(self.width)
             }
         }
@@ -2495,13 +2496,13 @@ impl Game {
     /// no flip once the frame started a video or a dialog (loop mode 4 or
     /// 5). The CD's program tests the dialog only (atlantis3-cd-fr-3379200
     /// @ 0x0043f840: `mode == 5`): a frame that started a video is
-    /// flipped.
+    /// flipped ([`atlantis3_data::Release::flips_after_video`]; the North
+    /// American CD's program tests both, as GOG.com's).
     fn flip_suppressed(&self) -> bool {
-        match self.release {
-            atlantis3_data::Release::Cd2001 => self.mode == Mode::Dialog,
-            atlantis3_data::Release::Gog2003 => {
-                matches!(self.mode, Mode::Intro | Mode::Video | Mode::Dialog)
-            }
+        if self.release.flips_after_video() {
+            self.mode == Mode::Dialog
+        } else {
+            matches!(self.mode, Mode::Intro | Mode::Video | Mode::Dialog)
         }
     }
 
