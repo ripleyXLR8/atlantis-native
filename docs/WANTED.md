@@ -20,7 +20,7 @@ Colours:
 | 🟢 | Already supported or tried |
 | 🔴 | **Most wanted**: would let the most players start their copy, or let the project check a program file it has only read about |
 | 🟠 | Wanted, in any order |
-| 🟡 | Supported, but a clean dump would repair or confirm a part of it |
+| 🟡 | Supported, but a clean dump would repair a part of it |
 | ⚪ | Not confirmed: the edition probably exists, but nobody has described a box yet |
 
 How to read the tables: the barcode is the EAN or UPC under the box's
@@ -107,15 +107,14 @@ whether the Italian voices and films are the collection's.
 🟢 **Already supported or tried:** GOG.com (the 2012 program, five
 languages), the 2004 North American CD of The Adventure Company
 (English, serial PCO403CD, Redump [125865](http://redump.org/disc/125865/),
-in progress) and the European English CD, whose four discs hold the
-North American discs' files byte for byte (tried on a public copy of its
-files; its disc images were rebuilt, so the pressing itself is not
-checked).
+in progress) and the European English CD (ATLEENCD1 … 4, Redump
+[111784](http://redump.org/disc/111784/)–111787), whose four discs hold
+the North American discs' files byte for byte (checked on a dump that
+matches Redump's).
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|
 | 🔴 **most wanted** | *Atlantis Evolution*, French | France | 2004 | 4 CD | French voices and texts; no dump of the first edition is known |
-| 🟡 confirm | *Atlantis Evolution*, English | Europe | 2004 | 4 CD | ATLEENCD1 … 4; barcode 3700265603028; ring code `ATLE002`; Redump [111784](http://redump.org/disc/111784/)–111787. Supported (the North American CD's files); a faithful dump would confirm that the pressing holds them |
 | 🟠 wanted | *Atlantis Evolution*, Hits Collection | France | — | 4 CD | Barcode 5390102491123; Redump [22045](http://redump.org/disc/22045/)–22048 |
 | 🟠 wanted | *Atlantis Evolution*, Italian | Italy | 2004 | 4 CD | Redump [113743](http://redump.org/disc/113743/)–113746 |
 | 🟠 wanted | *Atlantis Evolution*, Atari Real Value | Italy | — | 1 DVD | Barcode 8033064531045; Redump [71146](http://redump.org/disc/71146/) |
