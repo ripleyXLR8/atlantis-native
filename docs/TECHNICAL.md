@@ -4492,6 +4492,12 @@ scan), so its methods answer as for `CdUs2001`; its start-up reads
 `CRYO\ATLANTIS 3`, and its intro has a `bra` branch (`intro_bra.hnm`)
 that no data reaches and the port does not model. The data's language is
 `por` (`install::Language::Portuguese`), its `font.txt` the ANSI one.
+Its name, *Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)*,
+comes from `install::LANGUAGE_EDITIONS`: the same `Atlantis3.exe` is
+also the Swedish and the Traditional Chinese CDs', so the install's
+language (the one folder of `Datas\loc\text\`, `por` on this CD alone)
+names the edition, as `atlantis2_data::edition` does for Atlantis II's
+shared builds.
 Tests (`ATLANTIS3_CD_PT` = a folder with `Atlantis III - O Novo
 Mundo\CD1..CD3\` holding the CloneCD images, and `installed\`;
 optional): `crates/atlantis3-data/tests/cd_pt.rs` (the build, edition,

@@ -189,12 +189,12 @@ impl A3Files {
         let build = self.build()?;
         let (language, _) = crate::install::install_registry(self);
         let language = crate::install::Language::from_code(&language);
-        let name = if self.is_collection() {
-            exe::COLLECTION_LABEL
-        } else {
-            build.label
-        };
-        Ok(crate::install::named_label(name, language))
+        if self.is_collection() {
+            return Ok(crate::install::named_label(exe::COLLECTION_LABEL, language));
+        }
+        // An edition sharing its build with others is named by its data's
+        // language (`install::LANGUAGE_EDITIONS`).
+        Ok(crate::install::edition_label(build, language))
     }
 
     /// Whether the install is the Italian *Atlantis Collection*'s: its

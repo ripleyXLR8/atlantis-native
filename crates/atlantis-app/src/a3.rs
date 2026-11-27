@@ -958,7 +958,7 @@ mod tests {
         let Some((dir, discs)) = atlantis3_data::testing::cd_pt() else {
             return;
         };
-        let name = "Atlantis III, CD (October 2001 build), Portuguese";
+        let name = "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)";
         assert_eq!(label(&dir).unwrap(), name);
         assert!(holds_atlantis3(&dir));
         let base = std::env::temp_dir().join(format!("atlantis-a3-cdpt-{}", std::process::id()));

@@ -6,7 +6,7 @@
 //!
 //! - the program `Atlantis3.exe` is the known build
 //!   atlantis3-cd-pt-3424256 ([`Release::CdPt2001`]), the edition
-//!   "Atlantis III, CD (October 2001 build), Portuguese", the registry values
+//!   "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)", the registry values
 //!   `por` and `CD`;
 //! - the three discs are found from the `.img` images;
 //! - every file of the install and of the discs is read with its size
@@ -45,7 +45,7 @@ fn build_edition_and_discs() {
     );
     assert_eq!(
         files.edition_label().unwrap(),
-        "Atlantis III, CD (October 2001 build), Portuguese"
+        "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)"
     );
     let (language, version) = atlantis3_data::install::install_registry(&files);
     assert_eq!((&language[..], &version[..]), (&b"por"[..], &b"CD"[..]));
