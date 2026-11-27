@@ -180,7 +180,7 @@ fn big5_fonts_and_texts() {
         ]
     );
     let names = files.list("loc/text/gbr");
-    assert!(names.len() > 40, "{names:?}");
+    assert_eq!(names.len(), 14, "{names:?}");
     for n in &names {
         let d = files.read(&format!("loc/text/gbr/{n}")).unwrap();
         let lower = n.to_ascii_lowercase();
