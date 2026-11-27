@@ -5,7 +5,7 @@
 //!
 //! - the program `Atlantis3.exe` is the Portuguese CD's build
 //!   atlantis3-cd-pt-3424256 ([`Release::CdPt2001`]), the edition
-//!   "Atlantis III, CD (October 2001 build), Swedish", the registry values
+//!   "Atlantis III, Swedish CD, Swedish (Toptronics, 2002)", the registry values
 //!   `swe` and `CD`;
 //! - the three discs are found from the `.iso` images;
 //! - every file of the install and of the discs is read with its size
@@ -44,7 +44,7 @@ fn build_edition_and_discs() {
     );
     assert_eq!(
         files.edition_label().unwrap(),
-        "Atlantis III, CD (October 2001 build), Swedish"
+        "Atlantis III, Swedish CD, Swedish (Toptronics, 2002)"
     );
     let (language, version) = atlantis3_data::install::install_registry(&files);
     assert_eq!((&language[..], &version[..]), (&b"swe"[..], &b"CD"[..]));

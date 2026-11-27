@@ -88,11 +88,18 @@ impl Language {
 /// `Datas\loc\text\` holds one language folder, `por` on the Portuguese
 /// CD alone (`swe`, and `gbr` with Big5 texts, on the others), so the
 /// language names the edition.
-pub const LANGUAGE_EDITIONS: &[(&str, Language, &str)] = &[(
-    "atlantis3-cd-pt-3424256",
-    Language::Portuguese,
-    "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)",
-)];
+pub const LANGUAGE_EDITIONS: &[(&str, Language, &str)] = &[
+    (
+        "atlantis3-cd-pt-3424256",
+        Language::Portuguese,
+        "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)",
+    ),
+    (
+        "atlantis3-cd-pt-3424256",
+        Language::Swedish,
+        "Atlantis III, Swedish CD, Swedish (Toptronics, 2002)",
+    ),
+];
 
 /// The edition's name: an edition of [`LANGUAGE_EDITIONS`], else the
 /// build's name with the language ("Atlantis III, GOG.com, German",
@@ -257,6 +264,10 @@ mod tests {
         assert_eq!(
             edition_label(pt, Some(Language::Portuguese)),
             "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)"
+        );
+        assert_eq!(
+            edition_label(pt, Some(Language::Swedish)),
+            "Atlantis III, Swedish CD, Swedish (Toptronics, 2002)"
         );
         assert_eq!(
             edition_label(pt, Some(Language::English)),
