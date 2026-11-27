@@ -88,7 +88,7 @@ Spanish), the French CD (Cryo, 2001, three CDs, Redump
 Atlantis II: New Worlds Await You…*, DreamCatcher, 2001, three CDs, Redump
 [62557](http://redump.org/disc/62557/)–62559; its own program,
 `Beyond Atlantis 2.exe`), the Portuguese CD (*Atlantis III: O Novo
-Mundo*, Playgames, 2001, three CDs; its own build of `Atlantis3.exe`), the
+Mundo*, Playgames, 2002, three CDs; its own build of `Atlantis3.exe`), the
 Swedish CD (*Atlantis 3: Den nya världen*, Toptronics, 2002, three CDs; the
 Portuguese CD's program), the Czech CD (*Atlantis 3*, GAME4U Speciál 10,
 2003, three CDs; its own build of `Atlantis3.exe`) and the Italian *Atlantis Collection* DVD (2014; its installer's folder, whose `Game.exe` is GOG.com's

@@ -27,7 +27,7 @@
 //! `Language` = `usa` and `Install` = `CD` (its `setup.ins`); its
 //! `Datas\loc\text\` holds `usa` alone, which gives the same values.
 //!
-//! The Portuguese CD (*O Novo Mundo*, Playgames, 2001) has Cryo's
+//! The Portuguese CD (*O Novo Mundo*, Playgames, 2002) has Cryo's
 //! installer of the French CD with a list of 15 language codes
 //! (`setup.ins`); its `Datas\loc\text\` holds `por` alone. The Swedish
 //! CD (*Den nya världen*, Toptronics, 2002) has the same installer, and
@@ -96,7 +96,7 @@ pub const LANGUAGE_EDITIONS: &[(&str, Language, &str)] = &[
     (
         "atlantis3-cd-pt-3424256",
         Language::Portuguese,
-        "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)",
+        "Atlantis III, Portuguese CD, Portuguese (Playgames, 2002)",
     ),
     (
         "atlantis3-cd-pt-3424256",
@@ -268,7 +268,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             edition_label(pt, Some(Language::Portuguese)),
-            "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)"
+            "Atlantis III, Portuguese CD, Portuguese (Playgames, 2002)"
         );
         assert_eq!(
             edition_label(pt, Some(Language::Swedish)),

@@ -126,7 +126,7 @@ pub fn cd_us() -> Option<(PathBuf, PathBuf)> {
 }
 
 /// The variable naming the Portuguese CD's folder (*Atlantis III: O Novo
-/// Mundo*, Playgames, 2001): `Atlantis III - O Novo Mundo\CD1..CD3\`
+/// Mundo*, Playgames, 2002): `Atlantis III - O Novo Mundo\CD1..CD3\`
 /// with the CloneCD images, and `installed\` (the first disc's
 /// `data1.cab` extracted).
 pub const CD_PT_VAR: &str = "ATLANTIS3_CD_PT";

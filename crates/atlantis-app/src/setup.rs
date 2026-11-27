@@ -398,7 +398,7 @@ pub fn explain_atlantis3(dir: &Path, err: &atlantis3_data::files::OpenError) -> 
              ({e}): an edition of the game that is not supported yet.\n\n\
              Supported: GOG.com's release (English, French, German or Spanish), the French \
              CD (2001, three CDs), the North American CD (Beyond Atlantis II, DreamCatcher, \
-             2001, three CDs), the Portuguese CD (O Novo Mundo, Playgames, 2001, three CDs), \
+             2001, three CDs), the Portuguese CD (O Novo Mundo, Playgames, 2002, three CDs), \
              the Swedish CD (Den nya världen, Toptronics, 2002, three CDs), the Czech CD \
              (GAME4U Speciál 10, 2003, three CDs) and the Italian Atlantis Collection DVD (2014, installed). \
              Other editions are unknown to the \

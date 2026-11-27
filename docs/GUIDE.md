@@ -112,7 +112,7 @@ release (亞特蘭提斯2, Interwise, 2000), the GOG.com edition and the Italian
 [Atlantis II](#atlantis-ii)). For Atlantis III: GOG.com's release in
 English, French, German or Spanish, the French CD (2001, three CDs), the
 North American CD (*Beyond Atlantis II*, DreamCatcher, 2001, three CDs), the
-Portuguese CD (*O Novo Mundo*, Playgames, 2001, three CDs), the Swedish
+Portuguese CD (*O Novo Mundo*, Playgames, 2002, three CDs), the Swedish
 CD (*Den nya världen*, Toptronics, 2002, three CDs), the Czech CD (GAME4U
 Speciál 10, 2003, three CDs) and
 the Italian *Atlantis Collection* DVD (installed);
@@ -182,7 +182,7 @@ it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
 German*, *Atlantis III, CD, French*, *Atlantis III, CD, English
 (DreamCatcher, 2001)*, *Atlantis III, Portuguese CD, Portuguese
-(Playgames, 2001)*, *Atlantis III, Swedish CD, Swedish (Toptronics,
+(Playgames, 2002)*, *Atlantis III, Swedish CD, Swedish (Toptronics,
 2002)*, *Atlantis III, Czech CD, Czech (GAME4U Speciál 10, 2003)*,
 *Atlantis III, Atlantis Collection, Italian*, *Atlantis Evolution,
 GOG.com, English* or *Atlantis Evolution (2004), CD, English* or
@@ -980,11 +980,11 @@ Native plays it so:
   pictures under both names), a ninth subject is clickable, the pointer
   is reset in the Isis views, the intro is `intro_usa.hnm` alone.
 
-**The Portuguese CD.** *Atlantis III: O Novo Mundo* (Playgames, 2001,
+**The Portuguese CD.** *Atlantis III: O Novo Mundo* (Playgames, 2002,
 three CDs) installs and opens as the French CD does (the folder with
 `Atlantis3.exe` and `Datas`, the three CD images in it or in a folder
 inside it; a CloneCD dump's `.img` files are read as they are). The game
-library shows it as *Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)*. Its
+library shows it as *Atlantis III, Portuguese CD, Portuguese (Playgames, 2002)*. Its
 voices, texts and films are Portuguese, the rest GOG.com's data (its
 English scripts and films where GOG.com's French and English differ). Its
 program (3,424,256 bytes, MD5 `e5e89f926f80be9ce06a324f27018e89`) is the

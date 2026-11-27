@@ -1,4 +1,4 @@
-//! The Portuguese CD (*Atlantis III: O Novo Mundo*, Playgames, 2001)
+//! The Portuguese CD (*Atlantis III: O Novo Mundo*, Playgames, 2002)
 //! played from its installed folder and its three CD images
 //! (`ATLANTIS3_CD_PT`, optional: `SKIPPED` without it):
 //!

@@ -353,7 +353,7 @@ For *Atlantis III*:
 | [GOG.com](https://www.gog.com/) (*Atlantis 3 - The New World*; `Game.exe` of 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`) | English, French, German, Spanish | the installation folder (the one holding `Game.exe` and `Datas`) |
 | French CD (Cryo, 2001, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `f81dd8d2e49003b2ba53b48b4a21c2ec`) | French | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (or copies of the CDs) in it or in a folder inside it, or beside it in the folder picked (in the browser too: the images are read a part at a time) |
 | North American CD (*Beyond Atlantis II*, DreamCatcher, 2001, three CDs; `Beyond Atlantis 2.exe` of 3,366,912 bytes, MD5 `df6faa0cde4478943307e90aed65979d`) | English | the installation folder (the one holding `Beyond Atlantis 2.exe` and `Datas`), with the images of the three CDs (`.bin` as Redump has them, `.iso`, or copies of the CDs) in it or in a folder inside it |
-| Portuguese CD (*Atlantis III: O Novo Mundo*, Playgames, 2001, three CDs; `Atlantis3.exe` of 3,424,256 bytes, MD5 `e5e89f926f80be9ce06a324f27018e89`) | Portuguese | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (`.img` as CloneCD writes them, `.iso`, or copies of the CDs) in it or in a folder inside it |
+| Portuguese CD (*Atlantis III: O Novo Mundo*, Playgames, 2002, three CDs; `Atlantis3.exe` of 3,424,256 bytes, MD5 `e5e89f926f80be9ce06a324f27018e89`) | Portuguese | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (`.img` as CloneCD writes them, `.iso`, or copies of the CDs) in it or in a folder inside it |
 | Swedish CD (*Atlantis 3: Den nya världen*, Toptronics, 2002, three CDs; the Portuguese CD's `Atlantis3.exe`) | Swedish | the same as the Portuguese CD (ISO images) |
 | Czech CD (*Atlantis 3*, GAME4U Speciál 10, 2003, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `344f2149ce56096f1988b1621a00bc10`) | Czech | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (`.bin` / `.cue`, `.iso`, or copies of the CDs) in it or in a folder inside it |
 | *Atlantis Collection*, Italian DVD compilation (2014; *Atlantis 3 - Il Nuovo Mondo*; its `Game.exe` is GOG.com's earlier build of the same program, 3,473,408 bytes, MD5 `0068f6ed52bcfed7908d7e65fb3de3b1`) | Italian | the folder its installer creates (the one holding `Game.exe` and `Datas`; by default `Adventure Productions\Atlantis 3 - Il Nuovo Mondo` in the program files); the DVD itself is not read |
@@ -373,9 +373,9 @@ scarab case, the subjects menu, the Isis puzzle's pointer and the intro
 words left out), drawn in the Central European character set its
 `font.txt` asks for; the game library names it "Atlantis III, CD,
 English (DreamCatcher, 2001)". The Portuguese CD (*O Novo Mundo*,
-Playgames, 2001) has the North American program rebuilt two weeks later,
+Playgames, 2002) has the North American program rebuilt two weeks later,
 and plays the same way, with Portuguese voices, texts and films; the game
-library names it "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)". The
+library names it "Atlantis III, Portuguese CD, Portuguese (Playgames, 2002)". The
 Swedish CD (*Den nya världen*, Toptronics, 2002) is the same edition in
 Swedish ("Atlantis III, Swedish CD, Swedish (Toptronics, 2002)"). The Czech CD
 (GAME4U Speciál 10, 2003) has the North American program's game code
