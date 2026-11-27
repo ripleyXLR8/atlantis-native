@@ -75,11 +75,16 @@ pub fn edition_label(build: &Build, language: Option<Language>) -> String {
     named_label(build.label, language)
 }
 
-/// The edition `name` with the language, as [`edition_label`].
+/// The edition `name` with the language, as [`edition_label`]: after
+/// the name, or for a retail CD named with its publisher and year
+/// ("Atlantis III, CD (DreamCatcher, 2001)") before them, as
+/// `atlantis2_data::edition::edition_label` does ("Atlantis III, CD,
+/// English (DreamCatcher, 2001)").
 pub fn named_label(name: &str, language: Option<Language>) -> String {
-    match language {
-        Some(l) => format!("{name}, {}", l.name()),
-        None => name.to_string(),
+    match (language, name.find("CD (")) {
+        (Some(l), Some(i)) => format!("{}, {}{}", &name[..i + 2], l.name(), &name[i + 2..]),
+        (Some(l), None) => format!("{name}, {}", l.name()),
+        (None, _) => name.to_string(),
     }
 }
 
@@ -203,6 +208,24 @@ mod tests {
         assert_eq!(
             named_label("Atlantis III, Atlantis Collection", Some(Language::Italian)),
             "Atlantis III, Atlantis Collection, Italian"
+        );
+        assert_eq!(
+            named_label(
+                "Atlantis III, CD (DreamCatcher, 2001)",
+                Some(Language::English)
+            ),
+            "Atlantis III, CD, English (DreamCatcher, 2001)"
+        );
+        assert_eq!(
+            named_label("Atlantis III, CD", Some(Language::French)),
+            "Atlantis III, CD, French"
+        );
+        assert_eq!(
+            named_label(
+                "Atlantis III, GOG.com (2015 / 2018 build)",
+                Some(Language::Italian)
+            ),
+            "Atlantis III, GOG.com (2015 / 2018 build), Italian"
         );
     }
 }

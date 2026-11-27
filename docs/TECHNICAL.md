@@ -4464,8 +4464,8 @@ methods give GOG.com's behaviour; `thumb_rows` is `RowScan::Original`
 (the CD's encoder). The discs are the French CD's layout (the five
 disc-2 Hoggar animations included), read by the same `CdSource`; the
 install's language folder is `usa`, which `install::Language` names
-English (`edition_label`: *Atlantis III, CD (DreamCatcher, 2001),
-English*), the engine using `usa` as the program does (the texts, voices
+English (`edition_label`, the language before the publisher as Atlantis
+II's labels: *Atlantis III, CD, English (DreamCatcher, 2001)*), the engine using `usa` as the program does (the texts, voices
 and films by name, `intro_videos`' `intro_usa.hnm`). Its `font.txt` asks
 for `EASTEUROPE_CHARSET`, which `text::GdiFont::arial_charset` measures
 with the Central European table. Tests (`ATLANTIS3_CD_US` = a folder

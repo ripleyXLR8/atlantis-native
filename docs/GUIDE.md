@@ -177,11 +177,11 @@ last played selected. Each game is shown as its name and edition,
 Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
-German*, *Atlantis III, CD, French*, *Atlantis III, CD (DreamCatcher,
-2001), English*, *Atlantis III, Atlantis Collection, Italian*, *Atlantis
-Evolution, GOG.com, English* or *Atlantis Evolution (2004), CD, English*
-or *Atlantis Evolution (2004), Atlantis Collection, Italian* (the original
-2004 program, in progress: see
+German*, *Atlantis III, CD, French*, *Atlantis III, CD, English
+(DreamCatcher, 2001)*, *Atlantis III, Atlantis Collection, Italian*,
+*Atlantis Evolution, GOG.com, English* or *Atlantis Evolution (2004),
+CD, English* or *Atlantis Evolution (2004), Atlantis Collection,
+Italian* (the original 2004 program, in progress: see
 [The 2004 CD](#the-2004-cd-in-progress)) or *The Secrets of Atlantis :
 L'Héritage sacré (2006), DVD image, French*, and its folder: the
 game's name in gold capitals, the edition beside it (why the folder does
@@ -957,8 +957,8 @@ it from the first CD, then point Atlantis Native at the folder the
 installer created (the one holding `Beyond Atlantis 2.exe` and `Datas`)
 with the images of the three CDs (the `.bin` files of a Redump dump, an
 `.iso`, or copies of the CDs) in it or in a folder inside it, as for the
-French CD. The game library shows it as *Atlantis III, CD (DreamCatcher,
-2001), English*. Its data are GOG.com's English files but for its own
+French CD. The game library shows it as *Atlantis III, CD, English
+(DreamCatcher, 2001)*. Its data are GOG.com's English files but for its own
 intro (`intro_usa.hnm`), a few texts naming the game *Beyond Atlantis
 II*, dialog subtitles with a few coarse words left out, and fonts asking
 for the Central European character set (an `è` of the credits is drawn
