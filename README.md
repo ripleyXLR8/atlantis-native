@@ -362,8 +362,8 @@ CD's: it asks for the discs as the French CD does, and otherwise draws the
 scarab case, the subjects menu, the Isis puzzle's pointer and the intro
 (`intro_usa.hnm`) as GOG.com's program; its texts are English (a few
 words left out), drawn in the Central European character set its
-`font.txt` asks for; the game library names it "Atlantis III, CD
-(DreamCatcher, 2001), English". The Italian *Atlantis Collection* installs
+`font.txt` asks for; the game library names it "Atlantis III, CD,
+English (DreamCatcher, 2001)". The Italian *Atlantis Collection* installs
 GOG.com's 2015 / 2018 `Game.exe` (the one GOG shipped before 2022) with
 Italian texts, voices and films; the game library names it "Atlantis III,
 Atlantis Collection, Italian" (the same program in an older GOG.com

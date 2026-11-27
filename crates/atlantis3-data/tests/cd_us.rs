@@ -5,7 +5,7 @@
 //!
 //! - the program `Beyond Atlantis 2.exe` is the known build
 //!   atlantis3-cd-us-3366912 ([`Release::CdUs2001`]), the edition
-//!   "Atlantis III, CD (DreamCatcher, 2001), English", the registry values
+//!   "Atlantis III, CD, English (DreamCatcher, 2001)", the registry values
 //!   `usa` and `CD`;
 //! - the three discs are found from the `.bin` images (Mode 1 and Mode 2
 //!   sectors);
@@ -46,7 +46,7 @@ fn build_edition_and_discs() {
     );
     assert_eq!(
         files.edition_label().unwrap(),
-        "Atlantis III, CD (DreamCatcher, 2001), English"
+        "Atlantis III, CD, English (DreamCatcher, 2001)"
     );
     let (language, version) = atlantis3_data::install::install_registry(&files);
     assert_eq!((&language[..], &version[..]), (&b"usa"[..], &b"CD"[..]));
