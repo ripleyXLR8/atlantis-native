@@ -1004,6 +1004,33 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 
+    /// The Traditional Chinese CD (*亞特蘭提斯Ⅲ 失落的帝國*): its installed folder refused
+    /// without its discs, opened with the folder of its three CloneCD
+    /// images and started to the start page; its texts measured in Big5.
+    #[test]
+    fn the_traditional_chinese_cd_with_its_discs() {
+        let Some((dir, discs)) = atlantis3_data::testing::cd_zh_tw() else {
+            return;
+        };
+        let name = "Atlantis III, Taiwanese CD, Traditional Chinese (Interwise, 2002)";
+        assert_eq!(label(&dir).unwrap(), name);
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-cdzhtw-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let e = open_in(&dir, &base, false).err().unwrap();
+        assert!(e.contains("none of its discs"), "{e}");
+        let (mut game, label) =
+            open_in_with_discs(&dir, std::slice::from_ref(&discs), &base, false).unwrap();
+        assert_eq!(label, name);
+        assert_eq!(
+            game.files().discs().map(|d| d.disc_numbers()),
+            Some(vec![1, 2, 3])
+        );
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
     /// The Czech CD (GAME4U Speciál 10): its installed folder refused
     /// without its discs, opened with the folder of its three CloneCD
     /// images and started to the start page.

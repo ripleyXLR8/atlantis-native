@@ -540,6 +540,7 @@ fn gdi_of(font: &ab_glyph::FontVec, height: i32, simulated_bold: bool) -> GdiFon
             + i32::from(simulated_bold),
         charset: 0,
         abc,
+        dbcs: None,
     }
 }
 
@@ -971,6 +972,7 @@ mod tests {
             ave_char_width: 10,
             charset: 0,
             abc: vec![(1, 8, 1); 256],
+            dbcs: None,
         }
     }
 

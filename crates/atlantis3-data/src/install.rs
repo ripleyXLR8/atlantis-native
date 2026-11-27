@@ -33,6 +33,12 @@
 //! CD (*Den nya världen*, Toptronics, 2002) has the same installer, and
 //! `swe`. The Czech CD (GAME4U Speciál 10, 2003) lists one code, `cze`,
 //! the only folder of its `Datas\loc\text\`.
+//!
+//! The Traditional Chinese CD (亞特蘭提斯Ⅲ 失落的帝國, Interwise, 2002)
+//! installs the same program with the same installer; its texts are in
+//! `gbr`, in Big5, and its voices English: the registry value stays
+//! `gbr`, and the edition's language is told by its data, its
+//! `font\font.txt` asking for `CHINESEBIG5_CHARSET` ([`data_language`]).
 
 use crate::exe::Build;
 use crate::A3Files;
@@ -48,6 +54,9 @@ pub enum Language {
     Portuguese,
     Swedish,
     Czech,
+    /// The Traditional Chinese CD's: `gbr` with Big5 texts
+    /// ([`data_language`]); never a registry code of its own.
+    TraditionalChinese,
 }
 
 impl Language {
@@ -80,6 +89,7 @@ impl Language {
             Language::Portuguese => "Portuguese",
             Language::Swedish => "Swedish",
             Language::Czech => "Czech",
+            Language::TraditionalChinese => "Traditional Chinese",
         }
     }
 }
@@ -103,7 +113,42 @@ pub const LANGUAGE_EDITIONS: &[(&str, Language, &str)] = &[
         Language::Swedish,
         "Atlantis III, Swedish CD, Swedish (Toptronics, 2002)",
     ),
+    (
+        "atlantis3-cd-pt-3424256",
+        Language::TraditionalChinese,
+        "Atlantis III, Taiwanese CD, Traditional Chinese (Interwise, 2002)",
+    ),
 ];
+
+/// Whether the install's `Datas\font\font.txt` puts a font in
+/// `CHINESEBIG5_CHARSET` (the Traditional Chinese CD's, whose texts are
+/// Big5 and drawn in the system's Big5 face).
+pub fn has_big5_fonts(src: &dyn atlantis_data::FileSource) -> bool {
+    src.read(crate::font_txt::FONT_TXT_PATH).is_some_and(|d| {
+        crate::font_txt::FontTxt::parse(&d)
+            .fonts
+            .iter()
+            .any(|f| f.charset_name == "CHINESEBIG5_CHARSET")
+    })
+}
+
+/// The language of the install's texts: the registry value's
+/// ([`Language::from_code`]), but Traditional Chinese for an English code
+/// whose `font\font.txt` puts a font in `CHINESEBIG5_CHARSET` (the
+/// Traditional Chinese CD's: all five, its `gbr` texts Big5; atlantis3-re
+/// `discs/cd-zh-tw.md`). No other edition's `font.txt` asks for that
+/// character set.
+pub fn data_language(files: &A3Files, code: &[u8]) -> Option<Language> {
+    let language = Language::from_code(code)?;
+    if language != Language::English {
+        return Some(language);
+    }
+    Some(if has_big5_fonts(files.source()) {
+        Language::TraditionalChinese
+    } else {
+        language
+    })
+}
 
 /// The edition's name: an edition of [`LANGUAGE_EDITIONS`], else the
 /// build's name with the language ("Atlantis III, GOG.com, German",
@@ -273,6 +318,10 @@ mod tests {
         assert_eq!(
             edition_label(pt, Some(Language::Swedish)),
             "Atlantis III, Swedish CD, Swedish (Toptronics, 2002)"
+        );
+        assert_eq!(
+            edition_label(pt, Some(Language::TraditionalChinese)),
+            "Atlantis III, Taiwanese CD, Traditional Chinese (Interwise, 2002)"
         );
         assert_eq!(
             edition_label(pt, Some(Language::English)),

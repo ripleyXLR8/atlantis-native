@@ -188,7 +188,7 @@ impl A3Files {
     pub fn edition_label(&self) -> Result<String, OpenError> {
         let build = self.build()?;
         let (language, _) = crate::install::install_registry(self);
-        let language = crate::install::Language::from_code(&language);
+        let language = crate::install::data_language(self, &language);
         if self.is_collection() {
             return Ok(crate::install::named_label(exe::COLLECTION_LABEL, language));
         }

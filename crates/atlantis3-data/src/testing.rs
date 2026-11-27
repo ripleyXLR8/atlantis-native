@@ -153,6 +153,19 @@ pub fn cd_sv() -> Option<(PathBuf, PathBuf)> {
     Some((dir.join("installed"), dir))
 }
 
+/// The variable naming the Traditional Chinese CD's folder (亞特蘭提斯Ⅲ
+/// 失落的帝國, Interwise, 2002): its three ISO images and `installed\`
+/// (the first disc's `data1.cab` extracted).
+pub const CD_ZH_TW_VAR: &str = "ATLANTIS3_CD_ZH_TW";
+
+/// The Traditional Chinese CD's installed folder and its discs' folder
+/// (from `ATLANTIS3_CD_ZH_TW`); its absence never fails a test
+/// ([`optional_dir`]).
+pub fn cd_zh_tw() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_ZH_TW_VAR)?;
+    Some((dir.join("installed"), dir))
+}
+
 /// The variable naming the Czech CD's folder (GAME4U Speciál 10, 2003):
 /// its three `.bin` / `.cue` images and `installed\` (the first disc's
 /// `data1.cab` extracted).

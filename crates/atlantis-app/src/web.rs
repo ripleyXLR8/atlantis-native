@@ -441,7 +441,7 @@ pub async fn start(
         };
         // Atlantis III alone, or chosen among the games of the folder.
         if others.is_empty() || game.as_deref() == Some("atlantis3") {
-            start_atlantis3(all, &install)?;
+            start_atlantis3(all, &install).await?;
             return Ok("atlantis3".into());
         }
         if game.is_none() {
@@ -1335,14 +1335,40 @@ impl Loader for ImageLoader {
 }
 
 /// Atlantis III from its installed folder among the picked files
-/// ([`crate::a3_web`]), the saves in the browser's storage.
-fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
+/// ([`crate::a3_web`]), the saves in the browser's storage. The
+/// Traditional Chinese CD's Big5 text font is fetched first, unless the
+/// folder holds the player's `mingliu.ttc`.
+async fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
     let discs = {
         let paths: Vec<&str> = all.keys().map(String::as_str).collect();
         crate::web_layout::a3_discs(&paths, install)
     };
     let index = keep_picked(all);
     let discs = picked_sources(&index, &discs);
+    // The Big5 fonts are drawn in the system's Big5 face
+    // (`atlantis3_engine::text::Texts::big5_face`): the player's, else
+    // the port's, fetched beside the page.
+    let dir = PickedDir::new(&index, install);
+    if atlantis3_data::install::has_big5_fonts(&dir) {
+        let code_page = atlantis_data::TextCodePage::Windows950;
+        let player_font = atlantis_engine::subtitles::player_font(code_page)
+            .is_some_and(|(name, _)| dir.size(name).is_some());
+        if let Some(name) =
+            atlantis_engine::subtitles::cjk_font_file(code_page).filter(|_| !player_font)
+        {
+            let url = format!("fonts/{name}");
+            match fetch_url(&url).await {
+                Ok(data) => {
+                    if atlantis_engine::subtitles::provide_cjk_font(code_page, data) {
+                        log::info!("text font: {url}");
+                    } else {
+                        log::warn!("{url}: not a font");
+                    }
+                }
+                Err(e) => log::warn!("{url}: {e:?}"),
+            }
+        }
+    }
     let store: Rc<dyn SaveStore> = match WebStore::new("atlantis3") {
         Some(s) => Rc::new(s),
         None => {

@@ -8,6 +8,9 @@ license.workspace = true
 [dependencies]
 atlantis-codecs = { path = "../atlantis-codecs" }
 atlantis-data = { path = "../atlantis-data" }
+# The CJK faces of the first game (the player's PMingLiU, the bundled
+# Noto Serif TC) for the Traditional Chinese CD's Big5 fonts.
+atlantis-engine = { path = "../atlantis-engine" }
 atlantis2-data = { path = "../atlantis2-data" }
 # Shared with Atlantis II where the code is the same: the cube renderer,
 # the camera and the mouse look, the CON interpreter, the sound voices.
@@ -20,6 +23,7 @@ atlantis5-script = { path = "../atlantis5-script" }
 ab_glyph = "0.2"
 libm = "=0.2.16"
 log = "0.4"
+ttf-parser = { version = "0.25", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 md-5 = "0.10"

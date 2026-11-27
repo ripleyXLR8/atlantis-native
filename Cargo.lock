@@ -300,6 +300,7 @@ dependencies = [
  "ab_glyph",
  "atlantis-codecs",
  "atlantis-data",
+ "atlantis-engine",
  "atlantis2-data",
  "atlantis2-engine",
  "atlantis3-data",
@@ -308,6 +309,7 @@ dependencies = [
  "libm",
  "log",
  "md-5",
+ "ttf-parser",
 ]
 
 [[package]]
