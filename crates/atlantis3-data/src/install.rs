@@ -75,10 +75,30 @@ impl Language {
     }
 }
 
-/// The edition's name: the build's, then the language
-/// ("Atlantis III, GOG.com, German"); an unknown language leaves the
-/// build's name alone.
+/// Editions that share a build and differ by their data's language: the
+/// build, the install's language, the edition's whole name. The
+/// Portuguese CD's `Atlantis3.exe` (atlantis3-cd-pt-3424256) is also the
+/// Swedish CD's and the Traditional Chinese CD's (atlantis3-re
+/// `discs/cd-sv.md`, `discs/cd-zh-tw.md`); each install's
+/// `Datas\loc\text\` holds one language folder, `por` on the Portuguese
+/// CD alone (`swe`, and `gbr` with Big5 texts, on the others), so the
+/// language names the edition.
+pub const LANGUAGE_EDITIONS: &[(&str, Language, &str)] = &[(
+    "atlantis3-cd-pt-3424256",
+    Language::Portuguese,
+    "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)",
+)];
+
+/// The edition's name: an edition of [`LANGUAGE_EDITIONS`], else the
+/// build's name with the language ("Atlantis III, GOG.com, German",
+/// [`named_label`]); an unknown language leaves the build's name alone.
 pub fn edition_label(build: &Build, language: Option<Language>) -> String {
+    if let Some(&(_, _, name)) = LANGUAGE_EDITIONS
+        .iter()
+        .find(|&&(id, l, _)| id == build.id && Some(l) == language)
+    {
+        return name.to_string();
+    }
     named_label(build.label, language)
 }
 
@@ -223,6 +243,18 @@ mod tests {
                 Some(Language::English)
             ),
             "Atlantis III, CD, English (DreamCatcher, 2001)"
+        );
+        let pt = KNOWN_BUILDS
+            .iter()
+            .find(|b| b.id == "atlantis3-cd-pt-3424256")
+            .unwrap();
+        assert_eq!(
+            edition_label(pt, Some(Language::Portuguese)),
+            "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)"
+        );
+        assert_eq!(
+            edition_label(pt, Some(Language::English)),
+            "Atlantis III, CD, English (October 2001 build)"
         );
         assert_eq!(
             named_label("Atlantis III, CD", Some(Language::French)),

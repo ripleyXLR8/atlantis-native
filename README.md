@@ -367,7 +367,7 @@ words left out), drawn in the Central European character set its
 English (DreamCatcher, 2001)". The Portuguese CD (*O Novo Mundo*,
 Playgames, 2001) has the North American program rebuilt two weeks later,
 and plays the same way, with Portuguese voices, texts and films; the game
-library names it "Atlantis III, CD (October 2001 build), Portuguese". The Italian *Atlantis Collection* installs
+library names it "Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)". The Italian *Atlantis Collection* installs
 GOG.com's 2015 / 2018 `Game.exe` (the one GOG shipped before 2022) with
 Italian texts, voices and films; the game library names it "Atlantis III,
 Atlantis Collection, Italian" (the same program in an older GOG.com

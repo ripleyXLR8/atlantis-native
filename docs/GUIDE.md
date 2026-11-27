@@ -178,7 +178,7 @@ Lost Tales, CD, English (May 1997 build)* (with *from disc images* when
 it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 1.01)*, *Atlantis II, French CD (1999)*, *Atlantis III, GOG.com,
 German*, *Atlantis III, CD, French*, *Atlantis III, CD, English
-(DreamCatcher, 2001)*, *Atlantis III, CD (October 2001 build), Portuguese*,
+(DreamCatcher, 2001)*, *Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)*,
 *Atlantis III, Atlantis Collection, Italian*, *Atlantis Evolution, GOG.com, English* or *Atlantis Evolution
 (2004), CD, English* (the original 2004 program, in progress: see
 [The 2004 CD](#the-2004-cd-in-progress)) or *The Secrets of Atlantis :
@@ -975,7 +975,7 @@ Native plays it so:
 three CDs) installs and opens as the French CD does (the folder with
 `Atlantis3.exe` and `Datas`, the three CD images in it or in a folder
 inside it; a CloneCD dump's `.img` files are read as they are). The game
-library shows it as *Atlantis III, CD (October 2001 build), Portuguese*. Its
+library shows it as *Atlantis III, Portuguese CD, Portuguese (Playgames, 2001)*. Its
 voices, texts and films are Portuguese, the rest GOG.com's data (its
 English scripts and films where GOG.com's French and English differ). Its
 program (3,424,256 bytes, MD5 `e5e89f926f80be9ce06a324f27018e89`) is the
