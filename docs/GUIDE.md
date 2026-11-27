@@ -995,7 +995,8 @@ as GOG.com's program.
 three CDs) is the Portuguese CD's edition in Swedish: the same program
 and data but for the Swedish voices, texts and films. It installs and
 opens the same way (ISO images); the game library shows it as *Atlantis
-III, CD (October 2001 build), Swedish*.
+III, Swedish CD, Swedish (Toptronics, 2002)*, telling it from the
+Portuguese CD by the language of its installed data.
 
 **How it was checked.** The port follows the original program's code,
 address by address, and automated tests replay what that code computed
