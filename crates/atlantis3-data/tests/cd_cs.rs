@@ -5,8 +5,8 @@
 //!
 //! - the program `Atlantis3.exe` is the known build
 //!   atlantis3-cd-cs-3379200 ([`Release::CdCs2001`]; the French CD's size,
-//!   another file), the edition "Atlantis III, CD (GAME4U Speciál 10),
-//!   Czech", the registry values `cze` and `CD`;
+//!   another file), the edition "Atlantis III, Czech CD, Czech
+//!   (GAME4U Speciál 10, 2003)", the registry values `cze` and `CD`;
 //! - the three discs are found from the images;
 //! - every file of the install and of the discs is read with its size
 //!   (atlantis3-re `discs/cd-cs.files.tsv`);
@@ -44,7 +44,7 @@ fn build_edition_and_discs() {
     );
     assert_eq!(
         files.edition_label().unwrap(),
-        "Atlantis III, CD (GAME4U Speciál 10), Czech"
+        "Atlantis III, Czech CD, Czech (GAME4U Speciál 10, 2003)"
     );
     let (language, version) = atlantis3_data::install::install_registry(&files);
     assert_eq!((&language[..], &version[..]), (&b"cze"[..], &b"CD"[..]));

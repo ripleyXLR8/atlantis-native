@@ -205,7 +205,7 @@ pub const KNOWN_BUILDS: [Build; 6] = [
     },
     Build {
         id: "atlantis3-cd-cs-3379200",
-        label: "Atlantis III, CD (GAME4U Speciál 10)",
+        label: "Atlantis III, Czech CD (GAME4U Speciál 10, 2003)",
         size: 3_379_200,
         // 2001-10-10 10:49:42 UTC.
         pe_timestamp: 0x3bc4_27c6,
