@@ -107,7 +107,9 @@ Atlantis Native **不含任何遊戲資料**，請使用你自己的正版遊戲
   [GOG.com](https://www.gog.com/) 版（英文、法文、德文、西班牙文）與義大利文 *Atlantis Collection* DVD。
 - **《Atlantis III》**：[GOG.com](https://www.gog.com/) 版（*Atlantis 3 - The New World*，英文、法文、德文、西班牙文），
   指定其安裝資料夾（含有 `Game.exe` 與 `Datas` 的資料夾）；法文零售光碟版（2001 年，3 張光碟），
-  指定其安裝資料夾（含有 `Atlantis3.exe` 與 `Datas` 的資料夾），三張光碟的映像檔（或複製檔案）放在其中或其子資料夾中。
+  指定其安裝資料夾（含有 `Atlantis3.exe` 與 `Datas` 的資料夾），三張光碟的映像檔（或複製檔案）放在其中或其子資料夾中；
+  英特衛發行的繁體中文光碟版（《亞特蘭提斯Ⅲ 失落的帝國》，2002，3 張光碟，繁體中文字幕與英文語音），方式相同；
+  文字使用玩家放在遊戲資料夾中的 `mingliu.ttc`（新細明體），否則使用內建的 Noto Serif TC。
   其他版本（其他零售光碟與 DVD）尚屬未知，也未經測試：程式會拒絕其執行檔，並顯示檔案大小與 MD5，方便在 GitHub 上回報以便加入支援。
 - **《Atlantis Evolution》**：[GOG.com](https://www.gog.com/) 版（英文、法文、德文、義大利文、西班牙文），
   指定其安裝資料夾（含有 `Atlantis Evolution.exe` 與 `3D` 的資料夾）；The Adventure Company 的 2004 年英文光碟版（預覽版），

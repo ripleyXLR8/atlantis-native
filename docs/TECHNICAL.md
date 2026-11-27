@@ -4371,6 +4371,8 @@ German*). The language-dependent rules, from the original's code:
   as a Windows without a Japanese font (a port decision; the English
   texts are ASCII but one `’`). The English `AtlFont_Credit` asks for
   height 20, so the tables hold 22 (20 × 1.1 at 1024 pixels);
+  `CHINESEBIG5_CHARSET` (the Taiwanese CD, all five fonts) takes the
+  double-byte renderer and the Big5 line break, below;
 - the scarab case's bank (`AtlScarabee_MainInit` @ 0x00432200) is
   `Scarabee.spr` and nothing else: the English and German installations
   have it, the French and Spanish ones name it `Scarabée.SPR`, which the
@@ -4510,6 +4512,52 @@ The Swedish CD (2002) has the same `Atlantis3.exe` and the same data but
 CD, Swedish (Toptronics, 2002)* by `install::LANGUAGE_EDITIONS`; its tests are the same on
 `ATLANTIS3_CD_SV` (its three ISO images and `installed\`): `cd_sv.rs` in
 both crates, `the_swedish_cd_with_its_discs`.
+
+The Taiwanese CD (亞特蘭提斯Ⅲ 失落的帝國, Interwise, 2002) has the same
+`Atlantis3.exe` and the same installer; its texts are `loc\…\gbr\` in
+Big5 (code page 950) and its voices English, and its `font.txt` asks for
+`Arial` in `CHINESEBIG5_CHARSET` for all five fonts. The registry value
+stays `gbr`: `install::data_language` names the language
+`TraditionalChinese` when an English code comes with a Big5 `font.txt`,
+and `install::LANGUAGE_EDITIONS` names the edition *Atlantis III,
+Taiwanese CD, Traditional Chinese (Interwise, 2002)*.
+
+Its texts. GDI answers that request on a Traditional Chinese Windows with
+the system's Big5 face (PMingLiU, inferred), whose `tmCharSet` 0x88 makes
+the text library (atlantis3-cd-pt-3424256 @ 0x006bf430: script index 3)
+take its double-byte renderer (@ 0x006bfb30: `GetCharacterPlacementA`
+advances, `ExtTextOutA(ETO_GLYPH_INDEX)`) and its Big5 break finder
+(@ 0x006c0dc0). The layout loop (@ 0x006bd930, the French program's
+0x006b4a20 instruction for instruction) walks the text with the C
+runtime's `_mbsinc` / `_mbsdec` in the system code page, so its estimate,
+shrink, extend and skip count characters. The finder is a kinsoku rule
+over three lists of strings: after the first character that does not fit
+when it begins with one of `! ) , . : ; ? ] }` (it hangs past the zone);
+else back over the opening marks before it (they may not end a line),
+then back over the closing marks and the punctuation (they may not start
+one); the next line starts there, past the bytes equal to `tmBreakChar`.
+Spaces are ordinary characters in this mode. The port (`text::GdiFont`'s
+`dbcs` part, `text::Dbcs`, `text::big5_lines`, `text::big5_break`)
+follows it; a font is measured per character in the face it draws: the
+player's `mingliu.ttc` (face PMingLiU) in the installed folder, else the
+bundled Noto Serif TC, at the cell height in pixels per em (the player's
+face sized from its Windows metrics as GDI sizes a positive height). The
+advances are derived from the face's `hmtx` (rounded), not measured with
+GDI, so ASCII widths and the ascent may differ from the original's by a
+pixel; the ideographs are one em wide in both faces. A break the original
+could not make (an overflow on a paragraph's first character, a line of
+closing marks) is cut before the character that overflows; no shipped
+text gets there. Justification (alignment 3) is not reached by the game
+and not ported. The web build fetches `fonts/NotoSerifTC-Subset.otf` for
+this edition unless the folder holds `mingliu.ttc`.
+Tests (`ATLANTIS3_CD_ZH_TW`: its three ISO images and `installed\`;
+optional): `cd_zh_tw.rs` in both crates (the build, edition, registry,
+discs, every file against atlantis3-re's inventory, `font.txt` and the
+Big5 texts; the intro, a new game on disc 2, the five fonts at three
+widths, every `Dial.txt` line against `golden/a3_big5_dial_lines.txt` —
+atlantis3-re's model of the layout, byte ranges and hashes only — every
+character a glyph, a drawn line), `the_traditional_chinese_cd_with_its_discs`,
+and `text.rs`'s unit tests against the model's synthetic cases.
 
 **The Czech CD (GAME4U Speciál 10, 2003).** atlantis3-cd-cs-3379200
 (`Atlantis3.exe`, 3,379,200 bytes as the French CD's but another file,

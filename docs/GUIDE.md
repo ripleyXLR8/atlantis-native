@@ -113,8 +113,9 @@ release (亞特蘭提斯2, Interwise, 2000), the GOG.com edition and the Italian
 English, French, German or Spanish, the French CD (2001, three CDs), the
 North American CD (*Beyond Atlantis II*, DreamCatcher, 2001, three CDs), the
 Portuguese CD (*O Novo Mundo*, Playgames, 2002, three CDs), the Swedish
-CD (*Den nya världen*, Toptronics, 2002, three CDs), the Czech CD (GAME4U
-Speciál 10, 2003, three CDs) and
+CD (*Den nya världen*, Toptronics, 2002, three CDs), the Taiwanese CD
+(亞特蘭提斯Ⅲ 失落的帝國, Interwise, 2002, three CDs, Traditional Chinese),
+the Czech CD (GAME4U Speciál 10, 2003, three CDs) and
 the Italian *Atlantis Collection* DVD (installed);
 other editions are unknown and untested (see [Atlantis III](#atlantis-iii)). For Atlantis Evolution:
 GOG.com's release, in English, French, German, Italian and Spanish, and
@@ -183,6 +184,7 @@ it is read from images of the CDs), *Atlantis II, GOG.com, French (patch
 German*, *Atlantis III, CD, French*, *Atlantis III, CD, English
 (DreamCatcher, 2001)*, *Atlantis III, Portuguese CD, Portuguese
 (Playgames, 2002)*, *Atlantis III, Swedish CD, Swedish (Toptronics,
+2002)*, *Atlantis III, Taiwanese CD, Traditional Chinese (Interwise,
 2002)*, *Atlantis III, Czech CD, Czech (GAME4U Speciál 10, 2003)*,
 *Atlantis III, Atlantis Collection, Italian*, *Atlantis Evolution,
 GOG.com, English* or *Atlantis Evolution (2004), CD, English* or
@@ -338,7 +340,7 @@ What to pick:
   Italian *Atlantis Collection*: the installation folder (the one
   holding `Game.exe` and `Datas`).
 - *Atlantis III*, the French, North American (*Beyond Atlantis II*),
-  Portuguese, Swedish or Czech CD (2001 to 2003, three CDs): the folder of the installed game (the
+  Portuguese, Swedish, Taiwanese or Czech CD (2001 to 2003, three CDs): the folder of the installed game (the
   one holding `Atlantis3.exe`, or `Beyond Atlantis 2.exe`, and `Datas`), with the
   images of the three CDs (`.iso`, `.bin`, `.img`, `.mdf` or `.nrg`) in
   it or in a folder inside it, or copies of the CDs (for example folders
@@ -999,6 +1001,17 @@ and data but for the Swedish voices, texts and films. It installs and
 opens the same way (ISO images); the game library shows it as *Atlantis
 III, Swedish CD, Swedish (Toptronics, 2002)*, telling it from the
 Portuguese CD by the language of its installed data.
+
+**The Taiwanese CD.** 亞特蘭提斯Ⅲ 失落的帝國 (Interwise, 2002, three CDs)
+is the same program with Traditional Chinese texts and menus and English
+voices. It installs and opens as the Portuguese CD does (ISO images); the
+game library shows it as *Atlantis III, Taiwanese CD, Traditional
+Chinese (Interwise, 2002)*. The texts are drawn in the player's
+`mingliu.ttc` (its face PMingLiU, the one a Traditional Chinese Windows
+gives the game) when it is copied into the installed folder, else in the
+bundled Noto Serif TC; they are measured and broken per character, with
+the original's rules for Chinese punctuation (a comma or a closing mark
+never starts a line, an opening mark never ends one).
 
 **The Czech CD.** *Atlantis 3* as the magazine GAME4U's *Speciál 10*
 (2003, three CDs) installs and opens as the French CD does (the `.bin`
