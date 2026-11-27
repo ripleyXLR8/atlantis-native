@@ -103,7 +103,8 @@ whether the Italian voices and films are the collection's.
 | 🟠 wanted | *Atlantis III: Die neue Welt*, re-release | Germany | — | 1 DVD | Barcode 4019393958269; Redump [65418](http://redump.org/disc/65418/) |
 | 🟠 wanted | *Atlantis III: The New World*, version 1.11 | Europe, Dice | — | 3 CD | DCG 901660; barcode 8711539016609; Redump [70768](http://redump.org/disc/70768/) |
 | 🟠 wanted | *Atlantis III: Il Nuovo Mondo*, re-release | Italy | — | 3 CD | Serial 73399105; barcode 3342181027337; Redump [71147](http://redump.org/disc/71147/)–71149 |
-| ⚪ unconfirmed | *Atlantis III*, German, Greek or Russian first editions, and the Czech one before its GAME4U Speciál 10 re-issue | — | 2001–2002 | CD | The program has intro films for these languages, so these editions probably exist |
+| 🟠 wanted | *Atlantis III: Die neue Welt* | Germany, Cryo | 2001 | CD | AT3GRCD1 on disc 1 (made in France by Cinram); box codes AT3GRPC, AT3003; barcode 3554540163031. Only scans of the box, disc and manual are known: an image of the discs is wanted |
+| ⚪ unconfirmed | *Atlantis III*, Greek or Russian first editions, and the Czech one before its GAME4U Speciál 10 re-issue | — | 2001–2002 | CD | The program has intro films for these languages, so these editions probably exist |
 | 🟠 wanted | 亚特兰蒂斯3：新世界 | China | — | 3 CD | Redump [86956](http://redump.org/disc/86956/)–86958 |
 | 🟠 wanted | 亞特蘭提斯Ⅲ：失落的帝國 | Taiwan | — | 3 CD | Redump [86959](http://redump.org/disc/86959/)–86961 |
 
