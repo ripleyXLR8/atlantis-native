@@ -107,7 +107,10 @@ Atlantis Native **不含任何游戏数据**，请使用你自己的正版游戏
   [GOG.com](https://www.gog.com/) 版（英文、法文、德文、西班牙文）和意大利文 *Atlantis Collection* DVD。
 - **《Atlantis III》**：[GOG.com](https://www.gog.com/) 版（*Atlantis 3 - The New World*，英文、法文、德文、西班牙文），
   指定其安装文件夹（包含 `Game.exe` 和 `Datas` 的文件夹）；法文零售光盘版（2001 年，3 张光盘），
-  指定其安装文件夹（包含 `Atlantis3.exe` 和 `Datas` 的文件夹），三张光盘的镜像（或复制文件）放在其中或其子文件夹中。
+  指定其安装文件夹（包含 `Atlantis3.exe` 和 `Datas` 的文件夹），三张光盘的镜像（或复制文件）放在其中或其子文件夹中；
+  简体中文光盘版（《亚特兰蒂斯3 新世界》，2002，3 张光盘，简体中文字幕与英文语音）：复制第一张光盘的 `GAMEDATA` 文件夹
+  （包含 `Atlantis3.exe`、`GSooAPI.res` 和 `Datas`）并指定它，三张光盘的镜像放在其中或其子文件夹中；
+  中文按原版汉化外挂的方式绘制（14 像素宋体），使用玩家放在该文件夹中的 `simsun.ttc`，否则使用内置的 Noto Serif SC。
   其他版本（其他零售光盘和 DVD）尚属未知，也未经测试：程序会拒绝其可执行文件，并显示文件大小和 MD5，方便在 GitHub 上回报以便加入支持。
 - **《Atlantis Evolution》**：[GOG.com](https://www.gog.com/) 版（英文、法文、德文、意大利文、西班牙文），
   指定其安装文件夹（包含 `Atlantis Evolution.exe` 和 `3D` 的文件夹）；The Adventure Company 的 2004 年英文光盘版（预览版），

@@ -21,6 +21,8 @@
 //! - [`objects`]: `Objects.txt` and `Errors.txt`;
 //! - [`cine_txt`]: the cinematics' subtitle cues and captions;
 //! - [`font_txt`]: the fonts of `font.txt`;
+//! - [`gsoo`]: the Simplified Chinese CD's text hook and its table
+//!   `GSooAPI.res`;
 //! - [`atl`]: the `.atl` menu layouts and their `i_*.txt` tooltips;
 //! - [`cfg`]: the settings file `Atlantis3.cfg`;
 //! - [`save`]: the text saves;
@@ -60,6 +62,7 @@ pub mod evolution2004_sfx;
 pub mod exe;
 pub mod files;
 pub mod font_txt;
+pub mod gsoo;
 pub mod hnm_header;
 pub mod install;
 pub mod objects;

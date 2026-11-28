@@ -39,6 +39,13 @@
 //! `gbr`, in Big5, and its voices English: the registry value stays
 //! `gbr`, and the edition's language is told by its data, its
 //! `font\font.txt` asking for `CHINESEBIG5_CHARSET` ([`data_language`]).
+//!
+//! The Simplified Chinese CD (亚特兰蒂斯3, 2002) copies its first disc's
+//! `GAMEDATA\` (a program of its own, atlantis3-cd-zh-cn-3682370, and
+//! GOG.com English's data, `gbr` alone) with a text hook beside the
+//! program: the language is told by the hook's table `GSooAPI.res`
+//! ([`has_gsoo_texts`]), whose GBK Chinese replaces the English as the
+//! game draws it ([`crate::gsoo`]).
 
 use crate::exe::Build;
 use crate::A3Files;
@@ -57,6 +64,9 @@ pub enum Language {
     /// The Traditional Chinese CD's: `gbr` with Big5 texts
     /// ([`data_language`]); never a registry code of its own.
     TraditionalChinese,
+    /// The Simplified Chinese CD's: `gbr` with the text hook's GBK table
+    /// ([`has_gsoo_texts`]); never a registry code of its own.
+    SimplifiedChinese,
 }
 
 impl Language {
@@ -90,6 +100,7 @@ impl Language {
             Language::Swedish => "Swedish",
             Language::Czech => "Czech",
             Language::TraditionalChinese => "Traditional Chinese",
+            Language::SimplifiedChinese => "Simplified Chinese",
         }
     }
 }
@@ -118,7 +129,26 @@ pub const LANGUAGE_EDITIONS: &[(&str, Language, &str)] = &[
         Language::TraditionalChinese,
         "Atlantis III, Taiwanese CD, Traditional Chinese (Interwise, 2002)",
     ),
+    // The publisher is not on the discs (atlantis3-re `discs/cd-zh-cn.md`).
+    (
+        "atlantis3-cd-zh-cn-3682370",
+        Language::SimplifiedChinese,
+        "Atlantis III, Chinese CD, Simplified Chinese (2002)",
+    ),
 ];
+
+/// The build the Simplified Chinese CD's text hook is written for: its
+/// detours check the program's bytes at their addresses and stop on any
+/// other (GSooKernel.dll @ 0x10001020).
+pub const GSOO_BUILD: &str = "atlantis3-cd-zh-cn-3682370";
+
+/// Whether the install draws its texts through the Simplified Chinese
+/// CD's text hook: its program ([`GSOO_BUILD`]) with the hook's table
+/// `GSooAPI.res` beside it.
+pub fn has_gsoo_texts(files: &A3Files) -> bool {
+    files.build().is_ok_and(|b| b.id == GSOO_BUILD)
+        && files.source().size(crate::gsoo::TABLE_NAME).is_some()
+}
 
 /// Whether the install's `Datas\font\font.txt` puts a font in
 /// `CHINESEBIG5_CHARSET` (the Traditional Chinese CD's, whose texts are
@@ -137,7 +167,8 @@ pub fn has_big5_fonts(src: &dyn atlantis_data::FileSource) -> bool {
 /// whose `font\font.txt` puts a font in `CHINESEBIG5_CHARSET` (the
 /// Traditional Chinese CD's: all five, its `gbr` texts Big5; atlantis3-re
 /// `discs/cd-zh-tw.md`). No other edition's `font.txt` asks for that
-/// character set.
+/// character set. Simplified Chinese for an English code drawn through
+/// the Simplified Chinese CD's text hook ([`has_gsoo_texts`]).
 pub fn data_language(files: &A3Files, code: &[u8]) -> Option<Language> {
     let language = Language::from_code(code)?;
     if language != Language::English {
@@ -145,6 +176,8 @@ pub fn data_language(files: &A3Files, code: &[u8]) -> Option<Language> {
     }
     Some(if has_big5_fonts(files.source()) {
         Language::TraditionalChinese
+    } else if has_gsoo_texts(files) {
+        Language::SimplifiedChinese
     } else {
         language
     })
@@ -326,6 +359,15 @@ mod tests {
         assert_eq!(
             edition_label(pt, Some(Language::English)),
             "Atlantis III, CD, English (October 2001 build)"
+        );
+        let cn = KNOWN_BUILDS.iter().find(|b| b.id == GSOO_BUILD).unwrap();
+        assert_eq!(
+            edition_label(cn, Some(Language::SimplifiedChinese)),
+            "Atlantis III, Chinese CD, Simplified Chinese (2002)"
+        );
+        assert_eq!(
+            edition_label(cn, Some(Language::English)),
+            "Atlantis III, CD, English (February 2002 build)"
         );
         assert_eq!(
             named_label("Atlantis III, CD", Some(Language::French)),

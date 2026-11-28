@@ -339,6 +339,9 @@ pub struct TipCtx<'a> {
     pub tip: &'a mut TipBox,
     pub shapes: &'a mut Vec<Shape>,
     pub texts: &'a mut Vec<TextCall>,
+    /// The game's texts, for the text the library measures
+    /// ([`Texts::library_text`]).
+    pub library: Option<&'a Texts>,
 }
 
 impl Page {
@@ -871,6 +874,12 @@ fn tip_box<P: PagePixel>(
         ctx.tip.shown = false;
         return;
     }
+    // The measure goes through `AtlFont_Print`'s variant (@ 0x0041e390),
+    // whose copy-out the Simplified Chinese CD's hook rewrites.
+    let text = ctx
+        .library
+        .map_or(std::borrow::Cow::Borrowed(text), |t| t.library_text(text));
+    let text = &text[..];
     let (px, py) = ctx.pointer;
     let (wi, hi) = (w as i32, h as i32);
     let mut b = TipBox {
@@ -1376,7 +1385,7 @@ impl Menus {
         self.texts.push(TextCall::Layout(zone));
         let Some(t) = env.texts else { return };
         if let Some(g) = t.gdi(font, w) {
-            for line in layout(g, text, w as i32, h as i32, zone) {
+            for line in layout(g, &t.library_text(text), w as i32, h as i32, zone) {
                 self.texts.push(TextCall::Draw { line, font, rgb });
             }
         }
@@ -1423,6 +1432,7 @@ impl Menus {
             tip: &mut tip,
             shapes: &mut shapes,
             texts: &mut texts,
+            library: env.texts,
         };
         let draws = if x888 {
             p.pass(&mut surface32, w, h, env.now, input.button, Some(ctx))
@@ -1457,6 +1467,7 @@ impl Menus {
                 tip: &mut tip,
                 shapes: &mut shapes,
                 texts: &mut texts,
+                library: env.texts,
             };
             let draws = if x888 {
                 p.pass(&mut surface32, w, h, env.now, button, Some(ctx))

@@ -8,6 +8,8 @@ cut, plus ASCII and the punctuation. Noto Serif TC also holds the
 characters of Atlantis II's Traditional Chinese CD (its installed
 `loc/*.txt`, Big5) and of Atlantis III's (its installed
 `Datas/loc/text/gbr/*.txt`, Big5), which draw their texts in the same face.
+Noto Serif SC also holds the characters of Atlantis III's Simplified
+Chinese CD (the Chinese lines of its text hook's table `GSooAPI.res`, GBK).
 
 The fonts come from the official releases of
 https://github.com/notofonts/noto-cjk: Serif2.003 (14_NotoSerifSC.zip,
@@ -27,6 +29,9 @@ the game is kept here).
 the TC subset was regenerated for Atlantis III with `--keep
 NotoSerifTC-Subset.otf --tw3 ...`, which keeps every earlier character
 (the outlines come from the same Noto release, cut with the same options).
+The SC subset was regenerated the same way for Atlantis III's Simplified
+Chinese CD: `--sc NotoSerifSC-Regular.otf --keep-sc NotoSerifSC-Subset.otf
+--cn3 <its installed folder>/GSooAPI.res`.
     python3 assets/fonts/make_cjk_subset.py \\
         --jp NotoSansJP-Regular.otf --ja <the DVD's side B>/FACE_B/JAP
 
@@ -88,6 +93,16 @@ def a3_loc_chars(folder):
     return "".join(sorted(c for c in chars if ord(c) > 0x7f))
 
 
+def gsoo_chars(path):
+    """The characters of the Chinese lines (`GSoo_Chi:` to CR LF) of the
+    Simplified Chinese CD's text hook's table, read as code page 936."""
+    chars = set()
+    for line in Path(path).read_bytes().split(b"\r\n"):
+        if line.startswith(b"GSoo_Chi:"):
+            chars |= set(line[9:].decode("gbk", errors="ignore"))
+    return "".join(sorted(c for c in chars if ord(c) > 0x7f))
+
+
 def font_chars(path):
     """The characters a font maps (its best cmap)."""
     from fontTools.ttLib import TTFont
@@ -127,7 +142,9 @@ def main():
     p.add_argument("--cn", help="the Simplified Chinese CD (files or disc images)")
     p.add_argument("--tw2", help="Atlantis II's Traditional Chinese CD, installed")
     p.add_argument("--tw3", help="Atlantis III's Traditional Chinese CD, installed")
+    p.add_argument("--cn3", help="Atlantis III's Simplified Chinese CD's GSooAPI.res")
     p.add_argument("--keep", help="a subset already made, whose characters are kept")
+    p.add_argument("--keep-sc", help="the SC subset already made, whose characters are kept")
     p.add_argument("--jp", help="NotoSansJP-Regular.otf")
     p.add_argument("--ja", help="the Japanese DVD's language folder (FACE_B/JAP of side B)")
     a = p.parse_args()
@@ -136,8 +153,11 @@ def main():
         chars += a3_loc_chars(a.tw3) if a.tw3 else ""
         chars += font_chars(a.keep) if a.keep else ""
         subset(a.tc, chars, HERE / "NotoSerifTC-Subset.otf")
-    if a.sc and a.cn:
-        subset(a.sc, con_chars(a.cn), HERE / "NotoSerifSC-Subset.otf")
+    if a.sc and (a.cn or a.keep_sc):
+        chars = con_chars(a.cn) if a.cn else ""
+        chars += gsoo_chars(a.cn3) if a.cn3 else ""
+        chars += font_chars(a.keep_sc) if a.keep_sc else ""
+        subset(a.sc, chars, HERE / "NotoSerifSC-Subset.otf")
     if a.jp and a.ja:
         subset(a.jp, con_chars(a.ja), HERE / "NotoSansJP-Subset.otf", UNICODES_JP)
 

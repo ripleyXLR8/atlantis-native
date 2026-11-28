@@ -173,7 +173,7 @@ Atlantis Native contains none of them.</sub>
   images...) of the five games in one list, to choose the one to play at
   start-up or switch from F10.
 - 🏜️ **Atlantis III**: GOG.com's edition in English, French, German or
-  Spanish, the French, North American, Portuguese, Swedish, Taiwanese (Traditional Chinese) and Czech retail CDs and the Italian *Atlantis Collection*'s
+  Spanish, the French, North American, Portuguese, Swedish, Taiwanese (Traditional Chinese), Chinese (Simplified Chinese) and Czech retail CDs and the Italian *Atlantis Collection*'s
   installed game, whole, with the original's own menus
   and options (640 x 480, 800 x 600 or 1024 x 768, 16 or 32 bits; 32 by
   default, a bug fix), its saves kept apart from the game's folder, F12
@@ -356,6 +356,7 @@ For *Atlantis III*:
 | Portuguese CD (*Atlantis III: O Novo Mundo*, Playgames, 2002, three CDs; `Atlantis3.exe` of 3,424,256 bytes, MD5 `e5e89f926f80be9ce06a324f27018e89`) | Portuguese | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (`.img` as CloneCD writes them, `.iso`, or copies of the CDs) in it or in a folder inside it |
 | Swedish CD (*Atlantis 3: Den nya världen*, Toptronics, 2002, three CDs; the Portuguese CD's `Atlantis3.exe`) | Swedish | the same as the Portuguese CD (ISO images) |
 | Taiwanese CD (亞特蘭提斯Ⅲ 失落的帝國, Interwise, 2002, three CDs; the Portuguese CD's `Atlantis3.exe`) | Traditional Chinese subtitles and menus, English voices | the same as the Portuguese CD (ISO images); the texts are drawn with the player's `mingliu.ttc` when it is in the installed folder, else with the bundled Noto Serif TC |
+| Chinese CD (亚特兰蒂斯3 新世界, 2002, three CDs; `Atlantis3.exe` of 3,682,370 bytes, MD5 `854f9bc6ac48af9cb9e778ca49f9d460`, with the text hook's `GSooAPI.res`) | Simplified Chinese subtitles and menus (but the credits), English voices | the folder holding `Atlantis3.exe`, `GSooAPI.res` and `Datas` (the first disc's `GAMEDATA` folder copied), with the images of the three CDs (`.bin` / `.cue` as Redump has them, `.iso`, or copies of the CDs) in it or in a folder inside it; the Chinese is drawn with the player's `simsun.ttc` when it is in that folder, else with the bundled Noto Serif SC |
 | Czech CD (*Atlantis 3*, GAME4U Speciál 10, 2003, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `344f2149ce56096f1988b1621a00bc10`) | Czech | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (`.bin` / `.cue`, `.iso`, or copies of the CDs) in it or in a folder inside it |
 | *Atlantis Collection*, Italian DVD compilation (2014; *Atlantis 3 - Il Nuovo Mondo*; its `Game.exe` is GOG.com's earlier build of the same program, 3,473,408 bytes, MD5 `0068f6ed52bcfed7908d7e65fb3de3b1`) | Italian | the folder its installer creates (the one holding `Game.exe` and `Datas`; by default `Adventure Productions\Atlantis 3 - Il Nuovo Mondo` in the program files); the DVD itself is not read |
 
@@ -383,7 +384,15 @@ Taiwanese CD (亞特蘭提斯Ⅲ 失落的帝國, Interwise, 2002) is the same p
 with Traditional Chinese (Big5) texts and English voices; its texts are
 measured and broken per character as the original's double-byte text
 renderer does ("Atlantis III, Taiwanese CD, Traditional Chinese
-(Interwise, 2002)"). The Czech CD
+(Interwise, 2002)"). The
+Chinese CD (亚特兰蒂斯3 新世界, 2002) has a program of its own (built in
+February 2002, the Portuguese CD's behaviours) and the English data; its
+Simplified Chinese comes from a text hook beside the program, whose table
+`GSooAPI.res` replaces the English texts with GBK Chinese as the game
+draws them: the port does what the hook does (the same lookups, the
+Chinese in a 14-pixel SimSun cell three pixels right of and below the
+English line's place, a text wider than the screen wrapped upwards)
+("Atlantis III, Chinese CD, Simplified Chinese (2002)"). The Czech CD
 (GAME4U Speciál 10, 2003) has the North American program's game code
 built a week earlier (2001), plays the same way, with Czech voices and
 texts and the Czech part of the intro; the game library names it

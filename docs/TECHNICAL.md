@@ -4372,7 +4372,9 @@ German*). The language-dependent rules, from the original's code:
   texts are ASCII but one `’`). The English `AtlFont_Credit` asks for
   height 20, so the tables hold 22 (20 × 1.1 at 1024 pixels);
   `CHINESEBIG5_CHARSET` (the Taiwanese CD, all five fonts) takes the
-  double-byte renderer and the Big5 line break, below;
+  double-byte renderer and the Big5 line break, below; the Chinese CD
+  keeps the English `font.txt` and draws its Chinese through a text hook,
+  below;
 - the scarab case's bank (`AtlScarabee_MainInit` @ 0x00432200) is
   `Scarabee.spr` and nothing else: the English and German installations
   have it, the French and Spanish ones name it `Scarabée.SPR`, which the
@@ -4558,6 +4560,70 @@ widths, every `Dial.txt` line against `golden/a3_big5_dial_lines.txt` —
 atlantis3-re's model of the layout, byte ranges and hashes only — every
 character a glyph, a drawn line), `the_traditional_chinese_cd_with_its_discs`,
 and `text.rs`'s unit tests against the model's synthetic cases.
+
+**The Chinese CD (亚特兰蒂斯3 新世界, 2002).** atlantis3-cd-zh-cn-3682370
+(`Atlantis3.exe`, 3,682,370 bytes, PE timestamp 2002-02-25, MD5
+`854f9bc6...`), a build of its own between the 2001 CD programs and
+GOG.com's; its functions for every behaviour a `Release` method answers
+for are the Portuguese CD's, byte for byte with the addresses masked (the
+`/set` interpreter's disc test, the intro table with `bra`, the subject
+columns, the warp flip test, the Isis cursor reset, the thumbnail row
+scan; `Scarabee.spr`), so it is `Release::CdPt2001`. The disc has no
+Cryo installer: its first disc's `GAMEDATA\` is the installed game
+(GOG.com English's data, `loc\…\gbr\` alone), which the port opens with
+the three `.bin` / `.cue` images. The edition is told by the text hook's
+table beside the program (`install::has_gsoo_texts`,
+`Language::SimplifiedChinese`): *Atlantis III, Chinese CD, Simplified
+Chinese (2002)* (no publisher is on the discs).
+
+Its Chinese is a third-party text hook ("GSoo", 2002; atlantis3-re
+`binaries/atlantis3-cd-zh-cn-gsoo_dll.md`, read statically) that runs the
+English game and writes two detours into it; `atlantis3_data::gsoo` keeps
+its table `GSooAPI.res` (GBK, CR LF: `No.NNNNNNNN` headers, `GSoo_Eng:`
+and `GSoo_Chi:` lines) as bytes and makes its lookups the way its DLLs do
+(`strstr` over the whole file; a hit counts only as a whole English
+line; the first entry wins):
+
+- the copy-out @ 0x00447b20, which `AtlFont_Print` and its two variants
+  use for their text: a string of 16 bytes or more, not beginning with
+  `GSoo_No.` and found in the table, is overwritten with the 16-byte tag
+  `GSoo_No.NNNNNNNN` of its entry, so the text library lays out the tag
+  in Arial (`text::Texts::library_text`; the tooltip box and the
+  inventory label measure through the same prints, so they measure the
+  tag too). The other callers copy log lines, file and script names,
+  which equal no English text of the table;
+- the ANSI renderer's `ExtTextOutA` @ 0x006f179a (`text::gsoo_draw`):
+  for a tag, its entry's Chinese, at (x + 3, y + 3) in "宋体" (`lfHeight`
+  14) when its extent `cx` ≤ HORZRES − x − 32, else cut into `k + 1`
+  pieces, `k = cx / (HORZRES − x − 32)`, each taking characters while
+  their count times the cell height stays within that width, plus the
+  one that passes it, piece `j` at (x, y − 3 − 14·j): the text climbs up
+  from the line's place; for any other line, the Chinese of the entry
+  whose whole English equals it (so the 88 `Dial.txt` lines under 16
+  bytes, never tagged), at (x + 3, y + 3) on one line. The hook's font stays selected
+  for the print's later lines, which are then drawn in it at the
+  library's advances. HORZRES is taken as the screen's width (a
+  full-screen mode, inferred).
+
+The face is the player's `simsun.ttc` (face SimSun) in the installed
+folder, else the bundled Noto Serif SC, regenerated for this edition
+(`make_cjk_subset.py --keep-sc ... --cn3 GSooAPI.res`: 222 characters of
+the table's Chinese added, every earlier glyph unchanged), at 14 pixels per em, its
+advances derived from the face's `hmtx` as the Big5 fonts' are (GDI's
+answer to "宋体" in charset 0x5C was not measured); the web build fetches
+`fonts/NotoSerifSC-Subset.otf` for an install with `GSooAPI.res` unless
+it holds `simsun.ttc`. The table covers 617 of the 618 `Dial.txt` lines
+(one stage direction stays English), `Objects.txt`, `Errors.txt`, the two
+captions and every menu but the credits.
+Tests (`ATLANTIS3_CD_ZH_CN`: its three `.bin` / `.cue` images and
+`installed\`, the first disc's `GAMEDATA\`; optional): `cd_zh_cn.rs` in
+both crates (the build, edition, registry, discs, every file against
+atlantis3-re's inventory, the hook's files; the table's entries and
+lookups on every `Dial.txt` line, the object names and the credits; the
+intro, a new game on disc 2, every dialog line drawn through the hook at
+three widths, every Chinese character a glyph, a drawn line),
+`the_simplified_chinese_cd_with_its_discs`, and the unit tests of
+`gsoo.rs` and `text.rs`.
 
 **The Czech CD (GAME4U Speciál 10, 2003).** atlantis3-cd-cs-3379200
 (`Atlantis3.exe`, 3,379,200 bytes as the French CD's but another file,

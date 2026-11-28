@@ -42,10 +42,26 @@
 //! else the bundled Noto Serif TC, and the advances are **derived from
 //! the face's tables** (`hmtx` at the cell's pixels per em, rounded), not
 //! measured with GDI.
+//!
+//! The Simplified Chinese CD runs the English game with a text hook,
+//! GSoo (atlantis3-re `binaries/atlantis3-cd-zh-cn-gsoo_dll.md`; the
+//! table [`atlantis3_data::gsoo`]): `AtlFont_Print` copies its text out
+//! through a function the hook detours (atlantis3-cd-zh-cn-3682370
+//! @ 0x00447b20), which replaces a text of 16 bytes or more found in the
+//! table by a 16-byte tag ([`Texts::library_text`]): the library lays the
+//! tag out in Arial; then each `ExtTextOutA` of the ANSI renderer
+//! (@ 0x006f179a) goes through the hook, which draws the Chinese of a tag,
+//! or of a line equal to a whole English text, in "宋体" (SimSun) at a
+//! 14-pixel cell instead ([`gsoo_draw`]). The port's face for it is the
+//! player's SimSun (`simsun.ttc` beside the game's files), else the
+//! bundled Noto Serif SC, its advances derived from the face's tables as
+//! the Big5 fonts' are.
 
 use crate::px::ScreenPixel;
+use atlantis3_data::gsoo::{GsooTable, TagText, TAG_LEN};
 use atlantis_data::TextCodePage;
 use atlantis_engine::subtitles::{FaceSource, FontFace};
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -68,6 +84,17 @@ pub struct GdiFont {
 
 /// `CHINESEBIG5_CHARSET`: the Traditional Chinese CD's fonts.
 pub const CHARSET_BIG5: u8 = 0x88;
+
+/// `GB2312_CHARSET`: the `tmCharSet` given to the Simplified Chinese CD's
+/// hook font (its request, charset 0x5C, is no character set; the face
+/// name "宋体" decides [INFERRED]). Nothing reads it: the text library
+/// never measures that font.
+pub const CHARSET_GB2312: u8 = 0x86;
+
+/// The hook's font: `CreateFontIndirectA` with `lfHeight` 14, `lfWeight`
+/// 256, `lfCharSet` 0x5C, `VARIABLE_PITCH`, face "宋体" (GSooKernel.dll
+/// @ 0x10001400..0x1000167c): a 14-pixel cell.
+pub const GSOO_FONT_HEIGHT: i32 = 14;
 
 /// A double-byte font's face and measures: the face GDI would give (the
 /// player's PMingLiU, else the port's Noto Serif TC), at `ppem` pixels per
@@ -237,6 +264,18 @@ impl GdiFont {
     /// `tmAveCharWidth` the face's `xAvgCharWidth` (the layout's estimate
     /// only, which does not change the lines).
     pub fn big5(face: FontFace, height: i32) -> GdiFont {
+        GdiFont::double_byte(face, height, TextCodePage::Windows950, CHARSET_BIG5)
+    }
+
+    /// [`GdiFont::big5`] for any double-byte `code_page`, its `tmCharSet`
+    /// `charset`: the Simplified Chinese CD's text hook's font too
+    /// ([`GSOO_FONT_HEIGHT`], code page 936).
+    pub fn double_byte(
+        face: FontFace,
+        height: i32,
+        code_page: TextCodePage,
+        charset: u8,
+    ) -> GdiFont {
         let h = height.max(1);
         let (data, index) = face.file();
         let parsed = ttf_parser::Face::parse(data, index).ok();
@@ -272,10 +311,10 @@ impl GdiFont {
             tm_height: h,
             ascent,
             ave_char_width: ave.max(1),
-            charset: CHARSET_BIG5,
+            charset,
             abc: vec![(0, 0, 0); 256],
             dbcs: Some(Arc::new(Dbcs {
-                code_page: TextCodePage::Windows950,
+                code_page,
                 face,
                 ppem,
                 break_char: b' ',
@@ -287,19 +326,35 @@ impl GdiFont {
     /// height for the program's life (the fonts are handed out as
     /// `&'static`, as the measured tables are).
     pub fn big5_cached(face: &FontFace, height: i32) -> &'static GdiFont {
-        type Cache = Mutex<Vec<(FaceSource, usize, u32, i32, &'static GdiFont)>>;
+        GdiFont::double_byte_cached(face, height, TextCodePage::Windows950, CHARSET_BIG5)
+    }
+
+    /// [`GdiFont::double_byte`], made once per face, height and code page.
+    pub fn double_byte_cached(
+        face: &FontFace,
+        height: i32,
+        code_page: TextCodePage,
+        charset: u8,
+    ) -> &'static GdiFont {
+        type Key = (FaceSource, usize, u32, i32, TextCodePage, u8);
+        type Cache = Mutex<Vec<(Key, &'static GdiFont)>>;
         static CACHE: OnceLock<Cache> = OnceLock::new();
         let (data, index) = face.file();
-        let key = (face.source(), data.len(), index, height);
+        let key = (face.source(), data.len(), index, height, code_page, charset);
         let mut c = CACHE
             .get_or_init(|| Mutex::new(Vec::new()))
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        if let Some(&(.., f)) = c.iter().find(|e| (e.0, e.1, e.2, e.3) == key) {
+        if let Some(&(_, f)) = c.iter().find(|e| e.0 == key) {
             return f;
         }
-        let f: &'static GdiFont = Box::leak(Box::new(GdiFont::big5(face.clone(), height)));
-        c.push((key.0, key.1, key.2, key.3, f));
+        let f: &'static GdiFont = Box::leak(Box::new(GdiFont::double_byte(
+            face.clone(),
+            height,
+            code_page,
+            charset,
+        )));
+        c.push((key, f));
         f
     }
 
@@ -924,6 +979,206 @@ pub fn to_cp1252(ch: char) -> u8 {
     (0x80u8..0xa0).find(|&b| cp1252(b) == ch).unwrap_or(b'?')
 }
 
+/// What the draw hook (GSooKernel.dll @ 0x100017c0) makes of one
+/// `ExtTextOutA` of the library's ANSI renderer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum GsooDraw {
+    /// The call goes on with the line; `selected`: the hook selected its
+    /// Chinese font first (a tag it found no Chinese for), so the line's
+    /// bytes are drawn in it, at the library's advances.
+    Original { selected: bool },
+    /// The Chinese drawn instead, in the hook's font, each line its own
+    /// call with GDI's own advances (`dx` NULL); the original call then
+    /// draws nothing more. The Chinese font stays selected.
+    Chinese(Vec<Line>),
+}
+
+/// The draw hook on `line` (the library's `ExtTextOutA(hdc, x, y, ..., s,
+/// n, dx)`, `x`, `y` the cell's top-left: `SetTextAlign(0)`), `cjk` its
+/// Chinese font, `horzres` `GetDeviceCaps(HORZRES)` of the back buffer's
+/// DC (the screen's width [INFERRED: a full-screen mode]):
+///
+/// - `n` ≤ 1: nothing changes;
+/// - a tag (`GSoo_No.` and `n` = 16): the Chinese of its entry
+///   ([`GsooTable::tag_chinese`]); with `W` = `horzres − x` and (cx, cy)
+///   its extent (`GetTextExtentPoint32A`: the sum of its advances and the
+///   font's height), drawn at (x + 3, y + 3) when cx ≤ W − 32; else in
+///   `k + 1` pieces, k = cx / (W − 32) (unsigned), each taking characters
+///   (a pair whose two bytes are ≥ 0xa0, or a byte 0x20..0x7f; another
+///   byte ends it) while their count × cy stays within W − 32, plus the
+///   one that passes it, cut at the text's end, piece `j` (j = k … 0) at
+///   (x, y − 3 − cy·j);
+/// - another line: the Chinese of the entry whose whole English equals
+///   it ([`GsooTable::search`] with its `n` bytes), at (x + 3, y + 3) on
+///   one line, whatever its width.
+pub fn gsoo_draw(table: &GsooTable, cjk: &GdiFont, line: &Line, horzres: i32) -> GsooDraw {
+    let s = &line.bytes;
+    let n = s.len();
+    let piece = |x: i32, y: i32, bytes: &[u8]| Line {
+        x,
+        y,
+        bytes: bytes.to_vec(),
+        dx: cjk.dx(bytes),
+    };
+    if n <= 1 {
+        return GsooDraw::Original { selected: false };
+    }
+    if !(GsooTable::is_tag(s) && n == TAG_LEN) {
+        return match table.search(s, n) {
+            Some(at) => GsooDraw::Chinese(vec![piece(line.x + 3, line.y + 3, table.text(at))]),
+            None => GsooDraw::Original { selected: false },
+        };
+    }
+    // The font is selected before the lookup (@ 0x10001848).
+    let (tail, len) = match table.tag_chinese(s) {
+        TagText::NoEntry | TagText::NoEnd => return GsooDraw::Original { selected: true },
+        TagText::Chinese { tail, len } => (tail, len),
+        // The DLL's own string; its end pointer is not set on that path
+        // (@ 0x1000187a): the port cuts the pieces at the string's length.
+        TagText::Missing(m) => (m, m.len()),
+    };
+    let chi = &tail[..len];
+    let w_avail = horzres - line.x;
+    let (cx, cy) = (cjk.width(chi), cjk.tm_height);
+    if w_avail - 32 >= cx {
+        return GsooDraw::Chinese(vec![piece(line.x + 3, line.y + 3, chi)]);
+    }
+    #[allow(clippy::cast_sign_loss)]
+    let lim = (w_avail - 32) as u32;
+    if lim == 0 {
+        // `div` by zero in the DLL (@ 0x10001912): x = HORZRES − 32 and a
+        // text wider than 0; the port draws nothing.
+        return GsooDraw::Chinese(Vec::new());
+    }
+    #[allow(clippy::cast_sign_loss)]
+    let k = (cx.max(0) as u32) / lim;
+    let mut out = Vec::new();
+    let mut p = 0usize;
+    for j in (0..=k).rev() {
+        let (mut i, mut sum) = (0usize, 0u32);
+        loop {
+            let c = tail.get(p + i).copied().unwrap_or(0);
+            let d = tail.get(p + i + 1).copied().unwrap_or(0);
+            if c >= 0xa0 && d >= 0xa0 {
+                i += 2;
+            } else if (0x20..0x80).contains(&c) {
+                i += 1;
+            } else {
+                break;
+            }
+            #[allow(clippy::cast_sign_loss)]
+            {
+                sum = sum.wrapping_add(cy as u32);
+            }
+            if lim < sum {
+                break;
+            }
+        }
+        i = i.min(len - p);
+        if i > 0 {
+            #[allow(clippy::cast_possible_wrap)]
+            let y = line.y - cy * j as i32 - 3;
+            out.push(piece(line.x, y, &tail[p..p + i]));
+        }
+        p += i;
+    }
+    GsooDraw::Chinese(out)
+}
+
+/// The Simplified Chinese CD's text hook: its table and its font's face.
+pub struct Gsoo {
+    table: GsooTable,
+    face: FontFace,
+    /// Hook 1's and the line match's answers, by text (the lookups are
+    /// searches of the whole table).
+    tags: Mutex<HashMap<Vec<u8>, Option<[u8; TAG_LEN]>>>,
+    lines: Mutex<HashMap<(Vec<u8>, i32, i32), GsooDraw>>,
+}
+
+impl Gsoo {
+    pub fn new(table: GsooTable, face: FontFace) -> Gsoo {
+        Gsoo {
+            table,
+            face,
+            tags: Mutex::new(HashMap::new()),
+            lines: Mutex::new(HashMap::new()),
+        }
+    }
+
+    pub fn table(&self) -> &GsooTable {
+        &self.table
+    }
+
+    /// The face the hook's "宋体" is drawn in.
+    pub fn face(&self) -> &FontFace {
+        &self.face
+    }
+
+    /// The hook's Chinese font ([`GSOO_FONT_HEIGHT`], code page 936).
+    pub fn font(&self) -> &'static GdiFont {
+        GdiFont::double_byte_cached(
+            &self.face,
+            GSOO_FONT_HEIGHT,
+            TextCodePage::Windows936,
+            CHARSET_GB2312,
+        )
+    }
+
+    /// Hook 1 on `text` ([`GsooTable::tag`]).
+    pub fn tag(&self, text: &[u8]) -> Option<[u8; TAG_LEN]> {
+        let mut c = self
+            .tags
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        *c.entry(text.to_vec())
+            .or_insert_with(|| self.table.tag(text))
+    }
+
+    /// [`gsoo_draw`] on `line` for a screen `horzres` wide.
+    pub fn draw(&self, line: &Line, horzres: i32) -> GsooDraw {
+        let key = (line.bytes.clone(), line.x, horzres);
+        let mut c = self
+            .lines
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let d = c.entry(key).or_insert_with(|| {
+            gsoo_draw(
+                &self.table,
+                self.font(),
+                &Line {
+                    y: 0,
+                    ..line.clone()
+                },
+                horzres,
+            )
+        });
+        // Cached at y = 0: the places move with the line.
+        match d {
+            GsooDraw::Chinese(v) => GsooDraw::Chinese(
+                v.iter()
+                    .map(|l| Line {
+                        y: l.y + line.y,
+                        ..l.clone()
+                    })
+                    .collect(),
+            ),
+            o => o.clone(),
+        }
+    }
+}
+
+/// `line`'s bytes in another font, at the library's advances: the
+/// characters of `font`'s code page, each the sum of its bytes' advances
+/// (a pair's two entries [INFERRED]; the English texts are ASCII).
+fn at_advances(font: &GdiFont, line: &Line) -> Line {
+    let st = chars(&line.bytes, font.code_page());
+    let dx = st
+        .windows(2)
+        .map(|w| line.dx.get(w[0]..w[1]).map_or(0, |d| d.iter().sum()))
+        .collect();
+    Line { dx, ..line.clone() }
+}
+
 /// The game's text resources: the fonts of `font\font.txt`, the glyphs of
 /// `font\Atlantis.ttf` and the dialog texts of `loc\text\<lang>\Dial.txt`
 /// (the cue lines' and the dialogs' subtitles).
@@ -936,6 +1191,9 @@ pub struct Texts {
     /// The face of the `CHINESEBIG5_CHARSET` fonts ([`Texts::big5_face`]),
     /// when `font.txt` asks for one.
     big5: Option<FontFace>,
+    /// The Simplified Chinese CD's text hook, when the install has it
+    /// ([`atlantis3_data::install::has_gsoo_texts`]).
+    gsoo: Option<Gsoo>,
 }
 
 /// Every font id `font.txt` gives.
@@ -1003,12 +1261,56 @@ impl Texts {
                     .is_some_and(|d| d.charset(language) == CHARSET_BIG5)
             })
             .then(|| Texts::big5_face(files));
+        let gsoo = atlantis3_data::install::has_gsoo_texts(files)
+            .then(|| atlantis3_data::gsoo::GsooTable::load(files.source()))
+            .flatten()
+            .map(|t| Gsoo::new(t, Texts::gb_face(files)));
         Texts {
             glyphs,
             language: language.to_string(),
             fonts,
             dial,
             big5,
+            gsoo,
+        }
+    }
+
+    /// The face a Simplified Chinese Windows gives the hook's "宋体"
+    /// [INFERRED: SimSun, not measured]: the player's `simsun.ttc` beside
+    /// the game's files (its face SimSun), else the port's Noto Serif SC
+    /// (in the web build, the one its page fetched).
+    pub fn gb_face(files: &atlantis3_data::A3Files) -> FontFace {
+        use atlantis_engine::subtitles::player_font;
+        let code_page = TextCodePage::Windows936;
+        if let Some((name, family)) = player_font(code_page) {
+            if let Some(data) = files.source().read(name) {
+                match FontFace::player_family(data, family) {
+                    Some(face) => {
+                        log::info!("text font: the player's {name} ({family})");
+                        return face;
+                    }
+                    None => log::warn!("{name}: not a font the port can use"),
+                }
+            }
+        }
+        FontFace::bundled(code_page)
+    }
+
+    /// The Simplified Chinese CD's text hook, when the install has it.
+    pub fn gsoo(&self) -> Option<&Gsoo> {
+        self.gsoo.as_ref()
+    }
+
+    /// The text as the text library gets it: with the Simplified Chinese
+    /// CD's hook, a text of 16 bytes or more found in its table is its
+    /// 16-byte tag (the copy-out in `AtlFont_Print` and its variants,
+    /// atlantis3-cd-zh-cn-3682370 @ 0x0041ed33, 0x0041ec73, 0x0041ee08);
+    /// otherwise the text. The measures made through the same prints (the
+    /// tooltip box, the inventory label) take it too.
+    pub fn library_text<'a>(&self, text: &'a [u8]) -> Cow<'a, [u8]> {
+        match self.gsoo.as_ref().and_then(|k| k.tag(text)) {
+            Some(tag) => Cow::Owned(tag.to_vec()),
+            None => Cow::Borrowed(text),
         }
     }
 
@@ -1070,8 +1372,34 @@ impl Texts {
         let (Some(g), Some(gdi)) = (&self.glyphs, self.gdi(id, w)) else {
             return;
         };
-        let lines = layout(gdi, text, w as i32, h as i32, zone);
-        g.draw(gdi, &lines, rgb, out, w, h);
+        let text = self.library_text(text);
+        let lines = layout(gdi, &text, w as i32, h as i32, zone);
+        let Some(k) = &self.gsoo else {
+            g.draw(gdi, &lines, rgb, out, w, h);
+            return;
+        };
+        // The hook on each line's `ExtTextOutA`; its font, once selected,
+        // stays for the print's later lines (the library selects its own
+        // once per print, @ 0x006b55e0).
+        let cjk = k.font();
+        let mut selected = false;
+        for l in &lines {
+            #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+            match k.draw(l, w as i32) {
+                GsooDraw::Original { selected: s } => {
+                    selected |= s;
+                    if selected {
+                        g.draw(cjk, &[at_advances(cjk, l)], rgb, out, w, h);
+                    } else {
+                        g.draw(gdi, std::slice::from_ref(l), rgb, out, w, h);
+                    }
+                }
+                GsooDraw::Chinese(pieces) => {
+                    selected = true;
+                    g.draw(cjk, &pieces, rgb, out, w, h);
+                }
+            }
+        }
     }
 
     /// A text with its black shadow at (−1, +1): the dialog lines, the cue
@@ -1153,6 +1481,88 @@ mod tests {
         let p = b"\xa4\x40\xa4\x40\xa1\x75\xa4\x40";
         let st = chars(p, TextCodePage::Windows950);
         assert_eq!(big5_break(p, &st, 4), Some(2));
+    }
+
+    fn gsoo_table() -> GsooTable {
+        let mut t = b"//\r\n\r\n".to_vec();
+        t.extend_from_slice(b"No.00000000 base:0x00000000,#A\r\nGSoo_Eng:Short\r\nGSoo_Chi:\xb0\xa1\xb0\xa1\r\n\r\n");
+        t.extend_from_slice(
+            b"No.00000001 base:0x00000010,#B\r\nGSoo_Eng:A line of more than 16 bytes!\r\nGSoo_Chi:",
+        );
+        t.extend_from_slice(&b"\xb0\xa1".repeat(60));
+        t.extend_from_slice(b"\r\n\r\n");
+        GsooTable::new(t, None)
+    }
+
+    fn line(x: i32, y: i32, bytes: &[u8]) -> Line {
+        Line {
+            x,
+            y,
+            bytes: bytes.to_vec(),
+            dx: vec![10; bytes.len()],
+        }
+    }
+
+    /// The draw hook: a line equal to a whole English text, a tag that
+    /// fits, a tag wrapped upwards, a tag without an entry, a short call.
+    #[test]
+    fn gsoo_draws() {
+        let t = gsoo_table();
+        let cjk = GdiFont::double_byte(
+            FontFace::bundled(TextCodePage::Windows936),
+            GSOO_FONT_HEIGHT,
+            TextCodePage::Windows936,
+            CHARSET_GB2312,
+        );
+        assert_eq!(cjk.tm_height, 14);
+        let one = cjk.width(b"\xb0\xa1");
+        assert_eq!(one, 14);
+        // The library's text: the tag for 16 bytes or more.
+        assert_eq!(
+            &t.tag(b"A line of more than 16 bytes!").unwrap(),
+            b"GSoo_No.00000001"
+        );
+        match gsoo_draw(&t, &cjk, &line(10, 500, b"Short"), 640) {
+            GsooDraw::Chinese(v) => {
+                assert_eq!(v.len(), 1);
+                assert_eq!(
+                    (v[0].x, v[0].y, &v[0].bytes[..]),
+                    (13, 503, &b"\xb0\xa1\xb0\xa1"[..])
+                );
+                assert_eq!(v[0].dx, [14, 14]);
+            }
+            o => panic!("{o:?}"),
+        }
+        // 60 characters, 840 pixels: two pieces at 640 (W − 32 = 598, k =
+        // 1): 43 characters (42 × 14 = 588 fit, the 43rd passes), then 17.
+        match gsoo_draw(&t, &cjk, &line(10, 500, b"GSoo_No.00000001"), 640) {
+            GsooDraw::Chinese(v) => {
+                let got: Vec<(i32, i32, usize)> =
+                    v.iter().map(|l| (l.x, l.y, l.bytes.len())).collect();
+                assert_eq!(got, [(10, 500 - 3 - 14, 86), (10, 497, 34)]);
+            }
+            o => panic!("{o:?}"),
+        }
+        // At 1024 it fits: one line at x + 3, y + 3.
+        match gsoo_draw(&t, &cjk, &line(10, 500, b"GSoo_No.00000001"), 1024) {
+            GsooDraw::Chinese(v) => assert_eq!(
+                (v.len(), v[0].x, v[0].y, v[0].bytes.len()),
+                (1, 13, 503, 120)
+            ),
+            o => panic!("{o:?}"),
+        }
+        assert_eq!(
+            gsoo_draw(&t, &cjk, &line(10, 500, b"GSoo_No.00000007"), 640),
+            GsooDraw::Original { selected: true }
+        );
+        assert_eq!(
+            gsoo_draw(&t, &cjk, &line(10, 500, b"S"), 640),
+            GsooDraw::Original { selected: false }
+        );
+        assert_eq!(
+            gsoo_draw(&t, &cjk, &line(10, 500, b"Shor"), 640),
+            GsooDraw::Original { selected: false }
+        );
     }
 
     /// The Central European table: its own charset and, on the bytes

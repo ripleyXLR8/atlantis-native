@@ -92,7 +92,9 @@ Mundo*, Playgames, 2002, three CDs; its own build of `Atlantis3.exe`), the
 Swedish CD (*Atlantis 3: Den nya världen*, Toptronics, 2002, three CDs; the
 Portuguese CD's program), the Taiwanese CD (亞特蘭提斯Ⅲ：失落的帝國,
 Interwise, 2002, three CDs, Redump [86959](http://redump.org/disc/86959/)–86961;
-the Portuguese CD's program, Traditional Chinese texts), the Czech CD (*Atlantis 3*, GAME4U Speciál 10,
+the Portuguese CD's program, Traditional Chinese texts), the Chinese CD
+(亚特兰蒂斯3：新世界, 2002, three CDs, Redump [86956](http://redump.org/disc/86956/)–86958;
+its own build of `Atlantis3.exe`, Simplified Chinese through a text hook), the Czech CD (*Atlantis 3*, GAME4U Speciál 10,
 2003, three CDs; its own build of `Atlantis3.exe`) and the Italian *Atlantis Collection* DVD (2014; its installer's folder, whose `Game.exe` is GOG.com's
 2015 / 2018 one). Every other edition is unknown: its program is refused
 with its size and MD5. The Italian 3-CD re-release below would tell
@@ -107,7 +109,6 @@ whether the Italian voices and films are the collection's.
 | 🟠 wanted | *Atlantis III: Il Nuovo Mondo*, re-release | Italy | — | 3 CD | Serial 73399105; barcode 3342181027337; Redump [71147](http://redump.org/disc/71147/)–71149 |
 | 🟠 wanted | *Atlantis III: Die neue Welt* | Germany, Cryo | 2001 | CD | AT3GRCD1 on disc 1 (made in France by Cinram); box codes AT3GRPC, AT3003; barcode 3554540163031. Only scans of the box, disc and manual are known: an image of the discs is wanted |
 | ⚪ unconfirmed | *Atlantis III*, Greek or Russian first editions, and the Czech one before its GAME4U Speciál 10 re-issue | — | 2001–2002 | CD | The program has intro films for these languages, so these editions probably exist |
-| 🟠 wanted | 亚特兰蒂斯3：新世界 | China | — | 3 CD | Redump [86956](http://redump.org/disc/86956/)–86958 |
 
 ## Atlantis Evolution (2004)
 

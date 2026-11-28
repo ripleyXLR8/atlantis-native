@@ -1337,7 +1337,8 @@ impl Loader for ImageLoader {
 /// Atlantis III from its installed folder among the picked files
 /// ([`crate::a3_web`]), the saves in the browser's storage. The
 /// Traditional Chinese CD's Big5 text font is fetched first, unless the
-/// folder holds the player's `mingliu.ttc`.
+/// folder holds the player's `mingliu.ttc`; the Simplified Chinese CD's
+/// GBK one (its text hook's), unless it holds `simsun.ttc`.
 async fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
     let discs = {
         let paths: Vec<&str> = all.keys().map(String::as_str).collect();
@@ -1349,8 +1350,14 @@ async fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<()
     // (`atlantis3_engine::text::Texts::big5_face`): the player's, else
     // the port's, fetched beside the page.
     let dir = PickedDir::new(&index, install);
+    let mut code_pages = Vec::new();
     if atlantis3_data::install::has_big5_fonts(&dir) {
-        let code_page = atlantis_data::TextCodePage::Windows950;
+        code_pages.push(atlantis_data::TextCodePage::Windows950);
+    }
+    if dir.size(atlantis3_data::gsoo::TABLE_NAME).is_some() {
+        code_pages.push(atlantis_data::TextCodePage::Windows936);
+    }
+    for code_page in code_pages {
         let player_font = atlantis_engine::subtitles::player_font(code_page)
             .is_some_and(|(name, _)| dir.size(name).is_some());
         if let Some(name) =

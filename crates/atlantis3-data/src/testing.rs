@@ -166,6 +166,19 @@ pub fn cd_zh_tw() -> Option<(PathBuf, PathBuf)> {
     Some((dir.join("installed"), dir))
 }
 
+/// The variable naming the Simplified Chinese CD's folder (亚特兰蒂斯3,
+/// 2002): its three `.bin` / `.cue` images and `installed\` (the first
+/// disc's `GAMEDATA\` copied: the program, the text hook and `Datas\`).
+pub const CD_ZH_CN_VAR: &str = "ATLANTIS3_CD_ZH_CN";
+
+/// The Simplified Chinese CD's installed folder and its discs' folder
+/// (from `ATLANTIS3_CD_ZH_CN`); its absence never fails a test
+/// ([`optional_dir`]).
+pub fn cd_zh_cn() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_ZH_CN_VAR)?;
+    Some((dir.join("installed"), dir))
+}
+
 /// The variable naming the Czech CD's folder (GAME4U Speciál 10, 2003):
 /// its three `.bin` / `.cue` images and `installed\` (the first disc's
 /// `data1.cab` extracted).

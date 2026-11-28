@@ -69,7 +69,11 @@ pub enum Release {
     /// `Scarabee.spr`, the 2003 program's subject columns (@ 0x0043c0a0),
     /// warp flip test (@ 0x00440570) and Isis cursor reset (@ 0x004d1c40),
     /// the CD's thumbnail row scan (@ 0x006a6a30). The Swedish CD has the
-    /// same file (atlantis3-re `discs/cd-sv.md`).
+    /// same file (atlantis3-re `discs/cd-sv.md`). The Simplified Chinese
+    /// CD's program (atlantis3-cd-zh-cn-3682370, 2002-02-25) is a build of
+    /// its own whose functions for these behaviours are this program's,
+    /// byte for byte with the addresses masked (atlantis3-re
+    /// `discs/cd-zh-cn.md`).
     CdPt2001,
     /// The Czech CD's program (GAME4U Speciál 10, 2003; built 2001-10-10;
     /// atlantis3-re `binaries/atlantis3-cd-cs-3379200.md`): the North
@@ -123,8 +127,10 @@ pub struct Build {
 /// CD (*Beyond Atlantis II*, three CDs, 2001) installs the fourth; the
 /// Portuguese CD (*O Novo Mundo*, three CDs, 2001) and the Swedish CD
 /// (*Den nya världen*, three CDs, 2002) the fifth; the Czech CD (GAME4U
-/// Speciál 10, three CDs, 2003) the sixth.
-pub const KNOWN_BUILDS: [Build; 6] = [
+/// Speciál 10, three CDs, 2003) the sixth; the Simplified Chinese CD
+/// (three CDs, 2002, its files copied from the first disc's `GAMEDATA\`)
+/// the seventh.
+pub const KNOWN_BUILDS: [Build; 7] = [
     Build {
         id: "atlantis3-gog-fr-3473408",
         label: "Atlantis III, GOG.com",
@@ -217,6 +223,29 @@ pub const KNOWN_BUILDS: [Build; 6] = [
         release: Release::CdCs2001,
         cfg_name: "Atlantis3.cfg",
         // The North American CD's encoder.
+        thumb_rows: RowScan::Original,
+    },
+    Build {
+        id: "atlantis3-cd-zh-cn-3682370",
+        label: "Atlantis III, CD (February 2002 build)",
+        size: 3_682_370,
+        // 2002-02-25 08:40:15 UTC.
+        pe_timestamp: 0x3c79_f86f,
+        md5: [
+            0x85, 0x4f, 0x9b, 0xc6, 0xac, 0x48, 0xaf, 0x9c, 0xb9, 0xe7, 0x78, 0xca, 0x49, 0xf9,
+            0xd4, 0x60,
+        ],
+        exe_name: "Atlantis3.exe",
+        // Every behaviour Native follows is the Portuguese CD's program's
+        // (atlantis3-re `discs/cd-zh-cn.md`, its functions found by their
+        // masked bytes): the `/set` interpreter with the disc test
+        // (@ 0x0044b0d0 = atlantis3-cd-pt-3424256 @ 0x004481a0), the intro
+        // table with `bra` (@ 0x0045cdb0 = PT @ 0x00459a00), the subject
+        // columns (@ 0x0043d250), the warp flip test (@ 0x00441890), the
+        // Isis cursor reset (@ 0x004d1880), `Scarabee.spr`.
+        release: Release::CdPt2001,
+        cfg_name: "Atlantis3.cfg",
+        // The Portuguese CD's encoder (@ 0x006cf420 = PT @ 0x006a6a30).
         thumb_rows: RowScan::Original,
     },
 ];
@@ -445,11 +474,16 @@ mod tests {
             "344f2149ce56096f1988b1621a00bc10"
         );
         assert_eq!(
+            hex(&KNOWN_BUILDS[6].md5),
+            "854f9bc6ac48af9cb9e778ca49f9d460"
+        );
+        assert_eq!(
             KNOWN_BUILDS.map(|b| (b.cfg_name, b.thumb_rows)),
             [
                 ("Atlantis3.cfg", RowScan::W10),
                 ("Atlantis3.cfg", RowScan::Original),
                 ("Atlantis4.cfg", RowScan::Original),
+                ("Atlantis3.cfg", RowScan::Original),
                 ("Atlantis3.cfg", RowScan::Original),
                 ("Atlantis3.cfg", RowScan::Original),
                 ("Atlantis3.cfg", RowScan::Original),

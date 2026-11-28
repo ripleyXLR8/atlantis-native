@@ -1683,6 +1683,12 @@ impl Game {
         } else {
             0
         };
+        // Measured and printed through `AtlFont_Print`'s variant
+        // (@ 0x0041e390): the Simplified Chinese CD's hook's tag, if any.
+        let text = self
+            .texts
+            .as_ref()
+            .map_or(text.clone(), |t| t.library_text(&text).into_owned());
         let (_, zone, _) =
             crate::inventory::label_aligned(font, &text, self.pointer, w as i32, h as i32, halign);
         if let Some(t) = self.texts.as_ref() {
