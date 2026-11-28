@@ -712,3 +712,299 @@ fn a_film_shows_its_first_and_last_decoded_frames() {
     assert!(!play.stage().film_playing());
     assert_eq!(last, Some(frames_n - 1), "drawn once at the end");
 }
+
+/// The update after `Atl_Video_Play`'s call holds the film's load (Native
+/// reads the whole film and its voice in the call): it is not the film's
+/// time, which starts there (the original's film is paced by Bink's clock
+/// from its open, the voice played at the open: play.md § 7), so the
+/// picture does not run ahead of the voice.
+#[test]
+fn a_film_s_load_is_not_its_time() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    assert!(play
+        .game
+        .run_string("return function() Atl_Video_Play(\"is0001\") end"));
+    assert_eq!(play.stage().film_frame().expect("a film").0, 2);
+    // A long frame: the load.
+    play.update(0.25);
+    assert_eq!(
+        play.stage().film_frame().expect("a film").0,
+        2,
+        "frame 2's time not come"
+    );
+    // Then one frame period: frame 2.
+    play.update(0.1);
+    assert_eq!(play.stage().film_frame().expect("a film").0, 3);
+}
+
+/// A playlist whose track is a RIFF WAVE file (PCM 16-bit stereo,
+/// 22050 Hz: `zep_engine.wav`, the only track of
+/// `zeppelin_working_engine_room`) plays as an Ogg one: the original opens
+/// every track with FMOD's `FSOUND_Stream_Open` (@ 0x0045acf0), which
+/// reads WAVE.
+#[test]
+fn a_wave_playlist_plays() {
+    use atlantis3_engine::audio::{Audio, CHANNEL_MUSIC_2004};
+    let Some(d) = dvd() else { return };
+    let src: Arc<dyn atlantis_data::FileSource> =
+        Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
+    let audio = Audio::new();
+    let mut play = Play::new(src, "french", Some(audio.clone())).expect("play");
+    play.new_game();
+    frames(&mut play, 3);
+    play.skip();
+    frames(&mut play, 3);
+    assert_eq!(play.game.state(), 4, "play");
+    assert!(play.game.run_string(
+        "return function() Atl_Music_StopAll(0) \
+         Atl_Music_Play(\"zeppelin_working_engine_room\", 3) end"
+    ));
+    // Past its 3 s fade-in.
+    frames(&mut play, 120);
+    let music: Vec<String> = play.stage().music().into_iter().map(|m| m.0).collect();
+    assert_eq!(music, ["zeppelin_working_engine_room"]);
+    assert!(audio.is_playing(CHANNEL_MUSIC_2004 + 3));
+    for (ch, other) in (0..5).map(|c| (c, CHANNEL_MUSIC_2004 + c)) {
+        assert_eq!(audio.is_playing(other), ch == 3, "channel {ch}");
+    }
+    let mut out = vec![0f32; 44100];
+    audio.fill(&mut out, 44100, 2);
+    let peak = out.iter().fold(0f32, |m, v| m.max(v.abs()));
+    assert!(peak > 0.01, "{peak}");
+}
+
+/// Two presses in one long frame: one click on the last frame's pick, the
+/// other dropped (the original has at most one press a frame,
+/// @ 0x0047c8a0, and picks again after each).
+#[test]
+fn two_presses_in_one_play_frame_click_once() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    let zone = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1.is_empty())
+        .map(|z| z.0)
+        .expect("a move zone");
+    assert!(play.aim_at_zone(zone));
+    // The scene's script goes to the zone's view: counted, no transition,
+    // so the game is free again for a second click in the same frame.
+    play.game
+        .script()
+        .exec("__gone = 0 Atl_Address_Go = function() __gone = __gone + 1 end")
+        .expect("lua");
+    play.click();
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().global(b"__gone"), Value::Num(1.0));
+}
+
+/// A press carries both buttons' state (@ 0x0043bbc0); in play
+/// (@ 0x004300d0) a left press is a click only with the buttons exactly 1,
+/// a right press acts only with exactly 4: with the other button held,
+/// neither does anything.
+#[test]
+fn a_press_with_the_other_button_held_does_nothing_in_play() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    let zone = play
+        .zones()
+        .into_iter()
+        .find(|z| z.1.is_empty())
+        .map(|z| z.0)
+        .expect("a move zone");
+    assert!(play.aim_at_zone(zone));
+    play.game
+        .script()
+        .exec("__gone = 0 Atl_Address_Go = function() __gone = __gone + 1 end")
+        .expect("lua");
+    // The left press with the right button held: buttons 5.
+    play.set_buttons(true, true);
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().global(b"__gone"), Value::Num(0.0));
+    // The right press with the left button held: no inventory.
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(!play.stage().inventory_open_now());
+    assert_eq!(play.game.state(), 4);
+    // Alone, each acts.
+    play.set_buttons(true, false);
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.script().global(b"__gone"), Value::Num(1.0));
+    play.set_buttons(false, true);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+}
+
+/// A transition's loop (@ 0x00405390) steps the sprites only through its
+/// step (@ 0x0042d900), which calls the scene's update in `centring`'s
+/// phase 0 and in `zoom_and_fade`'s steps but the last, never in the
+/// step that changes the view by `no_fx` or `centring`: the new view's
+/// first picture shows its sprites with no time played, and their first
+/// step is the play frame after `Atl_Address_Go` returns.
+#[test]
+fn a_view_change_frame_steps_no_sprite() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    for (fx, back) in [("\"no_fx\"", 8), ("nil", 8)] {
+        go(&mut play, back);
+        // View 17's script plays the gorilla's `stand`.
+        let fx = if fx == "nil" {
+            String::new()
+        } else {
+            format!(", {fx}")
+        };
+        assert!(play.game.run_string(&format!(
+            "return function() Atl_Address_Go(\"zeppelin\", 17{fx}) end"
+        )));
+        for _ in 0..60 {
+            frames(&mut play, 1);
+            if play.stage().address() == Some((b"zeppelin".to_vec(), 17)) {
+                break;
+            }
+        }
+        assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 17)));
+        assert_eq!(play.stage().sprite_time(b"gorilla"), Some(0.0), "{fx}");
+        frames(&mut play, 1);
+        assert!(!play.game.busy());
+        assert_eq!(
+            play.stage().sprite_time(b"gorilla"),
+            Some(1.0 / 30.0),
+            "{fx}: stepped once after the transition"
+        );
+    }
+}
+
+/// The data with one panorama replaced (a damaged or another edition's
+/// file whose faces are 8² instead of 768²).
+struct SmallFaces {
+    inner: Atlantis5Source,
+    name: String,
+    jp6: Vec<u8>,
+}
+
+impl atlantis_data::FileSource for SmallFaces {
+    fn size(&self, name: &str) -> Option<u64> {
+        if name.eq_ignore_ascii_case(&self.name) {
+            return Some(self.jp6.len() as u64);
+        }
+        self.inner.size(name)
+    }
+    fn read_at(&self, name: &str, offset: u64, len: usize) -> Option<Vec<u8>> {
+        if name.eq_ignore_ascii_case(&self.name) {
+            let at = usize::try_from(offset).ok()?;
+            return self.jp6.get(at..at + len).map(<[u8]>::to_vec);
+        }
+        self.inner.read_at(name, offset, len)
+    }
+    fn has_dir(&self, name: &str) -> bool {
+        self.inner.has_dir(name)
+    }
+    fn list(&self, dir: &str) -> Vec<String> {
+        self.inner.list(dir)
+    }
+}
+
+/// A JP6 (version 0x20001) of six 8 × 8 faces (one JPEG made for the
+/// test, not the game's).
+fn small_jp6() -> Vec<u8> {
+    const JPEG: &str = "ffd8ffdb004300100b0c0e0c0a100e0d0e1211101318281a181616183123251d283a\
+333d3c3933383740485c4e404457453738506d51575f626768673e4d71797064785c656763ffdb004301111212\
+1815182f1a1a2f634238426363636363636363636363636363636363636363636363636363636363636363636363\
+636363636363636363636363636363ffc00011080008000803011100021101031101ffc400140001000000000000\
+00000000000000000003ffc40014100100000000000000000000000000000000ffc4001501010100000000000000\
+000000000000000405ffc40014110100000000000000000000000000000000ffda000c03010002110311003f0035\
+515fffd9";
+    let jpg: Vec<u8> = (0..JPEG.len() / 2)
+        .map(|i| u8::from_str_radix(&JPEG[2 * i..2 * i + 2], 16).expect("hex"))
+        .collect();
+    let mut d = vec![0u8; 0x6e];
+    d[..4].copy_from_slice(b"JP6\0");
+    d[4..8].copy_from_slice(&0x20001u32.to_le_bytes());
+    d[8..10].copy_from_slice(&8u16.to_le_bytes());
+    d[10..12].copy_from_slice(&8u16.to_le_bytes());
+    for i in 0..6 {
+        let off = d.len();
+        d.extend_from_slice(b"JPG\0");
+        d.extend_from_slice(&(4 + jpg.len() as u32).to_le_bytes());
+        d.extend_from_slice(&jpg);
+        let at = 0xe + 16 * i;
+        d[at..at + 4].copy_from_slice(&0x10u32.to_le_bytes());
+        d[at + 4..at + 8].copy_from_slice(&(off as u32).to_le_bytes());
+        d[at + 8..at + 12].copy_from_slice(&(8 + jpg.len() as u32).to_le_bytes());
+        d[at + 12..at + 16].copy_from_slice(&(0x40u32 | 1 << i).to_le_bytes());
+    }
+    d
+}
+
+/// A panorama whose faces are not 768² is refused at its load, as a bad
+/// file (the view kept), instead of stopping the renderer at the next
+/// picture.
+#[test]
+fn a_panorama_with_other_faces_is_refused() {
+    let Some(d) = dvd() else { return };
+    let inner = Atlantis5Source::open(&d.join("datas")).expect("the extracted tree");
+    let panorama =
+        atlantis3_engine::atlantis5::panorama_name(&inner, "zeppelin", 8).expect("view 8");
+    let src: Arc<dyn atlantis_data::FileSource> = Arc::new(SmallFaces {
+        inner,
+        name: format!("datas/warps/{panorama}"),
+        jp6: small_jp6(),
+    });
+    let mut play = Play::new(src, "french", None).expect("play");
+    play.new_game();
+    frames(&mut play, 3);
+    play.skip();
+    frames(&mut play, 3);
+    assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
+    assert!(play
+        .game
+        .run_string("return function() Atl_Address_Go(\"zeppelin\", 8, \"no_fx\") end"));
+    frames(&mut play, 3);
+    shot(&play, "a5-small-faces.png");
+    assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
+}
+
+/// A wheel turn is a mouse move event (@ 0x0047c8a0 calls the move
+/// handler when lX, lY or lZ is not 0): in play @ 0x0042cdc0 zeroes the
+/// damping clock with the speeds unchanged, so the view glides on
+/// undamped while the wheel turns.
+#[test]
+fn a_wheel_turn_holds_the_view_s_glide() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    play.look(40.0, 0.0);
+    frames(&mut play, 1);
+    let s = play.stage().camera_speed();
+    assert!(s[0] != 0.0, "turning");
+    // dt · 20 = 2/3 a frame: the clock never passes 1 while it is zeroed
+    // every frame.
+    for _ in 0..5 {
+        play.wheel();
+        frames(&mut play, 1);
+        assert_eq!(play.stage().camera_speed(), s);
+    }
+    frames(&mut play, 1);
+    assert_ne!(play.stage().camera_speed(), s, "damped without the wheel");
+}
+
+/// A press of the third or fourth button is a press event whose buttons
+/// are the left and right buttons' state (@ 0x0047c8a0, @ 0x0043bbc0):
+/// with the right button held it is a right press (`== 4`) and opens the
+/// inventory; with neither held it does nothing.
+#[test]
+fn a_middle_press_takes_the_held_buttons() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d);
+    play.other_press();
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 4);
+    play.set_buttons(false, true);
+    play.other_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+}

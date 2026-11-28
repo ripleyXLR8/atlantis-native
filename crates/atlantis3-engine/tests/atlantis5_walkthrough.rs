@@ -71,7 +71,12 @@ impl Walker {
     fn new(d: &Path) -> Walker {
         let src: Arc<dyn FileSource> =
             Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
-        let mut play = Play::new(src.clone(), "french", None).expect("play");
+        Walker::with_source(src, "french")
+    }
+
+    /// A player of the game in `src`, in `language`.
+    fn with_source(src: Arc<dyn FileSource>, language: &str) -> Walker {
+        let mut play = Play::new(src.clone(), language, None).expect("play");
         // The player's saves (the autosave `Atl_Save` writes, `Atl_Load`
         // reads) in a scratch folder of their own.
         static RUN: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -563,10 +568,13 @@ impl Walker {
             if slot < first {
                 panic!("slot {slot} left of the grid");
             }
+            // A `CIE_Button`: hot after a move onto it, the page turned
+            // when its click's picture ends (2 frames at 15 a second).
             let (rx, ry) = self.right_button.expect("the right button");
             self.play.mouse_at(rx, ry);
-            self.play.click();
             self.frames(1);
+            self.play.click();
+            self.frames(6);
         }
         panic!("slot {slot} not shown");
     }
@@ -655,13 +663,13 @@ impl Walker {
         self.play.mouse_at(x, y);
         self.play.click();
         // The subject's script, then the menu made again (or closed by
-        // the script, or a chapter started).
+        // the script, or a chapter started); a press in the frame it is
+        // made again is dropped (@ 0x00410f90 state 2).
         for _ in 0..30 * 600 {
             self.frames(1);
             if !self.play.game.busy()
                 && !self.play.stage().dialog_running()
-                && (!self.play.stage().menu_subjects().is_empty()
-                    || !self.play.stage().menu_open_now())
+                && (self.play.stage().menu_shown() || !self.play.stage().menu_open_now())
             {
                 break;
             }
@@ -2006,7 +2014,93 @@ fn a_game_over_loads_the_autosave() {
 #[test]
 fn whole_game() {
     let Some(d) = dvd() else { return };
-    let mut w = Walker::new_game(&d);
+    play_whole_game(Walker::new_game(&d));
+}
+
+/// The whole game on the international DVD (`ATLANTIS5_DVD_INT`: a copy
+/// of the pressed disc's files, read from its cabinets; skipped when
+/// unset) in English, opened from the English cabinet's place as the game
+/// library does: the same walk (the scripts are the same game logic, the
+/// French disc's compiled from the same sources).
+#[test]
+fn whole_game_international_english() {
+    let Some(d) = atlantis3_data::testing::a5_dvd_int() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d.join("datas_english.cab")).expect("the English place");
+    let lang = src.language(None);
+    assert_eq!(lang, "english");
+    let src: Arc<dyn FileSource> = Arc::new(src);
+    let mut w = Walker::with_source(src, &lang);
+    w.play.new_game();
+    w.settle();
+    play_whole_game(w);
+}
+
+/// The whole game on the Italian *Atlantis Collection*'s install
+/// (`ATLANTIS5_IT_COLLECTION`: the folder its installer fills in Italian;
+/// skipped when unset), in its one language: the international DVD's
+/// data, the same walk.
+#[test]
+fn whole_game_italian_collection() {
+    let Some(d) = atlantis3_data::testing::a5_it_collection() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d).expect("the install");
+    assert_eq!(
+        src.edition(),
+        atlantis3_data::atlantis5::Edition::ItalianCollection
+    );
+    let lang = src.language(None);
+    assert_eq!(lang, "italian");
+    let src: Arc<dyn FileSource> = Arc::new(src);
+    let mut w = Walker::with_source(src, &lang);
+    w.play.new_game();
+    w.settle();
+    play_whole_game(w);
+}
+
+/// The whole game on the North-American CDs (`ATLANTIS5_CD_US`: a folder
+/// holding a copy of each disc's files in `CD1`, `CD2` and `CD3`, read
+/// in place from their InstallShield set; skipped when unset): the
+/// international DVD's English data, the same walk. Every file is first
+/// checked against the MD5 of its descriptor: a damaged copy of a disc
+/// is named as such rather than failing at the first sprite it breaks.
+#[test]
+fn whole_game_north_american_cds() {
+    use md5::{Digest, Md5};
+    let Some(d) = atlantis3_data::testing::a5_cd_us() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d).expect("the three discs");
+    let set = src.installshield().expect("the discs' set").clone();
+    let cab = set.cabinet();
+    let damaged: Vec<String> = cab
+        .installed_files()
+        .into_iter()
+        .filter(|&i| {
+            cab.read_file(i)
+                .is_none_or(|data| <[u8; 16]>::from(Md5::digest(&data)) != cab.files()[i].md5)
+        })
+        .map(|i| cab.files()[i].path())
+        .collect();
+    assert!(
+        damaged.is_empty(),
+        "{} files of the discs do not match their MD5 (a damaged copy of a disc: copy it again):\n{}",
+        damaged.len(),
+        damaged.join("\n")
+    );
+    let lang = src.language(None);
+    assert_eq!(lang, "english");
+    let src: Arc<dyn FileSource> = Arc::new(src);
+    let mut w = Walker::with_source(src, &lang);
+    w.play.new_game();
+    w.settle();
+    play_whole_game(w);
+}
+
+/// The nine chapters from a new game's first view, then the credits.
+fn play_whole_game(mut w: Walker) {
     for (i, body) in CHAPTERS.iter().enumerate() {
         let c = u32::try_from(i + 1).expect("chapter");
         assert_eq!(w.chapter_now(), c);

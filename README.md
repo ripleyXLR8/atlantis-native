@@ -38,9 +38,10 @@ China, Yucatán and Xibalba, Shamballa and Atlantis, with every puzzle (see
 *Atlantis III: The New World* (2001) plays from start to end as well, on
 the desktop and in the browser: from the Hoggar desert through the Land
 of the Dead and the other worlds to the credits, with its dialogs,
-menus, saves and every puzzle. Two editions are known: GOG.com's, in
-English, French, German and Spanish, and the French retail CD (2001,
-three CDs) (see [Atlantis III](docs/GUIDE.md#atlantis-iii)). It has been
+menus, saves and every puzzle. Three editions are known: GOG.com's, in
+English, French, German and Spanish, the French retail CD (2001, three
+CDs) and the Italian *Atlantis Collection* DVD (2014) (see
+[Atlantis III](docs/GUIDE.md#atlantis-iii)). It has been
 checked mostly by automated replays against the original's code and by
 the developer's own play, not yet by many players: reports are welcome.
 
@@ -66,15 +67,27 @@ Bink films, the ship's pitching and its eight mini-games run, each
 traced to the original's code and checked piece by piece by automated
 tests. It has not yet been played through from start to end: reports
 are welcome (see [The 2004 CD](docs/GUIDE.md#the-2004-cd-in-progress)).
+The Italian *Atlantis Collection* DVD (2014) installs the same program
+in Italian, *Atlantis Evolution (2004), Atlantis Collection, Italian*;
+its installer leaves out the second CD's places, films and music, which
+the English CD's installation provides (see
+[The Italian Atlantis Collection](docs/GUIDE.md#the-italian-atlantis-collection-2004-program)).
 
 *The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,
 2006), the last game of Cryo's *Atlantis III* engine, plays from start
-to end from its French DVD (*L'Héritage sacré*) on the desktop and in
-the browser: its drive, its files, its image or its installation, in the
-game library as *The Secrets of Atlantis : L'Héritage sacré (2006), DVD,
-French*; on the desktop the DVD can be copied to the computer once
+to end from its French DVD (*L'Héritage sacré*), its international
+DVD (English, German, Italian, Spanish) and its North-American CDs
+(*The Secrets of Atlantis*, The Adventure Company, 2007, English) on the
+desktop and in the browser: its drive, its files, its image or its
+installation, in the game library as *The Secrets of Atlantis :
+L'Héritage sacré (2006), DVD, French*, one entry per language, *The
+Secrets of Atlantis: The Sacred Legacy (2006), DVD, German*, or *The
+Secrets of Atlantis (2007), 3 CDs, English*; the Italian *Atlantis
+Collection* DVD (2014) from its installed folder, as *The Secrets of
+Atlantis (2014), Atlantis Collection, installed, Italian*; on the desktop the DVD (or the three CDs, one after the other) can be copied to the computer once
 (**Copy to this computer** in the game library), so that it plays from
-the hard disk. The DVD's own Lua 5.0 scripts run as they are; the nine
+the hard disk. The DVD's own Lua 5.0 scripts (compiled on the French
+DVD, source on the international one) run as they are; the nine
 chapters, the twenty puzzles, the dialogs, the inventory, the saves, the
 deaths and the credits are checked by an automated walkthrough of the
 whole story. What is missing (two fonts when Windows' own are not installed) is listed in
@@ -160,7 +173,8 @@ Atlantis Native contains none of them.</sub>
   images...) of the five games in one list, to choose the one to play at
   start-up or switch from F10.
 - 🏜️ **Atlantis III**: GOG.com's edition in English, French, German or
-  Spanish and the French retail CD, whole, with the original's own menus
+  Spanish, the French, North American, Portuguese, Swedish, Taiwanese (Traditional Chinese) and Czech retail CDs and the Italian *Atlantis Collection*'s
+  installed game, whole, with the original's own menus
   and options (640 x 480, 800 x 600 or 1024 x 768, 16 or 32 bits; 32 by
   default, a bug fix), its saves kept apart from the game's folder, F12
   screenshots; on the desktop and in the browser.
@@ -169,9 +183,12 @@ Atlantis Native contains none of them.</sub>
   as the original lays it out, full screen or windowed; Escape or Space
   skips a film (a bug fix: the original has only its skip button); on
   the desktop and in the browser. Its original 2004 CD program is in the game library
-  too, as a preview.
-- 🏛️ **The Secrets of Atlantis**: the French DVD (2006), read from the
-  DVD, its files, its image or its installation, nothing unpacked; its
+  too, as a preview, with the Italian *Atlantis Collection* DVD's
+  (2014; the second CD's files taken from the English CD).
+- 🏛️ **The Secrets of Atlantis**: the French and international DVDs
+  (2006) and the North-American CDs (2007), read from the discs, their
+  files, their images or the installation, nothing unpacked; the
+  Italian *Atlantis Collection* DVD (2014) from its installation; its
   own scripts, menus and saves; full screen or windowed (F11); on the
   desktop (where the DVD can be copied to the computer once) and in the
   browser.
@@ -211,7 +228,7 @@ Atlantis II's and III's cinematics), and never sent anywhere; the saves
 stay in that browser. For the CD editions of Atlantis I, II and III, the
 folder may hold the CD images (`.iso`, `.bin`, `.img`, `.mdf`, `.nrg`)
 in place of copies of the discs, and *The Secrets of Atlantis* its DVD
-image (see [The web version](docs/GUIDE.md#the-web-version)).
+image or copies of its three CDs (see [The web version](docs/GUIDE.md#the-web-version)).
 
 > **Windows:** the program is not code-signed (a certificate costs money
 > each year), so Windows SmartScreen may warn that it "protected your PC"
@@ -316,9 +333,15 @@ For *Atlantis II*:
 | CD (1999, version 1.00) | French | the folder of the installed game (with `atlantis2.exe`), the images of its four CDs (or copies of the CDs) in it or in a folder inside it; in the browser too (the images read a part at a time), or the folder holding both the installed game and the images |
 | CD with the official patch 1.01 | French or English (one executable for both; tested with the French CD) | the same, with the patched `atlantis2.exe` |
 | CD, North American release (*Beyond Atlantis*, DreamCatcher, 2000, 4 CDs; its own program, version 1.01's code) | English | the same as the French CD |
+| CD, German release (1999, 4 CDs, also in the compilation *Die Legende Atlantis I & II*, 2000; the French CD's program, version 1.00, inside a copy protection, which Atlantis Native does not run) | German | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
+| CD, Spanish release (1999, 4 CDs, distributed by Friendware; the Polish CD's program, version 1.01's code, inside a copy protection, which Atlantis Native does not run) | Spanish | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
+| CD, Swedish release (*Legenden fortsätter…*, 1999, 4 CDs, IQ Media Nordic; version 1.01's program) | Swedish | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
 | CD, Polish release (1999, 4 CDs; its own program, version 1.01's code; texts in Windows-1250) | Polish | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
+| CD, Czech release (Bohemia Interactive, 2000, 4 CDs, also the 2002 budget re-issue *GAME4U Speciál 3*; the North American CD's program; texts in Windows-1250) | Czech | the same as the French CD (the installed folder, with the images or copies of the four CDs) |
+| CD, Taiwanese release (亞特蘭提斯2, Interwise, 2000, 4 CDs with two disc 1s): the Traditional Chinese disc 1 (the patch 1.01 program; texts in Big5) | Traditional Chinese subtitles and menus, English voices | the same as the French CD; the subtitles are drawn with the player's `mingliu.ttc` when it is in the installed folder, else with the bundled Noto Serif TC |
+| CD, the same release's English disc 1 (the Polish CD's program) | English | the same as the French CD; with both disc 1s in the folder, the one in the installed language is used |
 | [GOG.com](https://www.gog.com/) (version 1.01; the builds of 2018, June 2022 and July 2022) | English, French, German, Spanish (one executable for all four) | the installation folder |
-| *Atlantis Collection*, Italian DVD compilation (2014; shown as *Italian Collection (patch 1.01)*, its program being version 1.01 patched almost as GOG's 2018 build) | Italian | the folder its installer creates for *Atlantis 2 - Beyond Atlantis* (with `Game.exe` and `DATAS_A2`) |
+| *Atlantis Collection*, Italian DVD compilation (2014; shown as *Atlantis II, Atlantis Collection, Italian (patch 1.01)*, its program being version 1.01 patched almost as GOG's 2018 build) | Italian | the folder its installer creates for *Atlantis 2 - Beyond Atlantis* (with `Game.exe` and `DATAS_A2`) |
 
 Another executable is refused with its identifiers, so that it can be
 added.
@@ -329,6 +352,12 @@ For *Atlantis III*:
 |---|---|---|
 | [GOG.com](https://www.gog.com/) (*Atlantis 3 - The New World*; `Game.exe` of 3,473,408 bytes, MD5 `eb06eaa718877dfcabee6e8f89d85b31`) | English, French, German, Spanish | the installation folder (the one holding `Game.exe` and `Datas`) |
 | French CD (Cryo, 2001, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `f81dd8d2e49003b2ba53b48b4a21c2ec`) | French | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (or copies of the CDs) in it or in a folder inside it, or beside it in the folder picked (in the browser too: the images are read a part at a time) |
+| North American CD (*Beyond Atlantis II*, DreamCatcher, 2001, three CDs; `Beyond Atlantis 2.exe` of 3,366,912 bytes, MD5 `df6faa0cde4478943307e90aed65979d`) | English | the installation folder (the one holding `Beyond Atlantis 2.exe` and `Datas`), with the images of the three CDs (`.bin` as Redump has them, `.iso`, or copies of the CDs) in it or in a folder inside it |
+| Portuguese CD (*Atlantis III: O Novo Mundo*, Playgames, 2002, three CDs; `Atlantis3.exe` of 3,424,256 bytes, MD5 `e5e89f926f80be9ce06a324f27018e89`) | Portuguese | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (`.img` as CloneCD writes them, `.iso`, or copies of the CDs) in it or in a folder inside it |
+| Swedish CD (*Atlantis 3: Den nya världen*, Toptronics, 2002, three CDs; the Portuguese CD's `Atlantis3.exe`) | Swedish | the same as the Portuguese CD (ISO images) |
+| Taiwanese CD (亞特蘭提斯Ⅲ 失落的帝國, Interwise, 2002, three CDs; the Portuguese CD's `Atlantis3.exe`) | Traditional Chinese subtitles and menus, English voices | the same as the Portuguese CD (ISO images); the texts are drawn with the player's `mingliu.ttc` when it is in the installed folder, else with the bundled Noto Serif TC |
+| Czech CD (*Atlantis 3*, GAME4U Speciál 10, 2003, three CDs; `Atlantis3.exe` of 3,379,200 bytes, MD5 `344f2149ce56096f1988b1621a00bc10`) | Czech | the installation folder (the one holding `Atlantis3.exe` and `Datas`), with the images of the three CDs (`.bin` / `.cue`, `.iso`, or copies of the CDs) in it or in a folder inside it |
+| *Atlantis Collection*, Italian DVD compilation (2014; *Atlantis 3 - Il Nuovo Mondo*; its `Game.exe` is GOG.com's earlier build of the same program, 3,473,408 bytes, MD5 `0068f6ed52bcfed7908d7e65fb3de3b1`) | Italian | the folder its installer creates (the one holding `Game.exe` and `Datas`; by default `Adventure Productions\Atlantis 3 - Il Nuovo Mondo` in the program files); the DVD itself is not read |
 
 GOG.com ships the same `Game.exe` in its four languages; the language is
 read from the installation (the language GOG.com's installer records),
@@ -337,16 +366,46 @@ French CD's program is older (2001) and differs in a few things the
 player sees, which Atlantis Native follows (the scarab case is drawn,
 the discs are asked for; see
 [Atlantis III](docs/GUIDE.md#atlantis-iii)); the game library names it
-"Atlantis III, CD, French". Other editions (the other retail CDs and the
-DVDs) are unknown and untested: their program is refused with its size
-and MD5, so that it can be reported and added.
+"Atlantis III, CD, French". The North American CD (*Beyond Atlantis II*,
+DreamCatcher, 2001) has its own program, a month younger than the French
+CD's: it asks for the discs as the French CD does, and otherwise draws the
+scarab case, the subjects menu, the Isis puzzle's pointer and the intro
+(`intro_usa.hnm`) as GOG.com's program; its texts are English (a few
+words left out), drawn in the Central European character set its
+`font.txt` asks for; the game library names it "Atlantis III, CD,
+English (DreamCatcher, 2001)". The Portuguese CD (*O Novo Mundo*,
+Playgames, 2002) has the North American program rebuilt two weeks later,
+and plays the same way, with Portuguese voices, texts and films; the game
+library names it "Atlantis III, Portuguese CD, Portuguese (Playgames, 2002)". The
+Swedish CD (*Den nya världen*, Toptronics, 2002) is the same edition in
+Swedish ("Atlantis III, Swedish CD, Swedish (Toptronics, 2002)"). The
+Taiwanese CD (亞特蘭提斯Ⅲ 失落的帝國, Interwise, 2002) is the same program
+with Traditional Chinese (Big5) texts and English voices; its texts are
+measured and broken per character as the original's double-byte text
+renderer does ("Atlantis III, Taiwanese CD, Traditional Chinese
+(Interwise, 2002)"). The Czech CD
+(GAME4U Speciál 10, 2003) has the North American program's game code
+built a week earlier (2001), plays the same way, with Czech voices and
+texts and the Czech part of the intro; the game library names it
+"Atlantis III, Czech CD, Czech (GAME4U Speciál 10, 2003)". The Italian *Atlantis Collection* installs
+GOG.com's 2015 / 2018 `Game.exe` (the one GOG shipped before 2022) with
+Italian texts, voices and films; the game library names it "Atlantis III,
+Atlantis Collection, Italian" (the same program in an older GOG.com
+installation: "Atlantis III, GOG.com (2015 / 2018 build)"). That program
+reads its settings from a file no installation has, so the original
+starts with its defaults every time and forgets the options chosen in
+its menus; a bug fix reads them as GOG.com's current build does (see
+[Atlantis III](docs/GUIDE.md#atlantis-iii)). Other editions (the other
+retail CDs and the DVDs) are unknown and untested: their program is
+refused with its size and MD5, so that it can be reported and added.
 
 For *Atlantis Evolution*:
 
 | Release | Languages | What to point it at |
 |---|---|---|
 | [GOG.com](https://www.gog.com/) (`Atlantis Evolution.exe` of 2,363,910 bytes, MD5 `f2de382af52f1d89e32ed7c286be8b4f`; one program for all five languages) | English, French, German, Italian, Spanish (the one GOG.com's client installed, or another chosen in `settings.ini`) | the installation folder (the one holding `Atlantis Evolution.exe` and `3D`) |
-| The 2004 CD of The Adventure Company, four discs (`Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `2199bc93d2ac3f8b4279e0db898559e8`; **a preview**, not yet played through from start to end) | English | the folder where its installer put the game (the one holding `Atlantis Evolution.exe` and `cd0` to `cd4`; by default `C:\Program Files\The Adventure Company\Atlantis Evolution`) |
+| The 2004 CD of The Adventure Company, four discs, and the European English CD, whose discs hold the same files (`Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `2199bc93d2ac3f8b4279e0db898559e8`; **a preview**, not yet played through from start to end) | English | the folder where its installer put the game (the one holding `Atlantis Evolution.exe` and `cd0` to `cd4`; by default `C:\Program Files\The Adventure Company\Atlantis Evolution`) |
+| *Atlantis Collection*, Italian DVD compilation (2014; its `Atlantis 4\setup.exe`, an Inno Setup installer, installs the 2004 program rebuilt on 2004-10-07: `Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `13c57a6750a2e56ef187116a9c031ac5`; **a preview**) | Italian | the folder its installer created (by default `C:\Program Files\Adventure Productions\Atlantis Evolution`), **with the `cd2` folder of the English CD's installation copied into it**: the collection's installer leaves out the second CD's places, films and music, and Atlantis Native refuses the folder without them, saying so |
 
 GOG.com's edition is a 2012 program (Tetraedge Engine); the CD's is the
 original 2004 program, played by the *Atlantis III* engine. The CDs
@@ -361,11 +420,16 @@ For *The Secrets of Atlantis*:
 | Release | Languages | What to point it at |
 |---|---|---|
 | The French DVD of Nobilis (2006, *L'Héritage sacré*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `e5c43eb0411d1775e6242fec6d241f6e`, never run) | French | the DVD's drive or a copy of its files (the folder with `DATAS.cab`), its image (`.iso`) or the folder holding it, or the folder where its installer put the game (the one with `Datas`) |
+| The international DVD of Nobilis (2006, *The Sacred Legacy*, *Das heilige Vermächtnis*, *L'Eredità Sacra*, *El Legado Sagrado*; `The secrets of Atlantis.exe` of 3,883,008 bytes, MD5 `fcb357acdb6c16a76f3f4f6cb5a625c5`, never run) | English, German, Italian, Spanish | the same forms (its files are `datas.cab` and `datas_english.cab`, `datas_german.cab`, `datas_italian.cab`, `datas_spanish.cab`); the game library lists one entry per language, the web page asks for the language |
+| The North-American CDs of The Adventure Company (2007, *The Secrets of Atlantis*, three CDs; `bin\The Secrets of Atlantis.exe` of 7,368,704 bytes on the first disc, MD5 `ad356540e6375bf19e31372cd56193ae`, never run) | English | a folder holding a copy of each disc (one folder per disc, side by side: `data1.hdr`, `data1.cab`, `data2.cab` on the first, `data3.cab` on the second, `data4.cab` on the third), the three discs' files copied into one folder, the folder holding the three CD images, or the folder where the CDs' installer put the game; one CD in a drive is copied with the others, one after the other (**Copy to this computer**) |
+| *Atlantis Collection*, Italian DVD compilation (2014; its `Atlantis 5\Setup.exe`, an Inno Setup installer in English, German, Italian or Spanish, installs the international DVD's files with an unprotected `The Secrets of Atlantis.exe` of 2,822,144 bytes, MD5 `7d3784a3e99013baed76ddb892a4701d`, never run) | the language installed (English, German, Italian or Spanish) | the folder its installer creates (by default `Anuman interactive\The Secrets of Atlantis` in the program files, the one with `datas`); the installer itself is not read |
 
-You need your own DVD (or its image, or the game installed from it).
-The international DVD (`The secrets of Atlantis.exe` of 3,891,200 bytes)
-has the same layout, `DATAS.cab` and one `DATAS_<language>.cab` per
-language, which Atlantis Native reads, but it has not been tried.
+You need your own DVD or CDs (or their images, or the game installed from them).
+The original's installer asks for the language and installs that one
+only; Atlantis Native offers each language of the disc as its own entry
+of the game library. Started without a choice (`atlantis-native <the
+disc's folder>`), it plays the system's language when the disc has it,
+else English.
 
 The web version plays the five games: see
 [The web version](docs/GUIDE.md#the-web-version).
@@ -377,8 +441,8 @@ How to get the files from your CD or GOG.com: see
 
 Many boxed editions of the five games have never been seen by the
 project: the Polish and Japanese CDs of the first game, the European
-DVD of *Atlantis II*, the English CDs of *Atlantis III*, the French CD of
-*Atlantis Evolution*, the international DVD of *The Secrets of Atlantis*
+DVD of *Atlantis II*, the European English CDs of *Atlantis III*, the French CD of
+*Atlantis Evolution*, the Russian edition of *The Secrets of Atlantis*
 and more. If you own one, its box and discs can help it play: see
 [Wanted editions](docs/WANTED.md) for the list and what to send (photos,
 file listings and checksums only, never the game's files).
@@ -410,22 +474,25 @@ inside it. From the terminal, give that folder (the CD images may stay
 elsewhere with `--discs <folder>`). See
 [Atlantis II](docs/GUIDE.md#atlantis-ii).
 
-*Atlantis III* (2001) too: GOG.com's installation folder, or the French
+*Atlantis III* (2001) too: GOG.com's installation folder, the folder the
+Italian *Atlantis Collection*'s installer created, or the French
 CD's with its three CD images (or copies) in it or in a folder inside it
 (`--discs <folder>` from the terminal), found by the game library or
 given on the command line. See
 [Atlantis III](docs/GUIDE.md#atlantis-iii).
 
 *Atlantis Evolution* (2004) as well: GOG.com's installation folder, or
-the folder the 2004 CD's installer filled (a preview), found by the
+the folder the 2004 CD's installer filled (a preview; the Italian
+*Atlantis Collection*'s too, with the English CD's `cd2`), found by the
 game library or given on the command line. See
 [Atlantis Evolution](docs/GUIDE.md#atlantis-evolution).
 
 *The Secrets of Atlantis* (2006) too: its DVD, a copy of its files, its
 image or its installation, found by the game library or given on the
-command line. Played from the DVD or its image, its entry in the game
+command line, and its North-American CDs (2007) the same way. Played from the DVD or its image, its entry in the game
 library offers **Copy to this computer** (about 1.4 GB, once): the game
-then plays from the hard disk, without the disc. See
+then plays from the hard disk, without the disc. The CDs are copied the
+same way, one disc after the other (about 1.5 GB). See
 [The Secrets of Atlantis](docs/GUIDE.md#the-secrets-of-atlantis).
 
 ## Controls

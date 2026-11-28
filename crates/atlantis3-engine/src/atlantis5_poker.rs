@@ -132,6 +132,17 @@ pub struct Poker {
     /// The mouse at the last frame: the buttons' hover is tested only on
     /// a move (a mouse event of kind 2, @ 0x004523e0).
     last_mouse: Option<(i32, i32)>,
+    /// The cursor's place (+0x08, put at the menu's mouse by @ 0x0040d920
+    /// on the move events of the frames the process runs). A run's dialog
+    /// or film blocks the original's process: the moves made meanwhile
+    /// reach the global mouse, not the cursor, until a move event of a
+    /// frame the process runs.
+    place: Option<(i32, i32)>,
+    /// The mouse at the last frame, held by a run or not.
+    seen: Option<(i32, i32)>,
+    /// The mouse to put back at the cursor's place (states 2, 0xa, 0xc),
+    /// for the host to take ([`Poker::take_mouse`]).
+    mouse_back: Option<(i32, i32)>,
 }
 
 fn num(v: Option<&Value>) -> f64 {
@@ -185,6 +196,9 @@ impl Poker {
                 spr("punter.spr"),
             ],
             last_mouse: None,
+            place: None,
+            seen: None,
+            mouse_back: None,
         };
         p.add(None, 0, 0, Kind::Root);
         // card_bubble_1..3 (bubble.spr) at (0, 10).
@@ -408,6 +422,22 @@ impl Poker {
         })
     }
 
+    /// The text buttons at 1 (+0x8c), tests: in `increase_bet`,
+    /// `follow_bet`, `stop_bet`, `next_game` order.
+    #[doc(hidden)]
+    pub fn hot(&self) -> Vec<&'static str> {
+        [
+            (INCREASE, "increase_bet"),
+            (FOLLOW, "follow_bet"),
+            (STOP, "stop_bet"),
+            (NEXT_GAME, "next_game"),
+        ]
+        .into_iter()
+        .filter(|&(i, _)| matches!(self.els[i].kind, Kind::Text { over: true, .. }))
+        .map(|(_, n)| n)
+        .collect()
+    }
+
     /// A text element's text (tests).
     pub fn text_of(&self, name: &str) -> Option<String> {
         self.index(name).map(|i| self.text(i).1)
@@ -531,10 +561,35 @@ impl Poker {
             .push_back(Op::Run(format!("Atl_Dialog_Play({id})"), None));
     }
 
-    /// The panel's mouse (the cursor's place, @ 0x004520a0 then
-    /// @ 0x0040d890) and the cursor shown.
+    /// The panel's mouse put back at the cursor's place (@ 0x004520a0 on
+    /// the cursor, stored in the global mouse 0x006b0b38 / 0x006b0b3c and
+    /// given to @ 0x0040d890), so the moves made during the blocking film
+    /// or dialogs are dropped; the cursor shown. No hover is tested for
+    /// that place (no move).
     fn show_cursor(&mut self) {
         self.cursor = true;
+        if let Some(p) = self.place {
+            self.mouse_back = Some(p);
+            self.last_mouse = Some(p);
+        }
+    }
+
+    /// A frame held by a script run (a film or dialog of the board's): its
+    /// moves reach the mouse, not the cursor.
+    pub fn held_frame(&mut self, mouse: (i32, i32)) {
+        self.seen = Some(mouse);
+    }
+
+    /// Where the board's cursor is drawn: its place (+0x08), which only a
+    /// move event of a frame the process runs changes (@ 0x0040d920).
+    pub fn cursor_place(&self) -> Option<(i32, i32)> {
+        self.place
+    }
+
+    /// The mouse the board put back at the cursor's place this frame, if
+    /// any: the host's menus' mouse is to be set to it.
+    pub fn take_mouse(&mut self) -> Option<(i32, i32)> {
+        self.mouse_back.take()
     }
 
     // -- a frame -------------------------------------------------------------
@@ -563,24 +618,40 @@ impl Poker {
     /// the base handler @ 0x004523e0 hit-tests on a move event only), the
     /// clicks (@ 0x0040d920 → the buttons' handler), then the process
     /// (@ 0x004240b0). True when the board ends (its process returned 1).
+    /// `wheel`: the frame has a move event made by the wheel alone (lZ,
+    /// @ 0x0047c8a0), the hover tested with the mouse where it was.
     pub fn frame(
         &mut self,
         host: &mut dyn Host,
         mouse: (i32, i32),
         clicks: usize,
+        wheel: bool,
         measure: &dyn Fn(&str, &str, i32, bool) -> i32,
     ) -> bool {
+        let moved = self.seen != Some(mouse);
+        self.seen = Some(mouse);
         if !self.drain(host) {
             return false;
         }
-        if self.last_mouse.is_some_and(|m| m != mouse) {
+        // The process runs: the cursor at the mouse when this frame moved
+        // it (the moves of the frames held by a run are not events here).
+        if moved || self.place.is_none() {
+            self.place = Some(mouse);
+        }
+        // The hover on a move event of this frame only: not for the moves
+        // made while a run held the process (the showdown's dialogs, after
+        // state 0xc's put-back), nor for a put-back's place.
+        if (moved && self.last_mouse.is_some_and(|m| m != mouse)) || wheel {
             self.hover(mouse, measure);
         }
         self.last_mouse = Some(mouse);
         for _ in 0..clicks {
-            let hit = [INCREASE, FOLLOW, STOP, NEXT_GAME].into_iter().find(|&i| {
-                self.els[i].visible && matches!(self.els[i].kind, Kind::Text { over: true, .. })
-            });
+            // The press goes through the elements in the walk's order; the
+            // first text button at 1 takes it (@ 0x0044eb60).
+            let hit = self
+                .walk()
+                .into_iter()
+                .find(|&i| matches!(self.els[i].kind, Kind::Text { over: true, .. }));
             if let Some(i) = hit {
                 self.clicked(host, i);
             }
@@ -596,24 +667,48 @@ impl Poker {
     /// The text buttons' +0x8c (@ 0x0044eb60): 1 with the mouse in the
     /// box (both ends included, @ 0x00452020), else 0; a hidden button
     /// takes no event (@ 0x004523e0).
+    ///
+    /// The move goes through the shown elements in the walk's order and
+    /// stops at a button that turns 1 (it returns 1, @ 0x004523e0): the
+    /// buttons after it keep their state until the next move.
     fn hover(&mut self, (mx, my): (i32, i32), measure: &dyn Fn(&str, &str, i32, bool) -> i32) {
-        for i in [INCREASE, FOLLOW, STOP, NEXT_GAME] {
-            let shown = self.visible_path(i);
+        for i in self.walk() {
+            if !matches!(self.els[i].kind, Kind::Text { hover: Some(_), .. }) {
+                continue;
+            }
             let (x, y) = self.abs(i);
             let (font, text, w) = self.text(i);
             let h = measure(font, &text, w, true);
             let inside = (x..=x + w).contains(&mx) && (y..=y + h).contains(&my);
             if let Kind::Text { over, .. } = &mut self.els[i].kind {
-                if shown {
-                    *over = inside;
+                if !*over && inside {
+                    *over = true;
+                    return;
+                }
+                if *over && !inside {
+                    *over = false;
                 }
             }
         }
     }
 
-    fn visible_path(&self, i: usize) -> bool {
-        let e = &self.els[i];
-        e.visible && e.parent.is_none_or(|p| p == ROOT || self.visible_path(p))
+    /// The order an event goes through the elements (@ 0x004523e0): each
+    /// element's children from its list's head, a new child put at the
+    /// head (@ 0x00452140 with index 0), so the last made first, each
+    /// one's own children before it; a hidden one and its children
+    /// skipped (@ 0x004520f0). From the root's children.
+    fn walk(&self) -> Vec<usize> {
+        fn under(p: &Poker, i: usize, out: &mut Vec<usize>) {
+            for &c in p.els[i].children.iter().rev() {
+                if p.els[c].visible {
+                    under(p, c, out);
+                    out.push(c);
+                }
+            }
+        }
+        let mut out = Vec::new();
+        under(self, ROOT, &mut out);
+        out
     }
 
     /// The buttons' handler (@ 0x004258b0, the clicked element's name).

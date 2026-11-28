@@ -370,7 +370,7 @@ fn loader_lua(state: &mut LuaState) -> LuaResult<u32> {
     };
 
     let chunk_name = format!("@{filename}");
-    match crate::compile_or_undump(&source, &chunk_name) {
+    match crate::compile_or_undump_in(&source, &chunk_name, state.gc.compile_lua50) {
         Ok(proto) => {
             let mut proto =
                 crate::vm::proto::ProtoRef::try_unwrap(proto).unwrap_or_else(|rc| (*rc).clone());

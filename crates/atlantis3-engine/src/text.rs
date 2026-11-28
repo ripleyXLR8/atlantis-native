@@ -27,10 +27,27 @@
 //! Windows 11) and the text library's double-byte renderer; the port
 //! draws English as a Windows without one, in Arial and Windows-1252
 //! (its texts are ASCII but for one `’`).
+//!
+//! The Traditional Chinese CD (Interwise) asks for `Arial` in
+//! `CHINESEBIG5_CHARSET` for all five fonts: GDI answers on a Traditional
+//! Chinese Windows with its Big5 face (PMingLiU, inferred), whose
+//! `tmCharSet` (0x88) makes the text library take its double-byte
+//! renderer and its Big5 line break (atlantis3-cd-pt-3424256
+//! @ 0x006bfb30, @ 0x006c0dc0): widths per character from
+//! `GetCharacterPlacementA`, the layout loop counting characters with the
+//! C runtime's `_mbsinc` / `_mbsdec` in code page 950 (@ 0x006bd930, the
+//! twin of 0x006b4a20), a line ending only where the kinsoku rule of
+//! [`big5_break`] says. The port measures such a font with [`Dbcs`]: the
+//! face is the player's PMingLiU (`mingliu.ttc` beside the game's files),
+//! else the bundled Noto Serif TC, and the advances are **derived from
+//! the face's tables** (`hmtx` at the cell's pixels per em, rounded), not
+//! measured with GDI.
 
 use crate::px::ScreenPixel;
+use atlantis_data::TextCodePage;
+use atlantis_engine::subtitles::{FaceSource, FontFace};
 use std::collections::HashMap;
-use std::sync::OnceLock;
+use std::sync::{Arc, Mutex, OnceLock};
 
 /// GDI's measurements of `Arial` at one requested height.
 #[derive(Clone, Debug)]
@@ -42,8 +59,93 @@ pub struct GdiFont {
     pub ave_char_width: i32,
     /// `tmCharSet`: 0 ANSI, 238 Central European.
     pub charset: u8,
-    /// A, B, C of each byte.
+    /// A, B, C of each byte (single-byte fonts).
     pub abc: Vec<(i32, i32, i32)>,
+    /// A double-byte font (`CHINESEBIG5_CHARSET`): its face and code
+    /// page; its widths are per character, [`GdiFont::dx`].
+    pub dbcs: Option<Arc<Dbcs>>,
+}
+
+/// `CHINESEBIG5_CHARSET`: the Traditional Chinese CD's fonts.
+pub const CHARSET_BIG5: u8 = 0x88;
+
+/// A double-byte font's face and measures: the face GDI would give (the
+/// player's PMingLiU, else the port's Noto Serif TC), at `ppem` pixels per
+/// em, its texts read in `code_page` (950: a byte 0x81..0xfe and the byte
+/// after it are one character, as the C runtime's `_mbsinc` reads them
+/// after `_setmbcp(_MB_CP_ANSI)` @ 0x006d04de on a Traditional Chinese
+/// Windows).
+#[derive(Clone, Debug)]
+pub struct Dbcs {
+    pub code_page: TextCodePage,
+    pub face: FontFace,
+    pub ppem: f32,
+    /// `tmBreakChar`: the bytes skipped after a break (0x006bdbea); the
+    /// space [INFERRED: PMingLiU's, not measured].
+    pub break_char: u8,
+}
+
+impl Dbcs {
+    /// The character of `ch` (a byte or a pair): `'\0'` where the code
+    /// page has none, and for code page 950's user-defined pairs.
+    pub fn char_of(&self, ch: &[u8]) -> char {
+        if let [lead, trail] = *ch {
+            let user_defined = matches!(
+                (lead, trail),
+                (0x81..=0xa0, _) | (0xc6, 0xa1..) | (0xc7..=0xc8, _) | (0xfa..=0xfe, _)
+            );
+            if self.code_page == TextCodePage::Windows950 && user_defined {
+                return '\0';
+            }
+        }
+        self.code_page.decode(ch).chars().next().unwrap_or('\0')
+    }
+
+    /// The advance of each character of `s` ([`chars`]), in pixels: the
+    /// face's `hmtx` advance at `ppem`, rounded (derived from the font's
+    /// tables; GDI's `GetCharacterPlacementA` was not measured). A
+    /// character without a glyph takes the missing glyph's.
+    #[allow(clippy::cast_possible_truncation)]
+    pub fn advances(&self, s: &[u8]) -> Vec<i32> {
+        let (data, index) = self.face.file();
+        let face = ttf_parser::Face::parse(data, index).ok();
+        let upem = face
+            .as_ref()
+            .map_or(1000.0, |f| f32::from(f.units_per_em()));
+        chars(s, self.code_page)
+            .windows(2)
+            .map(|w| {
+                let c = self.char_of(&s[w[0]..w[1]]);
+                let adv = face.as_ref().map_or(0, |f| {
+                    let g = if c == '\0' {
+                        ttf_parser::GlyphId(0)
+                    } else {
+                        f.glyph_index(c).unwrap_or(ttf_parser::GlyphId(0))
+                    };
+                    f.glyph_hor_advance(g).unwrap_or(0)
+                });
+                (f32::from(adv) * self.ppem / upem).round() as i32
+            })
+            .collect()
+    }
+}
+
+/// The starts of the characters of `s` in `code_page`, then `s.len()`: a
+/// lead byte and the byte after it are one character (a lead byte at the
+/// end is one alone); in a single-byte code page every byte is one.
+pub fn chars(s: &[u8], code_page: TextCodePage) -> Vec<usize> {
+    let mut out = Vec::with_capacity(s.len() + 1);
+    let mut i = 0;
+    while i < s.len() {
+        out.push(i);
+        i += if code_page.is_lead_byte(s[i]) && i + 1 < s.len() {
+            2
+        } else {
+            1
+        };
+    }
+    out.push(s.len());
+    out
 }
 
 const TABLE: &str = include_str!("data/arial_gdi.txt");
@@ -86,6 +188,7 @@ fn parse_table(text: &str) -> HashMap<i32, GdiFont> {
                     ave_char_width: n(tm + 6),
                     charset: u8::try_from(cs).unwrap_or(0),
                     abc: vec![(0, 0, 0); 256],
+                    dbcs: None,
                 });
             }
             Some(&"ABC") => {
@@ -123,10 +226,101 @@ impl GdiFont {
         }
     }
 
+    /// A double-byte font for a request of `height` (a cell height, as
+    /// `font.txt`'s) in `CHINESEBIG5_CHARSET`, drawn in `face`. The
+    /// player's face is sized as GDI sizes a positive height: pixels per
+    /// em = MulDiv(unitsPerEm, height, usWinAscent + usWinDescent), its
+    /// ascent the Windows ascent at that size; the port's Noto Serif TC
+    /// stands in for PMingLiU, whose cell is its em [INFERRED], at
+    /// `height` pixels per em with its ideographs' ascent
+    /// ([`FontFace::cjk_ascent`]). `tmHeight` is `height` [INFERRED];
+    /// `tmAveCharWidth` the face's `xAvgCharWidth` (the layout's estimate
+    /// only, which does not change the lines).
+    pub fn big5(face: FontFace, height: i32) -> GdiFont {
+        let h = height.max(1);
+        let (data, index) = face.file();
+        let parsed = ttf_parser::Face::parse(data, index).ok();
+        let upem = parsed
+            .as_ref()
+            .map_or(1000, |f| i64::from(f.units_per_em()));
+        let os2 = parsed.as_ref().and_then(|f| f.tables().os2);
+        #[allow(clippy::cast_precision_loss)]
+        let ppem = match (face.source(), os2) {
+            (FaceSource::Player, Some(o))
+                if i64::from(o.windows_ascender()) + i64::from(o.windows_descender().abs()) > 0 =>
+            {
+                let cell = i64::from(o.windows_ascender()) + i64::from(o.windows_descender().abs());
+                ((upem * i64::from(h) + cell / 2) / cell).max(1) as f32
+            }
+            _ => h as f32,
+        };
+        #[allow(clippy::cast_possible_truncation)]
+        let ascent = face
+            .cjk_ascent(ppem)
+            .unwrap_or((ppem * 0.88).round() as i32);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        // OS/2 xAvgCharWidth, an int16 at byte 2.
+        let ave = parsed
+            .as_ref()
+            .and_then(|f| f.raw_face().table(ttf_parser::Tag::from_bytes(b"OS/2")))
+            .and_then(|t| t.get(2..4))
+            .map_or(h / 2, |r| {
+                (f32::from(i16::from_be_bytes([r[0], r[1]])) * ppem / upem as f32).round() as i32
+            });
+        GdiFont {
+            height,
+            tm_height: h,
+            ascent,
+            ave_char_width: ave.max(1),
+            charset: CHARSET_BIG5,
+            abc: vec![(0, 0, 0); 256],
+            dbcs: Some(Arc::new(Dbcs {
+                code_page: TextCodePage::Windows950,
+                face,
+                ppem,
+                break_char: b' ',
+            })),
+        }
+    }
+
+    /// [`GdiFont::big5`] at `height` in `face`, made once per face and
+    /// height for the program's life (the fonts are handed out as
+    /// `&'static`, as the measured tables are).
+    pub fn big5_cached(face: &FontFace, height: i32) -> &'static GdiFont {
+        type Cache = Mutex<Vec<(FaceSource, usize, u32, i32, &'static GdiFont)>>;
+        static CACHE: OnceLock<Cache> = OnceLock::new();
+        let (data, index) = face.file();
+        let key = (face.source(), data.len(), index, height);
+        let mut c = CACHE
+            .get_or_init(|| Mutex::new(Vec::new()))
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(&(.., f)) = c.iter().find(|e| (e.0, e.1, e.2, e.3) == key) {
+            return f;
+        }
+        let f: &'static GdiFont = Box::leak(Box::new(GdiFont::big5(face.clone(), height)));
+        c.push((key.0, key.1, key.2, key.3, f));
+        f
+    }
+
+    /// The code page the font's bytes are read in.
+    pub fn code_page(&self) -> TextCodePage {
+        match &self.dbcs {
+            Some(d) => d.code_page,
+            None if self.charset == CHARSET_EE => TextCodePage::Windows1250,
+            None => TextCodePage::Windows1252,
+        }
+    }
+
     /// The advances `ExtTextOutA` is given (@ 0x006b6880): A + B + C per
     /// byte, the last byte's negative C and the first byte's positive A
-    /// taken off.
+    /// taken off. A double-byte font's are per character, without
+    /// trims ([`Dbcs::advances`]: `GetCharacterPlacementA`'s `lpDx`,
+    /// @ 0x006bfd30).
     pub fn dx(&self, s: &[u8]) -> Vec<i32> {
+        if let Some(d) = &self.dbcs {
+            return d.advances(s);
+        }
         let n = s.len();
         s.iter()
             .enumerate()
@@ -266,14 +460,201 @@ fn break_before(p: &[u8], e: usize) -> (usize, usize) {
     }
 }
 
-/// The lines of `text` (Windows-1252 bytes) for a `w` x `h` screen
-/// (@ 0x006b4450, @ 0x006b51b0, @ 0x006b5370).
+/// The Big5 line break (atlantis3-cd-pt-3424256 @ 0x006c0dc0), its lists
+/// of strings compared as prefixes (0x006c0910): A, after which a line
+/// may end even past the zone (`! ) , . : ; ? ] }`); B, which may not end
+/// a line (the opening marks); C, which may not start one (A and the
+/// closing marks and the punctuation A141..A15C).
+pub const BIG5_LIST_A: [&[u8]; 9] = [b"!", b")", b",", b".", b":", b";", b"?", b"]", b"}"];
+pub const BIG5_LIST_B: [&[u8]; 26] = [
+    b"(",
+    b"[",
+    b"{",
+    b"\xa1\x5d",
+    b"\xa1\x5f",
+    b"\xa1\x61",
+    b"\xa1\x63",
+    b"\xa1\x65",
+    b"\xa1\x67",
+    b"\xa1\x69",
+    b"\xa1\x6b",
+    b"\xa1\x6d",
+    b"\xa1\x6f",
+    b"\xa1\x71",
+    b"\xa1\x73",
+    b"\xa1\x75",
+    b"\xa1\x77",
+    b"\xa1\x79",
+    b"\xa1\x7b",
+    b"\xa1\x7d",
+    b"\xa1\xa1",
+    b"\xa1\xa3",
+    b"\xa1\xa5",
+    b"\xa1\xa7",
+    b"\xa1\xa9",
+    b"\xa1\xab",
+];
+
+/// List C: list A, A141..A15C, then the closing marks.
+fn big5_list_c(s: &[u8]) -> bool {
+    const CLOSING: [u8; 23] = [
+        0x5e, 0x60, 0x62, 0x64, 0x66, 0x68, 0x6a, 0x6c, 0x6e, 0x70, 0x72, 0x74, 0x76, 0x78, 0x7a,
+        0x7c, 0x7e, 0xa2, 0xa4, 0xa6, 0xa8, 0xaa, 0xac,
+    ];
+    begins_with(s, &BIG5_LIST_A)
+        || matches!(s, [0xa1, t, ..] if (0x41..=0x5c).contains(t) || CLOSING.contains(t))
+}
+
+fn begins_with(s: &[u8], list: &[&[u8]]) -> bool {
+    list.iter().any(|e| s.starts_with(e))
+}
+
+/// Where the next line starts when a paragraph overflows at the
+/// character `e` (its index in `st`, the paragraph's character starts;
+/// the character `e - 1` is the first that does not fit), as the Big5
+/// finder (@ 0x006c0dc0) answers: after that character when it begins
+/// with list A; else back over the list B characters before it, then
+/// back over list C characters. `None` where the original's walk would
+/// leave the paragraph (`_mbsdec` at its start: a NULL the finder then
+/// reads [INFERRED: a crash]; no shipped text gets there).
+pub fn big5_break(p: &[u8], st: &[usize], e: usize) -> Option<usize> {
+    let at = |k: usize| &p[st[k]..];
+    let mut q = e.checked_sub(1)?;
+    if begins_with(at(q), &BIG5_LIST_A) {
+        return Some(q + 1);
+    }
+    while q > 0 && begins_with(at(q - 1), &BIG5_LIST_B) {
+        q -= 1;
+    }
+    if q == 0 {
+        return None;
+    }
+    while big5_list_c(at(q)) {
+        q = q.checked_sub(1)?;
+    }
+    Some(q)
+}
+
+/// One paragraph's lines with a double-byte font (@ 0x006bd930 with the
+/// Big5 finder): the loop of [`layout`] counting characters, widths summed
+/// per character, a line ending only at [`big5_break`]'s answer, the next
+/// one starting past the bytes equal to `tmBreakChar`.
+fn dbcs_lines(font: &GdiFont, d: &Dbcs, p: &[u8], avail: i32, limit: i32, ml: i32) -> Vec<Vec<u8>> {
+    let adv = d.advances(p);
+    big5_lines(p, &adv, font.ave_char_width, avail, limit, ml, d.break_char)
+        .into_iter()
+        .map(|(s, e)| p[s..e].to_vec())
+        .collect()
+}
+
+/// The lines (byte ranges) of paragraph `p` in code page 950, its
+/// characters' advances `adv`, as the layout loop @ 0x006bd930 makes them
+/// with the Big5 finder: the estimate `avail / ave` characters, shrunk or
+/// extended one character at a time to the first end that overflows
+/// (`ml + width > limit`), the line ended at [`big5_break`], the next
+/// one started past the bytes equal to `break_char`; a paragraph's last
+/// line whatever it holds (an empty one after a break that leaves only
+/// such bytes).
+#[allow(clippy::too_many_arguments)]
+pub fn big5_lines(
+    p: &[u8],
+    adv: &[i32],
+    ave: i32,
+    avail: i32,
+    limit: i32,
+    ml: i32,
+    break_char: u8,
+) -> Vec<(usize, usize)> {
+    big5_lines_cut(p, adv, ave, avail, limit, ml, break_char).0
+}
+
+/// [`big5_lines`] and how many lines the port had to cut where the
+/// original never returns (no Big5 break above the line's start).
+#[allow(clippy::too_many_arguments)]
+pub fn big5_lines_cut(
+    p: &[u8],
+    adv: &[i32],
+    ave: i32,
+    avail: i32,
+    limit: i32,
+    ml: i32,
+    break_char: u8,
+) -> (Vec<(usize, usize)>, usize) {
+    let mut cuts = 0;
+    let st = chars(p, TextCodePage::Windows950);
+    let n = st.len() - 1;
+    let mut pw = Vec::with_capacity(n + 1);
+    pw.push(0);
+    for k in 0..n {
+        pw.push(pw[k] + adv.get(k).copied().unwrap_or(0));
+    }
+    let mut out = Vec::new();
+    let mut s = 0usize;
+    loop {
+        let over = |e: usize| ml + pw[e] - pw[s] > limit;
+        let k = if ave > 0 {
+            (avail / ave).max(0) as usize
+        } else {
+            0
+        };
+        let mut e = s + k.min(n - s);
+        let overflow;
+        if over(e) {
+            while e > s && over(e) {
+                e -= 1;
+            }
+            e += 1;
+            overflow = true;
+        } else {
+            loop {
+                if e == n {
+                    overflow = false;
+                    break;
+                }
+                e += 1;
+                if over(e) {
+                    overflow = true;
+                    break;
+                }
+            }
+        }
+        if !overflow {
+            out.push((st[s], st[e]));
+            return (out, cuts);
+        }
+        match big5_break(p, &st, e).filter(|&b| b > s) {
+            Some(b) => {
+                out.push((st[s], st[b]));
+                s = b;
+            }
+            None => {
+                // The original never returns (or reads address 0); no
+                // shipped text gets here: the port cuts before the
+                // character that overflows.
+                let cut = (e - 1).max(s + 1);
+                out.push((st[s], st[cut]));
+                s = cut;
+                cuts += 1;
+            }
+        }
+        while s < n && p[st[s]] == break_char {
+            s += 1;
+        }
+    }
+}
+
+/// The lines of `text` (Windows-1252 bytes; Big5 with a double-byte font)
+/// for a `w` x `h` screen (@ 0x006b4450, @ 0x006b51b0, @ 0x006b5370).
 pub fn layout(font: &GdiFont, text: &[u8], w: i32, h: i32, z: Zone) -> Vec<Line> {
     let avail = (w - 1) - z.mr - z.ml;
     let limit = w - 1 - z.mr;
     let over = |s: &[u8]| z.ml + font.width(s) > limit;
     let mut lines: Vec<Vec<u8>> = Vec::new();
     for p in text.split(|&c| c == b'\n') {
+        if let Some(d) = &font.dbcs {
+            lines.extend(dbcs_lines(font, d, p, avail, limit, z.ml));
+            continue;
+        }
         let mut s = 0usize;
         loop {
             let chars = if font.ave_char_width > 0 {
@@ -411,6 +792,32 @@ impl Glyphs {
         mut f: impl FnMut(ab_glyph::OutlinedGlyph),
     ) {
         use ab_glyph::{Font, ScaleFont};
+        if let Some(d) = &gdi.dbcs {
+            let (data, index) = d.face.file();
+            let Ok(font) = ab_glyph::FontRef::try_from_slice_and_index(data, index) else {
+                return;
+            };
+            // ab_glyph scales by the line height (ascent − descent).
+            let upem = font.units_per_em().unwrap_or(1000.0);
+            let scale = ab_glyph::PxScale::from(d.ppem * font.height_unscaled() / upem);
+            for l in lines {
+                let mut pen = l.x as f32;
+                let base = (l.y + gdi.ascent) as f32;
+                let st = chars(&l.bytes, d.code_page);
+                for (w, &adv) in st.windows(2).zip(&l.dx) {
+                    let c = d.char_of(&l.bytes[w[0]..w[1]]);
+                    if c > ' ' {
+                        let id = font.glyph_id(c);
+                        let glyph = id.with_scale_and_position(scale, ab_glyph::point(pen, base));
+                        if let Some(og) = font.outline_glyph(glyph) {
+                            f(og);
+                        }
+                    }
+                    pen += adv as f32;
+                }
+            }
+            return;
+        }
         let scale = ab_glyph::PxScale::from(gdi.tm_height as f32);
         let sf = self.font.as_scaled(scale);
         for l in lines {
@@ -526,7 +933,19 @@ pub struct Texts {
     language: String,
     fonts: atlantis3_data::font_txt::FontTxt,
     dial: HashMap<(i32, i32), Vec<u8>>,
+    /// The face of the `CHINESEBIG5_CHARSET` fonts ([`Texts::big5_face`]),
+    /// when `font.txt` asks for one.
+    big5: Option<FontFace>,
 }
+
+/// Every font id `font.txt` gives.
+pub const FONT_IDS: [FontId; 5] = [
+    FontId::Default,
+    FontId::Bulle,
+    FontId::Special,
+    FontId::Titre,
+    FontId::Credit,
+];
 
 impl Texts {
     pub fn load(files: &atlantis3_data::A3Files, language: &str) -> Texts {
@@ -576,12 +995,48 @@ impl Texts {
                 .collect()
             })
             .unwrap_or_default();
+        let big5 = FONT_IDS
+            .iter()
+            .any(|id| {
+                fonts
+                    .font(id.name())
+                    .is_some_and(|d| d.charset(language) == CHARSET_BIG5)
+            })
+            .then(|| Texts::big5_face(files));
         Texts {
             glyphs,
             language: language.to_string(),
             fonts,
             dial,
+            big5,
         }
+    }
+
+    /// The face a Traditional Chinese Windows gives `Arial` in
+    /// `CHINESEBIG5_CHARSET` with `VARIABLE_PITCH` [INFERRED: PMingLiU, not
+    /// measured]: the player's `mingliu.ttc` beside the game's files (its
+    /// face PMingLiU), else the port's Noto Serif TC (in the web build,
+    /// the one its page fetched).
+    pub fn big5_face(files: &atlantis3_data::A3Files) -> FontFace {
+        use atlantis_engine::subtitles::player_font;
+        let code_page = TextCodePage::Windows950;
+        if let Some((name, _)) = player_font(code_page) {
+            if let Some(data) = files.source().read(name) {
+                match FontFace::player_family(data, "PMingLiU") {
+                    Some(face) => {
+                        log::info!("text font: the player's {name} (PMingLiU)");
+                        return face;
+                    }
+                    None => log::warn!("{name}: not a font the port can use"),
+                }
+            }
+        }
+        FontFace::bundled(code_page)
+    }
+
+    /// The face of the Big5 fonts, when `font.txt` has any.
+    pub fn big5(&self) -> Option<&FontFace> {
+        self.big5.as_ref()
     }
 
     /// The text of line `line` of dialog `dialog` (`GetTextFromDial`).
@@ -593,7 +1048,11 @@ impl Texts {
     pub fn gdi(&self, id: FontId, width: usize) -> Option<&'static GdiFont> {
         let def = self.fonts.font(id.name())?;
         let h = def.scaled_height(width as u32)?;
-        GdiFont::arial_charset(h, def.charset(&self.language))
+        let charset = def.charset(&self.language);
+        if charset == CHARSET_BIG5 {
+            return self.big5.as_ref().map(|f| GdiFont::big5_cached(f, h));
+        }
+        GdiFont::arial_charset(h, charset)
     }
 
     /// `AtlFont_SetLayout` + `AtlFont_Print` (@ 0x0041e190, @ 0x0041e2c0).
@@ -636,6 +1095,65 @@ impl Texts {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The synthetic cases of atlantis3-re `tools/emu/a3_text_model_dbcs.py
+    /// --cases` (every pair 18 wide, every byte 9; W 200, margins 10, 10):
+    /// the same lines. `a440` an ideograph, `a141` a comma (list C), `a175`
+    /// an opening bracket (list B), `a176` its closing one (list C).
+    #[test]
+    fn big5_lines_as_the_reference_model() {
+        let hex = |h: &str| -> Vec<u8> {
+            (0..h.len())
+                .step_by(2)
+                .map(|i| u8::from_str_radix(&h[i..i + 2], 16).unwrap())
+                .collect()
+        };
+        let (cjk, comma, open, close) = ("a440", "a141", "a175", "a176");
+        let r = |n: usize| cjk.repeat(n);
+        let cases: Vec<(String, &str)> = vec![
+            (r(5), "0-10"),
+            (r(30), "0-18 18-36 36-54 54-60"),
+            (r(9) + comma + &r(5), "0-16 16-30"),
+            (r(8) + open + &r(5), "0-16 16-28"),
+            (r(9) + close + &r(5), "0-16 16-30"),
+            (r(9) + "2e" + &r(5), "0-19 19-29"),
+            (r(4) + "2020" + &r(8), "0-18 18-26"),
+            ("4142".to_string() + &r(3) + "3132" + &r(12), "0-18 18-34"),
+            (r(8) + comma + close + &r(4), "0-14 14-28"),
+        ];
+        for (h, want) in cases {
+            let p = hex(&h);
+            let st = chars(&p, TextCodePage::Windows950);
+            let adv: Vec<i32> = st
+                .windows(2)
+                .map(|w| if w[1] - w[0] == 2 { 18 } else { 9 })
+                .collect();
+            let got: Vec<String> = big5_lines(&p, &adv, 9, 179, 189, 10, b' ')
+                .iter()
+                .map(|(s, e)| format!("{s}-{e}"))
+                .collect();
+            assert_eq!(got.join(" "), want, "{h}");
+        }
+    }
+
+    /// The finder: list A hangs past the zone, list B moves to the next
+    /// line, list C pulls the character before it; an overflow on the
+    /// paragraph's first character has no answer.
+    #[test]
+    fn big5_finder_lists() {
+        let p = b"\xa4\x40\xa4\x40\xa1\x41\xa4\x40";
+        let st = chars(p, TextCodePage::Windows950);
+        assert_eq!(st, [0, 2, 4, 6, 8]);
+        assert_eq!(big5_break(p, &st, 3), Some(1));
+        assert_eq!(big5_break(p, &st, 2), Some(1));
+        assert_eq!(big5_break(p, &st, 1), None);
+        let p = b"\xa4\x40!\xa4\x40";
+        let st = chars(p, TextCodePage::Windows950);
+        assert_eq!(big5_break(p, &st, 2), Some(2));
+        let p = b"\xa4\x40\xa4\x40\xa1\x75\xa4\x40";
+        let st = chars(p, TextCodePage::Windows950);
+        assert_eq!(big5_break(p, &st, 4), Some(2));
+    }
 
     /// The Central European table: its own charset and, on the bytes
     /// whose characters differ, its own widths (`è` against `č`).

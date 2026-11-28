@@ -37,7 +37,7 @@
 //! - The menus' handlers compare the clicked element's name with their
 //!   own (each menu's @ address is on its builder below).
 
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
 use atlantis3_data::atlantis5_texts::StringResources;
@@ -196,12 +196,45 @@ struct Text {
     scroll_box: Option<(i32, i32)>,
 }
 
+impl Text {
+    /// The colour drawn: a button's under the mouse, else its own.
+    fn shown_color(&self) -> u32 {
+        if self.over {
+            self.hover.unwrap_or(self.color)
+        } else {
+            self.color
+        }
+    }
+}
+
 struct SprButton {
     click: Option<Bank>,
     focus: Option<Bank>,
     /// +0x98.
     state: u8,
     time: f64,
+}
+
+impl SprButton {
+    /// The bank drawn and its picture: at 1 the focus looped, at 2 the
+    /// click played once, else the click's first picture (15 a second).
+    fn shown(&self) -> Option<(&Bank, usize)> {
+        let frame = |bank: &Bank, looped: bool| {
+            let n = bank.len().max(1);
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let u = (self.time * 15.0) as usize;
+            if looped {
+                u % n
+            } else {
+                u.min(n - 1)
+            }
+        };
+        match self.state {
+            1 => self.focus.as_ref().map(|f| (f, frame(f, true))),
+            2 => self.click.as_ref().map(|c| (c, frame(c, false))),
+            _ => self.click.as_ref().map(|c| (c, 0)),
+        }
+    }
 }
 
 enum Kind {
@@ -321,7 +354,8 @@ pub struct Menu {
     credits: Option<Credits>,
     /// The save page's labels to make again.
     relabel: bool,
-    /// Each text's height (+0x28) as last measured.
+    /// Each text's height (+0x28) as last drawn, the hit test's
+    /// (@ 0x00452020): 0 until the element's first draw.
     heights: Vec<i32>,
 }
 
@@ -344,6 +378,9 @@ pub struct Menus {
     /// synthetic move at the centre when a mode opens (@ 0x0041b780), then
     /// the player's moves.
     last_mouse: (i32, i32),
+    /// A move event this frame with the mouse where it was (a wheel turn,
+    /// lZ, @ 0x0047c8a0): the hover is tested all the same.
+    moved: bool,
     clicks: usize,
     /// The saves (a folder, the browser's storage).
     pub saves: Option<std::rc::Rc<dyn crate::atlantis5_saves::SaveFiles>>,
@@ -351,6 +388,50 @@ pub struct Menus {
     /// pages' dates (`FileTimeToLocalFileTime`).
     pub utc_offset: fn() -> i64,
     effects: Vec<Effect>,
+    /// How many menus were made: tells a menu from the one before it in
+    /// [`MenuPicture`] (their backgrounds and sprites are made with them).
+    made: u64,
+    /// Each mode's texts' heights as last drawn ([`Menu::heights`]),
+    /// kept for the program's run: the original makes its menus and
+    /// their elements once (the manager's ctor @ 0x0041b170), and a
+    /// text's +0x28 is 0 from its ctor (@ 0x00451170) until its first
+    /// draw (@ 0x00451600, the only write).
+    drawn: HashMap<u32, Vec<i32>>,
+}
+
+/// Everything [`Menus::render`] draws from while the menu's background
+/// covers the screen (a host-side check, not the original's: it draws
+/// every frame): two equal keys are the same picture. The menu (its
+/// background, banks and fonts never change once it is made), the
+/// cursor's place and, in drawing order, each drawn element's place and
+/// what [`Menu::draw`] reads of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MenuPicture {
+    menu: u64,
+    mouse: (i32, i32),
+    elements: Vec<ElementPicture>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ElementPicture {
+    Text {
+        at: (i32, i32),
+        font: String,
+        text: String,
+        width: i32,
+        color: u32,
+        align: u32,
+        scroll_box: Option<(i32, i32)>,
+    },
+    /// The bank drawn (0 none, 1 the focus, 2 the click) and its picture.
+    Button {
+        at: (i32, i32),
+        bank: u8,
+        frame: usize,
+    },
+    Sprite {
+        at: (i32, i32),
+    },
 }
 
 fn no_offset() -> i64 {
@@ -378,10 +459,13 @@ impl Menus {
             examine_item: Vec::new(),
             mouse: (W / 2, H / 2),
             last_mouse: (W / 2, H / 2),
+            moved: false,
             clicks: 0,
             saves: None,
             utc_offset: no_offset,
             effects: Vec::new(),
+            made: 0,
+            drawn: HashMap::new(),
         }
     }
 
@@ -422,6 +506,12 @@ impl Menus {
         self.menu.as_ref().map(|m| m.mode)
     }
 
+    /// Whether the menu up was closed by its handler: it ends at the next
+    /// step (its process's state 2).
+    pub fn closing(&self) -> bool {
+        self.menu.as_ref().is_some_and(|m| m.closed)
+    }
+
     /// Whether a menu is up or queued.
     pub fn active(&self) -> bool {
         self.menu.is_some() || !self.queue.is_empty()
@@ -445,6 +535,12 @@ impl Menus {
     /// A press of the left button, taken at the next step.
     pub fn click(&mut self) {
         self.clicks += 1;
+    }
+
+    /// A mouse move event with the mouse where it was (a wheel turn),
+    /// taken at the next step: the hover is tested.
+    pub fn move_event(&mut self) {
+        self.moved = true;
     }
 
     /// The effects the last steps asked for.
@@ -563,13 +659,15 @@ impl Menus {
         let f = "AtlFont_Default";
         let b =
             |name, key: &str| Element::button(name, f, self.string(key), 0x118, 0, 500).align(1);
+        // In the ctor's order (`evidence/m2/menu-in-game-ctor.trace`):
+        // `resume` after `exit`.
         let elements = vec![
-            Element::button("resume", f, self.string("back_to_game"), 0x118, 0x1c2, 500).align(2),
             b("save", "save_game"),
             b("option_graphic", "graphic_options"),
             b("option_sound", "sound_options"),
             b("option_control", "control_options"),
             b("exit", "quit_game"),
+            Element::button("resume", f, self.string("back_to_game"), 0x118, 0x1c2, 500).align(2),
             Element::text(
                 "confirm_exit_title",
                 f,
@@ -917,11 +1015,13 @@ impl Menus {
     /// 1: the game manager takes its next request), if any.
     pub fn step(&mut self, dt: f64, fonts: &Fonts, config: &mut Config) -> Option<u32> {
         let mut opened = false;
+        let moved = std::mem::take(&mut self.moved);
         if self.menu.is_none() {
             let mode = self.queue.pop_front()?;
             match self.build(mode, config) {
                 Some(m) => {
                     self.menu = Some(m);
+                    self.made += 1;
                     // @ 0x0041b780: the mouse put at the screen's centre
                     // (@ 0x0040d890(w >> 1, h >> 1)), the mode's
                     // Initialize, then the frame's event list emptied and
@@ -929,9 +1029,10 @@ impl Menus {
                     // (@ 0x004546a0(2, 0, w >> 1, h >> 1, 0, 0),
                     // @ 0x00412cc0) before the mode's process. Every
                     // ported mode's first state lays out and reaches
-                    // @ 0x0040d920, so the button under the centre is hot
-                    // from the opening frame, and that frame's own
-                    // presses are dropped.
+                    // @ 0x0040d920, so the button whose box (its height as
+                    // last drawn: 0 before its first draw of the run)
+                    // holds the centre is hot from the opening frame, and
+                    // that frame's own presses are dropped.
                     self.mouse = (W / 2, H / 2);
                     self.clicks = 0;
                     opened = true;
@@ -958,16 +1059,34 @@ impl Menus {
         }
         let clicks = std::mem::take(&mut self.clicks);
         let mut menu = self.menu.take()?;
+        // The frame after its close: the process entered in state 2 (the
+        // handler's close, vtable +0xc, only set it in the click's frame,
+        // whose process went on in state 1 and returned 0): it hides the
+        // cursor and the background and returns 1, reading no event, so
+        // that frame's presses are dropped (`evidence/m2/menu-main.c`
+        // FUN_004289e0, menu-handlers.c FUN_0041a680, menu-death-credits.c
+        // FUN_0040e510, menu-examine.c FUN_004138f0; menus.md § 1).
+        if menu.closed {
+            let mode = menu.mode;
+            if mode == CREDITS {
+                // @ 0x0040e510 state 2: the music stopped with a 1 s fade.
+                self.effects.push(Effect::MusicStopAll(1.0));
+            }
+            return self.queue.is_empty().then_some(mode);
+        }
         let mouse = self.mouse;
         menu.layout(fonts, self);
-        menu.measure(fonts);
+        // The texts' heights as last drawn (the draw @ 0x00451600 comes
+        // after the process): none yet at a mode's first opening in the
+        // run, so the opening's move at the centre tests one-row boxes.
+        menu.heights = self.drawn.get(&menu.mode).cloned().unwrap_or_default();
         // The hit test on a move only (@ 0x004523e0 tests on an event of
         // kind 2 and keeps the result in +0x40; the text button
         // @ 0x0044eb60 turns 1 on a move with it, the sprite button
         // @ 0x0044f0e0 likewise): the opening frame's synthetic move, then
         // the player's moves. A button shown later is not hot until a move
         // (`Menu::set_visible`).
-        if opened || mouse != self.last_mouse {
+        if opened || mouse != self.last_mouse || moved {
             menu.hover(mouse);
             self.last_mouse = mouse;
         }
@@ -1005,17 +1124,16 @@ impl Menus {
                 menu.laid_out = false;
             }
         }
-        if menu.closed {
-            let mode = menu.mode;
-            if mode == CREDITS {
-                // @ 0x0040e510 state 2: the music stopped with a 1 s fade.
-                self.effects.push(Effect::MusicStopAll(1.0));
-            }
-            return self.queue.is_empty().then_some(mode);
-        }
+        // A handler's close leaves the frame a state-1 one: the process
+        // returns 0 (the mode kept, the sound updated, the menu drawn);
+        // it ends at the next step.
         if menu.credits.is_some() && !menu.laid_out {
             self.credit_page(&mut menu, fonts);
         }
+        // The frame's draw (@ 0x0041baa0, after the process): each shown
+        // text measures its height (+0x28).
+        menu.measure(fonts);
+        self.drawn.insert(menu.mode, menu.heights.clone());
         self.menu = Some(menu);
         None
     }
@@ -1292,11 +1410,67 @@ impl Menus {
         self.draw_cursor(out);
     }
 
+    /// Whether the menu up draws its background over the whole screen
+    /// (every menu has one; none when its picture could not be read):
+    /// then nothing drawn before it shows.
+    pub fn covers_screen(&self) -> bool {
+        self.menu
+            .as_ref()
+            .and_then(|m| m.background.as_ref())
+            .is_some_and(|bg| bg.len() == VIEW_WIDTH * VIEW_HEIGHT)
+    }
+
+    /// What the menu's picture is drawn from ([`MenuPicture`]), when its
+    /// background covers the screen; none otherwise.
+    pub fn picture(&self) -> Option<MenuPicture> {
+        if !self.covers_screen() {
+            return None;
+        }
+        let m = self.menu.as_ref()?;
+        let elements = (0..m.elements.len())
+            .filter(|&i| m.visible(i))
+            .map(|i| {
+                let at = m.abs(i);
+                match &m.elements[i].kind {
+                    Kind::Text(t) => ElementPicture::Text {
+                        at,
+                        font: t.font.clone(),
+                        text: t.text.clone(),
+                        width: t.width,
+                        color: t.shown_color(),
+                        align: t.align,
+                        scroll_box: t.scroll_box,
+                    },
+                    Kind::Button(b) => {
+                        let (bank, frame) = match b.shown() {
+                            Some((_, frame)) if b.state == 1 => (1, frame),
+                            Some((_, frame)) => (2, frame),
+                            None => (0, 0),
+                        };
+                        ElementPicture::Button { at, bank, frame }
+                    }
+                    Kind::Sprite(_) => ElementPicture::Sprite { at },
+                }
+            })
+            .collect();
+        Some(MenuPicture {
+            menu: self.made,
+            mouse: self.mouse,
+            elements,
+        })
+    }
+
     /// The cursor (`cursor.spr`, frame 0) at the mouse.
     pub fn draw_cursor(&self, out: &mut [u32]) {
+        self.draw_cursor_at(out, self.mouse);
+    }
+
+    /// The menus' cursor drawn at (x, y) (a board whose cursor element
+    /// stays where it was while the mouse moved).
+    pub fn draw_cursor_at(&self, out: &mut [u32], (x, y): (i32, i32)) {
         if let Some(c) = &self.cursor {
             let mut t = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
-            c.draw(&mut t, Some(self.mouse.0), self.mouse.1, 0);
+            c.draw(&mut t, Some(x), y, 0);
         }
     }
 
@@ -1317,6 +1491,24 @@ impl Menus {
                 };
                 (e.name.to_string(), text, e.visible, x, y)
             })
+            .collect()
+    }
+
+    /// The buttons hot (tests): text buttons at 1 (+0x8c), sprite buttons
+    /// at 1 or 2 (+0x98), in the elements' order.
+    #[doc(hidden)]
+    pub fn hot(&self) -> Vec<&'static str> {
+        let Some(m) = &self.menu else {
+            return Vec::new();
+        };
+        m.elements
+            .iter()
+            .filter(|e| match &e.kind {
+                Kind::Text(t) => t.over,
+                Kind::Button(b) => b.state != 0,
+                Kind::Sprite(_) => false,
+            })
+            .map(|e| e.name)
             .collect()
     }
 
@@ -1579,33 +1771,67 @@ impl Menu {
         }
     }
 
-    /// Each text's height at its width (+0x28, @ 0x00451600).
+    /// The draw's measure (+0x28, @ 0x00451600): each shown text's height
+    /// at its width; a hidden one is not drawn and keeps its last.
     fn measure(&mut self, fonts: &Fonts) {
-        self.heights = self
-            .elements
-            .iter()
-            .map(|e| match &e.kind {
-                Kind::Text(t) => fonts.text_height(&t.font, &t.text, t.width),
-                _ => 0,
-            })
-            .collect();
+        self.heights.resize(self.elements.len(), 0);
+        for i in 0..self.elements.len() {
+            if !self.visible(i) {
+                continue;
+            }
+            if let Kind::Text(t) = &self.elements[i].kind {
+                self.heights[i] = fonts.text_height(&t.font, &t.text, t.width);
+            }
+        }
     }
 
-    /// The mouse's moves (event kind 0, +0xc 2): a text button under the
-    /// mouse is 1, else 0; a sprite button at 0 under the mouse turns 1
-    /// (its focus loop from frame 0), at 1 away from it 0.
+    /// The order an event goes through the elements (@ 0x004523e0): the
+    /// background's children from the list's head, each new child put at
+    /// the head (@ 0x00452140 with index 0), so the last made first; an
+    /// element's own children before it (its process calls @ 0x004523e0
+    /// first); a hidden element and its children skipped (@ 0x004520f0).
+    /// The elements are kept in the ctors' order.
+    fn walk(&self) -> Vec<usize> {
+        fn under(m: &Menu, parent: Option<usize>, out: &mut Vec<usize>) {
+            for i in (0..m.elements.len()).rev() {
+                let e = &m.elements[i];
+                if e.parent != parent || !e.visible {
+                    continue;
+                }
+                under(m, Some(i), out);
+                out.push(i);
+            }
+        }
+        let mut out = Vec::new();
+        under(self, None, &mut out);
+        out
+    }
+
+    /// The mouse's moves (event kind 0, +0xc 2), through the elements in
+    /// the walk's order: a text button out of 0 under the mouse turns 1,
+    /// at 1 away from it 0 (@ 0x0044eb60); a sprite button at 0 under the
+    /// mouse turns 1 (its focus loop from frame 0), at 1 away from it 0
+    /// (@ 0x0044f0e0). A button that turns 1 returns 1 and the walk stops
+    /// there (@ 0x004523e0): the elements after it do not see the move,
+    /// so one hot before stays hot until the next move.
     fn hover(&mut self, mouse: (i32, i32)) {
-        let inside: Vec<bool> = (0..self.elements.len())
-            .map(|i| self.visible(i) && self.inside_cached(i, mouse))
-            .collect();
-        for (i, inside) in inside.into_iter().enumerate() {
-            let e = &mut self.elements[i];
-            match &mut e.kind {
-                Kind::Text(t) if t.hover.is_some() => t.over = e.visible && inside,
+        for i in self.walk() {
+            let inside = self.inside_cached(i, mouse);
+            match &mut self.elements[i].kind {
+                Kind::Text(t) if t.hover.is_some() => {
+                    if !t.over && inside {
+                        t.over = true;
+                        return;
+                    }
+                    if t.over && !inside {
+                        t.over = false;
+                    }
+                }
                 Kind::Button(b) => match b.state {
-                    0 if e.visible && inside => {
+                    0 if inside => {
                         b.state = 1;
                         b.time = 0.0;
+                        return;
                     }
                     1 if !inside => b.state = 0,
                     _ => {}
@@ -1639,14 +1865,13 @@ impl Menu {
         }
     }
 
-    /// A press of the left button: a text button at 1 is clicked; a
+    /// A press of the left button, through the elements in the walk's
+    /// order, the first that takes it: a text button at 1 is clicked; a
     /// sprite button at 1 turns 2 (its click played once from frame 0);
     /// a sprite button at 2 takes it too (@ 0x0044f0e0).
     fn press(&mut self) -> Press {
-        for e in &mut self.elements {
-            if !e.visible {
-                continue;
-            }
+        for i in self.walk() {
+            let e = &mut self.elements[i];
             match &mut e.kind {
                 Kind::Text(t) if t.over => return Press::Clicked(e.name),
                 Kind::Button(b) if b.state == 1 => {
@@ -1720,11 +1945,7 @@ impl Menu {
             let (x, y) = self.abs(i);
             match &self.elements[i].kind {
                 Kind::Text(t) => {
-                    let color = if t.over {
-                        t.hover.unwrap_or(t.color)
-                    } else {
-                        t.color
-                    };
+                    let color = t.shown_color();
                     match t.scroll_box {
                         None => {
                             let h = fonts.text_height(&t.font, &t.text, t.width);
@@ -1787,33 +2008,9 @@ impl Menu {
                     }
                 }
                 Kind::Button(b) => {
-                    let mut tg = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
-                    let frame = |bank: &Bank, looped: bool| {
-                        let n = bank.len().max(1);
-                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-                        let u = (b.time * 15.0) as usize;
-                        if looped {
-                            u % n
-                        } else {
-                            u.min(n - 1)
-                        }
-                    };
-                    match b.state {
-                        1 => {
-                            if let Some(f) = &b.focus {
-                                f.draw(&mut tg, Some(x), y, frame(f, true));
-                            }
-                        }
-                        2 => {
-                            if let Some(c) = &b.click {
-                                c.draw(&mut tg, Some(x), y, frame(c, false));
-                            }
-                        }
-                        _ => {
-                            if let Some(c) = &b.click {
-                                c.draw(&mut tg, Some(x), y, 0);
-                            }
-                        }
+                    if let Some((bank, frame)) = b.shown() {
+                        let mut tg = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
+                        bank.draw(&mut tg, Some(x), y, frame);
                     }
                 }
                 Kind::Sprite(Some(bank)) => {

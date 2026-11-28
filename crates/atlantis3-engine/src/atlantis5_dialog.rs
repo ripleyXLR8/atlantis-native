@@ -540,6 +540,7 @@ fn gdi_of(font: &ab_glyph::FontVec, height: i32, simulated_bold: bool) -> GdiFon
             + i32::from(simulated_bold),
         charset: 0,
         abc,
+        dbcs: None,
     }
 }
 
@@ -873,9 +874,10 @@ pub fn subject_layout(n: usize) -> Vec<(i32, i32)> {
 /// The subject menu's bubble file: `subject_bubble_<n>.spr` for 1..=8
 /// subjects, `subject_bubble_8.spr` beyond (@ 0x00411f43..), under
 /// `sprites2d/dialog/`; placed at (W · 3 / 5, H / 3) (unsigned
-/// divisions).
+/// divisions). With no subject there is no bubble (@ 0x00411a90 leaves
+/// first; the caller does not ask).
 pub fn subject_bubble(n: usize) -> String {
-    if n == 0 || n > 8 {
+    if n > 8 {
         "subject_bubble_8.spr".into()
     } else {
         format!("subject_bubble_{n}.spr")
@@ -889,6 +891,9 @@ pub fn subject_bubble(n: usize) -> String {
 /// (`unfacing`, the music back).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MenuState {
+    /// Asked (mode 9 queued, @ 0x0041b5d0), not yet opened: the menus'
+    /// next frame opens it (@ 0x0041b780 → its Initialize @ 0x004117f0).
+    Asked,
     Facing,
     Open,
     Rebuild,
@@ -967,6 +972,7 @@ mod tests {
             ave_char_width: 10,
             charset: 0,
             abc: vec![(1, 8, 1); 256],
+            dbcs: None,
         }
     }
 
@@ -1272,6 +1278,23 @@ mod tests {
         assert_eq!(scroll_px(7.0, 300, 100), 30);
         assert_eq!(scroll_px(100.0, 300, 100), 200);
         assert_eq!(scroll_px(10.0, 80, 100), 0);
+    }
+
+    /// The faces Native ships draw every character of the international
+    /// DVD's texts (German, Italian, Spanish, English: all in
+    /// Windows-1252, the code page the text is drawn in): each has its own
+    /// glyph, not the missing-glyph box.
+    #[test]
+    fn the_faces_draw_the_international_texts_characters() {
+        use ab_glyph::Font;
+        let chars = "\u{df}\u{e4}\u{f6}\u{fc}\u{c4}\u{d6}\u{dc}\u{a1}\u{bf}\u{f1}\u{e0}\u{e1}\u{e8}\u{e9}\u{ec}\u{ee}\u{f2}\u{f3}\u{f9}\u{fa}\u{c8}\u{c9}\u{d3}\u{da}\u{ab}\u{bb}\u{a9}\u{2019}\u{2026}";
+        for face in FACES {
+            let f = ab_glyph::FontRef::try_from_slice(face).unwrap();
+            for c in chars.chars() {
+                assert_ne!(crate::text::to_cp1252(c), b'?', "{c}");
+                assert_ne!(f.glyph_id(c).0, 0, "U+{:04X}", c as u32);
+            }
+        }
     }
 
     #[test]

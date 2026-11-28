@@ -30,7 +30,7 @@ use std::sync::Arc;
 
 use atlantis3_data::atlantis5::Atlantis5Source;
 use atlantis3_engine::atlantis5::{VIEW_HEIGHT, VIEW_WIDTH};
-use atlantis3_engine::atlantis5_play::{Play, LOGOS};
+use atlantis3_engine::atlantis5_play::{PictureCache, Play, LOGOS};
 use atlantis3_engine::atlantis5_saves::SaveFiles;
 use atlantis3_engine::audio::Audio;
 use atlantis_data::FileSource;
@@ -112,16 +112,10 @@ impl SaveFiles for WebSaves {
     }
 }
 
-/// The language of the films' voices: French when the data have it, else
-/// the first (as the desktop's).
+/// The language played: the one the page chose, else the only one, else
+/// the browser's when the disc has it, else English (as the desktop's).
 fn language(src: &Atlantis5Source) -> String {
-    let langs = src.languages();
-    langs
-        .iter()
-        .find(|l| l.eq_ignore_ascii_case("french"))
-        .or_else(|| langs.first())
-        .cloned()
-        .unwrap_or_else(|| "french".to_string())
+    src.language(crate::locale::system_language().as_deref())
 }
 
 /// Starts the game from `src`, the saves in `store`: the logos' folder
@@ -153,9 +147,11 @@ pub fn start(src: Atlantis5Source, store: Rc<dyn SaveStore>) -> Result<(), JsVal
         last: None,
         next_frame: Instant::now(),
         shown_size: None,
+        cache: PictureCache::default(),
         clock: 0.0,
         menu: false,
         lock_asked: None,
+        buttons: (false, false),
         lock_refused: None,
         motion_acc: (0.0, 0.0),
         cursor: None,
@@ -192,11 +188,16 @@ struct A5App {
     next_frame: Instant,
     /// The canvas's size at the last picture drawn.
     shown_size: Option<winit::dpi::PhysicalSize<u32>>,
+    /// The picture last composed ([`Play::render_cached`]).
+    cache: PictureCache,
     /// The game's time (seconds).
     clock: f64,
     /// Whether a menu is up (the pointer is free).
     menu: bool,
     lock_asked: Option<Instant>,
+    /// The left and right buttons held (the original's press events carry
+    /// both, [`Play::set_buttons`]).
+    buttons: (bool, bool),
     /// When a lock request was last taken as refused: a click asks again
     /// once [`a2_web::LOCK_RETRY`] has passed (a browser refuses for a moment
     /// after the player left the lock with Escape).
@@ -356,6 +357,7 @@ impl A5App {
             return true;
         }
         let (at, to) = self.warm;
+        self.cache.invalidate();
         crate::a5_bar::draw(&mut self.picture, VIEW_WIDTH, VIEW_HEIGHT, at, to);
         false
     }
@@ -461,8 +463,15 @@ impl A5App {
                 a2_web::exit_lock();
             }
         }
-        play.render(&mut self.picture);
-        self.present();
+        // Composed and presented only when it changed (a menu with nothing
+        // drawn changed is the same picture: the port's own saving, the
+        // original draws every frame) or the canvas's size changed, which
+        // clears it; the canvas keeps the last picture meanwhile.
+        if play.render_cached(&mut self.picture, &mut self.cache)
+            || self.shown_size != Some(window.inner_size())
+        {
+            self.present();
+        }
         // The other folders decoded a little, so that the game's later
         // reads seldom decode a folder from its start.
         if !self.warm_done {
@@ -559,8 +568,32 @@ impl ApplicationHandler for A5App {
             }
             _ => {}
         }
+        // Both buttons' state, before the press is handled (@ 0x0047c8a0
+        // sets 0x006b0b04 before calling the press handlers); both up when
+        // the page loses the focus (no release comes then).
+        match &event {
+            WindowEvent::MouseInput { state, button, .. } => {
+                let down = *state == ElementState::Pressed;
+                match button {
+                    MouseButton::Left => self.buttons.0 = down,
+                    MouseButton::Right => self.buttons.1 = down,
+                    _ => {}
+                }
+            }
+            WindowEvent::Focused(false) => self.buttons = (false, false),
+            _ => {}
+        }
         if self.play.is_none() {
             return;
+        }
+        if matches!(
+            event,
+            WindowEvent::MouseInput { .. } | WindowEvent::Focused(false)
+        ) {
+            let (l, r) = self.buttons;
+            if let Some(play) = self.play.as_mut() {
+                play.set_buttons(l, r);
+            }
         }
         match event {
             WindowEvent::Occluded(_) => {
@@ -610,6 +643,24 @@ impl ApplicationHandler for A5App {
                     play.right_press();
                 }
             }
+            // The third and fourth buttons, as on the desktop: a press with
+            // the left and right buttons' state (@ 0x0047c8a0,
+            // @ 0x0043bbc0).
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Middle | MouseButton::Back,
+                ..
+            } => {
+                if let Some(play) = self.play.as_mut() {
+                    play.other_press();
+                }
+            }
+            // A wheel turn: a mouse move event with no move (lZ).
+            WindowEvent::MouseWheel { delta, .. } if wheel_turned(delta) => {
+                if let Some(play) = self.play.as_mut() {
+                    play.wheel();
+                }
+            }
             WindowEvent::KeyboardInput { event, .. }
                 if event.state == ElementState::Pressed && !event.repeat =>
             {
@@ -629,6 +680,14 @@ impl ApplicationHandler for A5App {
             }
             _ => {}
         }
+    }
+}
+
+/// Whether a wheel event turned the wheel (DirectInput's lZ not 0).
+fn wheel_turned(delta: winit::event::MouseScrollDelta) -> bool {
+    match delta {
+        winit::event::MouseScrollDelta::LineDelta(_, y) => y != 0.0,
+        winit::event::MouseScrollDelta::PixelDelta(p) => p.y != 0.0,
     }
 }
 

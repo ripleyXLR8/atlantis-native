@@ -344,7 +344,14 @@ pub async fn start(
     let picked = crate::web_layout::picked(&paths);
     // The Secrets of Atlantis: a copy of its DVD, an install, or the
     // extracted cabinets, alone or chosen among the games of the folder.
-    if let Some(folder) = crate::web_layout::a5_folder(&paths) {
+    // A `data1.hdr` is the game's only when its header says so (any
+    // InstallShield set has one): read from the picked files.
+    let picked_index = std::cell::OnceCell::new();
+    let cds = |dir: &str| {
+        let index = picked_index.get_or_init(|| keep_picked(all.clone()));
+        atlantis3_data::atlantis5::holds_atlantis5_cds_header(Arc::new(PickedDir::new(index, dir)))
+    };
+    if let Some(folder) = crate::web_layout::a5_folder(&paths, cds) {
         use crate::web_layout::Picked;
         let mut others: Vec<&str> = match &picked {
             Picked::Both(_) => vec!["atlantis=Atlantis: The Lost Tales", "atlantis2=Atlantis II"],
@@ -363,7 +370,7 @@ pub async fn start(
         }
         if others.is_empty() || game.as_deref() == Some("atlantis5") {
             drop(paths);
-            start_atlantis5(all, &folder)?;
+            start_atlantis5(all, &folder, language.as_deref(), a4_language.as_deref())?;
             return Ok("atlantis5".into());
         }
         if game.is_none() {
@@ -434,7 +441,7 @@ pub async fn start(
         };
         // Atlantis III alone, or chosen among the games of the folder.
         if others.is_empty() || game.as_deref() == Some("atlantis3") {
-            start_atlantis3(all, &install)?;
+            start_atlantis3(all, &install).await?;
             return Ok("atlantis3".into());
         }
         if game.is_none() {
@@ -461,7 +468,7 @@ pub async fn start(
         _ => None,
     };
     if let Some(layout) = a2 {
-        start_atlantis2(all, layout)?;
+        start_atlantis2(all, layout).await?;
         return Ok("atlantis2".into());
     }
     // The first game's CD images or Cryo's DVD's, when the folder holds no
@@ -472,7 +479,7 @@ pub async fn start(
         // reading them.
         if let Some(image) = a5_image(&all) {
             drop(paths);
-            start_atlantis5_image(all, &image)?;
+            start_atlantis5_image(all, &image, language.as_deref(), a4_language.as_deref())?;
             return Ok("atlantis5".into());
         }
         let folders = crate::web_layout::image_folders(&paths);
@@ -1328,14 +1335,40 @@ impl Loader for ImageLoader {
 }
 
 /// Atlantis III from its installed folder among the picked files
-/// ([`crate::a3_web`]), the saves in the browser's storage.
-fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
+/// ([`crate::a3_web`]), the saves in the browser's storage. The
+/// Traditional Chinese CD's Big5 text font is fetched first, unless the
+/// folder holds the player's `mingliu.ttc`.
+async fn start_atlantis3(all: HashMap<String, File>, install: &str) -> Result<(), JsValue> {
     let discs = {
         let paths: Vec<&str> = all.keys().map(String::as_str).collect();
         crate::web_layout::a3_discs(&paths, install)
     };
     let index = keep_picked(all);
     let discs = picked_sources(&index, &discs);
+    // The Big5 fonts are drawn in the system's Big5 face
+    // (`atlantis3_engine::text::Texts::big5_face`): the player's, else
+    // the port's, fetched beside the page.
+    let dir = PickedDir::new(&index, install);
+    if atlantis3_data::install::has_big5_fonts(&dir) {
+        let code_page = atlantis_data::TextCodePage::Windows950;
+        let player_font = atlantis_engine::subtitles::player_font(code_page)
+            .is_some_and(|(name, _)| dir.size(name).is_some());
+        if let Some(name) =
+            atlantis_engine::subtitles::cjk_font_file(code_page).filter(|_| !player_font)
+        {
+            let url = format!("fonts/{name}");
+            match fetch_url(&url).await {
+                Ok(data) => {
+                    if atlantis_engine::subtitles::provide_cjk_font(code_page, data) {
+                        log::info!("text font: {url}");
+                    } else {
+                        log::warn!("{url}: not a font");
+                    }
+                }
+                Err(e) => log::warn!("{url}: {e:?}"),
+            }
+        }
+    }
     let store: Rc<dyn SaveStore> = match WebStore::new("atlantis3") {
         Some(s) => Rc::new(s),
         None => {
@@ -1385,34 +1418,76 @@ fn a5_store() -> Rc<dyn SaveStore> {
 fn a5_error(e: &atlantis3_data::atlantis5::OpenError) -> JsValue {
     format!(
         "The Secrets of Atlantis: {e}.\n\nChoose the DVD's image (.iso), the DVD drive or a \
-         copy of the disc (the folder holding DATAS.cab), or the folder where the game is \
-         installed.\n\nHelp: {}",
+         copy of the disc (the folder holding DATAS.cab), a folder holding copies of the three \
+         North-American CDs (one folder per disc, or their files together), or the folder \
+         where the game is installed.\n\nHelp: {}",
         crate::guide::HELP_URL
     )
     .into()
 }
 
+/// The language of The Secrets of Atlantis's disc of several languages
+/// (the international DVD's four): `language` once the page's player chose
+/// it (a folder name: `german`, ...), else the page address's `?lang=`
+/// (`code`: `de`, `en`, `es`, `it`, `fr`); without either the page is
+/// asked, with `A5LANGUAGES:` then `folder=name` pairs separated by `;`
+/// in the installer's order (as Cryo's DVD's `LANGUAGES:`). A disc of one
+/// language plays it.
+fn a5_choose_language(
+    src: &mut atlantis3_data::atlantis5::Atlantis5Source,
+    language: Option<&str>,
+    code: Option<&str>,
+) -> Result<(), JsValue> {
+    use atlantis3_data::atlantis5::{in_installer_order, language_name, language_of_code};
+    if src.languages().len() < 2 {
+        return Ok(());
+    }
+    let wanted = [language, code.and_then(language_of_code)];
+    if wanted.into_iter().flatten().any(|l| src.choose_language(l)) {
+        return Ok(());
+    }
+    let list: Vec<String> = in_installer_order(src.languages())
+        .iter()
+        .map(|l| format!("{l}={}", language_name(l)))
+        .collect();
+    Err(format!("A5LANGUAGES:{}", list.join(";")).into())
+}
+
 /// The Secrets of Atlantis from its folder among the picked files (a
 /// copy of the DVD, an install, the extracted cabinets), read when the
-/// game reads it, the part it reads.
-fn start_atlantis5(all: HashMap<String, File>, folder: &str) -> Result<(), JsValue> {
+/// game reads it, the part it reads; in `language` or the page's `?lang=`
+/// ([`a5_choose_language`]).
+fn start_atlantis5(
+    all: HashMap<String, File>,
+    folder: &str,
+    language: Option<&str>,
+    code: Option<&str>,
+) -> Result<(), JsValue> {
     use atlantis3_data::atlantis5::Atlantis5Source;
     let index = keep_picked(all);
     let dir = Arc::new(PickedDir::new(&index, folder));
-    let src = Atlantis5Source::from_folder(dir).map_err(|e| a5_error(&e))?;
+    let mut src = Atlantis5Source::from_folder(dir).map_err(|e| a5_error(&e))?;
+    a5_choose_language(&mut src, language, code)?;
     crate::a5_web::start(src, a5_store())
 }
 
 /// The Secrets of Atlantis from its DVD's image `image` among the picked
-/// files, read a part at a time (never whole: 1.5 GB for the French DVD).
-fn start_atlantis5_image(all: HashMap<String, File>, image: &str) -> Result<(), JsValue> {
+/// files, read a part at a time (never whole: 1.5 GB for the French DVD);
+/// in `language` or the page's `?lang=` ([`a5_choose_language`]).
+fn start_atlantis5_image(
+    all: HashMap<String, File>,
+    image: &str,
+    language: Option<&str>,
+    code: Option<&str>,
+) -> Result<(), JsValue> {
     use atlantis3_data::atlantis5::{Atlantis5Source, Form};
     let index = keep_picked(all);
     let &(i, size) = index.get(image).ok_or("the DVD's image")?;
     let img = DiscImage::from_bytes(image, Box::new(PickedImage { index: i, size }))
         .ok_or("the DVD's image cannot be read")?;
-    let src =
+    let mut src =
         Atlantis5Source::from_disc(Arc::new(img), Form::DiscImage).map_err(|e| a5_error(&e))?;
+    a5_choose_language(&mut src, language, code)?;
     crate::a5_web::start(src, a5_store())
 }
 
@@ -1466,7 +1541,9 @@ fn start_atlantis4(
 /// Atlantis II from the picked files: its installed folder and discs
 /// ([`crate::web_layout::A2Layout`]), the saves in the browser's storage,
 /// the player menu under the start-up intro, as the desktop starts it.
-fn start_atlantis2(
+/// The Traditional Chinese CD's text font is fetched first, unless the
+/// folder holds the player's `mingliu.ttc`.
+async fn start_atlantis2(
     all: HashMap<String, File>,
     layout: crate::web_layout::A2Layout,
 ) -> Result<(), JsValue> {
@@ -1479,8 +1556,11 @@ fn start_atlantis2(
         OpenError::Exe { name, error } => help(&format!(
             "This folder holds an Atlantis II program, {name}, that Atlantis Native does not \
              know ({error}): an edition of the game that is not supported yet.\n\n\
-             Supported: the French CD (1999), the CD with patch 1.01, the Polish CD (1999), \
-             the DreamCatcher CD (2000), GOG.com and the Italian Atlantis Collection."
+             Supported: the French CD (1999), the CD with patch 1.01, the German CD (1999), \
+             the Spanish CD (1999), the Swedish CD (1999), the Polish CD (1999), the \
+             Czech CD (Bohemia Interactive, 2000), the Traditional Chinese and English CDs \
+             (Interwise, 2000), the DreamCatcher CD (2000), GOG.com and the Italian Atlantis \
+             Collection."
         )),
         e => help(&e.to_string()),
     })?;
@@ -1496,6 +1576,27 @@ fn start_atlantis2(
     let missing: Vec<u8> = (1..=4).filter(|n| !found.contains(n)).collect();
     if !missing.is_empty() {
         return Err(help(&crate::web_layout::a2_missing_discs(&missing)));
+    }
+    // The Traditional Chinese CD's texts are drawn in the system's Big5
+    // face (`atlantis2_engine::subtitle::system_cjk_face`): the player's,
+    // else the port's, fetched beside the page.
+    let code_page = files.text_code_page();
+    let player_font = atlantis_engine::subtitles::player_font(code_page)
+        .is_some_and(|(name, _)| files.install().size(name).is_some());
+    if let Some(name) =
+        atlantis_engine::subtitles::cjk_font_file(code_page).filter(|_| !player_font)
+    {
+        let url = format!("fonts/{name}");
+        match fetch_url(&url).await {
+            Ok(data) => {
+                if atlantis_engine::subtitles::provide_cjk_font(code_page, data) {
+                    log::info!("text font: {url}");
+                } else {
+                    log::warn!("{url}: not a font");
+                }
+            }
+            Err(e) => log::warn!("{url}: {e:?}"),
+        }
     }
     let store: Rc<dyn SaveStore> = match WebStore::new("atlantis2") {
         Some(s) => Rc::new(s),

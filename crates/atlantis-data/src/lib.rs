@@ -14,6 +14,7 @@ pub mod exe_icon;
 pub mod files;
 pub mod game;
 pub mod head;
+pub mod installshield;
 mod reader;
 pub mod saves;
 pub mod sprite;

@@ -77,6 +77,7 @@ pub mod launcher;
 pub mod launcher_art;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod library;
+pub mod locale;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod session;
 #[cfg(not(target_arch = "wasm32"))]

@@ -24,13 +24,13 @@
 use std::num::NonZeroU32;
 use std::path::Path;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
 use atlantis3_data::atlantis5::Atlantis5Source;
 use atlantis3_engine::atlantis5::{View, FIRST_VIEW, VIEW_HEIGHT, VIEW_WIDTH};
-use atlantis3_engine::atlantis5_play::Play;
+use atlantis3_engine::atlantis5_play::{PictureCache, Play};
 use atlantis3_engine::audio::Audio;
 use winit::application::ApplicationHandler;
 use winit::dpi::LogicalSize;
@@ -56,19 +56,25 @@ pub fn open(path: &Path) -> Result<(Atlantis5Source, String), String> {
         None => "The Secrets of Atlantis (2006), no program beside the data".to_string(),
     };
     let label = format!(
-        "{build}; {:?}; languages {}",
+        "{build}; {:?}; languages {}; playing {}",
         src.form(),
-        src.languages().join(", ")
+        src.languages().join(", "),
+        language(&src)
     );
     Ok((src, label))
 }
 
-/// How the game library shows the data at `path`: the game's name, the
-/// year, the medium and the language ("The Secrets of Atlantis : L'Héritage
-/// sacré (2006), DVD, French"); with the DVD's image, "DVD image"; with
-/// an install or the extracted cabinets, "DVD, installed"; with the
-/// copy of the disc's files made by [`crate::a5_copy`], "DVD, copied to
-/// this computer".
+/// How the game library shows the data at `path`: the edition's title
+/// ([`title`]), the year ([`year`]), the medium and the language played
+/// ("The Secrets of Atlantis : L'Héritage sacré (2006), DVD, French",
+/// "The Secrets of Atlantis: The Sacred Legacy (2006), DVD, German", "The
+/// Secrets of Atlantis (2007), 3 CDs, English"); with the DVD's image,
+/// "DVD image"; with an install or the extracted cabinets, "DVD,
+/// installed"; with the copy of the disc's files made by
+/// [`crate::a5_copy`], "DVD, copied to this computer" (the CDs: "CD
+/// images", "CDs, installed", "CDs, copied to this computer"); the
+/// Italian *Atlantis Collection*'s install, "The Secrets of Atlantis
+/// (2014), Atlantis Collection, installed, Italian".
 pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError> {
     edition(path).map(|e| e.0)
 }
@@ -78,7 +84,7 @@ pub fn label(path: &Path) -> Result<String, atlantis3_data::atlantis5::OpenError
 /// image): what the game library offers to copy to the computer.
 pub fn edition(path: &Path) -> Result<(String, bool), atlantis3_data::atlantis5::OpenError> {
     let src = Atlantis5Source::open(path)?;
-    let copy = crate::a5_copy::is_copy(path);
+    let copy = crate::a5_copy::is_copy(&atlantis3_data::atlantis5::place_root(path));
     Ok(edition_of(&src, copy))
 }
 
@@ -86,24 +92,21 @@ pub fn edition(path: &Path) -> Result<(String, bool), atlantis3_data::atlantis5:
 /// [`crate::a5_copy`] made): the label, and whether they are read from
 /// the disc.
 pub fn edition_of(src: &Atlantis5Source, copy: bool) -> (String, bool) {
-    use atlantis3_data::atlantis5::Form;
-    let medium = match src.form() {
-        Form::DiscFolder if copy => "DVD, copied to this computer",
-        Form::DiscFolder => "DVD",
-        Form::DiscImage => "DVD image",
-        Form::Tree => "DVD, installed",
+    use atlantis3_data::atlantis5::{Edition, Form};
+    let cds = src.edition() == Edition::NorthAmericanCds;
+    let medium = match (src.form(), cds) {
+        _ if src.edition() == Edition::ItalianCollection => "Atlantis Collection, installed",
+        (Form::DiscFolder, false) if copy => "DVD, copied to this computer",
+        (Form::DiscFolder, false) => "DVD",
+        (Form::DiscImage, false) => "DVD image",
+        (Form::Tree, false) => "DVD, installed",
+        (Form::DiscFolder, true) if copy => "CDs, copied to this computer",
+        (Form::DiscFolder, true) => "3 CDs",
+        (Form::DiscImage, true) => "CD images",
+        (Form::Tree, true) => "CDs, installed",
     };
-    let lang = language(src);
-    let mut lang_name = String::new();
-    let mut chars = lang.chars();
-    if let Some(c) = chars.next() {
-        lang_name.extend(c.to_uppercase());
-        lang_name.extend(chars);
-    }
-    let label = format!(
-        "{} (2006), {medium}, {lang_name}",
-        crate::setup::GameKind::Atlantis5.name()
-    );
+    let lang_name = atlantis3_data::atlantis5::language_name(&language(src));
+    let label = format!("{} ({}), {medium}, {lang_name}", title(src), year(src));
     (label, src.form() != Form::Tree && !copy)
 }
 
@@ -157,16 +160,41 @@ pub fn headless(path: &Path, screenshot: Option<&Path>) -> Result<(), String> {
     Ok(())
 }
 
-/// The language of the films' voices: French when the data have it, else
-/// the first.
-fn language(src: &Atlantis5Source) -> String {
-    let langs = src.languages();
-    langs
-        .iter()
-        .find(|l| l.eq_ignore_ascii_case("french"))
-        .or_else(|| langs.first())
-        .cloned()
-        .unwrap_or_else(|| "french".to_string())
+/// The language played: the one of the place opened (a language's place
+/// of the game library, [`atlantis3_data::atlantis5::language_place`]),
+/// else the only one, else the system's when the disc has it, else
+/// English ([`atlantis3_data::atlantis5::default_language`]).
+pub fn language(src: &Atlantis5Source) -> String {
+    src.language(crate::locale::system_language().as_deref())
+}
+
+/// The edition's title: the French DVD's (French only) is *L'Héritage
+/// sacré*; the international DVD's (English, German, Italian, Spanish) is
+/// sold as *The Sacred Legacy*; the North-American CDs' and the Italian
+/// *Atlantis Collection*'s (its installer's title) as *The Secrets of
+/// Atlantis*, with no subtitle.
+pub fn title(src: &Atlantis5Source) -> &'static str {
+    use atlantis3_data::atlantis5::Edition;
+    if matches!(
+        src.edition(),
+        Edition::NorthAmericanCds | Edition::ItalianCollection
+    ) {
+        "The Secrets of Atlantis"
+    } else if src.languages().iter().all(|l| l == "french") {
+        crate::setup::GameKind::Atlantis5.name()
+    } else {
+        "The Secrets of Atlantis: The Sacred Legacy"
+    }
+}
+
+/// The edition's year: 2006 for the DVDs, 2007 for the North-American
+/// CDs, 2014 for the Italian *Atlantis Collection*.
+pub fn year(src: &Atlantis5Source) -> u16 {
+    match src.edition() {
+        atlantis3_data::atlantis5::Edition::NorthAmericanCds => 2007,
+        atlantis3_data::atlantis5::Edition::Dvd => 2006,
+        atlantis3_data::atlantis5::Edition::ItalianCollection => 2014,
+    }
 }
 
 /// What the game needs before it starts, while the start's first logo is
@@ -246,8 +274,89 @@ fn next_frame_after(next_frame: Instant, now: Instant) -> Instant {
     (next_frame + FRAME).clamp(now, now + FRAME)
 }
 
+/// The longest a picture goes without a present while it does not
+/// change ([`must_present`]).
+const KEEP_SHOWN: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Whether a frame presents: when its picture was composed, when the
+/// system asked for the window's content (a resize, an expose, a redraw
+/// the port did not ask: on Wayland a skipped present then leaves
+/// garbage), and at least every [`KEEP_SHOWN`] (a system redraw that
+/// came with the port's own cannot be told from it). A picture that did
+/// not change is otherwise not presented again (the menus: the port's
+/// own saving, the original presents every frame the same picture).
+fn must_present(composed: bool, asked: bool, since: std::time::Duration) -> bool {
+    composed || asked || since >= KEEP_SHOWN
+}
+
+/// The present's state after one (`asked`, when the last was): one that
+/// reached the window clears the ask and is the last; a failed one (the
+/// surface's resize, its buffer or its present refused) leaves the ask
+/// set, so the next frame presents the picture again even when it was
+/// not composed anew.
+fn after_present(ok: bool, presented: Instant, now: Instant) -> (bool, Instant) {
+    if ok {
+        (false, now)
+    } else {
+        (true, presented)
+    }
+}
+
 /// The decoding's step before the game starts (uncompressed bytes).
 const WARM_STEP: u64 = 4 << 20;
+
+/// When the pointer is held in the window. Held only while the window has
+/// the focus and the system pointer is known to be in it: winit's
+/// `Locked` holds the pointer where it is (Windows clips it to a 1 × 1
+/// rectangle at its place, macOS freezes it), so a lock taken with the
+/// pointer over another window or on another screen would send the
+/// next press there. The pointer is seen in the window by `CursorEntered`,
+/// `CursorMoved` or a press (which only comes to the window under it);
+/// it is known gone by `CursorLeft` while it is not held (a held pointer
+/// cannot leave, and a crossing that a grab itself makes is not a leave).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct PointerHold {
+    inside: bool,
+    held: bool,
+}
+
+impl PointerHold {
+    /// The pointer seen in the window.
+    fn seen_inside(&mut self) {
+        self.inside = true;
+    }
+
+    /// The pointer left the window.
+    fn left(&mut self) {
+        if !self.held {
+            self.inside = false;
+        }
+    }
+
+    /// The window changed under the pointer (the full screen switched):
+    /// where the pointer is now is not known until it is seen again.
+    fn forget(&mut self) {
+        self.inside = false;
+    }
+
+    /// Whether the pointer is to be held with the window's `focused`:
+    /// the new state when it changes.
+    fn update(&mut self, focused: bool) -> Option<bool> {
+        let want = focused && self.inside;
+        (want != self.held).then(|| {
+            self.held = want;
+            want
+        })
+    }
+}
+
+/// Whether a wheel event turned the wheel (DirectInput's lZ not 0).
+fn wheel_turned(delta: winit::event::MouseScrollDelta) -> bool {
+    match delta {
+        winit::event::MouseScrollDelta::LineDelta(_, y) => y != 0.0,
+        winit::event::MouseScrollDelta::PixelDelta(p) => p.y != 0.0,
+    }
+}
 
 struct A5App {
     play: Option<Play>,
@@ -268,10 +377,25 @@ struct A5App {
     /// Whether the window has the focus (the mouse's moves turn the view
     /// or move the menus' mouse only then; the pointer is held only then).
     focused: bool,
+    /// Whether the pointer is in the window and held ([`PointerHold`]).
+    pointer: PointerHold,
     /// The fractions of the mouse's relative moves not yet given to a
     /// menu (some systems report them below a pixel).
     menu_move: (f64, f64),
-    _audio: Option<cpal::Stream>,
+    /// The left and right buttons held (the original's press events carry
+    /// both, [`Play::set_buttons`]).
+    buttons: (bool, bool),
+    /// The picture last composed ([`Play::render_cached`]).
+    cache: PictureCache,
+    /// The system asked for the window's content since the last present.
+    present_asked: bool,
+    /// When the last present was.
+    presented: Instant,
+    /// The sound output (kept alive while it plays), the mixer it pulls
+    /// from, and the flag its stream sets when the device goes away.
+    audio_out: Option<cpal::Stream>,
+    mixer: Audio,
+    audio_lost: Arc<AtomicBool>,
     /// Why the game could not be made, for the caller.
     error: Option<String>,
     /// Android: the window's buffers at the picture's size
@@ -285,6 +409,21 @@ struct A5App {
     /// Android: the fingers on the screen (see [`A5App::touch`]).
     #[cfg(target_os = "android")]
     touch: TouchA5,
+    /// Started as the library's one game without its screen: until then
+    /// Shift goes back to the library (as in the other games' modes).
+    shift_until: Option<Instant>,
+    /// Shift was pressed in time: the library's screen next.
+    to_library: bool,
+}
+
+/// How long after an automatic start Shift goes back to the game library
+/// (the other games' modes' grace).
+const SHIFT_GRACE: std::time::Duration = std::time::Duration::from_millis(2000);
+
+/// Whether Shift (`shift`, the modifiers now) at `now` goes back to the
+/// game library: only within the grace `until` of an automatic start.
+fn shift_to_library(until: Option<Instant>, now: Instant, shift: bool) -> bool {
+    shift && until.is_some_and(|t| now < t)
 }
 
 impl A5App {
@@ -319,48 +458,62 @@ impl A5App {
             },
             shown,
         );
+        let ok = drawn.is_some();
         if let Some((view, buttons)) = drawn {
             self.view = view;
             self.touch.buttons = buttons;
         }
+        (self.present_asked, self.presented) = after_present(ok, self.presented, Instant::now());
     }
 
     #[cfg(not(target_os = "android"))]
     fn present(&mut self) {
+        let ok = self.try_present();
+        (self.present_asked, self.presented) = after_present(ok, self.presented, Instant::now());
+    }
+
+    /// The picture into the window; false when it did not get there.
+    #[cfg(not(target_os = "android"))]
+    fn try_present(&mut self) -> bool {
         let (Some(window), Some(surface)) = (&self.window, self.surface.as_mut()) else {
-            return;
+            return false;
         };
         // The window's size read once: the placement and the buffer are
         // both made from it (a second read may differ during a resize).
         let size = window.inner_size();
         let (ww, wh) = (size.width.max(1) as usize, size.height.max(1) as usize);
         let (Some(w), Some(h)) = (NonZeroU32::new(ww as u32), NonZeroU32::new(wh as u32)) else {
-            return;
+            return false;
         };
         if surface.resize(w, h).is_err() {
-            return;
+            return false;
         }
         let Ok(mut buf) = surface.buffer_mut() else {
-            return;
+            return false;
         };
         scale_into(&mut buf, (ww, wh), &self.picture, &mut self.columns);
-        let _ = buf.present();
+        buf.present().is_ok()
     }
 
     /// The pointer held in the window while it has the focus, in play and
     /// in the menus alike (the original reads the mouse's relative moves
     /// through DirectInput throughout), and let go when another program
-    /// takes the focus.
-    fn grab(&self) {
+    /// takes the focus. Held only once the pointer is in the window
+    /// ([`PointerHold`]).
+    fn grab(&mut self) {
         let Some(window) = &self.window else {
             return;
         };
-        if self.focused {
-            let _ = window
-                .set_cursor_grab(CursorGrabMode::Locked)
-                .or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined));
-        } else {
-            let _ = window.set_cursor_grab(CursorGrabMode::None);
+        match self.pointer.update(self.focused) {
+            Some(true) => {
+                let _ = window
+                    .set_cursor_grab(CursorGrabMode::Locked)
+                    .or_else(|_| window.set_cursor_grab(CursorGrabMode::Confined));
+            }
+            Some(false) => {
+                let _ = window.set_cursor_grab(CursorGrabMode::None);
+            }
+            None => {}
         }
     }
 
@@ -374,6 +527,7 @@ impl A5App {
                 s.progress.0.load(Ordering::Relaxed),
                 s.progress.1.load(Ordering::Relaxed),
             );
+            self.cache.invalidate();
             if to > 0 {
                 crate::a5_bar::draw(&mut self.picture, VIEW_WIDTH, VIEW_HEIGHT, at, to);
             }
@@ -403,6 +557,27 @@ impl A5App {
         }
     }
 
+    /// The output's device gone while the game plays (a headset unplugged):
+    /// the default device opened again on the same mixer; when there is
+    /// none, the game goes on as without an output from the start
+    /// ([`mixer_for_play`], [`Play::drop_audio`]).
+    fn output_lost(&mut self) {
+        if !self.audio_lost.swap(false, Ordering::Relaxed) {
+            return;
+        }
+        log::warn!("audio output lost");
+        self.audio_out = None;
+        self.audio_out = open_output(&self.mixer, &self.audio_lost);
+        if self.audio_out.is_none() {
+            if let Some(play) = self.play.as_mut() {
+                play.drop_audio();
+            }
+            if let Some(s) = self.start.as_mut() {
+                s.audio = None;
+            }
+        }
+    }
+
     fn frame(&mut self, el: &ActiveEventLoop) {
         self.redraw_pending = false;
         self.next_frame = next_frame_after(self.next_frame, Instant::now());
@@ -410,6 +585,7 @@ impl A5App {
             self.present();
             return;
         }
+        self.output_lost();
         let Some(play) = self.play.as_mut() else {
             return;
         };
@@ -431,8 +607,10 @@ impl A5App {
             el.exit();
             return;
         }
-        play.render(&mut self.picture);
-        self.present();
+        let composed = play.render_cached(&mut self.picture, &mut self.cache);
+        if must_present(composed, self.present_asked, self.presented.elapsed()) {
+            self.present();
+        }
     }
 }
 
@@ -446,12 +624,12 @@ impl ApplicationHandler for A5App {
         self.frame = None;
         self.window = None;
         self.touch = TouchA5::default();
-        crate::android::pause_audio(&self._audio, true);
+        crate::android::pause_audio(&self.audio_out, true);
     }
 
     fn resumed(&mut self, el: &ActiveEventLoop) {
         #[cfg(target_os = "android")]
-        crate::android::pause_audio(&self._audio, false);
+        crate::android::pause_audio(&self.audio_out, false);
         if self.window.is_some() {
             return;
         }
@@ -492,7 +670,9 @@ impl ApplicationHandler for A5App {
 
     fn device_event(&mut self, _el: &ActiveEventLoop, _id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta } = event {
-            if !self.focused {
+            // Not while the pointer is free (outside the window): those
+            // moves are the player's on the other programs.
+            if !self.focused || !self.pointer.held {
                 return;
             }
             let Some(p) = self.play.as_mut() else {
@@ -569,10 +749,50 @@ impl ApplicationHandler for A5App {
         }
         // The focus in every phase, the start's bar included: the pointer
         // let go when another program takes it, held again on its return.
+        // Where the system pointer is: held once it is in the window.
+        match &event {
+            WindowEvent::CursorEntered { .. }
+            | WindowEvent::CursorMoved { .. }
+            | WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                ..
+            } => {
+                self.pointer.seen_inside();
+                self.grab();
+            }
+            WindowEvent::CursorLeft { .. } => self.pointer.left(),
+            _ => {}
+        }
         if let WindowEvent::Focused(f) = event {
             self.focused = f;
             self.grab();
+            // Away from the window no release comes: both buttons up.
+            if !f {
+                self.buttons = (false, false);
+                if let Some(play) = self.play.as_mut() {
+                    play.set_buttons(false, false);
+                }
+            }
             return;
+        }
+        // Shift in the first moments of an automatic start (the start's
+        // reads included): the game library.
+        if let WindowEvent::ModifiersChanged(m) = &event {
+            if shift_to_library(self.shift_until, Instant::now(), m.state().shift_key()) {
+                log::info!("The Secrets of Atlantis stopped: the game library");
+                self.to_library = true;
+                el.exit();
+                return;
+            }
+        }
+        // The window's content asked by the system: presented at the next
+        // frame even when the picture did not change (`must_present`).
+        match event {
+            WindowEvent::Resized(_)
+            | WindowEvent::ScaleFactorChanged { .. }
+            | WindowEvent::Occluded(false) => self.present_asked = true,
+            WindowEvent::RedrawRequested if !self.redraw_pending => self.present_asked = true,
+            _ => {}
         }
         if self.play.is_none() {
             // Black while the start's reads go on: only closing, the focus
@@ -584,9 +804,23 @@ impl ApplicationHandler for A5App {
             }
             return;
         }
+        // Both buttons' state, before the press is handled (@ 0x0047c8a0
+        // sets 0x006b0b04 before calling the press handlers).
+        if let WindowEvent::MouseInput { state, button, .. } = event {
+            let down = state == ElementState::Pressed;
+            match button {
+                MouseButton::Left => self.buttons.0 = down,
+                MouseButton::Right => self.buttons.1 = down,
+                _ => {}
+            }
+        }
+        let buttons = self.buttons;
         let Some(play) = self.play.as_mut() else {
             return;
         };
+        if matches!(event, WindowEvent::MouseInput { .. }) {
+            play.set_buttons(buttons.0, buttons.1);
+        }
         match event {
             WindowEvent::CloseRequested => el.exit(),
             // A key's press, not the system's repeats of a held key: the
@@ -609,12 +843,17 @@ impl ApplicationHandler for A5App {
                                 self.fullscreen.then_some(Fullscreen::Borderless(None)),
                             );
                         }
+                        // The held place may be outside the new window:
+                        // let go until the pointer is seen in it again.
+                        self.pointer.forget();
+                        self.grab();
                     }
                     _ => {}
                 }
             }
             // A press of the left button: the original's mouse event of
-            // kind 0 with the buttons 1 (@ 0x0043bbc0).
+            // kind 0 with the buttons 1, 5 with the right one held
+            // (@ 0x0043bbc0).
             WindowEvent::MouseInput {
                 state: ElementState::Pressed,
                 button: MouseButton::Left,
@@ -625,6 +864,18 @@ impl ApplicationHandler for A5App {
                 button: MouseButton::Right,
                 ..
             } => play.right_press(),
+            // The third and fourth buttons (DirectInput's `DIMOUSESTATE`
+            // has four, @ 0x0047c8a0 walks them; X1 is the fourth, X2 is
+            // not read): a press with the left and right buttons' state.
+            WindowEvent::MouseInput {
+                state: ElementState::Pressed,
+                button: MouseButton::Middle | MouseButton::Back,
+                ..
+            } => play.other_press(),
+            // A wheel turn (lZ): a mouse move event with no move.
+            WindowEvent::MouseWheel { delta, .. } if self.focused && wheel_turned(delta) => {
+                play.wheel();
+            }
             WindowEvent::RedrawRequested => self.frame(el),
             _ => {}
         }
@@ -635,19 +886,22 @@ impl ApplicationHandler for A5App {
 /// menu first); returns when the window is closed.
 pub fn run(path: &Path, fullscreen: bool) -> Result<(), String> {
     let mut el = EventLoop::new().map_err(|e| format!("No window can be opened: {e}"))?;
-    run_window_on(&mut el, path, fullscreen).map(|_| ())
+    run_window_on(&mut el, path, fullscreen, false).map(|_| ())
 }
 
 /// [`run`] on the program's event loop (the game chosen in the game
 /// library, or a folder given to the program): the window opens, the game
-/// plays until its `quit_game` or the window's closing.
+/// plays until its `quit_game` or the window's closing. With `shift_grace`
+/// (the library's one game, started without its screen) Shift pressed in
+/// the first moments goes back to the library ([`crate::a2::Ended::Library`]).
 pub fn run_window_on(
     el: &mut EventLoop<()>,
     path: &Path,
     fullscreen: bool,
+    shift_grace: bool,
 ) -> Result<crate::a2::Ended, String> {
     let (src, label) = open(path)?;
-    run_source_on(el, src, &label, fullscreen)
+    run_source_on(el, src, &label, fullscreen, shift_grace)
 }
 
 /// [`run_window_on`] with the data opened (`label` says what they are):
@@ -658,25 +912,26 @@ pub fn run_source_on(
     src: Atlantis5Source,
     label: &str,
     fullscreen: bool,
+    shift_grace: bool,
 ) -> Result<crate::a2::Ended, String> {
     use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     log::info!("{label}");
     let lang = language(&src);
+    let game_title = format!("{} ({})", title(&src), year(&src));
     let audio = Audio::new();
-    let out = {
-        let a = audio.clone();
-        crate::audio_out::start_with(move |buf, rate, channels| a.fill(buf, rate, channels))
-    };
+    let audio_lost = Arc::new(AtomicBool::new(false));
+    let out = open_output(&audio, &audio_lost);
     let src = Arc::new(src);
     let mut app = A5App {
         play: None,
-        start: Some(start(src, lang, mixer_for_play(audio, out.is_some()))),
+        start: Some(start(
+            src,
+            lang,
+            mixer_for_play(audio.clone(), out.is_some()),
+        )),
         error: None,
         picture: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
-        title: format!(
-            "{} (2006) - Atlantis Native",
-            crate::setup::GameKind::Atlantis5.name()
-        ),
+        title: format!("{game_title} - Atlantis Native"),
         fullscreen,
         window: None,
         surface: None,
@@ -686,8 +941,17 @@ pub fn run_source_on(
         next_frame: Instant::now(),
         redraw_pending: false,
         focused: false,
+        pointer: PointerHold::default(),
+        buttons: (false, false),
         menu_move: (0.0, 0.0),
-        _audio: out,
+        cache: PictureCache::default(),
+        present_asked: true,
+        presented: Instant::now(),
+        audio_out: out,
+        mixer: audio,
+        audio_lost,
+        shift_until: shift_grace.then(|| Instant::now() + SHIFT_GRACE),
+        to_library: false,
         #[cfg(target_os = "android")]
         frame: None,
         #[cfg(target_os = "android")]
@@ -697,10 +961,23 @@ pub fn run_source_on(
     };
     el.run_app_on_demand(&mut app)
         .map_err(|e| format!("The window failed: {e}"))?;
+    if app.to_library {
+        return Ok(crate::a2::Ended::Library);
+    }
     if let Some(e) = app.error {
         return Err(e);
     }
     Ok(crate::a2::Ended::Quit)
+}
+
+/// The default output device's stream pulling from `audio`; `lost` set
+/// when the device goes away.
+fn open_output(audio: &Audio, lost: &Arc<AtomicBool>) -> Option<cpal::Stream> {
+    let a = audio.clone();
+    crate::audio_out::start_watched(
+        move |buf, rate, channels| a.fill(buf, rate, channels),
+        lost.clone(),
+    )
 }
 
 /// The mixer the game is given: none without a sound output, so that the
@@ -949,6 +1226,52 @@ impl A5App {
 mod tests {
     use super::*;
 
+    /// The pointer is held only once it is seen in the window: the focus
+    /// coming back with the pointer over another window or screen does
+    /// not lock it there (Windows' `Locked` clips it where it is, macOS
+    /// freezes it), and the full screen's switch lets it go until it is
+    /// seen in the new window.
+    #[test]
+    fn the_pointer_is_held_only_inside_the_window() {
+        let mut p = PointerHold::default();
+        // The window opens with the focus, the pointer not seen yet.
+        assert_eq!(p.update(true), None);
+        assert!(!p.held);
+        p.seen_inside();
+        assert_eq!(p.update(true), Some(true));
+        // A crossing while held is not a leave.
+        p.left();
+        assert_eq!(p.update(true), None);
+        assert!(p.held);
+        // Another program takes the focus; the pointer goes over it.
+        assert_eq!(p.update(false), Some(false));
+        p.left();
+        // The focus back with the pointer still outside: not held.
+        assert_eq!(p.update(true), None);
+        assert!(!p.held);
+        // The pointer comes into the window: held.
+        p.seen_inside();
+        assert_eq!(p.update(true), Some(true));
+        // F11: let go until seen again.
+        p.forget();
+        assert_eq!(p.update(true), Some(false));
+        p.seen_inside();
+        assert_eq!(p.update(true), Some(true));
+    }
+
+    /// The library's one game started without its screen: Shift within
+    /// the grace goes back to the library, as in the other games' modes;
+    /// not after it, nor without the grace (a folder given to the program).
+    #[test]
+    fn shift_in_the_first_moments_goes_back_to_the_library() {
+        let t0 = Instant::now();
+        let until = Some(t0 + SHIFT_GRACE);
+        assert!(shift_to_library(until, t0, true));
+        assert!(!shift_to_library(until, t0, false));
+        assert!(!shift_to_library(until, t0 + SHIFT_GRACE, true));
+        assert!(!shift_to_library(None, t0, true));
+    }
+
     #[test]
     fn without_a_sound_output_the_game_times_its_sounds() {
         assert!(mixer_for_play(Audio::new(), false).is_none());
@@ -986,6 +1309,35 @@ mod tests {
             assert!(ox + dw <= ww && oy + dh <= wh, "{ww}x{wh}");
             assert!(buf.iter().all(|&p| p != 0xdead_beef), "{ww}x{wh}");
         }
+    }
+
+    #[test]
+    fn an_unchanged_picture_is_presented_when_the_system_asks() {
+        let short = FRAME;
+        // Composed: presented.
+        assert!(must_present(true, false, short));
+        // The same picture: not presented again...
+        assert!(!must_present(false, false, short));
+        // ...unless the system asked (a resize, an expose) or it was
+        // long ago.
+        assert!(must_present(false, true, short));
+        assert!(must_present(false, false, KEEP_SHOWN));
+    }
+
+    #[test]
+    fn a_failed_present_is_tried_again_at_the_next_frame() {
+        let before = Instant::now();
+        let now = before + FRAME;
+        // Reached the window: the ask cleared, the next frame's unchanged
+        // picture not presented again.
+        let (asked, at) = after_present(true, before, now);
+        assert_eq!((asked, at), (false, now));
+        assert!(!must_present(false, asked, FRAME));
+        // Refused: asked again at the next frame, the last present's time
+        // kept.
+        let (asked, at) = after_present(false, before, now);
+        assert_eq!((asked, at), (true, before));
+        assert!(must_present(false, asked, FRAME));
     }
 
     #[test]

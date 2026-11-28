@@ -209,6 +209,59 @@ fn zoom_and_fade_turns_the_field_of_view() {
     assert_eq!(g.script().global(b"ENTERED"), Value::Num(2.0));
 }
 
+/// zoom_and_fade's view change, frame by frame: the frame that loads the
+/// view asks for no field of view (@ 0x0042d900 phase 1: phase 2 and
+/// t = 0 set, then LAB_0042dec4, the scene update and return); phase 2
+/// first runs at the next frame, with that frame's time.
+fn zoom_and_fade_view_change_frame(with_enter_script: bool) {
+    let (mut g, probe) = game(BASE);
+    if !with_enter_script {
+        probe
+            .borrow_mut()
+            .files
+            .remove(&format!("{DIR}on_enter_view_deck.lua"));
+    }
+    g.new_game();
+    settle(&mut g, 5);
+    g.set_fov(1.0);
+    probe.borrow_mut().requests.clear();
+    assert!(g.click_zone(7, b""));
+    let loaded = |p: &Rc<RefCell<Probe>>| {
+        p.borrow()
+            .requests
+            .iter()
+            .any(|r| matches!(r, Request::LoadView { view: 7, .. }))
+    };
+    let mut frames = 0;
+    while !loaded(&probe) && frames < 100 {
+        g.update(0.02);
+        frames += 1;
+    }
+    assert!(loaded(&probe));
+    let ninth = std::f32::consts::PI / 9.0;
+    let f = fovs(&probe);
+    // The view change's frame: the camera kept at phase 0's last value.
+    assert!((f.last().unwrap() - (1.0 - ninth)).abs() < 1e-5, "{f:?}");
+    let n = f.len();
+    g.update(0.02);
+    let f = fovs(&probe);
+    assert_eq!(f.len(), n + 1, "{f:?}");
+    // Phase 2's first step: t = 0.02, k = 1 − 0.02 · 2.857143.
+    let k = 1.0 - 0.02 * f32::from_bits(0x4036_db6e);
+    let want = (ninth + 1.0) - (1.0 - k) * ninth;
+    assert!((f[n] - want).abs() < 1e-5, "{f:?}");
+}
+
+#[test]
+fn zoom_and_fade_keeps_the_field_of_view_in_the_view_change_frame() {
+    zoom_and_fade_view_change_frame(true);
+}
+
+#[test]
+fn zoom_and_fade_keeps_the_field_of_view_without_an_enter_script() {
+    zoom_and_fade_view_change_frame(false);
+}
+
 #[test]
 fn timers_repeat_and_end() {
     let (mut g, _probe) = game(BASE);
@@ -235,6 +288,31 @@ fn timers_repeat_and_end() {
     assert_eq!(g.script().global(b"N"), Value::Num(7.0));
     assert_eq!(g.timer_names(), [b"always".to_vec()]);
     // The second Create of "always" was logged, not made again: 1 s still.
+}
+
+#[test]
+fn a_due_timer_runs_after_a_handler_opened_a_menu() {
+    // @ 0x004353d0 → 0x00405ae0: the `timer` event and the scene's
+    // script with no state test, so a handler's Atl_ExamineItem (the
+    // manager in state 3) does not stop the timers due after it in the walk.
+    let (mut g, probe) = game(BASE);
+    g.new_game();
+    settle(&mut g, 5);
+    probe.borrow_mut().files.insert(
+        format!("{DIR}on_click_deck.lua"),
+        "local t = atl.event.type \
+         if t == \"timer\" then local n = atl.event.timer.name \
+           if n == \"a\" then A = (A or 0) + 1 Atl_ExamineItem(\"x\") \
+           elseif n == \"b\" then B = (B or 0) + 1 end \
+         elseif t == \"click_zone\" then Atl_Timer_Create(\"a\", 1) Atl_Timer_Create(\"b\", 1, 1) end"
+            .to_string(),
+    );
+    assert!(g.click_zone(0, b"make"));
+    g.update(1.0);
+    assert_eq!(g.script().global(b"A"), Value::Num(1.0));
+    assert_eq!(g.state(), 3);
+    assert_eq!(g.script().global(b"B"), Value::Num(1.0));
+    assert_eq!(g.timer_names(), [b"a".to_vec()]);
 }
 
 #[test]
@@ -581,6 +659,116 @@ fn the_load_state_ends_the_game_before_the_read() {
         .expect("the saved view loaded");
     assert!(reset < view);
     assert!(!p.requests.contains(&Request::GameEnded));
+}
+
+#[test]
+fn a_save_s_read_stops_when_atlantis_lua_raises() {
+    // @ 0x0043b210: `atlantis.lua` first (@ 0x00454410, state 6 at
+    // 0x0043b2ec); its Lua error throws, the catch @ 0x0043b884 rethrows
+    // and every later step is skipped, the queueing of 5 and 4 included.
+    let mut files = BASE.to_vec();
+    let atlantis = format!(
+        "{} function Atl_Address_GetCurrent() return \"deck\", 1 end",
+        files[0].1
+    );
+    files[0] = ("atlantis.lua", &atlantis);
+    let (mut g, probe) = game(&files);
+    g.new_game();
+    settle(&mut g, 5);
+    assert_eq!(g.state(), 4);
+    assert!(probe.borrow().saves.contains_key("autoslot"));
+    // A whole read first.
+    probe.borrow_mut().requests.clear();
+    assert!(g.load_file("autoslot"));
+    assert!(g.requests_pending());
+    settle(&mut g, 5);
+    assert_eq!(g.state(), 4);
+    // Then with an atlantis.lua that raises.
+    probe.borrow_mut().files.insert(
+        format!("{DIR}atlantis.lua"),
+        format!("{atlantis} error(\"boom\")"),
+    );
+    assert!(g.run_string("return function() Atl_Timer_Create(\"kept\", 100) end"));
+    probe.borrow_mut().requests.clear();
+    probe.borrow_mut().errors.clear();
+    assert!(!g.load_file("autoslot"));
+    assert!(!g.requests_pending());
+    assert_eq!(probe.borrow().errors.len(), 1);
+    // Nothing read: the timers as they were, no view loaded.
+    assert_eq!(g.timer_names(), [b"kept".to_vec()]);
+    assert!(!probe
+        .borrow()
+        .requests
+        .iter()
+        .any(|r| matches!(r, Request::LoadView { .. })));
+}
+
+#[test]
+fn a_save_s_read_stops_when_atlantis_lua_does_not_load() {
+    // @ 0x00454410 throws when `luaL_loadfile` fails (CException
+    // 0x0066eb64, before any `lua_pcall`); the reader calls it with no
+    // existence test, so a missing or broken file abandons the read.
+    let mut files = BASE.to_vec();
+    let atlantis = format!(
+        "{} function Atl_Address_GetCurrent() return \"deck\", 1 end",
+        files[0].1
+    );
+    files[0] = ("atlantis.lua", &atlantis);
+    for broken in [None, Some("function (")] {
+        let (mut g, probe) = game(&files);
+        g.new_game();
+        settle(&mut g, 5);
+        assert_eq!(g.state(), 4);
+        let key = format!("{DIR}atlantis.lua");
+        match broken {
+            None => {
+                probe.borrow_mut().files.remove(&key);
+            }
+            Some(src) => {
+                probe.borrow_mut().files.insert(key, src.to_string());
+            }
+        }
+        probe.borrow_mut().requests.clear();
+        assert!(!g.load_file("autoslot"), "{broken:?}");
+        assert!(!g.requests_pending(), "{broken:?}");
+        assert!(!probe
+            .borrow()
+            .requests
+            .iter()
+            .any(|r| matches!(r, Request::LoadView { .. })));
+    }
+}
+
+/// NewGame (@ 0x0042fc50) evaluates both files with no existence test and
+/// @ 0x00454410 throws on a load failure: `Exit Game`, the program ends.
+/// State 1's `lua_pcall` of a non-function `InitChapter` throws too.
+#[test]
+fn a_new_game_without_its_scripts_ends_the_program() {
+    for (name, src) in [
+        ("atlantis.lua", None),
+        ("atlantis.lua", Some("function (")),
+        ("on_new_game.lua", None),
+        ("on_new_game.lua", Some("function (")),
+        (
+            "atlantis.lua",
+            Some("require \"lib/util.lua\" InitChapter = 3"),
+        ),
+    ] {
+        let files: Vec<(&str, &str)> = BASE
+            .iter()
+            .filter_map(|&(n, s)| {
+                if n == name {
+                    src.map(|src| (n, src))
+                } else {
+                    Some((n, s))
+                }
+            })
+            .collect();
+        let (mut g, _) = game(&files);
+        g.new_game();
+        settle(&mut g, 5);
+        assert_eq!(g.state(), 8, "{name} {src:?}");
+    }
 }
 
 #[test]

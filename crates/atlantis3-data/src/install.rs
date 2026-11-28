@@ -14,6 +14,31 @@
 //! `Game.exe` for all four (the same file in the build's
 //! language-independent depot): the language is the data's, and that
 //! registry value is what the game itself goes by.
+//!
+//! The Italian *Atlantis Collection* DVD (2014) installs the game with an
+//! Inno Setup installer that writes `Install` = `CD` and `Language` =
+//! `ita` (atlantis3-re `discs/it-collection.md`) and leaves no file of
+//! them: its `Datas\loc\text\` holds `ita` alone, which gives the same
+//! values.
+//!
+//! The North American CD (*Beyond Atlantis II*, DreamCatcher, 2001)
+//! writes them under `HKLM\Software\DreamCatcher\BEYOND ATLANTIS 2`,
+//! the key its program reads (atlantis3-cd-us-3366912 @ 0x004d5950):
+//! `Language` = `usa` and `Install` = `CD` (its `setup.ins`); its
+//! `Datas\loc\text\` holds `usa` alone, which gives the same values.
+//!
+//! The Portuguese CD (*O Novo Mundo*, Playgames, 2002) has Cryo's
+//! installer of the French CD with a list of 15 language codes
+//! (`setup.ins`); its `Datas\loc\text\` holds `por` alone. The Swedish
+//! CD (*Den nya världen*, Toptronics, 2002) has the same installer, and
+//! `swe`. The Czech CD (GAME4U Speciál 10, 2003) lists one code, `cze`,
+//! the only folder of its `Datas\loc\text\`.
+//!
+//! The Traditional Chinese CD (亞特蘭提斯Ⅲ 失落的帝國, Interwise, 2002)
+//! installs the same program with the same installer; its texts are in
+//! `gbr`, in Big5, and its voices English: the registry value stays
+//! `gbr`, and the edition's language is told by its data, its
+//! `font\font.txt` asking for `CHINESEBIG5_CHARSET` ([`data_language`]).
 
 use crate::exe::Build;
 use crate::A3Files;
@@ -25,17 +50,30 @@ pub enum Language {
     French,
     German,
     Spanish,
+    Italian,
+    Portuguese,
+    Swedish,
+    Czech,
+    /// The Traditional Chinese CD's: `gbr` with Big5 texts
+    /// ([`data_language`]); never a registry code of its own.
+    TraditionalChinese,
 }
 
 impl Language {
     /// The language of a registry `Language` value (`gbr`, `fra`, `ger`,
-    /// `esp`; the folder names of `loc\text\`, any case).
+    /// `esp`, `ita`; the folder names of `loc\text\`, any case). The
+    /// North American CD's `usa` is English too: its own texts and
+    /// voices, the program's `usa` branches (the intro `intro_usa.hnm`).
     pub fn from_code(code: &[u8]) -> Option<Language> {
         match code.to_ascii_lowercase().as_slice() {
-            b"gbr" => Some(Language::English),
+            b"gbr" | b"usa" => Some(Language::English),
             b"fra" => Some(Language::French),
             b"ger" => Some(Language::German),
             b"esp" => Some(Language::Spanish),
+            b"ita" => Some(Language::Italian),
+            b"por" => Some(Language::Portuguese),
+            b"swe" => Some(Language::Swedish),
+            b"cze" => Some(Language::Czech),
             _ => None,
         }
     }
@@ -47,17 +85,94 @@ impl Language {
             Language::French => "French",
             Language::German => "German",
             Language::Spanish => "Spanish",
+            Language::Italian => "Italian",
+            Language::Portuguese => "Portuguese",
+            Language::Swedish => "Swedish",
+            Language::Czech => "Czech",
+            Language::TraditionalChinese => "Traditional Chinese",
         }
     }
 }
 
-/// The edition's name: the build's, then the language
-/// ("Atlantis III, GOG.com, German"); an unknown language leaves the
-/// build's name alone.
+/// Editions that share a build and differ by their data's language: the
+/// build, the install's language, the edition's whole name. The
+/// Portuguese CD's `Atlantis3.exe` (atlantis3-cd-pt-3424256) is also the
+/// Swedish CD's and the Traditional Chinese CD's (atlantis3-re
+/// `discs/cd-sv.md`, `discs/cd-zh-tw.md`); each install's
+/// `Datas\loc\text\` holds one language folder, `por` on the Portuguese
+/// CD alone (`swe`, and `gbr` with Big5 texts, on the others), so the
+/// language names the edition.
+pub const LANGUAGE_EDITIONS: &[(&str, Language, &str)] = &[
+    (
+        "atlantis3-cd-pt-3424256",
+        Language::Portuguese,
+        "Atlantis III, Portuguese CD, Portuguese (Playgames, 2002)",
+    ),
+    (
+        "atlantis3-cd-pt-3424256",
+        Language::Swedish,
+        "Atlantis III, Swedish CD, Swedish (Toptronics, 2002)",
+    ),
+    (
+        "atlantis3-cd-pt-3424256",
+        Language::TraditionalChinese,
+        "Atlantis III, Taiwanese CD, Traditional Chinese (Interwise, 2002)",
+    ),
+];
+
+/// Whether the install's `Datas\font\font.txt` puts a font in
+/// `CHINESEBIG5_CHARSET` (the Traditional Chinese CD's, whose texts are
+/// Big5 and drawn in the system's Big5 face).
+pub fn has_big5_fonts(src: &dyn atlantis_data::FileSource) -> bool {
+    src.read(crate::font_txt::FONT_TXT_PATH).is_some_and(|d| {
+        crate::font_txt::FontTxt::parse(&d)
+            .fonts
+            .iter()
+            .any(|f| f.charset_name == "CHINESEBIG5_CHARSET")
+    })
+}
+
+/// The language of the install's texts: the registry value's
+/// ([`Language::from_code`]), but Traditional Chinese for an English code
+/// whose `font\font.txt` puts a font in `CHINESEBIG5_CHARSET` (the
+/// Traditional Chinese CD's: all five, its `gbr` texts Big5; atlantis3-re
+/// `discs/cd-zh-tw.md`). No other edition's `font.txt` asks for that
+/// character set.
+pub fn data_language(files: &A3Files, code: &[u8]) -> Option<Language> {
+    let language = Language::from_code(code)?;
+    if language != Language::English {
+        return Some(language);
+    }
+    Some(if has_big5_fonts(files.source()) {
+        Language::TraditionalChinese
+    } else {
+        language
+    })
+}
+
+/// The edition's name: an edition of [`LANGUAGE_EDITIONS`], else the
+/// build's name with the language ("Atlantis III, GOG.com, German",
+/// [`named_label`]); an unknown language leaves the build's name alone.
 pub fn edition_label(build: &Build, language: Option<Language>) -> String {
-    match language {
-        Some(l) => format!("{}, {}", build.label, l.name()),
-        None => build.label.to_string(),
+    if let Some(&(_, _, name)) = LANGUAGE_EDITIONS
+        .iter()
+        .find(|&&(id, l, _)| id == build.id && Some(l) == language)
+    {
+        return name.to_string();
+    }
+    named_label(build.label, language)
+}
+
+/// The edition `name` with the language, as [`edition_label`]: after
+/// the name, or for a retail CD named with its publisher and year
+/// ("Atlantis III, CD (DreamCatcher, 2001)") before them, as
+/// `atlantis2_data::edition::edition_label` does ("Atlantis III, CD,
+/// English (DreamCatcher, 2001)").
+pub fn named_label(name: &str, language: Option<Language>) -> String {
+    match (language, name.find("CD (")) {
+        (Some(l), Some(i)) => format!("{}, {}{}", &name[..i + 2], l.name(), &name[i + 2..]),
+        (Some(l), None) => format!("{name}, {}", l.name()),
+        (None, _) => name.to_string(),
     }
 }
 
@@ -174,7 +289,54 @@ mod tests {
                 format!("Atlantis III, GOG.com, {name}")
             );
         }
-        assert_eq!(Language::from_code(b"ita"), None);
+        assert_eq!(Language::from_code(b"ITA"), Some(Language::Italian));
+        assert_eq!(Language::from_code(b"USA"), Some(Language::English));
+        assert_eq!(Language::from_code(b"por"), Some(Language::Portuguese));
+        assert_eq!(Language::from_code(b"SWE"), Some(Language::Swedish));
+        assert_eq!(Language::from_code(b"cze"), Some(Language::Czech));
+        assert_eq!(Language::from_code(b"rus"), None);
         assert_eq!(edition_label(b, None), "Atlantis III, GOG.com");
+        assert_eq!(
+            named_label("Atlantis III, Atlantis Collection", Some(Language::Italian)),
+            "Atlantis III, Atlantis Collection, Italian"
+        );
+        assert_eq!(
+            named_label(
+                "Atlantis III, CD (DreamCatcher, 2001)",
+                Some(Language::English)
+            ),
+            "Atlantis III, CD, English (DreamCatcher, 2001)"
+        );
+        let pt = KNOWN_BUILDS
+            .iter()
+            .find(|b| b.id == "atlantis3-cd-pt-3424256")
+            .unwrap();
+        assert_eq!(
+            edition_label(pt, Some(Language::Portuguese)),
+            "Atlantis III, Portuguese CD, Portuguese (Playgames, 2002)"
+        );
+        assert_eq!(
+            edition_label(pt, Some(Language::Swedish)),
+            "Atlantis III, Swedish CD, Swedish (Toptronics, 2002)"
+        );
+        assert_eq!(
+            edition_label(pt, Some(Language::TraditionalChinese)),
+            "Atlantis III, Taiwanese CD, Traditional Chinese (Interwise, 2002)"
+        );
+        assert_eq!(
+            edition_label(pt, Some(Language::English)),
+            "Atlantis III, CD, English (October 2001 build)"
+        );
+        assert_eq!(
+            named_label("Atlantis III, CD", Some(Language::French)),
+            "Atlantis III, CD, French"
+        );
+        assert_eq!(
+            named_label(
+                "Atlantis III, GOG.com (2015 / 2018 build)",
+                Some(Language::Italian)
+            ),
+            "Atlantis III, GOG.com (2015 / 2018 build), Italian"
+        );
     }
 }

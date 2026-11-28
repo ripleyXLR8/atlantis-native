@@ -26,7 +26,8 @@ pub enum GameKind {
     /// Atlantis II (`atlantis2.exe`, or GOG.com's `Game.exe`:
     /// [`atlantis2_data::files::holds_atlantis2`]).
     Atlantis2,
-    /// Atlantis III (GOG.com's `Game.exe` beside `Datas\scenar\defnames.con`:
+    /// Atlantis III (GOG.com's `Game.exe`, or a CD's program, beside
+    /// `Datas\scenar\defnames.con`:
     /// [`atlantis3_data::files::holds_atlantis3`]).
     Atlantis3,
     /// Atlantis Evolution (GOG.com's `Atlantis Evolution.exe` beside
@@ -81,12 +82,15 @@ four discs itself.\n\
 \u{2022} Atlantis II on CD: the folder where the game is installed (the one with \
 atlantis2.exe), with the images of its four CDs (or copies of the CDs) in it or in a \
 folder inside it.\n\
-\u{2022} Atlantis III: GOG.com's installation folder (the one with Game.exe and Datas), or \
-the folder where the French CD installed it (the one with Atlantis3.exe and Datas), with the \
+\u{2022} Atlantis III: GOG.com's installation folder or the one the Italian Atlantis Collection \
+DVD's installer created (the one with Game.exe and Datas), or \
+the folder where the French, Portuguese, Swedish, Taiwanese or Czech CD installed it (the one with Atlantis3.exe and Datas) or the \
+North American CD (Beyond Atlantis II, the one with Beyond Atlantis 2.exe and Datas), with the \
 images of its three CDs (or copies of the CDs) in it or in a folder inside it.\n\
 \u{2022} Atlantis Evolution: GOG.com's installation folder (the one with Atlantis Evolution.exe \
-and 3D), or the folder where its 2004 CD installed it (the one with Atlantis Evolution.exe \
-and cd0 to cd4).\n\
+and 3D), or the folder where its 2004 CD or the Italian Atlantis Collection DVD installed it \
+(the one with Atlantis Evolution.exe and cd0 to cd4; the collection's with the English CD's \
+cd2 folder copied into it).\n\
 \u{2022} The Secrets of Atlantis (French DVD): the DVD's drive or a copy of its files (the one \
 with DATAS.cab), the folder holding the DVD's image (.iso), or the folder where it was \
 installed.\n\n\
@@ -371,8 +375,11 @@ pub fn explain_atlantis2(dir: &Path, err: &OpenError) -> String {
         OpenError::Exe { name, error } => format!(
             "{shown} holds an Atlantis II program, {name}, that Atlantis Native does not \
              know ({error}): an edition of the game that is not supported yet.\n\n\
-             Supported: the French CD (1999), the CD with patch 1.01, the Polish CD (1999), \
-             the DreamCatcher CD (2000), GOG.com and the Italian Atlantis Collection."
+             Supported: the French CD (1999), the CD with patch 1.01, the German CD (1999), \
+             the Spanish CD (1999), the Swedish CD (1999), the Polish CD (1999), the \
+             Czech CD (Bohemia Interactive, 2000), the Traditional Chinese and English CDs \
+             (Interwise, 2000), the DreamCatcher CD (2000), GOG.com and the Italian Atlantis \
+             Collection."
         ),
         OpenError::NoExecutable => format!(
             "{shown} does not hold Atlantis II's program (atlantis2.exe, or GOG.com's \
@@ -389,13 +396,19 @@ pub fn explain_atlantis3(dir: &Path, err: &atlantis3_data::files::OpenError) -> 
         atlantis3_data::files::OpenError::Exe(e) => format!(
             "{shown} holds an Atlantis III program that Atlantis Native does not know \
              ({e}): an edition of the game that is not supported yet.\n\n\
-             Supported: GOG.com's release (English, French, German or Spanish) and the French \
-             CD (2001, three CDs). Other editions are unknown to the \
+             Supported: GOG.com's release (English, French, German or Spanish), the French \
+             CD (2001, three CDs), the North American CD (Beyond Atlantis II, DreamCatcher, \
+             2001, three CDs), the Portuguese CD (O Novo Mundo, Playgames, 2002, three CDs), \
+             the Swedish CD (Den nya världen, Toptronics, 2002, three CDs), the Taiwanese \
+             CD in Traditional Chinese (Interwise, 2002, three CDs), the Czech CD \
+             (GAME4U Speciál 10, 2003, three CDs) and the Italian Atlantis Collection DVD (2014, installed). \
+             Other editions are unknown to the \
              project: an issue on GitHub with the program's size and MD5 helps."
         ),
         _ => format!(
             "{shown} does not hold Atlantis III ({err}): choose the folder where the game \
-             is installed, the one with Game.exe (GOG.com's) or Atlantis3.exe (the CD's) and Datas."
+             is installed, the one with Game.exe (GOG.com's), Atlantis3.exe (the French CD's) or \
+             Beyond Atlantis 2.exe (the North American CD's) and Datas."
         ),
     }
 }
@@ -410,20 +423,34 @@ pub fn explain_atlantis3_no_disc(dir: &Path) -> String {
     )
 }
 
-/// What to tell the player about an Atlantis Evolution folder that does
-/// not open.
 /// What to tell the player about a folder of The Secrets of Atlantis that
 /// does not open.
 pub fn explain_atlantis5(dir: &Path, err: &atlantis3_data::atlantis5::OpenError) -> String {
+    if let atlantis3_data::atlantis5::OpenError::MissingDiscs(missing) = err {
+        return format!(
+            "{} holds one of the three CDs of The Secrets of Atlantis (2007), whose files \
+             are spread over the three discs ({} still needed).\n\n\
+             Choose a folder holding a copy of each CD (one folder per disc, side by side, \
+             or the three discs' files copied together), or the folder holding the three \
+             CD images; or add this drive to the game library and choose Copy to this \
+             computer, then insert each disc when asked.",
+            dir.display(),
+            missing.join(", ")
+        );
+    }
     format!(
         "{} does not hold The Secrets of Atlantis in a form Atlantis Native reads ({err}).\n\n\
          Choose the DVD's drive or a copy of its files (the folder with DATAS.cab and \
-         DATAS_french.cab), the folder holding the DVD's image (.iso), or the folder where \
-         the game was installed (the one with Datas).",
+         DATAS_french.cab), the folder holding the DVD's image (.iso), a folder holding \
+         copies of the three North-American CDs (data1.hdr and data1.cab to data4.cab), \
+         or the folder where the game was installed (the one with Datas; the Italian \
+         Atlantis Collection DVD's game is read from its install only).",
         dir.display()
     )
 }
 
+/// What to tell the player about an Atlantis Evolution folder that does
+/// not open.
 pub fn explain_atlantis4(dir: &Path, err: &atlantis4_data::files::OpenError) -> String {
     use atlantis4_data::files::OpenError;
     let shown = dir.display();
@@ -431,8 +458,9 @@ pub fn explain_atlantis4(dir: &Path, err: &atlantis4_data::files::OpenError) -> 
         OpenError::Exe(e) => format!(
             "{shown} holds an Atlantis Evolution program that Atlantis Native does not \
              know ({e}): an edition of the game that is not supported yet.\n\n\
-             Supported: GOG.com's release (English, French, German, Italian, Spanish) and \
-             the 2004 CD (The Adventure Company, English). Other editions are unknown to the project: an issue on GitHub with the \
+             Supported: GOG.com's release (English, French, German, Italian, Spanish), \
+             the 2004 CD (The Adventure Company, English) and the Italian Atlantis \
+             Collection DVD (2014, installed). Other editions are unknown to the project: an issue on GitHub with the \
              program's size and MD5 helps."
         ),
         OpenError::NoExe => format!(
@@ -467,6 +495,16 @@ pub fn candidate_folders() -> Vec<PathBuf> {
                 }
             }
         }
+        // The Italian Atlantis Collection's Atlantis III and Atlantis
+        // Evolution installers: `Adventure Productions\Atlantis 3 - Il
+        // Nuovo Mondo` and `Adventure Productions\Atlantis Evolution`
+        // (atlantis4-re `discs/it-collection.md`) in the program files.
+        for base in [
+            r"C:\Program Files\Adventure Productions",
+            r"C:\Program Files (x86)\Adventure Productions",
+        ] {
+            push_matching(&mut out, Path::new(base), "atlantis");
+        }
         for base in [
             r"C:\GOG Games",
             r"C:\Program Files (x86)\GOG Galaxy\Games",
@@ -476,11 +514,27 @@ pub fn candidate_folders() -> Vec<PathBuf> {
         ] {
             push_matching(&mut out, Path::new(base), "atlantis");
         }
+        // The Secrets of Atlantis's installers (the international DVD's
+        // and the Italian Atlantis Collection's) record the install
+        // folder as `Install_Dir` under Nobilis's key (32-bit
+        // installers: the WOW6432Node view on 64-bit Windows).
+        for key in [
+            r"HKLM\SOFTWARE\WOW6432Node\Nobilis\The Secrets of Atlantis",
+            r"HKLM\SOFTWARE\Nobilis\The Secrets of Atlantis",
+        ] {
+            if let Some(path) = reg_value(key, "Install_Dir") {
+                log::info!("{key} Install_Dir: {path}");
+                out.push(PathBuf::from(path));
+            }
+        }
         // The 2004 CD's installer: `The Adventure Company\Atlantis
-        // Evolution` in the program files.
+        // Evolution` in the program files; the Italian Atlantis
+        // Collection's: `Anuman interactive\The Secrets of Atlantis`.
         for base in [
             r"C:\Program Files\The Adventure Company",
             r"C:\Program Files (x86)\The Adventure Company",
+            r"C:\Program Files\Anuman interactive",
+            r"C:\Program Files (x86)\Anuman interactive",
         ] {
             push_matching(&mut out, Path::new(base), "atlantis");
         }
@@ -497,12 +551,22 @@ pub fn candidate_folders() -> Vec<PathBuf> {
     {
         if let Some(home) = std::env::var_os("HOME") {
             let home = Path::new(&home);
+            // The Italian Atlantis Collection's Atlantis III installer
+            // under Wine.
+            for base in [
+                ".wine/drive_c/Program Files/Adventure Productions",
+                ".wine/drive_c/Program Files (x86)/Adventure Productions",
+            ] {
+                push_matching(&mut out, &home.join(base), "atlantis");
+            }
             for base in [
                 "GOG Games",
                 "Games",
                 ".wine/drive_c/GOG Games",
                 ".wine/drive_c/Program Files/The Adventure Company",
                 ".wine/drive_c/Program Files (x86)/The Adventure Company",
+                ".wine/drive_c/Program Files/Anuman interactive",
+                ".wine/drive_c/Program Files (x86)/Anuman interactive",
             ] {
                 push_matching(&mut out, &home.join(base), "atlantis");
             }
@@ -662,6 +726,50 @@ mod tests {
     fn touch(p: &Path) {
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();
         std::fs::write(p, b"x").unwrap();
+    }
+
+    /// Atlantis III's French CD layout (its install beside copies of its
+    /// discs, CD 1 holding an InstallShield 5 `data1.hdr`, as Atlantis
+    /// II's US CD 1 does): not The Secrets of Atlantis' CDs, so the
+    /// install below is found.
+    #[test]
+    fn another_installshield_set_is_not_the_fifth_game() {
+        let d = tmp("is5");
+        let mut hdr = b"ISc(".to_vec();
+        // Version 0x01005201: major 5.
+        hdr.extend(0x0100_5201u32.to_le_bytes());
+        hdr.extend(0x200u32.to_le_bytes());
+        hdr.resize(0x400, 0);
+        let mut cab = b"ISc(".to_vec();
+        cab.extend(0x0100_5201u32.to_le_bytes());
+        cab.resize(0x200, 0);
+        std::fs::create_dir_all(d.join("cd1")).unwrap();
+        std::fs::write(d.join("cd1/data1.hdr"), &hdr).unwrap();
+        std::fs::write(d.join("cd1/data1.cab"), &cab).unwrap();
+        std::fs::create_dir_all(d.join("cd2")).unwrap();
+        std::fs::write(d.join("cd2/data2.cab"), &cab).unwrap();
+        fake_atlantis3_gog(&d.join("installed"));
+        for p in [d.clone(), d.join("cd1"), d.join("cd2")] {
+            assert!(
+                !atlantis3_data::atlantis5::holds_atlantis5(&p),
+                "{}",
+                p.display()
+            );
+            assert_eq!(kind_of(&p), None, "{}", p.display());
+        }
+        assert_eq!(
+            find_roots(&d, 2),
+            [(d.join("installed"), GameKind::Atlantis3)]
+        );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn the_missing_cds_message_has_no_runs_of_spaces() {
+        let e = atlantis3_data::atlantis5::OpenError::MissingDiscs(vec!["data3.cab".into()]);
+        let text = explain_atlantis5(Path::new("cd1"), &e);
+        assert!(!text.contains("  "), "{text:?}");
+        assert!(text.contains("(data3.cab still needed).\n\nChoose a folder"));
     }
 
     #[test]
@@ -876,7 +984,8 @@ mod tests {
     fn explains_atlantis3_folders() {
         let d = Path::new("/games/Atlantis 3");
         let e = explain_atlantis3(d, &atlantis3_data::files::OpenError::NoDatas);
-        assert!(e.contains("Game.exe (GOG.com's) or Atlantis3.exe"), "{e}");
+        assert!(e.contains("Game.exe (GOG.com's), Atlantis3.exe"), "{e}");
+        assert!(e.contains("Beyond Atlantis 2.exe"), "{e}");
         let e = explain_atlantis3_no_disc(d);
         assert!(e.contains("three discs"), "{e}");
         assert_eq!(GameKind::Atlantis3.name(), "Atlantis III");

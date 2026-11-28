@@ -159,7 +159,7 @@ impl BugFix {
             BugFix::FilmSubtitles => &[
                 "At 800 x 600 the original draws the subtitles",
                 "of a dialog over a film too late to be seen",
-                "(only the DreamCatcher CD shows them).",
+                "(the DreamCatcher and Czech CDs show them).",
             ],
             BugFix::FilmLanguage => &[
                 "Some editions (GOG.com except in English, the",

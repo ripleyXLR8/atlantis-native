@@ -322,3 +322,120 @@ fn a_shown_panel_takes_a_click_only_after_a_move() {
     frames(&mut play, 1);
     assert_ne!(play.poker().map(|p| p.state), Some(3), "after a move");
 }
+
+/// The panel's return (states 2, 0xa, 0xc) puts the mouse back at the
+/// cursor's place (@ 0x004520a0 on the cursor, @ 0x0040d890): the moves
+/// made while the opponents' dialogs played are dropped, and the button
+/// under it is not hot until a move.
+#[test]
+fn the_panel_puts_the_mouse_back_at_the_cursor() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_poker(&d);
+    let wait_panel = |play: &mut Play| {
+        for _ in 0..30_000 {
+            frames(play, 1);
+            if !play.game.busy() && play.poker().is_some_and(|p| p.state == 3) {
+                return;
+            }
+        }
+        panic!("no panel");
+    };
+    wait_panel(&mut play);
+    assert!(play.click_poker("follow_bet"));
+    let at_click = play.menus.mouse;
+    frames(&mut play, 1);
+    assert!(play.game.busy(), "the opponents' dialogs");
+    play.mouse_by(200, 50);
+    assert_ne!(play.menus.mouse, at_click);
+    wait_panel(&mut play);
+    assert_eq!(play.menus.mouse, at_click, "back at the cursor's place");
+    // On the button, but not hot: a press does nothing.
+    play.click();
+    frames(&mut play, 3);
+    assert_eq!(play.poker().map(|p| p.state), Some(3));
+}
+
+/// The showdown's dialogs (281 in game 2, the punter's win) run after
+/// state 0xc's put-back and block the board's process: the moves made
+/// meanwhile reach the mouse, not the cursor element (@ 0x0040d920 sees
+/// no move event after them), so the cursor stays at its place and
+/// `next_game` is not hot (+0x8c = 0 from its show) until a move.
+#[test]
+fn a_move_during_the_showdown_s_dialog_waits_for_the_next_move() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_poker(&d);
+    let mut moved_to = None;
+    for _ in 0..30_000 {
+        frames(&mut play, 1);
+        let Some(state) = play.poker().map(|p| p.state) else {
+            panic!("the board ended");
+        };
+        let game = num(&lua(&mut play, "atl.puzzle.poker.game"));
+        if play.game.busy() {
+            if game == 2 && state == 0xe && moved_to.is_none() {
+                let (x, y) = play.poker().unwrap().place_of("next_game").unwrap();
+                play.mouse_at(x + 5, y + 5);
+                moved_to = Some((x + 5, y + 5));
+            }
+            continue;
+        }
+        match state {
+            3 => assert!(play.click_poker(if game == 2 { "stop_bet" } else { "follow_bet" })),
+            0xb => assert!(play.click_poker("follow_bet")),
+            0xd if moved_to.is_some() => break,
+            0xd => assert!(play.click_poker("next_game")),
+            _ => {}
+        }
+    }
+    let at = moved_to.expect("game 2's showdown dialog");
+    assert_eq!(play.poker().map(|p| p.state), Some(0xd));
+    assert_eq!(play.menus.mouse, at, "the mouse moved");
+    assert_ne!(
+        play.poker().unwrap().cursor_place(),
+        Some(at),
+        "the cursor at its place"
+    );
+    // A press without a move: `next_game` is not hot.
+    play.click();
+    frames(&mut play, 3);
+    assert_eq!(play.poker().map(|p| p.state), Some(0xd));
+    // After a move: the cursor follows, the press starts the next game.
+    assert!(play.click_poker("next_game"));
+    frames(&mut play, 1);
+    assert_ne!(play.poker().map(|p| p.state), Some(0xd));
+}
+
+/// A move goes through the panel's buttons from the last made
+/// (@ 0x00452140 puts each new child at the head) and stops at the one it
+/// turns hot (@ 0x004523e0, @ 0x0044eb60): from `follow_bet` onto
+/// `stop_bet`, made after it, both stay hot until the next move, and a
+/// press would go to `stop_bet`, the first in that order.
+#[test]
+fn a_move_onto_a_later_button_leaves_the_earlier_one_hot() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_poker(&d);
+    for _ in 0..30_000 {
+        frames(&mut play, 1);
+        if !play.game.busy() && play.poker().is_some_and(|p| p.state == 3) {
+            break;
+        }
+    }
+    assert_eq!(play.poker().map(|p| p.state), Some(3));
+    let at = |play: &Play, n: &str| {
+        let st = play.stage();
+        play.poker().unwrap().point_of(n, &st.fonts).expect(n)
+    };
+    let (ix, iy) = at(&play, "follow_bet");
+    let (fx, fy) = at(&play, "stop_bet");
+    play.mouse_at(ix + 1, iy);
+    play.update(0.0);
+    play.mouse_at(ix, iy);
+    play.update(0.0);
+    assert_eq!(play.poker().unwrap().hot(), ["follow_bet"]);
+    play.mouse_at(fx, fy);
+    play.update(0.0);
+    assert_eq!(play.poker().unwrap().hot(), ["follow_bet", "stop_bet"]);
+    play.mouse_at(fx + 1, fy);
+    play.update(0.0);
+    assert_eq!(play.poker().unwrap().hot(), ["stop_bet"]);
+}

@@ -136,12 +136,25 @@ fn the_gorillas_subject_menu_and_dialog() {
         "the gorilla under the centre"
     );
     play.click();
-    frames(&mut play, 1);
+    // The click's frame asks the menu; the next opens it.
+    frames(&mut play, 2);
     // A character with subjects and an empty hand: the subject menu, the
     // manager in state 3, the gorilla turning to face.
     assert_eq!(play.game.state(), 3);
     assert!(play.stage().menu_open_now());
     assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
+    // No menus' cursor while the character turns (the menu's cursor is
+    // shown only when its elements are made, @ 0x00410f90), wherever the
+    // mouse goes.
+    play.mouse_at(300, 200);
+    frames(&mut play, 1);
+    assert!(play.stage().menu_open_now() && play.stage().menu_subjects().is_empty());
+    let mut view = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    play.stage().render(&mut view);
+    assert!(
+        shot(&play, "a5-subject-facing.png") == view,
+        "no cursor while facing"
+    );
     for _ in 0..300 {
         frames(&mut play, 1);
         if !play.stage().menu_subjects().is_empty() {
@@ -149,6 +162,9 @@ fn the_gorillas_subject_menu_and_dialog() {
         }
     }
     assert_eq!(anim(&play, "gorilla").as_deref(), Some("listen"));
+    // Then the cursor is drawn.
+    play.stage().render(&mut view);
+    assert!(shot(&play, "a5-subject-cursor.png") != view, "the cursor");
     assert_eq!(play.stage().menu_subjects(), [b"gorille".to_vec()]);
     let menu = shot(&play, "a5-subject-menu.png");
     assert!(menu.iter().any(|&p| p & 0xff_ffff != 0));
@@ -266,6 +282,7 @@ fn at_a_low_frame_rate_the_talker_faces_then_listens() {
         assert!(play.aim_at_sprite(b"gorilla"));
         play.click();
         play.update(dt);
+        play.update(dt);
         assert!(play.stage().menu_open_now());
         assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
         for _ in 0..100 {
@@ -352,25 +369,34 @@ fn terminate_dialog_turns_the_character_back_once() {
 /// at the screen's centre (its state 2, @ 0x00410f90): the cursor drawn
 /// goes there too, where the next click is tested.
 #[test]
-fn the_rebuilt_subject_menu_moves_the_drawn_cursor_too() {
+fn the_rebuilt_subject_menu_puts_the_cursor_back_at_the_click() {
+    // @ 0x0041b780: the mode's open puts the mouse at the centre;
+    // @ 0x00410f90 state 2: the elements made again with the mouse back at
+    // the menu's own (+0xc/+0x10, where it was at the click), the moves
+    // made during the subject's script dropped.
     let Some(d) = dvd() else { return };
     let mut play = to_first_view(&d, None);
     go(&mut play, 17);
     assert!(play.aim_at_sprite(b"gorilla"));
     play.click();
+    frames(&mut play, 2);
+    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+    assert!(play.stage().menu_open_now());
+    assert_eq!(play.menus.mouse, centre, "centred at the open");
     for _ in 0..300 {
         frames(&mut play, 1);
         if !play.stage().menu_subjects().is_empty() {
             break;
         }
     }
-    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
-    assert_eq!(play.menus.mouse, centre);
+    assert_eq!(play.menus.mouse, centre, "not moved at the facing's end");
     let (x, y) = play.stage().menu_subject_point(0).expect("subject 0");
     play.mouse_at(x, y);
     play.click();
     frames(&mut play, 2);
     assert!(play.stage().dialog_state().is_some());
+    // A move during the subject's dialog.
+    play.mouse_at(100, 100);
     play.space();
     for _ in 0..30 {
         frames(&mut play, 1);
@@ -379,7 +405,159 @@ fn the_rebuilt_subject_menu_moves_the_drawn_cursor_too() {
         }
     }
     assert_eq!(play.stage().menu_subjects().len(), 3, "made again");
+    assert_eq!(play.menus.mouse, (x, y));
+    assert_eq!(play.stage().mouse, (x, y));
+    // A press there without a move asks a subject again.
+    play.click();
+    frames(&mut play, 2);
+    assert!(play.stage().menu_open_now());
+    assert!(
+        play.stage().dialog_state().is_some(),
+        "a subject asked again"
+    );
+}
+
+/// @ 0x00411a90 leaves before making any element when the subject list
+/// is empty: no bubble (its `subject_bubble_8.spr` arm for 0 is dead).
+#[test]
+fn a_subject_menu_without_subjects_has_no_bubble() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 1);
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    assert!(play.stage().menu_has_bubble());
+    play.stage_mut().menu_set_subjects(Vec::new());
+    assert!(play.stage().menu_shown(), "the menu stays");
+    assert!(!play.stage().menu_has_bubble());
+}
+
+/// @ 0x00410f90 case 0 never runs the menu's events (@ 0x0040d920): the
+/// moves made while the character plays `facing` reach only the global
+/// mouse, so the subjects appear with the cursor still at the open's
+/// centre; the first move after takes it to the global mouse plus that
+/// move (the move event carries the global mouse, @ 0x0043bde0).
+#[test]
+fn moves_during_the_facing_do_not_move_the_subject_menu_s_cursor() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 2);
+    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+    assert!(play.stage().menu_open_now());
     assert_eq!(play.menus.mouse, centre);
+    // A move during the facing.
+    play.mouse_by(150, -100);
+    assert_eq!(play.menus.mouse, centre, "the facing's move");
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    assert!(play.stage().menu_shown());
+    assert_eq!(play.menus.mouse, centre, "the cursor at the centre");
+    assert_eq!(play.stage().mouse, centre);
+    // The next move: the global mouse plus it.
+    play.mouse_by(2, 3);
+    let to = (centre.0 + 152, centre.1 - 97);
+    assert_eq!(play.menus.mouse, to);
+    assert_eq!(play.stage().mouse, to);
+    play.mouse_by(1, 1);
+    assert_eq!(play.menus.mouse, (to.0 + 1, to.1 + 1));
+}
+
+/// A wheel turn after moves made during the facing is a move event
+/// carrying the global mouse (play.md § 2, dialogs.md § 4): the menu's
+/// mouse and its cursor go there, where the next press is tested.
+#[test]
+fn a_wheel_turn_after_the_facing_moves_the_subject_menu_s_cursor() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 2);
+    let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+    play.mouse_by(150, -100);
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    frames(&mut play, 1);
+    assert_eq!(play.menus.mouse, centre, "the cursor at the centre");
+    play.wheel();
+    frames(&mut play, 1);
+    let to = (centre.0 + 150, centre.1 - 100);
+    assert_eq!(play.menus.mouse, to);
+    assert_eq!(play.stage().mouse, to);
+}
+
+/// The frame the subject menu's process returns 1 (state 5: `unfacing`
+/// put in) makes the mode 0xd; with nothing queued @ 0x0041b780 returns 1
+/// before the scene's update (@ 0x0044c380) and the sound's: no sprite is
+/// stepped that frame, so `unfacing` is still at its time 0 after it.
+#[test]
+fn the_frame_the_subject_menu_ends_steps_no_sprite() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 1);
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    // A press off the subjects: state 5 at the next frame.
+    play.mouse_at(5, 5);
+    play.click();
+    frames(&mut play, 1);
+    assert!(play.stage().menu_open_now(), "closing");
+    frames(&mut play, 1);
+    assert!(!play.stage().menu_open_now(), "ended");
+    assert_eq!(anim(&play, "gorilla").as_deref(), Some("unfacing"));
+    assert_eq!(play.stage().sprite_time(b"gorilla"), Some(0.0));
+    // The next frame (play) steps it.
+    frames(&mut play, 1);
+    assert!(play.stage().sprite_time(b"gorilla").unwrap() > 0.0);
+}
+
+#[test]
+fn a_press_in_the_frame_the_subjects_are_made_is_dropped() {
+    // @ 0x00410f90 case 0 returns after making the elements, with no
+    // event taken: a press in that frame does not close the menu.
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 1);
+    assert!(play.stage().menu_open_now());
+    for _ in 0..300 {
+        play.click();
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    frames(&mut play, 2);
+    assert!(play.stage().menu_open_now(), "still open");
+    assert!(!play.stage().menu_subjects().is_empty());
+    assert!(play.stage().menu_subject_point(0).is_some());
 }
 
 #[test]
@@ -404,11 +582,13 @@ fn the_autosave_is_written_and_loaded() {
         "<LUA_DB>",
         "<CAMERA ",
         "<SOUND>",
-        "<PERSISTANT_SPRITES",
         "<CALLBACK_SHOOTER_MANAGER>",
     ] {
         assert!(text.contains(section), "{section}");
     }
+    // No persistent sprite: no `PERSISTANT_SPRITES` (@ 0x00439f10 makes
+    // it only for a list that is not empty).
+    assert!(!text.contains("PERSISTANT_SPRITES"), "no empty section");
     // `CAMERA_MOVER` after `CONFIGURATION` (@ 0x00437f40): the free mode,
     // its speeds, no boat.
     let at = |s: &str| text.find(s).unwrap_or_else(|| panic!("{s}"));
@@ -441,6 +621,15 @@ fn the_autosave_is_written_and_loaded() {
         play.game.script().global(b"native_check"),
         Value::Str(b"yes".to_vec())
     );
+    // No list playing: no `SOUND` (@ 0x0043a4f0 makes it at the first
+    // channel with a list's name).
+    assert!(play
+        .game
+        .run_string("return function() Atl_Music_StopAll(0) Atl_Save() end"));
+    frames(&mut play, 1);
+    let text = std::fs::read_to_string(&file).expect("saves/autoslot written");
+    assert!(text.contains("<CAMERA "));
+    assert!(!text.contains("SOUND"), "no empty section");
     assert!(play.game.timer_names().contains(&b"native_t".to_vec()));
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -468,6 +657,40 @@ fn the_right_button_puts_the_hands_object_back() {
     ));
     frames(&mut play, 1);
     assert_eq!(play.game.script().global(b"native_has"), Value::Bool(true));
+}
+
+#[test]
+fn a_right_press_during_a_scripts_dialog_leaves_the_inventory() {
+    // dialogs.md § 3 (0x004329df..0x00432a47): the dialog player's frame
+    // takes only a left press and Space; the inventory under the script's
+    // dialog is still up after it.
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    play.right_press();
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 3);
+    assert!(play.stage().inventory_open_now());
+    assert!(play
+        .game
+        .run_string("return function() Atl_Dialog_Play(1) end"));
+    frames(&mut play, 1);
+    assert!(play.game.busy());
+    // Off the cells.
+    play.mouse_at(500, 100);
+    play.right_press();
+    frames(&mut play, 2);
+    for _ in 0..600 {
+        if !play.game.busy() {
+            break;
+        }
+        play.space();
+        frames(&mut play, 2);
+    }
+    assert!(!play.game.busy());
+    frames(&mut play, 2);
+    assert_eq!(play.game.state(), 3);
+    assert!(play.stage().inventory_open_now());
 }
 
 #[test]
@@ -713,4 +936,256 @@ fn the_3d_talker_moves_its_mouth_with_its_voice() {
         checked > 30 && talks > 5 && listens > 5,
         "{checked} frames, {talks} talk, {listens} listen"
     );
+}
+
+/// A sound output lost in mid-game (`Play::drop_audio`, the front end's
+/// device gone): the mixer no longer drains, so a voiced tirade given to
+/// it would never end; once dropped, the voice is timed by its length as
+/// without an output from the start.
+#[test]
+fn a_lost_sound_output_times_the_voices_by_their_length() {
+    use atlantis3_engine::audio::Audio;
+    let Some(d) = dvd() else { return };
+    let src: Arc<dyn atlantis_data::FileSource> =
+        Arc::new(Atlantis5Source::open(&d.join("datas")).expect("the extracted tree"));
+    // A mixer no output drains.
+    let mut play = Play::new(src, "french", Some(Audio::new())).expect("play");
+    play.new_game();
+    frames(&mut play, 3);
+    play.skip();
+    frames(&mut play, 3);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    let (x, y) = play.stage().menu_subject_point(0).expect("subject 0");
+    play.mouse_at(x, y);
+    play.click();
+    frames(&mut play, 2);
+    let tirade = |play: &Play| play.stage().dialog_state().map(|s| s.1);
+    assert_eq!(tirade(&play), Some(0));
+    // A minute: the undrained voice still "plays".
+    frames(&mut play, 30 * 60);
+    assert_eq!(tirade(&play), Some(0), "held by the mixer");
+    play.drop_audio();
+    let mut steps = 0;
+    while tirade(&play) == Some(0) {
+        frames(&mut play, 1);
+        steps += 1;
+        assert!(steps < 30 * 60, "the tirade ends by its length");
+    }
+}
+
+/// The click on a character only keeps its name and asks mode 9
+/// (@ 0x004300d0: @ 0x00410f80, a string assign; @ 0x0041b5d0(9); state 3):
+/// that frame's scene update still steps the character's own sprite, and
+/// the menus' display, mode 0xd, draws no view. The menu's Initialize
+/// (@ 0x004117f0: `facing`, the record held, the music at half) runs at
+/// the menus' next frame (@ 0x0041b780), before that frame's scene
+/// update: `facing` is one step old after it.
+#[test]
+fn the_subject_menu_s_facing_starts_at_its_first_frame() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    let before = anim(&play, "gorilla");
+    let t0 = play.stage().sprite_time(b"gorilla").expect("the gorilla");
+    let mut cache = atlantis3_engine::atlantis5_play::PictureCache::default();
+    let mut px = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    assert!(play.render_cached(&mut px, &mut cache));
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 3);
+    assert_eq!(anim(&play, "gorilla"), before, "the click's frame");
+    let t1 = play.stage().sprite_time(b"gorilla").expect("the gorilla");
+    assert!(t1 > t0, "stepped in the click's frame");
+    assert!(!play.render_cached(&mut px, &mut cache), "no view drawn");
+    frames(&mut play, 1);
+    assert_eq!(anim(&play, "gorilla").as_deref(), Some("facing"));
+    assert_eq!(play.stage().sprite_time(b"gorilla"), Some(1.0 / 30.0));
+    assert!(play.render_cached(&mut px, &mut cache));
+}
+
+/// A right press made with the left button held carries the buttons 5
+/// (@ 0x0043bbc0): the dialog player's frame takes `& 1`
+/// (0x004329df..0x00432a47) and ends the tirade, as a left press.
+#[test]
+fn a_right_press_with_the_left_held_ends_a_tirade() {
+    let Some(d) = dvd() else { return };
+    let mut play = to_first_view(&d, None);
+    go(&mut play, 17);
+    assert!(play
+        .game
+        .run_string("return function() Atl_Dialog_Play(1) end"));
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if play
+            .stage()
+            .dialog_state()
+            .is_some_and(|s| matches!(s.2, 1..=3))
+        {
+            break;
+        }
+    }
+    let (_, tirade, _) = play.stage().dialog_state().expect("a tirade");
+    // Not ended by itself in a few frames.
+    frames(&mut play, 2);
+    assert_eq!(play.stage().dialog_state().map(|s| s.1), Some(tirade));
+    play.set_buttons(true, false);
+    play.set_buttons(true, true);
+    play.right_press();
+    frames(&mut play, 2);
+    assert_ne!(
+        play.stage().dialog_state().map(|s| s.1),
+        Some(tirade),
+        "the tirade ended"
+    );
+}
+
+/// A 2D talker's film loops for as long as its tirade lasts: the dialog
+/// player's state 2 steps it (@ 0x00456cb0: at most one frame a step)
+/// without testing the end, and `binkw32.dll`'s `BinkNextFrame` goes to
+/// frame 1 after the last one. The first dialog whose first tirade is a
+/// 2D talker's with a voice longer than one pass of the film.
+#[test]
+fn a_2d_talkers_film_loops_through_a_long_tirade() {
+    use atlantis3_data::atlantis5_texts::{Dialogs, Picturing};
+    use atlantis3_engine::atlantis5_dialog::{picturing, voice_path};
+    let Some(d) = dvd() else { return };
+    let src = Atlantis5Source::open(&d.join("datas")).unwrap();
+    let read = |p: &str| atlantis_data::FileSource::read(&src, p);
+    let set = Dialogs::parse(&read("datas/texts/dialog/french/dialogs.xml").unwrap()).unwrap();
+    let (id, film) = set
+        .dialogs
+        .iter()
+        .filter_map(|g| {
+            let t = &g.tirades.first()?.talker;
+            (picturing(&set, g, t) == Picturing::TwoD).then_some((g, t))
+        })
+        .find_map(|(g, t)| {
+            let film = read(&format!("datas/videos/{t}.bik"))?;
+            let v = atlantis3_data::bink::BinkVideo::open(Arc::<[u8]>::from(film)).ok()?;
+            let pass = f64::from(v.frame_count()) / v.fps();
+            let voice = read(&voice_path("french", g.id, 0))?;
+            let a = atlantis4_data::audio::decode_vorbis(&voice).ok()?;
+            #[allow(clippy::cast_precision_loss)]
+            let length = a.samples.len() as f64 / f64::from(a.channels) / f64::from(a.sample_rate);
+            (length > pass + 1.0).then_some((g.id, v.frame_count()))
+        })
+        .expect("a long 2D tirade");
+    let mut play = to_first_view(&d, None);
+    assert!(play
+        .game
+        .run_string(&format!("return function() Atl_Dialog_Play({id}) end")));
+    let (mut wrapped, mut last, mut steps) = (false, None, 0);
+    for i in 0..30 * 120 {
+        // 10 frames at 10 fps first, below the film's rate: still one
+        // film frame a step, late, none skipped.
+        play.update(if i < 10 { 0.1 } else { 1.0 / 30.0 });
+        let Some((_, 0, 2)) = play.stage().dialog_state() else {
+            if last.is_some() {
+                break;
+            }
+            continue;
+        };
+        let (n, frames) = play.stage().dialog_portrait().expect("the film");
+        assert_eq!(frames, film);
+        if let Some(p) = last {
+            // One frame a step at most; frame 1 again after the last.
+            assert!(n == p || n == p + 1 || (p == frames && n == 1), "{p} → {n}");
+            wrapped |= p == frames && n == 1;
+            steps += usize::from(n != p);
+        }
+        last = Some(n);
+    }
+    assert!(wrapped, "the film looped ({steps} steps, at {last:?})");
+}
+
+/// The international DVD (`ATLANTIS5_DVD_INT`: a copy of the pressed
+/// disc's files, read from its cabinets; skipped when unset) in German,
+/// opened from the German cabinet's place as the game library does: the
+/// new game's first view, then the gorilla's subject menu and dialog 1,
+/// its first tirade the German table's with its German voice
+/// ([`first_dialog`]).
+#[test]
+fn the_international_dvd_in_german() {
+    let Some(d) = atlantis3_data::testing::a5_dvd_int() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d.join("datas_german.cab")).expect("the German place");
+    assert_eq!(src.chosen_language(), Some("german"));
+    first_dialog(src, "german", "int-german");
+}
+
+/// The Italian *Atlantis Collection*'s install (`ATLANTIS5_IT_COLLECTION`;
+/// skipped when unset), its one language played with no choice: the same
+/// first view and dialog 1 in Italian ([`first_dialog`]).
+#[test]
+fn the_italian_collection_in_italian() {
+    let Some(d) = atlantis3_data::testing::a5_it_collection() else {
+        return;
+    };
+    let src = Atlantis5Source::open(&d).expect("the install");
+    assert_eq!(src.chosen_language(), None);
+    assert_eq!(src.language(Some("en")), "italian");
+    first_dialog(src, "italian", "it-collection");
+}
+
+/// A new game in `src`, played in `language`: its first film skipped, the
+/// first view, then the gorilla's subject menu and dialog 1, its first
+/// tirade `language`'s table's with a voice of `language`'s (shots named
+/// `a5-<tag>-...`).
+fn first_dialog(src: Atlantis5Source, language: &str, tag: &str) {
+    use atlantis3_data::atlantis5_texts::Dialogs;
+    let lang = src.language(None);
+    assert_eq!(lang, language);
+    let src: Arc<dyn atlantis_data::FileSource> = Arc::new(src);
+    let table = Dialogs::parse(
+        &src.read(&format!("datas/texts/dialog/{language}/dialogs.xml"))
+            .unwrap(),
+    )
+    .expect("the dialogs");
+    let mut play = Play::new(src.clone(), &lang, None).expect("play");
+    play.set_save_dir(Some(scratch(tag)));
+    play.new_game();
+    frames(&mut play, 3);
+    assert!(play.stage().film_playing(), "cine01 plays");
+    play.skip();
+    frames(&mut play, 3);
+    assert_eq!(play.stage().address(), Some((b"zeppelin".to_vec(), 3)));
+    let view = shot(&play, &format!("a5-{tag}-first-view.png"));
+    assert!(view.iter().any(|&p| p & 0xff_ffff != 0));
+    go(&mut play, 17);
+    assert!(play.aim_at_sprite(b"gorilla"));
+    play.click();
+    frames(&mut play, 2);
+    for _ in 0..300 {
+        frames(&mut play, 1);
+        if !play.stage().menu_subjects().is_empty() {
+            break;
+        }
+    }
+    // The subjects are the scripts' ids, the same in every edition.
+    assert_eq!(play.stage().menu_subjects(), [b"gorille".to_vec()]);
+    let (x, y) = play.stage().menu_subject_point(0).expect("subject 0");
+    play.mouse_at(x, y);
+    play.click();
+    frames(&mut play, 2);
+    let (id, tirade, _) = play.stage().dialog_state().expect("dialog 1 plays");
+    assert_eq!((id, tirade), (1, 0));
+    let want = &table.dialog(1).expect("dialog 1").tirades[0].text;
+    assert_eq!(play.stage().dialog_text(), Some(want.as_str()));
+    assert!(src
+        .size(&atlantis3_engine::atlantis5_dialog::voice_path(
+            language, 1, 0
+        ))
+        .is_some_and(|n| n > 0));
+    let talk = shot(&play, &format!("a5-{tag}-dialog-1.png"));
+    assert!(talk != view);
 }

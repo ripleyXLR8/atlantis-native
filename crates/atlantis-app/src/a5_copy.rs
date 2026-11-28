@@ -6,6 +6,13 @@
 //! where they open as the DVD's files. The port's own: the original's
 //! installer unpacks the cabinets instead.
 //!
+//! The North-American CDs ([`cd_copy_dir`], about 1.5 GB) are copied the
+//! same way, one disc at a time: their InstallShield set's header, its
+//! volumes on the disc in the drive and the program, until the three
+//! discs' files are there ([`CopyError::NextDisc`] asks for the next one
+//! meanwhile); the disc in the drive opens with those copied already
+//! ([`register_cd_copy`]).
+//!
 //! Each file is written under a temporary name (`.part`) and renamed once
 //! whole, so a copy cut short (cancelled, an error, the program closed)
 //! starts again from the files not yet copied. The free room is checked
@@ -16,8 +23,10 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
-use atlantis3_data::atlantis5::{disc_files, Atlantis5Source};
-use atlantis_data::FileSource;
+use atlantis3_data::atlantis5::{
+    disc_files, holds_cd_volumes, Atlantis5Source, OpenError, CD_HEADER,
+};
+use atlantis_data::{FileSource, StdDir};
 
 /// The bytes read and written at once.
 const CHUNK: usize = 8 << 20;
@@ -30,9 +39,31 @@ pub fn copy_dir() -> PathBuf {
     crate::desktop::data_dir().join("atlantis5").join("disc")
 }
 
-/// Whether `path` is the copy's folder ([`copy_dir`]).
+/// Where the North-American CDs' copy goes: `atlantis5/cds` in the
+/// per-user data folder.
+pub fn cd_copy_dir() -> PathBuf {
+    crate::desktop::data_dir().join("atlantis5").join("cds")
+}
+
+/// Lets a CD of The Secrets of Atlantis in a drive open with the other
+/// discs' files already copied ([`cd_copy_dir`]): called at the start.
+pub fn register_cd_copy() {
+    atlantis3_data::atlantis5::set_cd_copy_dirs(vec![cd_copy_dir()]);
+}
+
+/// Where the copy of the data at `path` goes: [`cd_copy_dir`] for the
+/// CDs, else [`copy_dir`].
+pub fn copy_dir_for(path: &Path) -> PathBuf {
+    match Atlantis5Source::disc_root(path) {
+        Some(root) if holds_cd_volumes(&*root) => cd_copy_dir(),
+        _ => copy_dir(),
+    }
+}
+
+/// Whether `path` is a copy's folder ([`copy_dir`], [`cd_copy_dir`]).
 pub fn is_copy(path: &Path) -> bool {
     crate::library::same_folder(path, &copy_dir())
+        || crate::library::same_folder(path, &cd_copy_dir())
 }
 
 /// The copy's progress, shared with the thread doing it: the bytes copied
@@ -64,6 +95,9 @@ pub enum CopyError {
     NoRoom { need: u64, free: u64 },
     /// The player cancelled.
     Cancelled,
+    /// One of the North-American CDs copied: the others' files still
+    /// needed (`data3.cab`, ...).
+    NextDisc(Vec<String>),
     /// A read or a write failed.
     Io(String),
 }
@@ -79,6 +113,11 @@ impl std::fmt::Display for CopyError {
                 free >> 20
             ),
             CopyError::Cancelled => write!(f, "cancelled"),
+            CopyError::NextDisc(v) => write!(
+                f,
+                "this CD is copied; insert the next one (still needed: {})",
+                v.join(", ")
+            ),
             CopyError::Io(e) => write!(f, "{e}"),
         }
     }
@@ -102,6 +141,15 @@ impl Plan {
 
     /// The copy of the disc whose root is `root`.
     pub fn from_root(root: Arc<dyn FileSource>) -> Result<Plan, CopyError> {
+        // The North-American CDs: what the disc (or discs) hold of the
+        // set, under its own names.
+        if root.size(atlantis3_data::atlantis5::DATA_CAB).is_none() && holds_cd_volumes(&*root) {
+            let files: Vec<(String, u64)> = disc_files(&*root)
+                .into_iter()
+                .filter_map(|n| Some((n.clone(), root.size(&n)?)))
+                .collect();
+            return Ok(Plan { root, files });
+        }
         let files: Vec<(String, u64)> = disc_files(&*root)
             .into_iter()
             .filter_map(|n| {
@@ -115,11 +163,21 @@ impl Plan {
                 Some((name, size))
             })
             .collect();
-        if files.len() < 2 {
-            // DATAS.cab and no language's cabinet.
+        // No language's cabinet (`DATAS_<language>.cab`; the program is
+        // not one): not the disc, refused before anything is copied.
+        if !files.iter().any(|(n, _)| n.starts_with("DATAS_")) {
             return Err(CopyError::NotADisc);
         }
         Ok(Plan { root, files })
+    }
+
+    /// Whether the disc's files hold one of `names` (the files a copy
+    /// still needs: a volume in a CD image is not a file of the image's
+    /// folder, but the plan reads it).
+    pub fn holds_any(&self, names: &[String]) -> bool {
+        self.files
+            .iter()
+            .any(|(n, _)| names.iter().any(|m| m.eq_ignore_ascii_case(n)))
     }
 
     /// The files still to copy into `dest` (those missing there or of
@@ -174,7 +232,9 @@ impl Plan {
         let (left, need) = self.still_to_copy(dest);
         progress.done.store(0, Ordering::Relaxed);
         progress.total.store(need, Ordering::Relaxed);
-        if let Some(free) = free(dest) {
+        // The room only for bytes to write: a whole copy opens at once,
+        // whatever is left free.
+        if let Some(free) = free(dest).filter(|_| !left.is_empty()) {
             let freed: u64 = stale.iter().map(|s| s.1).sum();
             if free.saturating_add(freed) < need + MARGIN {
                 return Err(CopyError::NoRoom {
@@ -191,6 +251,10 @@ impl Plan {
         }
         for (name, size) in &left {
             let part = dest.join(format!("{name}.part"));
+            // The CDs' program is in a folder (`bin`).
+            if let Some(dir) = part.parent() {
+                std::fs::create_dir_all(dir).map_err(|e| io(dir, e))?;
+            }
             let r = self.copy_file(name, *size, &part, progress);
             if let Err(e) = r {
                 let _ = std::fs::remove_file(&part);
@@ -202,9 +266,19 @@ impl Plan {
         for (path, _) in stale {
             let _ = std::fs::remove_file(path);
         }
-        Atlantis5Source::open(dest)
-            .map(|_| ())
-            .map_err(|e| CopyError::Io(format!("{}: {e}", dest.display())))
+        match Atlantis5Source::open(dest) {
+            Ok(_) => Ok(()),
+            Err(OpenError::MissingDiscs(v)) => Err(CopyError::NextDisc(v)),
+            // The second or third CD copied first: their volumes, no
+            // header yet (it is on the first disc).
+            Err(OpenError::NotTheGame)
+                if holds_cd_volumes(&StdDir::new(dest))
+                    && StdDir::new(dest).size(CD_HEADER).is_none() =>
+            {
+                Err(CopyError::NextDisc(vec![CD_HEADER.to_string()]))
+            }
+            Err(e) => Err(CopyError::Io(format!("{}: {e}", dest.display()))),
+        }
     }
 
     fn copy_file(
@@ -337,7 +411,7 @@ impl Job {
 /// with the progress on the standard output, then adds the copy to the
 /// game library in place of the disc's entry (or at its end).
 pub fn install_cli(from: &Path) -> Result<PathBuf, String> {
-    let dest = copy_dir();
+    let dest = copy_dir_for(from);
     let mut job = Job::start(from, &dest).map_err(|e| format!("{}: {e}", from.display()))?;
     println!("copying {} to {}", from.display(), dest.display());
     let t0 = std::time::Instant::now();
@@ -358,17 +432,54 @@ pub fn install_cli(from: &Path) -> Result<PathBuf, String> {
     println!("copied in {:.1} s", t0.elapsed().as_secs_f64());
     let data = crate::desktop::data_dir();
     let mut lib = crate::library::Library::load(&data);
-    match lib.position(from) {
-        Some(i) => {
-            lib.relocate(i, &dest);
-        }
-        None => {
-            lib.add(&dest);
-        }
-    }
+    move_entries_to_copy(&mut lib, from, &dest);
     lib.save(&data)
         .map_err(|e| format!("{}: {e}", data.display()))?;
     Ok(dest)
+}
+
+/// The game library `lib` once the disc at `from` (its root, or a
+/// language's place of it, [`atlantis3_data::atlantis5::language_place`])
+/// is copied to `copy`: every entry of that disc now names the copy (a
+/// language's place the same language's place of the copy). With no
+/// entry of it, the copy is added: a place per language when it has
+/// several. Returns where `from`'s entry is now.
+pub fn move_entries_to_copy(lib: &mut crate::library::Library, from: &Path, copy: &Path) -> usize {
+    use crate::library::same_folder;
+    use atlantis3_data::atlantis5::{language_place, language_places, place_language, place_root};
+    let to = |f: &Path| match place_language(f) {
+        Some(l) => language_place(copy, &l),
+        None => copy.to_path_buf(),
+    };
+    let disc = place_root(from);
+    let mine: Vec<PathBuf> = lib
+        .folders()
+        .iter()
+        .filter(|f| same_folder(&place_root(f), &disc))
+        .cloned()
+        .collect();
+    if mine.is_empty() {
+        let places = language_places(copy);
+        let added = if places.is_empty() {
+            vec![to(from)]
+        } else {
+            places
+        };
+        for p in &added {
+            lib.add(p);
+        }
+        let want = to(from);
+        return lib
+            .position(&want)
+            .or_else(|| lib.position(&added[0]))
+            .unwrap_or(0);
+    }
+    for f in mine {
+        if let Some(i) = lib.position(&f) {
+            lib.relocate(i, &to(&f));
+        }
+    }
+    lib.position(&to(from)).unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -436,18 +547,25 @@ pub(crate) mod tests {
     /// French menu texts), the program and the installer. Returns the
     /// bytes the copy takes.
     pub(crate) fn fake_disc(dir: &Path) -> u64 {
+        fake_disc_of(dir, &["french"])
+    }
+
+    /// [`fake_disc`] with a cabinet per language of `languages`
+    /// (`datas_<language>.cab`, as the international DVD's).
+    pub(crate) fn fake_disc_of(dir: &Path, languages: &[&str]) -> u64 {
         std::fs::create_dir_all(dir).unwrap();
         let main = stored_cab(&[
             (".\\Datas\\Scenes\\zeppelin.wam", b"wam"),
             (".\\Datas\\Warps\\ze0003.jp6", &big()),
         ]);
-        let french = stored_cab(&[(
-            ".\\Datas\\Texts\\Menu\\french\\string_resources.xml",
-            b"<x/>",
-        )]);
-        let n = main.len() + french.len() + 10;
+        let mut n = main.len() + 10;
         std::fs::write(dir.join("DATAS.cab"), main).unwrap();
-        std::fs::write(dir.join("datas_french.cab"), french).unwrap();
+        for l in languages {
+            let name = format!(".\\Datas\\Texts\\Menu\\{l}\\string_resources.xml");
+            let cab = stored_cab(&[(name.as_str(), b"<x/>")]);
+            n += cab.len();
+            std::fs::write(dir.join(format!("datas_{l}.cab")), cab).unwrap();
+        }
         std::fs::write(dir.join("The secrets of Atlantis.exe"), [1; 10]).unwrap();
         std::fs::write(dir.join("Install.exe"), [2; 10]).unwrap();
         n as u64
@@ -540,6 +658,9 @@ pub(crate) mod tests {
             main
         );
         assert_eq!(plan.still_to_copy(&dest), (Vec::new(), 0));
+        // Copied again with no room left: nothing to write, no room asked.
+        let p = Progress::default();
+        assert_eq!(plan.copy_to(&dest, &p, |_| Some(0)), Ok(()));
         // The copy opens as the disc's files, with the same data.
         let src = Atlantis5Source::open(&dest).unwrap();
         assert_eq!(src.form(), atlantis3_data::atlantis5::Form::DiscFolder);
@@ -558,6 +679,15 @@ pub(crate) mod tests {
         assert!(matches!(Plan::of(&d), Err(CopyError::NotADisc)));
         let mut m = atlantis_data::files::MemFiles::new();
         m.insert("DATAS.cab", vec![0; 4]);
+        assert!(matches!(
+            Plan::from_root(Arc::new(m)),
+            Err(CopyError::NotADisc)
+        ));
+        // DATAS.cab and the program, no language's cabinet: still not the
+        // disc (the program is not a language).
+        let mut m = atlantis_data::files::MemFiles::new();
+        m.insert("DATAS.cab", vec![0; 4]);
+        m.insert("The secrets of Atlantis.exe", vec![1; 10]);
         assert!(matches!(
             Plan::from_root(Arc::new(m)),
             Err(CopyError::NotADisc)
@@ -591,5 +721,140 @@ pub(crate) mod tests {
             Plan::of(&root.join("datas")),
             Err(CopyError::NotADisc)
         ));
+    }
+
+    /// The international DVD (`ATLANTIS5_DVD_INT`): its plan, from the
+    /// disc's root and from a language's place (the same disc).
+    #[test]
+    fn the_international_dvd_plan() {
+        let Some(root) = atlantis3_data::testing::a5_dvd_int() else {
+            return;
+        };
+        for p in [root.clone(), root.join("datas_german.cab")] {
+            let plan = Plan::of(&p).unwrap();
+            let names: Vec<&str> = plan.files.iter().map(|f| f.0.as_str()).collect();
+            assert_eq!(
+                names,
+                [
+                    "DATAS.cab",
+                    "DATAS_english.cab",
+                    "DATAS_german.cab",
+                    "DATAS_italian.cab",
+                    "DATAS_spanish.cab",
+                    "The secrets of Atlantis.exe"
+                ],
+                "{}",
+                p.display()
+            );
+            let bytes: u64 = plan.files.iter().map(|f| f.1).sum();
+            assert_eq!(bytes, 1_709_151_146 + 3_883_008);
+        }
+    }
+
+    /// A disc of two languages copied: the copy opens in both, each from
+    /// its place.
+    #[test]
+    fn a_disc_of_two_languages() {
+        let d = tmp("two");
+        let disc = d.join("dvd");
+        fake_disc_of(&disc, &["english", "german"]);
+        let dest = d.join("copy");
+        let plan = Plan::of(&disc.join("datas_german.cab")).unwrap();
+        plan.copy_to(&dest, &Progress::default(), |_| Some(u64::MAX))
+            .unwrap();
+        let places = atlantis3_data::atlantis5::language_places(&dest);
+        assert_eq!(
+            places,
+            [
+                dest.join("DATAS_english.cab"),
+                dest.join("DATAS_german.cab")
+            ]
+        );
+        let src = Atlantis5Source::open(&places[1]).unwrap();
+        assert_eq!(src.chosen_language(), Some("german"));
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// The North-American CDs (`ATLANTIS5_CD_US`: a folder holding a copy
+    /// of each disc's files in `CD1`, `CD2` and `CD3`; skipped when
+    /// unset) copied one disc after the other, as from one drive (each
+    /// disc's files alone in a folder, no other disc beside it), the
+    /// second first: the first two ask for the next one (the header,
+    /// then the last volume), the third completes a copy that opens as
+    /// the discs, its program identified. About 1.5 GB written to a
+    /// scratch folder, removed after.
+    #[cfg(unix)]
+    #[test]
+    fn the_three_cds_one_after_the_other() {
+        use atlantis3_data::atlantis5::{set_cd_copy_dirs, Edition, Form};
+        let Some(cds) = atlantis3_data::testing::a5_cd_us() else {
+            return;
+        };
+        let d = tmp("cds");
+        let dest = d.join("cds");
+        // Each disc in a drive of its own.
+        let drive = |disc: &str| {
+            let root = d.join("drives").join(disc).join("disc");
+            if !root.exists() {
+                std::fs::create_dir_all(&root).unwrap();
+                for e in std::fs::read_dir(cds.join(disc)).unwrap().flatten() {
+                    std::os::unix::fs::symlink(e.path(), root.join(e.file_name())).unwrap();
+                }
+            }
+            root
+        };
+        set_cd_copy_dirs(vec![dest.clone()]);
+        let copy = |disc: &str| {
+            let plan = Plan::of(&drive(disc)).expect(disc);
+            plan.copy_to(&dest, &Progress::default(), |_| Some(u64::MAX))
+        };
+        assert_eq!(
+            copy("CD2"),
+            Err(CopyError::NextDisc(vec!["data1.hdr".to_string()]))
+        );
+        assert_eq!(
+            copy("CD1"),
+            Err(CopyError::NextDisc(vec!["data4.cab".to_string()]))
+        );
+        assert!(dest.join("bin/The Secrets of Atlantis.exe").is_file());
+        // The second disc again: nothing left to copy from it.
+        let plan = Plan::of(&drive("CD2")).unwrap();
+        assert_eq!(plan.still_to_copy(&dest).1, 0);
+        assert_eq!(copy("CD3"), Ok(()));
+        let src = Atlantis5Source::open(&dest).unwrap();
+        assert_eq!(src.form(), Form::DiscFolder);
+        assert_eq!(src.edition(), Edition::NorthAmericanCds);
+        assert_eq!(src.build().unwrap().unwrap().id, "atlantis5-cd-us-7368704");
+        set_cd_copy_dirs(Vec::new());
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    /// One CD's folder with the other discs' folders beside it (as
+    /// `ATLANTIS5_CD_US` holds them), the way it opens: one copy takes
+    /// the three discs' files.
+    #[test]
+    fn a_cd_folder_is_copied_with_the_discs_beside_it() {
+        let Some(cds) = atlantis3_data::testing::a5_cd_us() else {
+            return;
+        };
+        for disc in ["CD1", "CD2", "CD3"] {
+            let plan = Plan::of(&cds.join(disc)).expect(disc);
+            let mut names: Vec<&str> = plan.files.iter().map(|f| f.0.as_str()).collect();
+            names.sort_unstable();
+            assert_eq!(
+                names,
+                [
+                    "bin/The Secrets of Atlantis.exe",
+                    "data1.cab",
+                    "data1.hdr",
+                    "data2.cab",
+                    "data3.cab",
+                    "data4.cab"
+                ],
+                "{disc}"
+            );
+            assert!(plan.holds_any(&["DATA4.CAB".to_string()]));
+            assert!(!plan.holds_any(&["data5.cab".to_string()]));
+        }
     }
 }

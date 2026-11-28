@@ -79,9 +79,12 @@ fn element(play: &Play, name: &str) -> (String, bool, i32, i32) {
         .unwrap_or_else(|| panic!("no element {name}"))
 }
 
+/// A click on `name`, then its frame and the next: a click that closes
+/// the menu ends it in the frame after its own (the process returns 1
+/// when entered in state 2, `evidence/m2/menu-main.c` FUN_004289e0).
 fn click(play: &mut Play, name: &str) {
     assert!(play.click_menu(name), "{name} shown");
-    frames(play, 1);
+    frames(play, 2);
 }
 
 /// From the main menu, a new game to its first view (its film ended).
@@ -220,7 +223,8 @@ fn a_double_click_in_one_frame_clicks_once() {
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     assert!(play.click_menu("save"));
     play.click();
-    frames(&mut play, 2);
+    // The click's frame, the in-game menu's end, the page's opening.
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::SAVE));
     click(&mut play, "back");
     frames(&mut play, 1);
@@ -581,7 +585,7 @@ fn a_right_press_on_an_inventory_item_examines_it() {
     // Its end: the inventory again (mode 8 queued after it).
     play.mouse_at(5, 5);
     play.click();
-    frames(&mut play, 2);
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), None);
     assert!(play.stage().inventory_open_now());
     assert_eq!(play.game.state(), 3);
@@ -591,6 +595,178 @@ fn a_right_press_on_an_inventory_item_examines_it() {
     frames(&mut play, 2);
     assert!(!play.stage().inventory_open_now());
     assert_eq!(play.game.state(), 4);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The inventory's page buttons are `CIE_Button`s (@ 0x0044ee40,
+/// @ 0x0044f0e0, @ 0x0044f210): hot after a move onto them, a left press
+/// plays the click's picture once (2 frames at 15 a second) and the page
+/// turns at its end; a second press meanwhile is taken and does nothing.
+/// A right press is not theirs: the inventory ends.
+#[test]
+fn the_inventory_page_buttons_click_at_their_picture_s_end() {
+    use atlantis3_engine::atlantis5_play::InventoryHit;
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-pages");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    let find = |play: &mut Play, want: &dyn Fn(Option<InventoryHit>) -> bool| {
+        for y in (300..576).step_by(2) {
+            for x in (0..1024).step_by(2) {
+                play.mouse_at(x, y);
+                if want(play.stage().inventory_hit()) {
+                    return (x + 2, y + 2);
+                }
+            }
+        }
+        panic!("not found");
+    };
+    let cell0 = find(&mut play, &|h| h == Some(InventoryHit::Slot(0)));
+    let right = find(&mut play, &|h| h == Some(InventoryHit::Right));
+    let offset = |play: &mut Play| {
+        play.mouse_at(cell0.0, cell0.1);
+        let o = match play.stage().inventory_hit() {
+            Some(InventoryHit::Slot(s)) => s,
+            h => panic!("{h:?}"),
+        };
+        play.mouse_at(right.0, right.1);
+        o
+    };
+    // Hot after a move: the frame sees the mouse on the button.
+    play.mouse_at(right.0, right.1);
+    frames(&mut play, 1);
+    assert_eq!(play.stage().inventory_button_state(true), Some(1));
+    // A double click: the picture plays, no page yet; the second press is
+    // taken by the pressed button.
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.stage().inventory_button_state(true), Some(2));
+    assert_eq!(offset(&mut play), 0);
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(offset(&mut play), 0);
+    // 2 frames at 15 a second: not ended at 3/30 s, ended at 5/30 s.
+    frames(&mut play, 1);
+    assert_eq!(offset(&mut play), 0);
+    frames(&mut play, 2);
+    assert_eq!(offset(&mut play), 1, "one page");
+    frames(&mut play, 4);
+    assert_eq!(offset(&mut play), 1, "one page");
+    assert_eq!(play.stage().inventory_button_state(true), Some(1));
+    // A right press on the button ends the inventory.
+    play.right_press();
+    frames(&mut play, 2);
+    assert!(!play.stage().inventory_open_now());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The page buttons' hit box (@ 0x00452020) includes the right and bottom
+/// edges: both buttons sit 10 above the bottom, so the row H − 10 is
+/// still theirs and the row under it is not.
+#[test]
+fn the_inventory_page_buttons_include_their_bottom_edge() {
+    use atlantis3_engine::atlantis5_play::InventoryHit;
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-edge");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    let row = |play: &mut Play, y: i32| {
+        let mut hits = Vec::new();
+        for x in 0..1024 {
+            play.mouse_at(x, y);
+            if let Some(h @ (InventoryHit::Left | InventoryHit::Right)) =
+                play.stage().inventory_hit()
+            {
+                if !hits.contains(&h) {
+                    hits.push(h);
+                }
+            }
+        }
+        hits
+    };
+    assert_eq!(
+        row(&mut play, 576 - 10),
+        [InventoryHit::Left, InventoryHit::Right]
+    );
+    assert!(row(&mut play, 576 - 9).is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A left press made with the right button held carries the buttons 5;
+/// off the elements no element takes it and the inventory's state 2
+/// (@ 0x00414a30: `buttons & 4` on a press) ends the inventory. A left
+/// press alone there does nothing.
+#[test]
+fn a_left_press_with_the_right_held_ends_the_inventory() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-held");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    play.mouse_at(500, 100);
+    assert_eq!(play.stage().inventory_hit(), None);
+    play.click();
+    frames(&mut play, 2);
+    assert!(play.stage().inventory_open_now(), "a left press alone");
+    play.set_buttons(false, true);
+    play.set_buttons(true, true);
+    play.click();
+    frames(&mut play, 2);
+    assert!(!play.stage().inventory_open_now());
+    assert_eq!(play.game.state(), 4);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Between two chained menus (the in-game menu, then its sound page) the
+/// mode is 0xd for one frame: @ 0x0041baa0 draws neither the view (modes
+/// 8, 9, 0xc only) nor a menu, so the picture before stays and no game
+/// view shows between the pages.
+#[test]
+fn no_game_view_is_drawn_between_chained_menus() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("menu-chain");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    let mut cache = atlantis3_engine::atlantis5_play::PictureCache::default();
+    let mut px = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    assert!(play.click_menu("option_sound"));
+    let mut between = 0;
+    for _ in 0..30 {
+        play.update(1.0 / 60.0);
+        if play.menus.current().is_none() {
+            assert_eq!(play.menus.queued(), [menus::SOUND]);
+            assert_eq!(play.game.state(), 3);
+            let before = px.clone();
+            assert!(!play.render_cached(&mut px, &mut cache), "nothing drawn");
+            assert!(px == before, "the picture before kept");
+            let mut fresh = vec![0x0012_3456u32; VIEW_WIDTH * VIEW_HEIGHT];
+            play.render(&mut fresh);
+            assert!(fresh.iter().all(|&p| p == 0x0012_3456), "no view drawn");
+            between += 1;
+        } else {
+            play.render_cached(&mut px, &mut cache);
+        }
+        if play.menus.current() == Some(menus::SOUND) {
+            break;
+        }
+    }
+    assert_eq!(between, 1, "one frame between the pages");
+    assert_eq!(play.menus.current(), Some(menus::SOUND));
+    // The page's own picture next.
+    let mut full = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    play.render(&mut full);
+    assert!(px == full);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -708,10 +884,14 @@ fn the_logos_sound_plays() {
 
 /// A mode opens with one mouse move at the screen's centre (@ 0x0041b780:
 /// the frame's events emptied, @ 0x004546a0(2, 0, w >> 1, h >> 1, 0, 0)
-/// inserted before the mode's process), so the button under the centre
-/// is hot at once: a press without a move clicks it (the in-game menu's
-/// `option_control`, the save page's slot 4). A press in the opening
-/// frame itself is dropped with that frame's events.
+/// inserted before the mode's process), so the button whose box holds
+/// the centre is hot at once: a press without a move clicks it. The box's
+/// height is the text's as last drawn (+0x28, written only by the draw
+/// @ 0x00451600, 0 from the ctor @ 0x00451170; the menus are made once a
+/// run): at a page's first opening of the run the boxes are one row
+/// high. So the in-game menu's `option_control` (y 288) is hot at every
+/// opening, the save page's slot 4 (y 284) only from its second. A press
+/// in the opening frame itself is dropped with that frame's events.
 #[test]
 fn a_press_before_any_move_clicks_the_button_at_the_centre() {
     let Some(d) = dvd() else { return };
@@ -722,17 +902,32 @@ fn a_press_before_any_move_clicks_the_button_at_the_centre() {
     frames(&mut play, 1);
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     play.click();
-    frames(&mut play, 2);
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::CONTROL));
     click(&mut play, "back");
     frames(&mut play, 1);
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     // A double click on `save`: the second press, on the page just
-    // opened, saves slot 4.
+    // opened for the first time, finds slot 4 one row high, not hot.
     assert!(!dir.join("slot_4").exists());
     assert!(play.click_menu("save"));
-    // The press's frame closes the in-game menu, the next opens the page.
+    // The press's frame closes the in-game menu, the next ends it, the
+    // one after opens the page.
+    frames(&mut play, 3);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    play.click();
     frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    assert!(
+        !dir.join("slot_4").exists(),
+        "slot 4 not hot at the first opening"
+    );
+    // Drawn since: from the second opening on, slot 4 is hot at once.
+    click(&mut play, "back");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert!(play.click_menu("save"));
+    frames(&mut play, 3);
     assert_eq!(play.menus.current(), Some(menus::SAVE));
     play.click();
     frames(&mut play, 2);
@@ -756,5 +951,363 @@ fn a_press_in_the_opening_frame_is_dropped() {
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
     frames(&mut play, 2);
     assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// One 60 Hz frame of the desktop's loop: the step, then the picture
+/// composed only when it is not provably the one already drawn. True when
+/// it was composed; the picture is checked against a full render of
+/// every layer each time (over the picture before: between two chained
+/// menus nothing is drawn).
+fn frame_cached(
+    play: &mut Play,
+    px: &mut [u32],
+    cache: &mut atlantis3_engine::atlantis5_play::PictureCache,
+) -> bool {
+    play.update(1.0 / 60.0);
+    let mut full = px.to_vec();
+    let composed = play.render_cached(px, cache);
+    play.render_every_layer(&mut full);
+    assert!(px == full.as_slice(), "the kept picture is the full render");
+    composed
+}
+
+/// The menus' picture is composed again only when something drawn
+/// changed (a host-side saving: the original draws every frame): an idle
+/// main menu is composed once, a mouse move or a hover composes it again,
+/// and the picture is always the full render's.
+#[test]
+fn an_idle_menu_is_not_composed_again() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("menu-cost");
+    let mut play = booted(&d, &dir);
+    assert_eq!(play.menus.current(), Some(menus::MAIN));
+    let mut cache = atlantis3_engine::atlantis5_play::PictureCache::default();
+    let mut px = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    assert!(frame_cached(&mut play, &mut px, &mut cache), "the first");
+    // Five seconds idle: no composition (before: one per frame, 300).
+    let t = std::time::Instant::now();
+    for _ in 0..300 {
+        assert!(!frame_cached(&mut play, &mut px, &mut cache));
+    }
+    eprintln!(
+        "idle main menu: {} compositions in 300 frames ({:.2} ms a frame with the check)",
+        cache.composed(),
+        t.elapsed().as_secs_f64() * 1e3 / 300.0
+    );
+    assert_eq!(cache.composed(), 1);
+    // A mouse move: the cursor moved, composed once.
+    play.mouse_by(7, 3);
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    assert!(!frame_cached(&mut play, &mut px, &mut cache));
+    // A hover: the button turns red, composed once.
+    let (x, y) = {
+        let st = play.stage();
+        play.menus
+            .point_of("new_game", &st.fonts)
+            .expect("new_game")
+    };
+    let before = px.clone();
+    play.mouse_at(x, y);
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    assert!(px != before);
+    for _ in 0..30 {
+        assert!(!frame_cached(&mut play, &mut px, &mut cache));
+    }
+    // Outside a menu's own picture (the cache forgotten): composed.
+    cache.invalidate();
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    assert_eq!(cache.composed(), 4);
+    // The credits: the pages' turns (every 4 s) compose, the frames
+    // between do not.
+    click(&mut play, "credits");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::CREDITS));
+    play.mouse_at(10, 10);
+    let start = cache.composed();
+    for _ in 0..250 {
+        frame_cached(&mut play, &mut px, &mut cache);
+    }
+    let idle = cache.composed() - start;
+    eprintln!("credits, idle: {idle} compositions in 250 frames");
+    assert!((2..=4).contains(&idle), "{idle}");
+    // The sprite button `back`: its focus (one picture) composes once;
+    // a press plays its click (two pictures at 15 a second): each new
+    // picture composes, the frames between do not, until it closes the
+    // credits (that frame, the main menu queued, draws nothing).
+    let (x, y) = {
+        let st = play.stage();
+        play.menus.point_of("back", &st.fonts).expect("back")
+    };
+    play.mouse_at(x + 1, y);
+    let start = cache.composed();
+    for _ in 0..60 {
+        frame_cached(&mut play, &mut px, &mut cache);
+    }
+    assert_eq!(cache.composed() - start, 1, "the focus");
+    play.click();
+    let (start, mut n) = (cache.composed(), 0);
+    while play.menus.current() == Some(menus::CREDITS) && n < 60 {
+        frame_cached(&mut play, &mut px, &mut cache);
+        n += 1;
+    }
+    let pressed = cache.composed() - start;
+    eprintln!("credits, back pressed: {pressed} compositions in {n} frames");
+    assert_ne!(play.menus.current(), Some(menus::CREDITS), "closed");
+    assert!(pressed >= 2 && pressed < n, "{pressed} in {n}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The in-game menu over the view: its background covers the view, so
+/// the view is not rendered under it (the same picture), and an idle
+/// frame composes nothing.
+#[test]
+fn the_in_game_menu_is_composed_on_change_only() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("in-game-cost");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    let mut cache = atlantis3_engine::atlantis5_play::PictureCache::default();
+    let mut px = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+    let n = 60;
+    let t = std::time::Instant::now();
+    for _ in 0..n {
+        play.render_every_layer(&mut px);
+    }
+    let every = t.elapsed().as_secs_f64() * 1e3 / f64::from(n);
+    let t = std::time::Instant::now();
+    for _ in 0..n {
+        play.render(&mut px);
+    }
+    let covered = t.elapsed().as_secs_f64() * 1e3 / f64::from(n);
+    eprintln!("in-game menu: {every:.2} ms a composition with the view, {covered:.2} ms without");
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    for _ in 0..120 {
+        assert!(!frame_cached(&mut play, &mut px, &mut cache));
+    }
+    play.mouse_by(-40, 25);
+    assert!(frame_cached(&mut play, &mut px, &mut cache));
+    assert_eq!(cache.composed(), 2);
+    // Back to play: every frame composed (no shortcut in play).
+    click(&mut play, "resume");
+    for _ in 0..10 {
+        frames(&mut play, 1);
+        if play.game.state() == 4 {
+            break;
+        }
+    }
+    let start = cache.composed();
+    for _ in 0..5 {
+        assert!(frame_cached(&mut play, &mut px, &mut cache));
+    }
+    assert_eq!(cache.composed() - start, 5);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A move goes through the elements from the last made (@ 0x00452140
+/// puts each new child at the list's head) and stops at the button it
+/// turns hot (@ 0x004523e0: a child that returns 1 takes the event;
+/// @ 0x0044eb60 returns 1 when +0x8c goes 0 → 1). In the in-game menu
+/// `option_graphic` is made after `save`, so a jump from `save` onto it
+/// leaves `save` hot too until the next move; a press clicks
+/// `option_graphic`, the first in that order.
+#[test]
+fn a_move_onto_a_later_button_leaves_the_earlier_one_hot() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("hover-walk");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    let at = |play: &Play, name: &str| {
+        let st = play.stage();
+        play.menus.point_of(name, &st.fonts).expect(name)
+    };
+    let (sx, sy) = at(&play, "save");
+    let (gx, gy) = at(&play, "option_graphic");
+    play.mouse_at(sx, sy);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["save"]);
+    play.mouse_at(gx, gy);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["save", "option_graphic"]);
+    // Still both while the mouse stays.
+    frames(&mut play, 3);
+    assert_eq!(play.menus.hot(), ["save", "option_graphic"]);
+    // The next move reaches `save` (nothing turns hot before it).
+    play.mouse_at(gx + 1, gy);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["option_graphic"]);
+    // Back onto `save`: `option_graphic` comes first and turns cold.
+    play.mouse_at(sx, sy);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["save"]);
+    play.mouse_at(gx, gy);
+    frames(&mut play, 1);
+    play.click();
+    frames(&mut play, 3);
+    assert_eq!(play.menus.current(), Some(menus::GRAPHIC));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A right press made with the left button held carries the buttons 5
+/// (@ 0x0043bbc0 builds them from both buttons' state): the menus take it
+/// as a left press (`& 1`, @ 0x0044eb60), so the button hot at the centre
+/// is clicked; a middle press with the left held is a left press too.
+#[test]
+fn a_right_press_with_the_left_held_clicks_a_menu_button() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("right-with-left");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 2);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert_eq!(play.menus.hot(), ["option_control"]);
+    play.set_buttons(true, false);
+    play.set_buttons(true, true);
+    play.right_press();
+    frames(&mut play, 3);
+    assert_eq!(play.menus.current(), Some(menus::CONTROL));
+    click(&mut play, "back");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    // The middle button with the left held.
+    let (x, y) = {
+        let st = play.stage();
+        play.menus
+            .point_of("option_sound", &st.fonts)
+            .expect("option_sound")
+    };
+    play.mouse_at(x, y);
+    frames(&mut play, 1);
+    play.set_buttons(true, false);
+    play.other_press();
+    frames(&mut play, 3);
+    assert_eq!(play.menus.current(), Some(menus::SOUND));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The inventory opened by a right press opens as a mode at the menus'
+/// next frame (@ 0x0041b780), which empties that frame's events: a left
+/// press made then, the right button still held (buttons 5), is dropped
+/// instead of ending the inventory (@ 0x00414a30, `& 4` untaken).
+#[test]
+fn the_inventory_s_opening_frame_drops_its_presses() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-opening");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.set_buttons(false, true);
+    play.right_press();
+    play.set_buttons(true, true);
+    play.click();
+    frames(&mut play, 2);
+    assert!(play.stage().inventory_open_now());
+    assert_eq!(play.game.state(), 3);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// With a page button hot, a right press with the left held (buttons 5)
+/// is the button's press (`& 1`, @ 0x0044f0e0: its click played, then the
+/// page), not the inventory's end.
+#[test]
+fn a_right_press_with_the_left_held_takes_a_page_button() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("inventory-page-held");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.right_press();
+    frames(&mut play, 1);
+    assert!(play.stage().inventory_open_now());
+    let y = 576 - 10;
+    let x = (0..1024)
+        .find(|&x| {
+            play.mouse_at(x, y);
+            play.stage().inventory_hit()
+                == Some(atlantis3_engine::atlantis5_play::InventoryHit::Right)
+        })
+        .expect("the right page button");
+    play.mouse_at(x + 1, y);
+    frames(&mut play, 1);
+    play.mouse_at(x, y);
+    frames(&mut play, 1);
+    play.set_buttons(true, false);
+    play.set_buttons(true, true);
+    play.right_press();
+    frames(&mut play, 2);
+    assert!(play.stage().inventory_open_now(), "taken by the button");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A wheel turn is a mouse move event (@ 0x0047c8a0: lZ not 0): the hover
+/// is tested with the mouse where it is. At the save page's first opening
+/// slot 4 is not hot at the centre (one-row boxes); after the opening
+/// frame's draw a wheel turn alone makes it hot.
+#[test]
+fn a_wheel_turn_tests_the_hover() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("wheel-hover");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 2);
+    assert!(play.click_menu("save"));
+    frames(&mut play, 3);
+    assert_eq!(play.menus.current(), Some(menus::SAVE));
+    assert!(play.menus.hot().is_empty());
+    frames(&mut play, 3);
+    assert!(play.menus.hot().is_empty(), "no move, no test");
+    play.wheel();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.hot(), ["save_4"]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A click that ends a menu: its process returns 0 in the click's frame
+/// (the handler's close only sets state 2) and 1 at the next, which reads
+/// no event (`evidence/m2/menu-main.c` FUN_004289e0, menu-handlers.c
+/// FUN_0041a680): the next page opens the frame after, and `resume`
+/// gives play back one frame after its click.
+#[test]
+fn a_menu_ends_the_frame_after_its_click() {
+    let Some(d) = dvd() else { return };
+    let dir = scratch("end-frame");
+    let mut play = booted(&d, &dir);
+    new_game(&mut play);
+    play.escape();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert!(play.click_menu("option_sound"));
+    frames(&mut play, 1);
+    assert_eq!(
+        play.menus.current(),
+        Some(menus::IN_GAME),
+        "the click's frame"
+    );
+    // A press in the end frame (the mouse still on `option_sound`) is not
+    // read.
+    play.click();
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), None, "the end frame: mode 0xd");
+    assert_eq!(play.game.state(), 3);
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::SOUND));
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::SOUND));
+    click(&mut play, "back");
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    assert!(play.click_menu("resume"));
+    frames(&mut play, 1);
+    assert_eq!(play.game.state(), 3, "still the menus in the click's frame");
+    assert_eq!(play.menus.current(), Some(menus::IN_GAME));
+    frames(&mut play, 1);
+    assert_eq!(play.menus.current(), None);
+    assert_eq!(play.game.state(), 4, "play the frame after");
     let _ = std::fs::remove_dir_all(&dir);
 }

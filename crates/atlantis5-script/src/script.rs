@@ -1218,6 +1218,10 @@ impl Script {
             // walks tables in 5.0.3's order, the order the game's save
             // writes its LUA_DB in.
             state.gc.table_lua50 = true;
+            // Lua 5.0 source (the international DVD's scripts; rilua
+            // Native patch 11): a generic `for` over a table walks it with
+            // `next`, as lua50.dll's compiler codes it (`TFORPREP`).
+            state.gc.compile_lua50 = true;
             // The original is a 32-bit program without the large-address
             // flag (PE characteristics 0x010e): 2 GB of address space, its
             // image, DLLs, Direct3D and data in it, so its Lua heap could

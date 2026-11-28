@@ -591,7 +591,7 @@ fn run_other_game(
     a5: Option<PathBuf>,
 ) -> Result<(), String> {
     let run = if let Some(dir) = a5 {
-        crate::a5::run_window_on(el, &dir, true)
+        crate::a5::run_window_on(el, &dir, true, false)
     } else if let Some(dir) = a2 {
         let enhancements = crate::a2::stored_settings().enhancements;
         crate::a2::open(&dir, &[], &crate::a2::A2Start::default(), enhancements).and_then(
@@ -840,7 +840,7 @@ fn run_tree_game(el: &mut EventLoop<()>, game: OtherGame) -> Result<(), String> 
                 .atlantis5
                 .ok_or_else(|| "The Secrets of Atlantis: no data".to_string())?;
             let label = crate::a5::edition_of(&src, false).0;
-            crate::a5::run_source_on(el, src, &label, true).map(|_| ())
+            crate::a5::run_source_on(el, src, &label, true, false).map(|_| ())
         }
         GameKind::LostTales => Ok(()),
     }

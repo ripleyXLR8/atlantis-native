@@ -336,7 +336,12 @@ impl FontTxt {
             let rest: Vec<&str> = toks.collect();
             match key {
                 "[PartitionCode]" => {
-                    for t in rest {
+                    // Separated by blanks or commas: the Traditional
+                    // Chinese CD's `0x20,0xA148,0xA141,0xA143,0xA149` gives
+                    // these five codes (1.01's AtlFont_MainInit
+                    // atlantis2-gog-fr-2183168 @ 0x0046e4e0 under
+                    // emulation, atlantis2-re `subtitles_101_zh.txt`).
+                    for t in rest.iter().flat_map(|t| t.split(',')) {
                         let t = t.trim_start_matches("0x").trim_start_matches("0X");
                         if let Ok(v) = u16::from_str_radix(t, 16) {
                             out.breaks.push(v);
@@ -402,6 +407,8 @@ mod tests {
         let m = FontTxt::parse(b"[CharacterSet]\tMBCS\r\n[PartitionCode]\t0x20 0xA1A1\r\n");
         assert_eq!((m.mbcs, m.breaks), (Some(true), vec![0x20, 0xa1a1]));
         assert_eq!(FontTxt::parse(b"[CharacterSet] SBCS\n").mbcs, Some(false));
+        let zh = FontTxt::parse(b"[PartitionCode]\t0x20,0xA148,0xA141,0xA143,0xA149\r\n");
+        assert_eq!(zh.breaks, vec![0x20, 0xa148, 0xa141, 0xa143, 0xa149]);
         let d = f.font("AtlFT_Dialog").unwrap();
         assert_eq!((d.face.as_str(), d.height), ("Gill Alt One MT", 12));
         assert!(f.font("AtlFT_Popup").is_none());

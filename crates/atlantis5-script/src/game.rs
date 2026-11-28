@@ -216,6 +216,13 @@ pub struct Game {
     /// The camera's field of view as the engine last set it (radians),
     /// which `zoom_and_fade` starts from.
     fov: f32,
+    /// The runs that ended on a Lua error so far (a save's read stops
+    /// when its `atlantis.lua` is one).
+    run_errors: u64,
+    /// The scene's update of the transition steps since the last
+    /// [`Game::take_transition_scene`]: `Some(Some(dt))` for a step that
+    /// calls it with its time, `Some(None)` for one that does not.
+    transition_scene: Option<Option<f64>>,
 }
 
 impl Game {
@@ -235,6 +242,8 @@ impl Game {
             timers_paused: false,
             clock: 0.0,
             fov: 0.0,
+            run_errors: 0,
+            transition_scene: None,
         })
     }
 
@@ -257,6 +266,19 @@ impl Game {
     /// (the loop @ 0x00405390 that draws the frames), none outside one.
     pub fn transition_fx(&self) -> Option<Fx> {
         self.transitions.last().map(|t| t.fx)
+    }
+
+    /// Whether a transition step ran since the last call, and the time
+    /// it gave the scene's update. The loop @ 0x00405390 runs only the
+    /// step, the sound, the draw and the flip; the step itself calls the
+    /// scene's update (@ 0x0044c380, the sprites' step) with its time in
+    /// `centring`'s phase 0 (LAB_0042e2c0) and in every `zoom_and_fade`
+    /// step but the last (LAB_0042dec4), never in `no_fx`'s step nor in
+    /// `centring`'s view change, which reach LAB_0042e5fe without it.
+    /// `Some(Some(dt))`: the sprites stepped by `dt`; `Some(None)`: not
+    /// stepped this frame; `None`: no step (the frame's own update).
+    pub fn take_transition_scene(&mut self) -> Option<Option<f64>> {
+        self.transition_scene.take()
     }
 
     /// Whether requests wait in the manager's queue (+0x2c).
@@ -326,11 +348,20 @@ impl Game {
         }
         // Each file runs to its end before the next (EvaluateScriptFile).
         // An error in either is caught @ 0x0042feda / 0x0042ff5e, logged
-        // and rethrown as `Exit Game` (0x0066cdcc): fatal.
+        // and rethrown as `Exit Game` (0x0066cdcc): fatal. That includes a
+        // file that is missing or does not load: @ 0x00454410 throws when
+        // `luaL_loadfile` fails, and NewGame calls it with no existence
+        // test.
         for name in [&b"atlantis.lua"[..], b"on_new_game.lua"] {
             let path = Self::scripts_path(name);
             if self.push_file(&path, false, true) {
                 self.run();
+            } else {
+                self.note(format!(
+                    "CGameManager::NewGame() : EvaluateScriptFile ({}) threw",
+                    String::from_utf8_lossy(&path)
+                ));
+                self.exit_on_error();
             }
             if self.state == 8 {
                 return;
@@ -594,8 +625,11 @@ impl Game {
 
     /// A timer's end as @ 0x00405ae0 handles it: the `timer` event and
     /// the scene's `on_click` (the timers call it when their time is up).
+    /// No state test (the step @ 0x004353d0 and @ 0x00405ae0 have none):
+    /// a handler that opened a menu (`Atl_ExamineItem`, state 3) leaves
+    /// the timers due after it in the walk to run their handlers.
     pub fn timer_event(&mut self, name: &[u8]) -> bool {
-        if self.busy() || self.state != 4 {
+        if self.busy() {
             return false;
         }
         self.script.set_timer_event(name);
@@ -723,6 +757,7 @@ impl Game {
                         crate::engine::ErrorSite::String(what.clone())
                     };
                     self.event(&Event::Error(site, &m));
+                    self.run_errors += 1;
                     if self.runs.last().is_some_and(|r| r.fatal) {
                         self.exit_on_error();
                         return;
@@ -752,11 +787,7 @@ impl Game {
             return;
         };
         if run.enter_view {
-            if let Some(t) = self.transitions.last_mut() {
-                t.entering = false;
-            }
-            // no_fx and centring end with the view change.
-            self.continue_transition(0.0);
+            self.view_entered();
         }
         if run.chapter {
             // @ 0x0042f000 case 1: +0x50 = 0 once `InitChapter` has
@@ -815,15 +846,38 @@ impl Game {
         let path = Self::scripts_path(&name);
         if self.push_file(&path, true, false) {
             self.run();
-        } else if let Some(t) = self.transitions.last_mut() {
-            t.entering = false;
-            self.continue_transition(0.0);
+        } else {
+            self.view_entered();
+        }
+    }
+
+    /// The view change's step once `on_enter_view` is done (@ 0x0042d900).
+    /// no_fx and centring end with the view change (LAB_0042e5fe, return
+    /// 1): the continuation is the same step, its scene update the view
+    /// change's. zoom_and_fade's phase 1 only sets phase 2 and t = 0, then
+    /// the scene update and return (LAB_0042dec4): phase 2 first runs at
+    /// the loop's next step, with that frame's time.
+    fn view_entered(&mut self) {
+        let Some(t) = self.transitions.last_mut() else {
+            return;
+        };
+        t.entering = false;
+        if t.fx == Fx::ZoomAndFade {
+            // The step ends now; its picture comes before the next one.
+            t.fresh = true;
+            return;
+        }
+        let kept = self.transition_scene.take();
+        self.continue_transition(0.0);
+        if kept.is_some() {
+            self.transition_scene = kept;
         }
     }
 
     /// One step of the transition on top, `dt` seconds on.
     #[allow(clippy::cast_possible_truncation)]
-    fn continue_transition(&mut self, dt: f32) {
+    fn continue_transition(&mut self, step_dt: f64) {
+        let dt = step_dt as f32;
         let Some(t) = self.transitions.last_mut() else {
             return;
         };
@@ -831,6 +885,17 @@ impl Game {
             return;
         }
         t.fresh = true;
+        // The scene's update of this step (@ 0x0042d900: LAB_0042e2c0 and
+        // LAB_0042dec4 only); a view change's continuation (no_fx's and
+        // centring's end) keeps the view change's.
+        self.transition_scene = match (t.fx, t.phase) {
+            (Fx::Centring, 0) | (Fx::ZoomAndFade, 0 | 1) => Some(Some(step_dt)),
+            (Fx::ZoomAndFade, _) => {
+                let last = t.t + dt > f32::from_bits(0x3eb3_3333);
+                Some((!last).then_some(step_dt))
+            }
+            _ => Some(None),
+        };
         let pi = f32::from_bits(0x4049_0fdb);
         // 0x00655748: 1/9 (20° of π).
         let ninth = f32::from_bits(0x3de3_8e39);
@@ -941,6 +1006,7 @@ impl Game {
         self.note("an uncaught script error: the program ends (MainLoop's catch)".into());
         self.drop_runs();
         self.transitions.clear();
+        self.transition_scene = None;
         self.queue.clear();
         self.previous = self.state;
         self.state = 8;
@@ -1019,6 +1085,7 @@ impl Game {
         self.previous = 0;
         self.drop_runs();
         self.transitions.clear();
+        self.transition_scene = None;
         self.timers.clear();
         self.timer_walk = None;
     }
@@ -1154,8 +1221,8 @@ impl Game {
     /// @ 0x00418960); at its end the reader queues the requests 5 (the
     /// transition, here [`Game`]'s own) and 4 (0x0043b6f4..0x0043b7c1).
     /// False when the file is missing or its read was abandoned (not an
-    /// `ATL_FILE`, `LUA_DB` missing or unreadable, `Atl_Address_GetCurrent`
-    /// raising).
+    /// `ATL_FILE`, `atlantis.lua` missing, unloadable or raising, `LUA_DB`
+    /// missing or unreadable, `Atl_Address_GetCurrent` raising).
     pub fn load_file(&mut self, file: &str) -> bool {
         let Some(data) = self.engine.borrow_mut().read_save(file) else {
             self.note(format!("Atl_Load: the file saves/{file} is missing"));
@@ -1171,14 +1238,25 @@ impl Game {
             self.note("CSaveFileReader :: Read -> not an ATL_FILE".into());
             return false;
         };
-        let path = Self::scripts_path(b"atlantis.lua");
-        if self.push_file(&path, false, false) {
-            self.run();
-        }
         // The reader is one try: a throw abandons it at that step, before
         // the queueing of 5 and 4 (0x0043b6f4..0x0043b7c1); the catches
         // (0x0043b884, 0x0043b8ca) only log. False, so the menus' loads
-        // reopen their page.
+        // reopen their page. First `atlantis.lua` (@ 0x00454410, state 6
+        // at 0x0043b2ec): a Lua error in it throws.
+        // A missing or unloadable file throws there as well
+        // (`luaL_loadfile` != 0 → `CException` 0x0066eb64, before any
+        // `lua_pcall`; the reader makes no existence test).
+        let path = Self::scripts_path(b"atlantis.lua");
+        let errors = self.run_errors;
+        if !self.push_file(&path, false, false) {
+            self.note("CSaveFileReader :: Read -> atlantis.lua did not load".into());
+            return false;
+        }
+        self.run();
+        if self.run_errors != errors {
+            self.note("CSaveFileReader :: Read -> atlantis.lua raised".into());
+            return false;
+        }
         let Some(db) = root.child("LUA_DB") else {
             self.note("CSerialisableLuaDB :: Deserialize: no <LUA_DB> element".into());
             return false;
@@ -1260,7 +1338,13 @@ impl Game {
                 });
                 self.run();
             }
-            None => self.chapter = 0,
+            // `InitChapter` not a function: state 1's `lua_pcall(2, 0)`
+            // fails and throws (format 0x0066cc98), uncaught below
+            // MainLoop: the program ends, as for a raising InitChapter.
+            None => {
+                self.chapter = 0;
+                self.exit_on_error();
+            }
         }
     }
 
@@ -1367,8 +1451,7 @@ impl Game {
                 return;
             }
             if !t.finished {
-                #[allow(clippy::cast_possible_truncation)]
-                self.continue_transition(dt as f32);
+                self.continue_transition(dt);
                 return;
             }
             // When its script ends, the frame goes on below: in state 4 a

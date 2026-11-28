@@ -24,8 +24,11 @@
 //! The game folder is GOG.com's installation (`Game.exe` beside `Datas\`),
 //! in English, French, German or Spanish: one executable for the four
 //! ([`atlantis3_data::exe::KNOWN_BUILDS`]), the language is the data's;
+//! the Italian *Atlantis Collection*'s installation (GOG.com's earlier
+//! `Game.exe`, Italian data);
 //! or the French retail CD's installation (`Atlantis3.exe` beside
-//! `Datas\`) with its three discs (CD images or copies of the CDs) in it,
+//! `Datas\`) or the North American CD's (`Beyond Atlantis 2.exe`) with
+//! its three discs (CD images or copies of the CDs) in it,
 //! in a folder inside it or in a `--discs <folder>`
 //! ([`atlantis3_data::discs`]).
 //!
@@ -1118,9 +1121,27 @@ pub fn evolution_2004_data_dir() -> PathBuf {
     crate::desktop::data_dir().join("atlantis-evolution-2004")
 }
 
+/// Why the 2004 program's install in `dir` cannot be played to its end,
+/// for the player: disc 2's world data missing (the Italian *Atlantis
+/// Collection*'s installer leaves them out,
+/// [`atlantis3_data::evolution2004::check_disc2`]); `None` when they are
+/// there or the program is not a known build.
+pub fn evolution_2004_incomplete(dir: &Path) -> Option<String> {
+    evolution_2004_incomplete_in(&StdDir::new(dir), dir)
+}
+
+/// [`evolution_2004_incomplete`] for the installation read through
+/// `install` (Android: a chosen folder), named `shown` in the message.
+fn evolution_2004_incomplete_in(install: &dyn FileSource, shown: &Path) -> Option<String> {
+    use atlantis3_data::evolution2004::{check_disc2, identify, EXE_NAME};
+    let build = identify(&install.read(EXE_NAME)?).ok()?;
+    check_disc2(install, build).map(|e| format!("{}: {e}", shown.display()))
+}
+
 /// The 2004 program's game in `dir`, its saves and `Atlantis4.cfg` in
 /// `base` (the install's `datas\Atlantis4.cfg` until the menus write the
-/// player's own).
+/// player's own); refused when disc 2's world data are missing
+/// ([`evolution_2004_incomplete`]).
 pub fn open_evolution_2004(dir: &Path, base: &Path) -> Result<Game, String> {
     open_evolution_2004_in(Arc::new(StdDir::new(dir)), dir, base)
 }
@@ -1133,6 +1154,9 @@ pub fn open_evolution_2004_in(
     base: &Path,
 ) -> Result<Game, String> {
     use atlantis3_data::evolution2004::Evolution2004Source;
+    if let Some(why) = evolution_2004_incomplete_in(&*install, shown) {
+        return Err(why);
+    }
     let _ = std::fs::create_dir_all(base);
     let cfg_path = base.join("Atlantis4.cfg");
     let src = Evolution2004Source::new(Arc::new(WithCfg {
@@ -1212,6 +1236,90 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
     }
 
+    /// *Atlantis Evolution*'s Italian *Atlantis Collection* install
+    /// (`ATLANTIS4_IT_COLLECTION`): named in the library, refused as its
+    /// installer leaves it (disc 2's world data missing), in Italian, and,
+    /// with the English CD's install's `cd2` world folders beside its own
+    /// (`ATLANTIS4_CD`, linked into a scratch folder as a player's merged
+    /// copy has them), opened and started to the start page.
+    #[test]
+    fn the_italian_collection_of_evolution_2004() {
+        let Some(dir) = atlantis3_data::testing::a4_it_collection() else {
+            return;
+        };
+        let label = "Atlantis Evolution (2004), Atlantis Collection, Italian";
+        assert_eq!(crate::a4::label(&dir).unwrap(), label);
+        assert_eq!(evolution_2004_label(&dir).unwrap(), label);
+        let why = evolution_2004_incomplete(&dir).expect("disc 2 missing");
+        assert!(
+            why.contains(label) && why.contains("English 2004 CD"),
+            "{why}"
+        );
+        let base = std::env::temp_dir().join(format!("atlantis-a4it-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        assert_eq!(
+            open_evolution_2004(&dir, &base.join("data")).err(),
+            Some(why)
+        );
+        // The registry's `Language` = `ita` (from `loc\\text\\`): texts and
+        // voices in Italian.
+        let src =
+            atlantis3_data::evolution2004::Evolution2004Source::new(Arc::new(StdDir::new(&dir)));
+        let startup =
+            atlantis3_engine::startup::Startup::read(&A3Files::evolution_2004(Arc::new(src)));
+        assert_eq!(
+            (startup.text_language(), startup.voice_language()),
+            ("ita".to_string(), "ita".to_string())
+        );
+        #[cfg(unix)]
+        {
+            let Some(cd) = std::env::var_os("ATLANTIS4_CD").map(PathBuf::from) else {
+                eprintln!("SKIPPED the_italian_collection_of_evolution_2004 (merged): ATLANTIS4_CD not set");
+                let _ = std::fs::remove_dir_all(&base);
+                return;
+            };
+            let link = |t: &Path, l: &Path| {
+                std::fs::create_dir_all(l.parent().unwrap()).unwrap();
+                std::os::unix::fs::symlink(t, l).unwrap();
+            };
+            let merged = base.join("install");
+            for e in std::fs::read_dir(&dir).unwrap().flatten() {
+                if e.file_name() != "cd2" {
+                    link(&e.path(), &merged.join(e.file_name()));
+                }
+            }
+            link(&dir.join("cd2/datas/loc"), &merged.join("cd2/datas/loc"));
+            for f in atlantis3_data::evolution2004::DISC2_FOLDERS {
+                let theirs = std::fs::read_dir(cd.join("cd2/datas"))
+                    .unwrap()
+                    .flatten()
+                    .find(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(f))
+                    .unwrap_or_else(|| panic!("the CD's cd2/datas/{f}"));
+                link(
+                    &theirs.path(),
+                    &merged.join("cd2/datas").join(theirs.file_name()),
+                );
+            }
+            assert_eq!(evolution_2004_incomplete(&merged), None);
+            assert_eq!(crate::a4::label(&merged).unwrap(), label);
+            let mut game = open_evolution_2004(&merged, &base.join("data")).unwrap();
+            game.start_logos_2004();
+            let mut t = 0.0;
+            while game.logos_running_2004() && t < 60.0 {
+                game.skip();
+                t += 0.04;
+                game.step(t);
+            }
+            for _ in 0..25 {
+                t += 0.04;
+                game.step(t);
+            }
+            assert!(!game.logos_running_2004());
+            assert_eq!(game.mode(), Mode::Menu);
+        }
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
     /// The French CD's installed folder: its edition, refused without its
     /// discs, opened with them (`--discs`) and started to the start page.
     #[test]
@@ -1239,6 +1347,171 @@ mod tests {
         let shot = base.join("a3cd.png");
         headless(&dir, &[discs], &base, 30, Some(&shot), true, false).unwrap();
         assert!(std::fs::read(&shot).unwrap().starts_with(b"\x89PNG"));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The North American CD (*Beyond Atlantis II*): its installed folder
+    /// (`Beyond Atlantis 2.exe`) refused without its discs, opened with
+    /// the folder of its three `.bin` images and started to the start
+    /// page.
+    #[test]
+    fn the_north_american_cd_with_its_discs() {
+        let Some((dir, discs)) = atlantis3_data::testing::cd_us() else {
+            return;
+        };
+        let name = "Atlantis III, CD, English (DreamCatcher, 2001)";
+        assert_eq!(label(&dir).unwrap(), name);
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-cdus-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let e = open_in(&dir, &base, false).err().unwrap();
+        assert!(e.contains("none of its discs"), "{e}");
+        let (mut game, label) =
+            open_in_with_discs(&dir, std::slice::from_ref(&discs), &base, false).unwrap();
+        assert_eq!(label, name);
+        assert_eq!(
+            game.files().discs().map(|d| d.disc_numbers()),
+            Some(vec![1, 2, 3])
+        );
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The Portuguese CD (*O Novo Mundo*): its installed folder refused
+    /// without its discs, opened with the folder of its three CloneCD
+    /// images and started to the start page.
+    #[test]
+    fn the_portuguese_cd_with_its_discs() {
+        let Some((dir, discs)) = atlantis3_data::testing::cd_pt() else {
+            return;
+        };
+        let name = "Atlantis III, Portuguese CD, Portuguese (Playgames, 2002)";
+        assert_eq!(label(&dir).unwrap(), name);
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-cdpt-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let e = open_in(&dir, &base, false).err().unwrap();
+        assert!(e.contains("none of its discs"), "{e}");
+        let (mut game, label) =
+            open_in_with_discs(&dir, std::slice::from_ref(&discs), &base, false).unwrap();
+        assert_eq!(label, name);
+        assert_eq!(
+            game.files().discs().map(|d| d.disc_numbers()),
+            Some(vec![1, 2, 3])
+        );
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The Swedish CD (*Den nya världen*): its installed folder refused
+    /// without its discs, opened with the folder of its three CloneCD
+    /// images and started to the start page.
+    #[test]
+    fn the_swedish_cd_with_its_discs() {
+        let Some((dir, discs)) = atlantis3_data::testing::cd_sv() else {
+            return;
+        };
+        let name = "Atlantis III, Swedish CD, Swedish (Toptronics, 2002)";
+        assert_eq!(label(&dir).unwrap(), name);
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-cdsv-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let e = open_in(&dir, &base, false).err().unwrap();
+        assert!(e.contains("none of its discs"), "{e}");
+        let (mut game, label) =
+            open_in_with_discs(&dir, std::slice::from_ref(&discs), &base, false).unwrap();
+        assert_eq!(label, name);
+        assert_eq!(
+            game.files().discs().map(|d| d.disc_numbers()),
+            Some(vec![1, 2, 3])
+        );
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The Traditional Chinese CD (*亞特蘭提斯Ⅲ 失落的帝國*): its installed folder refused
+    /// without its discs, opened with the folder of its three CloneCD
+    /// images and started to the start page; its texts measured in Big5.
+    #[test]
+    fn the_traditional_chinese_cd_with_its_discs() {
+        let Some((dir, discs)) = atlantis3_data::testing::cd_zh_tw() else {
+            return;
+        };
+        let name = "Atlantis III, Taiwanese CD, Traditional Chinese (Interwise, 2002)";
+        assert_eq!(label(&dir).unwrap(), name);
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-cdzhtw-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let e = open_in(&dir, &base, false).err().unwrap();
+        assert!(e.contains("none of its discs"), "{e}");
+        let (mut game, label) =
+            open_in_with_discs(&dir, std::slice::from_ref(&discs), &base, false).unwrap();
+        assert_eq!(label, name);
+        assert_eq!(
+            game.files().discs().map(|d| d.disc_numbers()),
+            Some(vec![1, 2, 3])
+        );
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The Czech CD (GAME4U Speciál 10): its installed folder refused
+    /// without its discs, opened with the folder of its three CloneCD
+    /// images and started to the start page.
+    #[test]
+    fn the_czech_cd_with_its_discs() {
+        let Some((dir, discs)) = atlantis3_data::testing::cd_cs() else {
+            return;
+        };
+        let name = "Atlantis III, Czech CD, Czech (GAME4U Speciál 10, 2003)";
+        assert_eq!(label(&dir).unwrap(), name);
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-cdcs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let e = open_in(&dir, &base, false).err().unwrap();
+        assert!(e.contains("none of its discs"), "{e}");
+        let (mut game, label) =
+            open_in_with_discs(&dir, std::slice::from_ref(&discs), &base, false).unwrap();
+        assert_eq!(label, name);
+        assert_eq!(
+            game.files().discs().map(|d| d.disc_numbers()),
+            Some(vec![1, 2, 3])
+        );
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// The Italian *Atlantis Collection*'s installed folder: its edition,
+    /// started to the start page; the player's `Atlantis3.cfg` read with
+    /// `fix_cfg_name`, the defaults with `--original` (the program's
+    /// reader opens `Atlantis4.cfg`).
+    #[test]
+    fn the_italian_collection() {
+        let Some(dir) = atlantis3_data::testing::it_collection() else {
+            return;
+        };
+        assert_eq!(
+            label(&dir).unwrap(),
+            "Atlantis III, Atlantis Collection, Italian"
+        );
+        assert!(holds_atlantis3(&dir));
+        let base = std::env::temp_dir().join(format!("atlantis-a3-itcoll-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).unwrap();
+        std::fs::write(base.join("Atlantis3.cfg"), "Resolution\t= 1024 768\r\n").unwrap();
+        let (mut game, label) = open_in(&dir, &base, false).unwrap();
+        assert_eq!(label, "Atlantis III, Atlantis Collection, Italian");
+        assert_eq!(game.startup.config.resolution, (1024, 768));
+        assert_eq!(&game.startup.config.langue[..], b"ita");
+        assert!(game.show_start_page());
+        assert_eq!(game.mode(), Mode::Menu);
+        let (game, _) = open_in(&dir, &base, true).unwrap();
+        assert_eq!(game.startup.config.resolution, (800, 600));
         let _ = std::fs::remove_dir_all(&base);
     }
 

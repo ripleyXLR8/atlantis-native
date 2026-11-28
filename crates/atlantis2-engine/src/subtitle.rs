@@ -81,9 +81,28 @@
 //! (1.01 logs `Font %s not found, using system font`; 1.00's
 //! `AddFontResourceA` fails and GDI substitutes a face the same way): here
 //! the port's Liberation Sans, which has Arial's metrics.
+//!
+//! The Traditional Chinese CD (Interwise, Taiwan, 2000; the 1.01 executable) ships
+//! Big5 texts with `[CharacterSet] MBCS` and asks for the face of its
+//! `atl_font.ttf`, "HG-Gothic-M Medium", a Japanese font (its `OS/2` code
+//! pages Latin 1 and Japanese, no Big5; 94 of the texts' 1350 ideographs,
+//! among them 你 and 說, are not in it). The fonts are made in
+//! `DEFAULT_CHARSET`, which a Traditional Chinese Windows takes for Big5,
+//! so GDI's font mapper answers with a Big5 face of the system,
+//! `VARIABLE_PITCH` asked: PMingLiU, MingLiU's proportional face of
+//! `mingliu.ttc` (inferred, as for the first game's Chinese CDs; not
+//! run). The port draws those texts as the first game's Chinese CDs: with
+//! the player's `mingliu.ttc` beside the game's files (its PMingLiU face),
+//! else Noto Serif TC (bundled, cut to the characters of both games'
+//! Chinese texts), the outlines unhinted at the size the cell height gives
+//! (MingLiU's em is its cell: `Height` pixels per em) and thresholded;
+//! each lead byte (code page 950) is read with the byte after it as one
+//! character, which GDI measures and draws as one (atlantis2-re
+//! `binaries/atlantis2-cd-zh-tw-2183168.md`).
 
-use ab_glyph::{point, Font, FontVec, Glyph, PxScale};
+use ab_glyph::{point, Font, FontVec, Glyph, GlyphId, PxScale};
 use atlantis_data::TextCodePage;
+use atlantis_engine::subtitles::FontFace;
 
 use atlantis2_data::dialog::FontTxt;
 use atlantis2_data::exe::Release;
@@ -389,6 +408,81 @@ fn table(ttf: &[u8], tag: &[u8; 4]) -> Option<(usize, usize)> {
     None
 }
 
+/// A character of a text as GDI reads it in the system's code page: a
+/// byte, or in a double-byte code page a lead byte and the byte after it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Char {
+    Byte(u8),
+    Pair(u8, u8),
+}
+
+/// The characters of `bytes` in `code_page` (a lead byte at the end is a
+/// byte of its own).
+fn chars(bytes: &[u8], code_page: TextCodePage) -> Vec<Char> {
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if code_page.is_lead_byte(b) && i + 1 < bytes.len() {
+            out.push(Char::Pair(b, bytes[i + 1]));
+            i += 2;
+        } else {
+            out.push(Char::Byte(b));
+            i += 1;
+        }
+    }
+    out
+}
+
+/// The character of a byte pair in `code_page`: `'\0'` where it has none,
+/// and in code page 950 in its user-defined ranges (lead bytes 0x81..0xa0,
+/// C6 A1..C8 FE, FA 40..FE FE, which `encoding_rs`'s Big5 reads as Hong
+/// Kong characters): the Traditional Chinese CD's `Credits.txt` has four
+/// Windows-1252 apostrophes (0x92) before a letter there.
+fn pair_char(code_page: TextCodePage, lead: u8, trail: u8) -> char {
+    let user_defined = matches!(
+        (lead, trail),
+        (0x81..=0xa0, _) | (0xc6, 0xa1..) | (0xc7..=0xc8, _) | (0xfa..=0xfe, _)
+    );
+    if code_page == TextCodePage::Windows950 && user_defined {
+        return '\0';
+    }
+    code_page
+        .decode(&[lead, trail])
+        .chars()
+        .next()
+        .unwrap_or('\0')
+}
+
+/// The face a Traditional Chinese Windows gives the Chinese CD's request
+/// (see the module's notes): the player's `mingliu.ttc` beside the game's
+/// files, its face PMingLiU, else the port's Noto Serif TC. For another
+/// double-byte code page the first game's choice of the player's font.
+pub fn system_cjk_face(files: &A2Files, code_page: TextCodePage) -> FontFace {
+    use atlantis_engine::subtitles::player_font;
+    let Some((name, family)) = player_font(code_page) else {
+        return FontFace::bundled(code_page);
+    };
+    let family = match code_page {
+        // VARIABLE_PITCH: the proportional face of the file.
+        TextCodePage::Windows950 => "PMingLiU",
+        _ => family,
+    };
+    match files.install().read(name) {
+        Some(data) => match FontFace::player_family(data, family) {
+            Some(face) => {
+                log::info!("text font: the player's {name} ({family})");
+                face
+            }
+            None => {
+                log::warn!("{name}: not a font the port can use");
+                FontFace::bundled(code_page)
+            }
+        },
+        None => FontFace::bundled(code_page),
+    }
+}
+
 /// The subtitle font: `AtlFT_Dialog` of `Font.txt` in the game's TrueType
 /// file, at the size GDI makes of its height.
 pub struct SubtitleFont {
@@ -412,8 +506,9 @@ pub struct SubtitleFont {
     mbcs: bool,
     /// The code page a byte's glyph is looked up in: the system code
     /// page `TextOutA` reads the bytes in (the fonts are made in
-    /// `DEFAULT_CHARSET`), Windows-1250 for the Polish CD, Windows-1252
-    /// for every other edition ([`atlantis2_data::edition`]).
+    /// `DEFAULT_CHARSET`), Windows-1250 for the Polish and Czech CDs, 950
+    /// (Big5) for the Traditional Chinese CD, Windows-1252 for every other
+    /// edition ([`atlantis2_data::edition`]).
     code_page: TextCodePage,
 }
 
@@ -502,12 +597,61 @@ impl SubtitleFont {
         })
     }
 
+    /// Font `id` of `font_txt` in the face a Windows of a double-byte
+    /// code page gives a font without that character set (the module's
+    /// notes): `face` at `Height` pixels per em in a cell of `Height`
+    /// (1.01; 1.00: MulDiv(points, 96, 72)), its ascent
+    /// [`FontFace::cjk_ascent`], the outlines unhinted, the bytes read in
+    /// `code_page`.
+    pub fn named_cjk(
+        face: &FontFace,
+        font_txt: &FontTxt,
+        id: &str,
+        release: Release,
+        code_page: TextCodePage,
+    ) -> Option<SubtitleFont> {
+        let entry = font_txt.font(id)?;
+        let (data, index) = face.file();
+        let font = FontVec::try_from_vec_and_index(data.to_vec(), index).ok()?;
+        let (ppem, line_step, mbcs) = match release {
+            Release::V100 => {
+                let ppem = ((i64::from(entry.height) * 96 + 36) / 72).max(1) as u16;
+                (ppem, entry.height, true)
+            }
+            Release::V101 => {
+                let ppem = entry.height.max(1) as u16;
+                (ppem, i32::from(ppem) + 1, font_txt.mbcs == Some(true))
+            }
+        };
+        let em = f32::from(ppem);
+        let ascent = face.cjk_ascent(em).unwrap_or((em * 0.88).round() as i32);
+        Some(SubtitleFont {
+            font,
+            glyphs: None,
+            ppem,
+            widths: None,
+            ascent,
+            cell: i32::from(ppem),
+            line_step,
+            breaks: font_txt.breaks.clone(),
+            mbcs,
+            code_page,
+        })
+    }
+
     /// Font `id` of `font_txt` for the game in `files`: its file in
     /// `loc\`, made as the executable's release makes it; a system font
     /// (the port's Liberation Sans) when the file is missing. The bytes
-    /// are read in the edition's code page ([`A2Files::text_code_page`]).
+    /// are read in the edition's code page ([`A2Files::text_code_page`]);
+    /// in a double-byte one, the system's face of that code page
+    /// ([`system_cjk_face`], [`SubtitleFont::named_cjk`]).
     pub fn load(files: &A2Files, font_txt: &FontTxt, id: &str) -> Option<SubtitleFont> {
         let release = files.build().release;
+        let code_page = files.text_code_page();
+        if code_page.is_double_byte() {
+            let face = system_cjk_face(files, code_page);
+            return SubtitleFont::named_cjk(&face, font_txt, id, release, code_page);
+        }
         let file = &font_txt.font(id)?.file;
         let ttf = match files.read(Folder::Loc, file) {
             Some(t) if !file.is_empty() => t,
@@ -527,8 +671,16 @@ impl SubtitleFont {
         self.code_page
     }
 
-    fn glyph(&self, b: u8) -> ab_glyph::GlyphId {
+    fn glyph(&self, b: u8) -> GlyphId {
         self.font.glyph_id(self.code_page.char_of(b))
+    }
+
+    /// The glyph of a character.
+    fn glyph_of(&self, c: Char) -> GlyphId {
+        match c {
+            Char::Byte(b) => self.glyph(b),
+            Char::Pair(l, t) => self.font.glyph_id(pair_char(self.code_page, l, t)),
+        }
     }
 
     /// Whether the font has a glyph of its own for byte `b` (in the
@@ -537,9 +689,9 @@ impl SubtitleFont {
         self.glyph(b).0 != 0
     }
 
-    /// The advance of byte `b`, in pixels.
-    fn advance(&self, b: u8) -> i32 {
-        let g = self.glyph(b);
+    /// The advance of a character, in pixels.
+    fn advance(&self, c: Char) -> i32 {
+        let g = self.glyph_of(c);
         match &self.widths {
             Some(w) => i32::from(w.get(usize::from(g.0)).copied().unwrap_or(0)),
             None => {
@@ -551,7 +703,11 @@ impl SubtitleFont {
 
     /// `GetTextExtentPoint32A`: width and height of `bytes`.
     pub fn extent(&self, bytes: &[u8]) -> (i32, i32) {
-        (bytes.iter().map(|&b| self.advance(b)).sum(), self.cell)
+        let w = chars(bytes, self.code_page)
+            .into_iter()
+            .map(|c| self.advance(c))
+            .sum();
+        (w, self.cell)
     }
 
     /// The layout of `text` on a `w` x `h` screen.
@@ -590,8 +746,8 @@ impl SubtitleFont {
         for call in calls {
             let mut pen = call.x;
             let base = (call.y + self.ascent) as f32;
-            for &b in &call.bytes {
-                if let Some(table) = &self.glyphs {
+            for c in chars(&call.bytes, self.code_page) {
+                if let (Some(table), Char::Byte(b)) = (&self.glyphs, c) {
                     if let Some(g) = &table[usize::from(b)] {
                         for (k, &on) in g.bits.iter().enumerate() {
                             if on {
@@ -604,11 +760,11 @@ impl SubtitleFont {
                             }
                         }
                     }
-                    pen += self.advance(b);
+                    pen += self.advance(c);
                     continue;
                 }
                 let g = Glyph {
-                    id: self.glyph(b),
+                    id: self.glyph_of(c),
                     scale,
                     position: point(pen as f32, base),
                 };
@@ -625,7 +781,7 @@ impl SubtitleFont {
                         );
                     });
                 }
-                pen += self.advance(b);
+                pen += self.advance(c);
             }
         }
     }
@@ -671,9 +827,9 @@ impl SubtitleFont {
         let colour = (c & 0xff) << 16 | (c & 0xff00) | (c >> 16) & 0xff | u32::from(top) << 24;
         let (x1, y1) = ((ox + dw) as i32, (oy + dh) as i32);
         let mut pen = call.x;
-        for &b in &call.bytes {
+        for c in chars(&call.bytes, self.code_page) {
             let g = Glyph {
-                id: self.glyph(b),
+                id: self.glyph_of(c),
                 scale,
                 position: point(ox as f32 + pen as f32 * sx, base),
             };
@@ -693,7 +849,7 @@ impl SubtitleFont {
                     *d = atlantis_engine::upscale::lerp8888(*d, colour, a.min(256));
                 });
             }
-            pen += self.advance(b);
+            pen += self.advance(c);
         }
     }
 
@@ -762,6 +918,32 @@ mod tests {
         // A table entry with the lead flag matches its low byte alone.
         assert!(is_break(&[0x8120], b" ", false));
         assert!(!is_break(&[0x8120], b" ", true));
+    }
+
+    #[test]
+    fn big5_pairs_are_characters() {
+        let cp = TextCodePage::Windows950;
+        // 我 `，` a, a lead byte at the end alone.
+        assert_eq!(
+            chars(&[0xa7, 0xda, 0xa1, 0x41, b'a', 0xa7], cp),
+            [
+                Char::Pair(0xa7, 0xda),
+                Char::Pair(0xa1, 0x41),
+                Char::Byte(b'a'),
+                Char::Byte(0xa7)
+            ]
+        );
+        assert_eq!(pair_char(cp, 0xa7, 0xda), '我');
+        assert_eq!(pair_char(cp, 0xa1, 0x41), '，');
+        // Code page 950's user-defined pairs: no character (the credits'
+        // Windows-1252 apostrophe before an `s`).
+        assert_eq!(pair_char(cp, 0x92, 0x73), '\0');
+        assert_eq!(pair_char(cp, 0xfa, 0x40), '\0');
+        // A single-byte code page has no pairs.
+        assert_eq!(
+            chars(&[0xe9, 0xe8], TextCodePage::Windows1252),
+            [Char::Byte(0xe9), Char::Byte(0xe8)]
+        );
     }
 
     #[test]

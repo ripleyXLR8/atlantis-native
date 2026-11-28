@@ -11,6 +11,14 @@
 //! per-disc ones under the current disc's `cd<N>\`, which `Menu_TestChangeCD`
 //! sets (atlantis4-re `subsystems/cd2004-files.md`). Addresses are
 //! atlantis4-cd-en-3022848's.
+//!
+//! The Italian *Atlantis Collection* DVD (2014) installs the same program,
+//! rebuilt on 2004-10-07 (atlantis4-collection-it-3022848: the CD's code
+//! but for its version line, a key test in the logos and one more
+//! language in the font's character sets; atlantis4-re
+//! `binaries/README.md`), with Italian `loc\` data and the same `FLA`
+//! layout, but its installer leaves out disc 2's places, films and music
+//! ([`missing_disc2`]).
 
 use md5::{Digest, Md5};
 
@@ -36,19 +44,112 @@ pub struct Build {
 }
 
 /// The builds this port knows: the North American CD's, which the European
-/// CD ships too (the same `Data1.cab`).
-pub const KNOWN_BUILDS: [Build; 1] = [Build {
-    id: "atlantis4-cd-en-3022848",
-    label: "Atlantis Evolution (2004), CD",
-    language: "English",
-    size: 3_022_848,
-    // 2004-09-28 09:51:02 UTC.
-    pe_timestamp: 0x4159_17e6,
-    md5: [
-        0x21, 0x99, 0xbc, 0x93, 0xd2, 0xac, 0x3f, 0x8b, 0x42, 0x79, 0xe0, 0xdb, 0x89, 0x85, 0x59,
-        0xe8,
-    ],
-}];
+/// CD ships too (the same `Data1.cab`), and the Italian *Atlantis
+/// Collection* DVD's.
+pub const KNOWN_BUILDS: [Build; 2] = [
+    Build {
+        id: "atlantis4-cd-en-3022848",
+        label: "Atlantis Evolution (2004), CD",
+        language: "English",
+        size: 3_022_848,
+        // 2004-09-28 07:51:02 UTC.
+        pe_timestamp: 0x4159_17e6,
+        md5: [
+            0x21, 0x99, 0xbc, 0x93, 0xd2, 0xac, 0x3f, 0x8b, 0x42, 0x79, 0xe0, 0xdb, 0x89, 0x85,
+            0x59, 0xe8,
+        ],
+    },
+    // The Italian *Atlantis Collection* DVD's (Inno Setup installer of
+    // 2014, one language; its registry `Language` is `ita`): the CD's
+    // program rebuilt nine days later, the same size.
+    Build {
+        id: COLLECTION_BUILD,
+        label: "Atlantis Evolution (2004), Atlantis Collection",
+        language: "Italian",
+        size: 3_022_848,
+        // 2004-10-07 13:43:47 UTC.
+        pe_timestamp: 0x4165_4813,
+        md5: [
+            0x13, 0xc5, 0x7a, 0x67, 0x50, 0xa2, 0xe5, 0x6e, 0xf1, 0x87, 0x11, 0x6a, 0x9c, 0x03,
+            0x1a, 0xc5,
+        ],
+    },
+];
+
+/// The Italian *Atlantis Collection*'s program's id in [`KNOWN_BUILDS`].
+pub const COLLECTION_BUILD: &str = "atlantis4-collection-it-3022848";
+
+/// The folders of disc 2's world data (`cd2\datas\<folder>`) in the CD's
+/// installation, 1142 files: the folders the Italian *Atlantis
+/// Collection*'s installer does not create (it installs only
+/// `cd2\datas\loc\bink\ita`; atlantis4-re `discs/it-collection.md`).
+pub const DISC2_FOLDERS: [&str; 8] = [
+    "spw", "warp", "binkdial", "bink", "music", "binktraj", "spf", "map",
+];
+
+/// The folders of [`DISC2_FOLDERS`] that the install `src` lacks (absent
+/// or empty): none for the CD's installation, all eight for the Italian
+/// *Atlantis Collection*'s as its installer leaves it. The scripts move to
+/// disc 2 at chapter 10 (`changecd=2`, `chapi010.con`), whose places and
+/// films are then missing.
+pub fn missing_disc2(src: &dyn atlantis_data::FileSource) -> Vec<&'static str> {
+    DISC2_FOLDERS
+        .iter()
+        .copied()
+        .filter(|f| src.list(&format!("cd2/datas/{f}")).is_empty())
+        .collect()
+}
+
+/// Why an install does not open: disc 2's world data are missing
+/// ([`missing_disc2`]). Its text tells the player what to do.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MissingDisc2 {
+    /// The edition ([`edition_label`]).
+    pub edition: String,
+    /// The folders missing under `cd2\datas\`.
+    pub folders: Vec<&'static str>,
+    /// Whether the build is the Italian *Atlantis Collection*'s.
+    pub collection: bool,
+}
+
+impl std::fmt::Display for MissingDisc2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "This installation of {} lacks the places, films and music of the game's \
+             second CD (in cd2\\datas\\: {}), where the game goes at chapter 10.",
+            self.edition,
+            self.folders.join(", ")
+        )?;
+        if self.collection {
+            write!(
+                f,
+                " The Italian Atlantis Collection DVD's installer does not install them."
+            )?;
+        }
+        write!(
+            f,
+            "\n\nThe English 2004 CD's installation holds them: copy its cd2 folder into \
+             this installation, merging it with the cd2 folder already there (keep \
+             cd2\\datas\\loc\\bink\\ita), then open this folder again. On the other three \
+             discs the two editions share every file outside the language folders but one \
+             subtitle timing file."
+        )
+    }
+}
+
+impl std::error::Error for MissingDisc2 {}
+
+/// [`MissingDisc2`] for the install `src` of `build`, `None` when disc 2's
+/// world data are there.
+pub fn check_disc2(src: &dyn atlantis_data::FileSource, build: &Build) -> Option<MissingDisc2> {
+    let folders = missing_disc2(src);
+    (!folders.is_empty()).then(|| MissingDisc2 {
+        edition: edition_label(build),
+        folders,
+        collection: build.id == COLLECTION_BUILD,
+    })
+}
 
 /// The two sprite libraries shipped beside the program (2002-05-14), the
 /// same files as *Atlantis V*'s: name, size, PE timestamp, MD5.
@@ -130,7 +231,9 @@ pub fn identify_dir(dir: &std::path::Path) -> Option<Result<&'static Build, ExeE
 
 /// The edition's name for the game library and the window: the game, the
 /// year of its program, the medium and the language (atlantis4-re decision
-/// 0008: "Atlantis Evolution (2004), CD, English").
+/// 0008: "Atlantis Evolution (2004), CD, English"; the Italian collection's
+/// as *Atlantis III*'s, "Atlantis Evolution (2004), Atlantis Collection,
+/// Italian").
 pub fn edition_label(build: &Build) -> String {
     format!("{}, {}", build.label, build.language)
 }
@@ -379,6 +482,41 @@ mod tests {
         assert_eq!(hex(&SPR_DLLS[0].3), "dff10ab7a8b3c8a3553b1165f58b766e");
         assert_eq!(hex(&SPR_DLLS[1].3), "d889443ff5e452e8132e3f4bb2d6135c");
         assert_eq!(identify(b"MZ"), Err(ExeError::NotPe));
+        let it = &KNOWN_BUILDS[1];
+        assert_eq!(it.id, COLLECTION_BUILD);
+        assert_eq!(hex(&it.md5), "13c57a6750a2e56ef187116a9c031ac5");
+        assert_eq!((it.size, it.pe_timestamp), (3_022_848, 0x4165_4813));
+        assert_eq!(
+            edition_label(it),
+            "Atlantis Evolution (2004), Atlantis Collection, Italian"
+        );
+    }
+
+    /// Disc 2's world data: all there, all missing (the collection's
+    /// install), or some.
+    #[test]
+    fn disc2_world_data() {
+        use atlantis_data::files::MemFiles;
+        let mut m = MemFiles::new();
+        m.insert("cd2/datas/loc/bink/ita/jaws.bik", vec![0]);
+        assert_eq!(missing_disc2(&m), DISC2_FOLDERS);
+        let e = check_disc2(&m, &KNOWN_BUILDS[1]).unwrap();
+        assert!(e.collection);
+        let text = e.to_string();
+        assert!(text.contains("Atlantis Evolution (2004), Atlantis Collection, Italian"));
+        assert!(text.contains("spw, warp, binkdial, bink, music, binktraj, spf, map"));
+        assert!(text.contains("Italian Atlantis Collection DVD's installer"));
+        for f in DISC2_FOLDERS {
+            m.insert(&format!("cd2/datas/{f}/x"), vec![0]);
+        }
+        assert!(missing_disc2(&m).is_empty());
+        assert_eq!(check_disc2(&m, &KNOWN_BUILDS[1]), None);
+        let mut m = MemFiles::new();
+        m.insert("cd2/datas/warp/x.jp6", vec![0]);
+        let e = check_disc2(&m, &KNOWN_BUILDS[0]).unwrap();
+        assert!(!e.collection);
+        assert!(!e.to_string().contains("Italian Atlantis Collection DVD"));
+        assert_eq!(e.folders.len(), 7);
     }
 
     #[test]
@@ -467,6 +605,7 @@ mod tests {
         assert!(holds_evolution_2004(&dir));
         let exe = std::fs::read(dir.join(EXE_NAME)).unwrap();
         assert_eq!(identify(&exe).unwrap().id, "atlantis4-cd-en-3022848");
+        assert!(missing_disc2(&atlantis_data::StdDir::new(&dir)).is_empty());
         for (name, size, stamp, md5) in SPR_DLLS {
             let d = std::fs::read(dir.join(name)).unwrap();
             let m: [u8; 16] = Md5::digest(&d).into();

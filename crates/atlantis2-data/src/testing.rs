@@ -7,7 +7,13 @@
 //! `ATLANTIS2_PATCH101` (the 1.01 executable) and `ATLANTIS2_DATA_US` /
 //! `ATLANTIS2_DISCS_US` (the North American CD), `ATLANTIS2_IT_COLLECTION`
 //! (the Italian *Atlantis Collection*'s installed folder),
-//! `ATLANTIS2_DATA_PL` / `ATLANTIS2_DISCS_PL` (the Polish CD). Without them a
+//! `ATLANTIS2_DATA_PL` / `ATLANTIS2_DISCS_PL` (the Polish CD),
+//! `ATLANTIS2_DATA_DE` / `ATLANTIS2_DISCS_DE` (the German CD),
+//! `ATLANTIS2_DATA_ES` / `ATLANTIS2_DISCS_ES` (the Spanish CD),
+//! `ATLANTIS2_DATA_SV` / `ATLANTIS2_DISCS_SV` (the Swedish CD),
+//! `ATLANTIS2_DATA_CS` / `ATLANTIS2_DISCS_CS` (the Czech CD),
+//! `ATLANTIS2_DATA_ZH` / `ATLANTIS2_DATA_ZH_EN` / `ATLANTIS2_DISCS_ZH` (the
+//! Interwise release's Traditional Chinese and English CDs). Without them a
 //! test must not pass as if it had run: [`missing`] fails it, unless
 //! `ATLANTIS2_SKIP_DATA_TESTS=1` asks for the game-data tests to be
 //! skipped (a build without the game, such as the CI's), and then writes a
@@ -38,7 +44,7 @@ pub fn missing(what: &str) {
         panic!(
             "{what}: this test needs the game's data; set the variables \
              (ATLANTIS2_DATA, ATLANTIS2_DISCS, ATLANTIS2_GOG, \
-             ATLANTIS2_PATCH101, ATLANTIS2_DATA_US, ATLANTIS2_DISCS_US, ATLANTIS2_IT_COLLECTION, ATLANTIS2_DATA_PL, ATLANTIS2_DISCS_PL) or {SKIP_VAR}=1 to skip the game-data tests"
+             ATLANTIS2_PATCH101, ATLANTIS2_DATA_US, ATLANTIS2_DISCS_US, ATLANTIS2_IT_COLLECTION, ATLANTIS2_DATA_PL, ATLANTIS2_DISCS_PL, ATLANTIS2_DATA_DE, ATLANTIS2_DISCS_DE, ATLANTIS2_DATA_ES, ATLANTIS2_DISCS_ES, ATLANTIS2_DATA_SV, ATLANTIS2_DISCS_SV, ATLANTIS2_DATA_CS, ATLANTIS2_DISCS_CS, ATLANTIS2_DATA_ZH, ATLANTIS2_DATA_ZH_EN, ATLANTIS2_DISCS_ZH) or {SKIP_VAR}=1 to skip the game-data tests"
         );
     }
     // Written straight to the standard error, which the harness does not

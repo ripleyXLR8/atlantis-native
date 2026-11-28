@@ -11,7 +11,7 @@
 | `atlantis-engine` | the game, independent of any platform: input events in, 640x480 frames and audio out |
 | `atlantis2-data` | Atlantis II: detection, the install folder and the four discs, `WAM V2.8` places, `defnames.con`, the place sprites (SPW) and the sprite banks (`SPRCRYO`), the `.db` 3D scenes and head maps, the dialog scripts, the object names of `Messages.txt` |
 | `atlantis2-engine` | Atlantis II: the cube panoramas and their camera, the place animations, the cursor and the moves between views (Tibet), the dialogs (lines, voices, body videos, 3D heads, lip-sync, subtitles, music ducking), the CON script interpreter, the menus and the saves, the bag bar, the object in hand and the special objects' overlays, the Tibet mandala puzzle, Ireland's four puzzles (Brigid's cross, the skull, the ogham stones, the blackbird songs), China (the zoom of a move, the picture viewer, `NextWarpInvalide`, the demons' special events, the figurines on the floor, the chest, the five wheels, the pearl and the dragon, the turtle ring, the labyrinth's souls: all seven of its puzzles), Yucatán and Xibalba (the Maya counting grids, the Tezcatlipoca statue's hook, `AngleWarpXNow` / `AngleWarpYNow` as the original turns the view; Xibalba with all three of its puzzles: the star map, the 3D canoe puzzle, its own loop type 9 with the Atl3D database pipeline (`atl3d/ortho.rs`, `canoe.rs`), and the spider's web with its 3D creatures over the panorama (`atl3d/warp.rs`, `engine/web.rs`)) |
-| `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe` and the French CD's `Atlantis3.exe`, `Datas\` and the CD's discs, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
+| `atlantis3-data` | Atlantis III: detection of the GOG.com `Game.exe`, the French, Portuguese and Czech CDs' `Atlantis3.exe` and the North American CD's `Beyond Atlantis 2.exe`, `Datas\` and the CDs' discs, the 2001 sprite blitters (`SPRCRYO`, `SPWCRYO`), the text formats, `Atlantis3.cfg`, the text saves, `.db` lights |
 | `atlantis3-engine` | Atlantis III: the start-up's settings, the intro and the cinematics with their sound, the chapter scripts, the panorama (`warpBFPII`, 16 and 32 bits), the place animations and sprites, the cursor, the moves with their travel videos, the dialogs with their 3D heads, the inventory, the menus and the saves, every puzzle and map, the ending and the credits; see [Atlantis III](#atlantis-iii) |
 | `atlantis4-data` | Atlantis Evolution: detection of GOG.com's `Atlantis Evolution.exe`, the language (`lang.ini`), warp packages, scenes, pictures (an exact JPEG decoder), fonts, texts, the Vorbis sounds and Theora videos decoded as the original decodes them |
 | `atlantis4-script` | Atlantis Evolution: its Lua 5.1 scripts (vendored `rilua`) and the engine's bindings |
@@ -1196,8 +1196,11 @@ parts of 1 byte to 512 KB give the whole file's bytes, a part read ahead
 is the span then read, a raw read never over a batch), the layouts with
 images (`web_layout`'s tests), and the players' images on disk read as
 the browser reads them (`web_layout::tests::on_disk`: Atlantis II's
-French, Polish and North American CDs with `ATLANTIS2_DATA[_PL|_US]` /
-`ATLANTIS2_DISCS[_PL|_US]`, a cinematic of disc 1 by parts of 512 KB as
+French, Polish, German, Spanish, Swedish, Czech and North American CDs with
+`ATLANTIS2_DATA[_PL|_DE|_ES|_SV|_CS|_US]` / `ATLANTIS2_DISCS[_PL|_DE|_ES|_SV|_CS|_US]`
+and the Taiwanese release's two installs with `ATLANTIS2_DATA_ZH`,
+`ATLANTIS2_DATA_ZH_EN` / `ATLANTIS2_DISCS_ZH` (the disc 1 in each one's
+language taken), a cinematic of disc 1 by parts of 512 KB as
 the desktop's whole read; Atlantis III's French CD with
 `ATLANTIS3_CD_FR` / `ATLANTIS3_DISCS_FR`, disc 2 for a new game; the
 first game's ISO, raw `.bin`, `.mdf` and Nero images with the
@@ -1546,7 +1549,115 @@ back) into `yucatan-*.png`.
   The port reads the code page from the language
   (`edition::Language::text_code_page`, `A2Files::text_code_page`):
   `SubtitleFont::load` looks each byte's glyph up in it, Windows-1250 for
-  Polish, Windows-1252 for every other edition (`tests/pl_cd.rs`). The languages differ only in data: `loc\` (texts,
+  Polish and Czech, code page 950 for Traditional Chinese, Windows-1252
+  for every other edition (`tests/pl_cd.rs`). The
+  German CD's `atlantis2.exe` (4 CDs, 1999, the discs also in the
+  compilation *Die Legende Atlantis I & II*, 2000;
+  `atlantis2-cd-de-2432347`, 2432347 bytes, MD5
+  `8550d510492f7f992a15a623bbefd322`) is the French CD's executable
+  inside a copy protection wrapper: the same PE timestamp 0x38030926 and
+  version string 3.15, `.rdata` and `.data` byte for byte the French
+  CD's at the same addresses and file offsets, the wrapper's sections
+  after them (atlantis2-re `binaries/atlantis2-cd-de-2432347.md`). The
+  port tells it by its size and MD5, reads its tables through the section
+  table as for any build, and never runs it: `Release::V100`, the French
+  CD's listener table. Its install is the French CD's but for
+  `atlantis2.exe` and `loc\` (German texts, Windows-1252, GOG's German but
+  for `menu.txt`'s CD line, which names the language; the French CD's
+  `Font.txt` and font); its discs are the French CD's but for the German
+  voices (GOG's German, byte for byte) and the German tracks of films 19,
+  55 and 66 in `datas_a2\apc\`, where the films read them, so
+  `fix_film_language` finds nothing to change (`tests/de_cd.rs`,
+  `tests/film_language.rs`). The Spanish CD's `atlantis2.exe` (4 CDs,
+  1999, distributed by Friendware; `atlantis2-cd-es-2415963`, 2415963
+  bytes, MD5 `881e461cc4d0f765cb2942bd826aba8d`) is the Polish CD's
+  executable inside the same kind of wrapper: the same PE timestamp
+  0x3815d8ef and version string 3.15, `.rdata` and `.data` byte for byte
+  the Polish CD's at the same addresses and file offsets (atlantis2-re
+  `binaries/atlantis2-cd-es-2415963.md`). Told by its size and MD5, never
+  run: `Release::V101`, 1.01's listener table, no GOG patch. Its install
+  is the French CD's but for `atlantis2.exe` and `loc\` (Spanish texts,
+  Windows-1252, GOG's Spanish but for `Menu.txt`'s CD line, which names
+  the language; the Polish CD's `Font.txt`, with 1.01's heights; the
+  French CD's font); its discs are the Polish CD's layout (the spider's
+  textures renamed without accents, a distributor's logo as
+  `intro00.hnm` on disc 1 with no track, here Friendware's, GOG's
+  `INTROESP.HNM`; the two intro films as `intro01` and `intro02`) with
+  the Spanish voices (GOG's Spanish, byte for byte) and the Spanish
+  tracks of films 19, 55 and 66 in `datas_a2\apc\` (`tests/es_cd.rs`).
+  The Swedish CD's `atlantis2.exe` (*Legenden fortsätter…*, 4 CDs, 1999,
+  IQ Media Nordic; `atlantis2-cd-sv-2183168`, 2183168 bytes, MD5
+  `d879726ab178570b5ab5069be98f0570`) is the 1.01 patch's file but for
+  the PE header's timestamp, 0x382834c1 (1999-11-09, eight days before
+  1.01's 0x38328ed1): every other byte the same, version string 3.18, no
+  copy protection (atlantis2-re `binaries/atlantis2-cd-sv-2183168.md`).
+  `Release::V101`, 1.01's listener table, no GOG patch. Its install is
+  the Polish CD's but for `atlantis2.exe` and `loc\` (Swedish texts,
+  Windows-1252, the only known Swedish `Menu.txt`, which names the
+  language; the Polish CD's `Font.txt` and font, which has `å ä ö`); its
+  discs are the Polish CD's layout with the Swedish voices (no other
+  edition's), the Swedish tracks of films 19, 55 and 66 in
+  `datas_a2\apc\` and IQ Media's logo as `intro00.hnm` (60 frames, no
+  track; GOG's `INTROSWE.HNM`, which GOG ships unused) (`tests/sv_cd.rs`).
+  The Czech CD (Bohemia Interactive, 2000, 4 CDs; read from its 2002
+  re-issue with the magazine *GAME4U Speciál 3*, raw Mode 2 `.bin`
+  images) ships the North American CD's `atlantis2.exe` byte for byte
+  (MD5 `0f634c4620680dfea6782645c79dc84c`) and that CD's installed files
+  but `loc\`: so its build is `atlantis2-cd-us-2199552` and the edition is
+  told by the data, the only known Czech `Menu.txt` naming the language
+  (`Language::Czech`) and the pair (build, language) the edition's name
+  (`edition::LANGUAGE_EDITIONS`: "Atlantis II, Czech CD (Bohemia Interactive, 2000)"). Its
+  `Font.txt` says `[Language] CZE`, which none of the build's language
+  branches tests (`jpn` for the line break; `dut`, `esp`, `ita`, `swe` for
+  the intro), so it plays as the North American CD. Its texts are
+  Windows-1250 (`š` 0x9a, `ž` 0x9e, `ť` 0x9d, `č` 0xe8, `ě` 0xec, `ř`
+  0xf8, `ů` 0xf9...): the program makes its fonts in `DEFAULT_CHARSET`, so
+  they are read in the system's code page, the one of the Czech Windows
+  it was sold for, as for the Polish CD; the font (GOG's `Atl_Font.ttf`)
+  has every Czech letter. Its discs hold the Czech voices (no other
+  edition's), the Czech tracks of films 19, 55 and 66 in `datas_a2\apc\`
+  and Bohemia Interactive's logo as `intro00.hnm` (90 frames, no track)
+  (`tests/cs_cd.rs`). The Taiwanese release (亞特蘭提斯2, Interwise, 2000,
+  4 CDs) has two disc 1s, each with its InstallShield installer
+  (`setup.lid` `0404` and `0009`), and discs 2 to 4 shared, the North
+  American CD's files; the voices and film tracks are English on every
+  disc. The Traditional Chinese disc 1 installs the 1.01 patch's
+  `atlantis2.exe` byte for byte (MD5 `255310e7d6bd7f823f680e2bd3be8b7f`)
+  with the Polish CD's files but `loc\` and `scenar\chapi083.con`; the
+  English one installs the Polish CD's program (MD5
+  `f2b6f7bfa3c1952dceddfa1a662ebb84`) with GOG's English texts (its
+  `Menu.txt` asks for "any Atlantis 2 CD") and the French CD's font. Both
+  are told by their `Menu.txt` (`Language::TraditionalChinese`,
+  `Language::English`) and named by `LANGUAGE_EDITIONS` ("Atlantis II,
+  Taiwanese CD, Traditional Chinese (Interwise, 2000)", "Atlantis II,
+  Taiwanese CD, English (Interwise, 2000)"). Of two images of one disc,
+  `A2Files` keeps the one whose `setup.lid` names the installed language
+  (`installer_language`, a port addition: the original reads the disc in
+  the drive). The
+  Chinese texts are Big5 with `[CharacterSet] MBCS` and
+  `[PartitionCode] 0x20,0xA148,0xA141,0xA143,0xA149` (comma-separated,
+  which 1.01's parser reads as five codes: the space, `？`, `，`, `。`,
+  `！`). Their `Font.txt` names the face of the shipped `atl_font.ttf`,
+  "HG-Gothic-M Medium", a Japanese font (code pages Latin 1 and JIS, 94
+  of the texts' 1350 ideographs missing); the fonts are made in
+  `DEFAULT_CHARSET`, which a Traditional Chinese Windows takes for Big5,
+  so GDI's mapper answers with the system's Big5 face, `VARIABLE_PITCH`
+  asked: PMingLiU (inferred, as for the first game's Chinese CDs).
+  `SubtitleFont::load` then draws with `system_cjk_face`: the player's
+  `mingliu.ttc` beside the game's files (its PMingLiU face), else the
+  bundled Noto Serif TC (cut to both games' Chinese characters); `Height`
+  pixels per em in a cell of `Height` (MingLiU's em is its cell), lines
+  `Height` + 1 apart, each lead byte read with the next as one character
+  in the measure and the drawing; code page 950's user-defined pairs (four
+  Windows-1252 apostrophes before a letter in `Credits.txt`) have no
+  glyph. The line breaking is 1.01's MBCS path, checked against the
+  original under emulation with a model of MingLiU's widths
+  (`golden/subtitles_101_zh.txt`: all 1214 lines; a row may end one
+  ideograph past W − 20 when that one is a break, 40 rows touch the
+  screen's edge so). The disc's `intro00.hnm` is Interwise's logo (90
+  frames, no track) before the European `intro01` and `intro02`; the
+  English disc 1 holds those two films alone, as `intro00` and `intro01`
+  (`tests/zh_cd.rs`). The languages differ only in data: `loc\` (texts,
   `Font.txt`), the voices of `datas_a2\apc\dial\` and the manual; the
   language shown with the edition ("Atlantis II, GOG.com, German (patch
   1.01)") is told by the MD5 of `loc\Menu.txt`
@@ -3725,7 +3836,7 @@ back) into `yucatan-*.png`.
   at start-up and when the display is set up, does to the word.
 - **Dialogs** (`dialog.rs`, `hnm_stream.rs`, `subtitle.rs`, `sound.rs`):
   a world's `loc\Dial<XX>.txt` (the texts, Windows-1252; Windows-1250 for
-  the Polish CD),
+  the Polish and Czech CDs, Big5 for the Traditional Chinese CD),
   `scenar\com<XX>.txt` (speaker, mood, stand, camera, kind of each line)
   and `scenar\info<XX>.txt` (the speakers) are read with the world; a
   dialog collects its lines, loads each speaker's head per stand, and
@@ -4260,6 +4371,8 @@ German*). The language-dependent rules, from the original's code:
   as a Windows without a Japanese font (a port decision; the English
   texts are ASCII but one `’`). The English `AtlFont_Credit` asks for
   height 20, so the tables hold 22 (20 × 1.1 at 1024 pixels);
+  `CHINESEBIG5_CHARSET` (the Taiwanese CD, all five fonts) takes the
+  double-byte renderer and the Big5 line break, below;
 - the scarab case's bank (`AtlScarabee_MainInit` @ 0x00432200) is
   `Scarabee.spr` and nothing else: the English and German installations
   have it, the French and Spanish ones name it `Scarabée.SPR`, which the
@@ -4303,13 +4416,15 @@ behind the release:
   `--discs` folders (`discs::disc_candidates`, `A3Files::with_discs`);
 - `Release::scarab_bank`: `Scarabée.spr` (@ 0x00431c22) for the CD,
   `Scarabee.spr` for GOG.com's;
-- `subjects::Layout::cd_columns`: the hit test's columns are
-  `count / 5 + 1` (@ 0x0043b3c0);
-- `Game::flip_suppressed`: only a dialog stops the warp frame's flip
-  (@ 0x0043f840);
-- `hooks::ldmorts::view_isis`: no warp cursor reset (@ 0x004c7210);
-- `game::intro_videos_cd`: the CD's intro table (@ 0x00458c40), which
-  plays `intro.hnm` in French as GOG.com's does.
+- `subjects::Layout::cd_columns` (`Release::cd_subject_columns`): the hit
+  test's columns are `count / 5 + 1` (@ 0x0043b3c0);
+- `Game::flip_suppressed` (`Release::flips_after_video`): only a dialog
+  stops the warp frame's flip (@ 0x0043f840);
+- `hooks::ldmorts::view_isis` (`Release::isis_cursor_reset`): no warp
+  cursor reset (@ 0x004c7210);
+- `game::intro_videos_cd` (`Release::cd_intro_table`): the CD's intro
+  table (@ 0x00458c40), which plays `intro.hnm` in French as GOG.com's
+  does.
 
 Tests: `crates/atlantis3-data/tests/cd_fr.rs` (the build, the edition
 *Atlantis III, CD, French*, the discs from the images and from copies,
@@ -4336,6 +4451,130 @@ folder of `Datas\loc\text\`. Tests: `web_layout`'s
 to `cd3` beside it: the edition, the three discs, disc 2 chosen); in
 headless Edge the CD reaches its start page and a new game asks for disc
 2 and shows the Hoggar's first view from it.
+
+**The North American CD (2001).** atlantis3-cd-us-3366912 (`Beyond
+Atlantis 2.exe`, 3,366,912 bytes, PE timestamp 2001-10-17, MD5
+`df6faa0c...`), `Release::CdUs2001`, the fourth `KNOWN_BUILDS` row and the
+third name of `exe::EXE_NAMES`. atlantis3-re
+`binaries/atlantis3-cd-us-3366912.md`: 9648 of its 9709 functions are
+the French CD's (masked); the changed ones carry the 2003 program's scarab
+bank, subject columns, flip test, Isis cursor reset and intro table, its
+flip argument and cfg defaults, and the start-up reads
+`HKLM\Software\DreamCatcher\BEYOND ATLANTIS 2`. So `disc_test()` is true
+(`CHANGECD` @ 0x00449942 calls the disc test) and the other `Release`
+methods give GOG.com's behaviour; `thumb_rows` is `RowScan::Original`
+(the CD's encoder). The discs are the French CD's layout (the five
+disc-2 Hoggar animations included), read by the same `CdSource`; the
+install's language folder is `usa`, which `install::Language` names
+English (`edition_label`, the language before the publisher as Atlantis
+II's labels: *Atlantis III, CD, English (DreamCatcher, 2001)*), the engine using `usa` as the program does (the texts, voices
+and films by name, `intro_videos`' `intro_usa.hnm`). Its `font.txt` asks
+for `EASTEUROPE_CHARSET`, which `text::GdiFont::arial_charset` measures
+with the Central European table. Tests (`ATLANTIS3_CD_US` = a folder
+with the three `.bin` / `.cue` images and `installed\`, disc 1's
+`data1.cab` extracted; optional, `testing::optional_dir` writes
+`SKIPPED` without it): `crates/atlantis3-data/tests/cd_us.rs` (the build,
+edition, registry values, the discs from Mode 1 and Mode 2 images, every
+file of the install and the discs read with its size against atlantis3-re's
+inventory, the disc test's copies), `crates/atlantis3-engine/tests/cd_us.rs`
+(the intro `intro_usa.hnm` to its last frame, a new game on disc 2 and
+its save, the scarab case drawn from `Scarabee.spr`, the Central European
+fonts) and `atlantis-app`'s `the_north_american_cd_with_its_discs`. The
+web page finds the program by `EXE_NAMES` as the desktop does; it has not
+been tried in a browser with this edition.
+
+**The Portuguese CD (2001).** atlantis3-cd-pt-3424256 (`Atlantis3.exe`,
+3,424,256 bytes, PE timestamp 2001-10-31, MD5 `e5e89f92...`),
+`Release::CdPt2001`. atlantis3-re `binaries/atlantis3-cd-pt-3424256.md`:
+the North American program rebuilt (about a thousand functions compiled
+otherwise: frames, temporaries, link order), with that program's code at
+every place `Release` distinguishes (the disc test, `Scarabee.spr`, the
+subject columns, the flip test, the Isis cursor reset, the CD's row
+scan), so its methods answer as for `CdUs2001`; its start-up reads
+`CRYO\ATLANTIS 3`, and its intro has a `bra` branch (`intro_bra.hnm`)
+that no data reaches and the port does not model. The data's language is
+`por` (`install::Language::Portuguese`), its `font.txt` the ANSI one.
+Its name, *Atlantis III, Portuguese CD, Portuguese (Playgames, 2002)*,
+comes from `install::LANGUAGE_EDITIONS`: the same `Atlantis3.exe` is
+also the Swedish and the Traditional Chinese CDs', so the install's
+language (the one folder of `Datas\loc\text\`, `por` on this CD alone)
+names the edition, as `atlantis2_data::edition` does for Atlantis II's
+shared builds.
+Tests (`ATLANTIS3_CD_PT` = a folder with `Atlantis III - O Novo
+Mundo\CD1..CD3\` holding the CloneCD images, and `installed\`;
+optional): `crates/atlantis3-data/tests/cd_pt.rs` (the build, edition,
+registry values, the discs, every file against atlantis3-re's inventory,
+the disc test's copies), `crates/atlantis3-engine/tests/cd_pt.rs` (the
+intro `intro.hnm`, a new game on disc 2 and its save, the scarab case,
+the ANSI fonts) and `atlantis-app`'s `the_portuguese_cd_with_its_discs`.
+The Swedish CD (2002) has the same `Atlantis3.exe` and the same data but
+`loc\…\swe\` (`install::Language::Swedish`), named *Atlantis III, Swedish
+CD, Swedish (Toptronics, 2002)* by `install::LANGUAGE_EDITIONS`; its tests are the same on
+`ATLANTIS3_CD_SV` (its three ISO images and `installed\`): `cd_sv.rs` in
+both crates, `the_swedish_cd_with_its_discs`.
+
+The Taiwanese CD (亞特蘭提斯Ⅲ 失落的帝國, Interwise, 2002) has the same
+`Atlantis3.exe` and the same installer; its texts are `loc\…\gbr\` in
+Big5 (code page 950) and its voices English, and its `font.txt` asks for
+`Arial` in `CHINESEBIG5_CHARSET` for all five fonts. The registry value
+stays `gbr`: `install::data_language` names the language
+`TraditionalChinese` when an English code comes with a Big5 `font.txt`,
+and `install::LANGUAGE_EDITIONS` names the edition *Atlantis III,
+Taiwanese CD, Traditional Chinese (Interwise, 2002)*.
+
+Its texts. GDI answers that request on a Traditional Chinese Windows with
+the system's Big5 face (PMingLiU, inferred), whose `tmCharSet` 0x88 makes
+the text library (atlantis3-cd-pt-3424256 @ 0x006bf430: script index 3)
+take its double-byte renderer (@ 0x006bfb30: `GetCharacterPlacementA`
+advances, `ExtTextOutA(ETO_GLYPH_INDEX)`) and its Big5 break finder
+(@ 0x006c0dc0). The layout loop (@ 0x006bd930, the French program's
+0x006b4a20 instruction for instruction) walks the text with the C
+runtime's `_mbsinc` / `_mbsdec` in the system code page, so its estimate,
+shrink, extend and skip count characters. The finder is a kinsoku rule
+over three lists of strings: after the first character that does not fit
+when it begins with one of `! ) , . : ; ? ] }` (it hangs past the zone);
+else back over the opening marks before it (they may not end a line),
+then back over the closing marks and the punctuation (they may not start
+one); the next line starts there, past the bytes equal to `tmBreakChar`.
+Spaces are ordinary characters in this mode. The port (`text::GdiFont`'s
+`dbcs` part, `text::Dbcs`, `text::big5_lines`, `text::big5_break`)
+follows it; a font is measured per character in the face it draws: the
+player's `mingliu.ttc` (face PMingLiU) in the installed folder, else the
+bundled Noto Serif TC, at the cell height in pixels per em (the player's
+face sized from its Windows metrics as GDI sizes a positive height). The
+advances are derived from the face's `hmtx` (rounded), not measured with
+GDI, so ASCII widths and the ascent may differ from the original's by a
+pixel; the ideographs are one em wide in both faces. A break the original
+could not make (an overflow on a paragraph's first character, a line of
+closing marks) is cut before the character that overflows; no shipped
+text gets there. Justification (alignment 3) is not reached by the game
+and not ported. The web build fetches `fonts/NotoSerifTC-Subset.otf` for
+this edition unless the folder holds `mingliu.ttc`.
+Tests (`ATLANTIS3_CD_ZH_TW`: its three ISO images and `installed\`;
+optional): `cd_zh_tw.rs` in both crates (the build, edition, registry,
+discs, every file against atlantis3-re's inventory, `font.txt` and the
+Big5 texts; the intro, a new game on disc 2, the five fonts at three
+widths, every `Dial.txt` line against `golden/a3_big5_dial_lines.txt` —
+atlantis3-re's model of the layout, byte ranges and hashes only — every
+character a glyph, a drawn line), `the_traditional_chinese_cd_with_its_discs`,
+and `text.rs`'s unit tests against the model's synthetic cases.
+
+**The Czech CD (GAME4U Speciál 10, 2003).** atlantis3-cd-cs-3379200
+(`Atlantis3.exe`, 3,379,200 bytes as the French CD's but another file,
+PE timestamp 2001-10-10, MD5 `344f2149...`), `Release::CdCs2001`.
+atlantis3-re `binaries/atlantis3-cd-cs-3379200.md`: the North American
+program's game code (9687 of its 9709 functions the same, masked) with
+the French CD's C runtime and a start-up reading `CRYO\ATLANTIS 3` or
+`DreamCatcher\BEYOND ATLANTIS 2`; its `Release` methods answer as for
+`CdUs2001`. Its data are the North American CD's with `loc\…\cze\`
+(`install::Language::Czech`, Windows-1250 texts under the
+`EASTEUROPE_CHARSET` fonts) and `intro_cze.hnm`, which `intro_videos`
+plays after `intro.hnm` for `cze`. Tests on `ATLANTIS3_CD_CS` (its three
+`.bin` / `.cue` images and `installed\`; optional): `cd_cs.rs` in both
+crates (the build, edition, discs, every file against atlantis3-re's
+inventory, the disc test's copies; the intro to `intro_cze.hnm`'s last
+frame, a new game on disc 2, the scarab case, the Central European
+fonts), `the_czech_cd_with_its_discs`.
 
 The desktop's `a3::A3App` is its own `ApplicationHandler`, as Atlantis
 II's is: `setup::kind_of` tells Atlantis III by `Game.exe` (or the CD's
@@ -4664,6 +4903,36 @@ below it) and the folder picker explains them
 line opens it; `--headless <folder>` runs its logos and start page
 without a window; `--evolution2004 <folder>` is the development entry.
 
+**The Italian *Atlantis Collection* (2014).** Its Inno Setup installer
+(`Atlantis 4\setup.exe`, one language) installs the same layout and
+registry values (`Install` = `FLA`, `Language` = `ita`) with the
+2004 program rebuilt on 2004-10-07, atlantis4-collection-it-3022848
+(3,022,848 bytes, PE timestamp 0x41654813, MD5
+`13c57a6750a2e56ef187116a9c031ac5`), the second entry of
+`evolution2004::KNOWN_BUILDS`: *Atlantis Evolution (2004), Atlantis
+Collection, Italian* (the label of *Atlantis III*'s collection, the
+build's name then its language). Function by function it is the CD's
+program but for three changes (atlantis4-re `binaries/README.md`): its
+version line, a key test in the logos (Escape or Space ends the logo
+playing, as Native already does for the CD), and Czech (`tch`) among the
+languages whose font character set follows the language. The language
+comes from `loc\text\ita\` alone (`install::install_registry`), as for
+the CD. Its installer leaves out disc 2's world data: `cd2\datas\`
+holds only `loc\bink\ita\`, not the 1142 files of `spw`, `warp`,
+`binkdial`, `bink`, `music`, `binktraj`, `spf` and `map`, which the
+scripts need from chapter 10 (`changecd=2`).
+`evolution2004::missing_disc2` names the missing folders and
+`check_disc2` (`MissingDisc2`) explains them: `a3::open_evolution_2004`,
+the folder picker and the browser's `start_evolution_2004` refuse the
+install with that text. The English CD's installation holds those files
+under the same names, none of them already in the collection's install,
+and the two editions' other discs share every file outside `loc` but
+seven (the language menu's pictures, one chapter script and one subtitle
+timing file): the player copies its `cd2` folder into the collection's,
+and the merged folder opens (`tests/evolution2004_it_collection.rs`, the
+app's `the_italian_collection_of_evolution_2004`, with
+`ATLANTIS4_IT_COLLECTION` and `ATLANTIS4_CD`).
+
 **In the browser.** `web_layout::a4cd_install` finds the install among
 the picked files (`atlantis evolution.exe` beside `cd0/datas/scenar/`),
 and `a3_web::start_evolution_2004` runs it in *Atlantis III*'s page
@@ -4689,6 +4958,25 @@ folder holding it, or an unpacked tree. The formats shared with
 *Atlantis III* and the 2004 program (WAM, JP6 panoramas, sprites, MLS
 playlists, `font.txt`, Bink films) are read by the same code; the XML
 texts (string resources, dialogs, film subtitles) by `atlantis5_texts`.
+
+**Languages.** The program reads the registry's `Language` (written by
+the installer: `ENGLISH`, `GERMAN`, `ITALIAN`, `SPANISH` on the
+international DVD, `FRENCH` on the French one) and uses it as the folder
+of its texts, voices, film voices and fonts; it has no language page.
+The international DVD holds four languages. A disc of several languages
+has a place per language, `atlantis5::language_place` (the cabinet's
+path, `<root>/DATAS_<language>.cab`; on the disc it is the cabinet, for
+an image or an install a name of that form), which
+`Atlantis5Source::open` opens in that language (`chosen_language`).
+The game library lists the places (`desktop::atlantis5_places`, also in
+the search and the first start's offer); a copy to the computer moves
+each of them to the copy (`a5_copy::move_entries_to_copy`). The root
+alone plays `atlantis5::default_language`: the only language, else the
+system's (`locale::system_language`: `GetUserDefaultUILanguage` on
+Windows, `AppleLocale` on macOS, `LC_ALL`/`LC_MESSAGES`/`LANG`
+elsewhere, `navigator.language` in the browser) when the disc has it,
+else English. The web page asks (`A5LANGUAGES:` from `start`, as Cryo's
+DVD's `LANGUAGES:`), or takes `?lang=`.
 
 **The copy to the computer.** `atlantis-app::a5_copy` (desktop only)
 copies the disc's files the game needs to `atlantis5/disc` in the
@@ -4732,10 +5020,13 @@ dates); the sound through `audio_out::web_out`, mixed ahead as Atlantis
 Evolution's. `window.atlantis5.state()` / `.test("click <element>")`
 are the end-to-end runs' aids.
 
-**Scripts.** `atlantis5-script` runs the player's own compiled chunks:
-the vendored `rilua` (a Lua 5.1 VM) loads Lua 5.0 chunks
-(`vendor/rilua/src/vm/undump50.rs`) and runs 5.0's operations that differ
-(see `vendor/rilua/VENDORED.txt`). Each script (a click, a view's
+**Scripts.** `atlantis5-script` runs the player's own scripts: the
+vendored `rilua` (a Lua 5.1 VM) loads the French DVD's Lua 5.0 chunks
+(`vendor/rilua/src/vm/undump50.rs`) and runs 5.0's operations that differ;
+the international DVD's scripts are Lua 5.0 source, which a state with
+`Gc::compile_lua50` compiles with Lua 5.0.3's loops (its numeric loop's
+variable is the index; a generic loop over a table walks it with `next`)
+(see `vendor/rilua/VENDORED.txt`, patches 4 and 11). Each script (a click, a view's
 entry, a timer, the chapter's `InitChapter`) runs as a coroutine that
 waits at the calls the original runs over frames (`Atl_Address_Go`,
 `Atl_Video_Play`, `Atl_Dialog_Play`, an animated look). The game
@@ -4774,7 +5065,17 @@ computer is checked on a fake disc whose small stored cabinets open as
 the game (`a5_copy`'s tests: the room, the cancel, a copy cut short;
 `the_library_copies_atlantis5s_disc`: the screen held, then the entry
 moved to the copy) and against the French DVD's plan
-(`the_french_dvd_plan`).
+(`the_french_dvd_plan`). With `ATLANTIS5_DVD_INT` set to a copy of the
+international DVD's files (skipped without):
+`atlantis3-data/tests/atlantis5_dvd_int.rs` (its four languages, its
+program, a place per language, each language's texts and fonts, every
+character in Windows-1252), `atlantis5-script/tests/international_dvd.rs`
+(the 66 sources compile with Lua 5.0's loops; with `ATLANTIS5_DVD_FR`
+too, each function's loops are the French chunks'),
+`whole_game_international_english` (the walkthrough in English, from the
+cabinets) and `the_international_dvd_in_german` (the first view and a
+dialog), the game library's entries (`the_library_lists_atlantis5s_languages`)
+and the copy's plan (`the_international_dvd_plan`).
 
 ## Tests
 
@@ -4883,6 +5184,63 @@ the spider's renamed textures and its web drawn as on the French CD, a
 subtitle, the main menu's tooltip and a save, the browser's way of opening
 it; `tests/flow.rs`'s whole game with the mouse played again on it;
 `pl-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_DE`, `ATLANTIS2_DISCS_DE` the German CD's installed folder
+(`data1.cab` of its first disc extracted) and a folder holding its four CD
+images, other images beside them passed over (`tests/de_cd.rs`: the
+executable by its MD5, its `.rdata` and `.data` against the French CD's,
+the edition's name and language, the `loc` files, every subtitle laid out,
+every letter a glyph, the German film tracks against GOG's German, a
+subtitle with its voices against GOG's German, the main menu's tooltip and a
+save, the browser's way of opening it; `tests/flow.rs`'s whole game with the
+mouse played again on it; `de-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_ES`, `ATLANTIS2_DISCS_ES` the Spanish CD's installed folder
+(`data1.cab` of its first disc extracted) and a folder holding its four CD
+images (`tests/es_cd.rs`: the executable by its MD5, its `.rdata` and
+`.data` against the Polish CD's, the edition's name and language, the `loc`
+files against GOG's Spanish, every subtitle laid out, every letter a glyph,
+the Spanish film tracks against GOG's Spanish, the spider's renamed textures
+and its web drawn as on the French CD, the intro with the distributor's
+logo, a subtitle with its voices against GOG's Spanish, the main menu's
+tooltip and a save, the browser's way of opening it; `tests/flow.rs`'s whole
+game with the mouse played again on it; `es-*.png` with
+`ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_SV`, `ATLANTIS2_DISCS_SV` the Swedish CD's installed folder
+(`data1.cab` of its first disc extracted) and a folder holding its four CD
+images (`tests/sv_cd.rs`: the executable by its MD5 and against the 1.01
+patch's (`ATLANTIS2_PATCH101`), the edition's name and language, the `loc`
+files against the Polish CD's lines and objects, every subtitle laid out,
+every letter a glyph, the Swedish film tracks, the spider's renamed
+textures and its web drawn as on the French CD, the intro with the
+distributor's logo (against GOG's French `INTROSWE.HNM`), a subtitle with
+its voices, none the Polish CD's, the main menu's tooltip and a save, the
+browser's way of opening it; `tests/flow.rs`'s whole game with the mouse
+played again on it; `sv-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_CS`, `ATLANTIS2_DISCS_CS` the Czech CD's installed folder
+(`data1.hdr` and `data1.cab` of its first disc extracted) and a folder
+holding its four CD images (`tests/cs_cd.rs`: the executable by its MD5
+and against the North American CD's, every installed file but `loc`'s
+against that CD's, the edition's name and language, the `loc` files
+against its lines and objects, every subtitle laid out, every letter a
+glyph in Windows-1250, the Czech film tracks, the spider and its web drawn
+as on the North American CD, the intro with Bohemia Interactive's logo, a
+subtitle with its voices, none the North American CD's, the main menu's
+tooltip and a save, the browser's way of opening it through the `.bin`
+images; `tests/flow.rs`'s whole game with the mouse played again on it;
+`cs-*.png` with `ATLANTIS2_PNG_DIR`),
+`ATLANTIS2_DATA_ZH`, `ATLANTIS2_DATA_ZH_EN`, `ATLANTIS2_DISCS_ZH` the
+Taiwanese release's installed folders (`data1.cab` of its Traditional
+Chinese and of its English disc 1 extracted) and a folder holding its five
+CD images (`tests/zh_cd.rs`: the executables by their MD5, the Chinese
+one against the 1.01 patch's, every installed file against the Polish
+CD's, the editions' names and languages, each half's own disc 1 taken,
+the `loc` files against the North American CD's lines and objects, the
+shipped font's code pages and missing ideographs, every subtitle against
+the 1.01 executable's layout under emulation, every character a glyph of
+the port's Noto Serif TC, the English voices and film tracks, both disc
+1s' intros with Interwise's logo, a subtitle on four rows, the main menu's
+tooltip and a save, the browser's way of opening both halves;
+`tests/flow.rs`'s whole game with the mouse played again on each half;
+`zh-*.png` with `ATLANTIS2_PNG_DIR`),
 `ATLANTIS2_GOG_EN`, `ATLANTIS2_GOG_DE`, `ATLANTIS2_GOG_ES` GOG.com's English,
 German and Spanish installations and `ATLANTIS2_GOG_OLD` a folder holding
 `1.0/Atlantis 2/Game.exe` and `1.0-w10/Atlantis 2/Game.exe`, GOG's older

@@ -38,6 +38,10 @@ pub struct Film {
     drawn: bool,
     /// When `BinkOpen` ran (the game's seconds).
     start: f64,
+    /// The frames of the passes before this one ([`Film::bink_step`]'s
+    /// wrap): `BinkWait` times frames by the count `BinkDoFrame` keeps,
+    /// which goes on across the wrap.
+    looped: u32,
     /// The last frame decoded, in the display's format.
     pub rgb565: Vec<u16>,
     pub xrgb: Vec<u32>,
@@ -60,6 +64,7 @@ impl Film {
             frame_num: 1,
             drawn: false,
             start: now,
+            looped: 0,
             rgb565,
             xrgb,
             depth,
@@ -85,11 +90,17 @@ impl Film {
         self.video.fps()
     }
 
+    /// The film's clock started again at `now` (the game's seconds): its
+    /// frames timed from there, as from the open.
+    pub fn restart_clock(&mut self, now: f64) {
+        self.start = now;
+    }
+
     /// `BinkWait` = 0: frame `frame_num` is not drawn yet and its time has
     /// come.
     pub fn due(&self, now: f64) -> bool {
         let ms = ((now - self.start) * 1000.0).max(0.0) as u64;
-        !self.drawn && ms >= self.video.frame_time_ms(self.frame_num - 1)
+        !self.drawn && ms >= self.video.frame_time_ms(self.looped + self.frame_num - 1)
     }
 
     /// `BinkWait` = 0 for frame `frame_num` whether it was drawn or not
@@ -97,7 +108,7 @@ impl Film {
     /// frame while its start timer runs: [INFERRED, RAD's API]).
     pub fn time_come(&self, now: f64) -> bool {
         let ms = ((now - self.start) * 1000.0).max(0.0) as u64;
-        ms >= self.video.frame_time_ms(self.frame_num - 1)
+        ms >= self.video.frame_time_ms(self.looped + self.frame_num - 1)
     }
 
     /// Whether frame `frame_num` was decoded.
@@ -149,6 +160,30 @@ impl Film {
         }
         self.frame_num += 1;
         self.drawn = false;
+        true
+    }
+
+    /// *The Secrets of Atlantis*' film player's step (atlantis5-dvd-int-3891200
+    /// @ 0x00456cb0) when its caller ignores its return (the dialog's 2D
+    /// talker, state 2): `if (BinkWait() == 0) { BinkDoFrame();
+    /// BinkNextFrame(); }`, at most one frame per call. Its `binkw32.dll`
+    /// (RAD 1994-2002, `BinkNextFrame` @ 0x30014550,
+    /// 0x300146e0..0x30014702) goes to frame 1 again once `FrameNum` ≥
+    /// `Frames`, so the film loops; `BinkWait` (@ 0x30014c10) times frames
+    /// by the count `BinkDoFrame` keeps (+0x270, @ 0x300144c6..0x300144df),
+    /// which the wrap does not reset: frame 1 of the next pass comes one
+    /// period after the last frame. Whether a frame was decoded.
+    pub fn bink_step(&mut self, now: f64) -> bool {
+        if !self.due(now) {
+            return false;
+        }
+        self.do_frame();
+        if !self.next_frame() {
+            self.looped += self.frames();
+            self.video.rewind();
+            self.frame_num = 1;
+            self.drawn = false;
+        }
         true
     }
 }

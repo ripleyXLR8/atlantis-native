@@ -7,7 +7,11 @@
 //! and `ATLANTIS3_GOG_ES` ([`GOG_LANGUAGES`]); the French retail CD's
 //! tests read its installed folder (`Atlantis3.exe` and `Datas\`) from
 //! `ATLANTIS3_CD_FR` and the folder of its three discs (the CD images or
-//! copies of the CDs) from `ATLANTIS3_DISCS_FR` ([`cd_fr`]). Without it a
+//! copies of the CDs) from `ATLANTIS3_DISCS_FR` ([`cd_fr`]); the Italian
+//! *Atlantis Collection*'s installed folder from `ATLANTIS3_IT_COLLECTION`
+//! ([`it_collection`]). The North American CD's folder
+//! (`ATLANTIS3_CD_US`, [`cd_us`]) is optional: without it its tests write
+//! `SKIPPED` and pass. Without the others a
 //! test must
 //! not pass as if it had run: [`missing`] fails it, unless
 //! `ATLANTIS3_SKIP_DATA_TESTS=1` (or `ATLANTIS2_SKIP_DATA_TESTS=1`, which a
@@ -82,6 +86,98 @@ pub fn cd_fr() -> Option<(PathBuf, PathBuf)> {
     Some((dir_of(CD_FR_VAR)?, dir_of(DISCS_FR_VAR)?))
 }
 
+/// The variable naming the Italian *Atlantis Collection*'s installed
+/// folder (`Game.exe` and `Datas\`, as its installer lays them out).
+pub const IT_COLLECTION_VAR: &str = "ATLANTIS3_IT_COLLECTION";
+
+/// The Italian *Atlantis Collection*'s installed folder
+/// (`ATLANTIS3_IT_COLLECTION`), or `None` after [`missing`].
+pub fn it_collection() -> Option<PathBuf> {
+    dir_of(IT_COLLECTION_VAR)
+}
+
+/// The folder named by `var`, or `None` after writing `SKIPPED <test>:
+/// <var> not set`: the editions added later, whose absence never fails a
+/// test (as [`a5_dvd_fr`]).
+pub fn optional_dir(var: &str) -> Option<PathBuf> {
+    match std::env::var_os(var) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(std::io::stderr(), "SKIPPED {test}: {var} not set");
+            None
+        }
+    }
+}
+
+/// The variable naming the North American CD's folder (*Beyond Atlantis
+/// II*, DreamCatcher, 2001): its three CD images, and `installed\` (the
+/// first disc's `data1.cab` extracted: `Beyond Atlantis 2.exe` and the
+/// files of `Datas\` the installer copies).
+pub const CD_US_VAR: &str = "ATLANTIS3_CD_US";
+
+/// The North American CD's installed folder and its discs' folder (from
+/// `ATLANTIS3_CD_US`: `<folder>/installed`, `<folder>`); its absence never
+/// fails a test ([`optional_dir`]).
+pub fn cd_us() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_US_VAR)?;
+    Some((dir.join("installed"), dir))
+}
+
+/// The variable naming the Portuguese CD's folder (*Atlantis III: O Novo
+/// Mundo*, Playgames, 2002): `Atlantis III - O Novo Mundo\CD1..CD3\`
+/// with the CloneCD images, and `installed\` (the first disc's
+/// `data1.cab` extracted).
+pub const CD_PT_VAR: &str = "ATLANTIS3_CD_PT";
+
+/// The Portuguese CD's installed folder and its discs' folder (from
+/// `ATLANTIS3_CD_PT`); its absence never fails a test ([`optional_dir`]).
+pub fn cd_pt() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_PT_VAR)?;
+    Some((
+        dir.join("installed"),
+        dir.join("Atlantis III - O Novo Mundo"),
+    ))
+}
+
+/// The variable naming the Swedish CD's folder (*Den nya världen*,
+/// Toptronics, 2002): its three ISO images and `installed\` (the first
+/// disc's `data1.cab` extracted).
+pub const CD_SV_VAR: &str = "ATLANTIS3_CD_SV";
+
+/// The Swedish CD's installed folder and its discs' folder (from
+/// `ATLANTIS3_CD_SV`); its absence never fails a test ([`optional_dir`]).
+pub fn cd_sv() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_SV_VAR)?;
+    Some((dir.join("installed"), dir))
+}
+
+/// The variable naming the Traditional Chinese CD's folder (亞特蘭提斯Ⅲ
+/// 失落的帝國, Interwise, 2002): its three ISO images and `installed\`
+/// (the first disc's `data1.cab` extracted).
+pub const CD_ZH_TW_VAR: &str = "ATLANTIS3_CD_ZH_TW";
+
+/// The Traditional Chinese CD's installed folder and its discs' folder
+/// (from `ATLANTIS3_CD_ZH_TW`); its absence never fails a test
+/// ([`optional_dir`]).
+pub fn cd_zh_tw() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_ZH_TW_VAR)?;
+    Some((dir.join("installed"), dir))
+}
+
+/// The variable naming the Czech CD's folder (GAME4U Speciál 10, 2003):
+/// its three `.bin` / `.cue` images and `installed\` (the first disc's
+/// `data1.cab` extracted).
+pub const CD_CS_VAR: &str = "ATLANTIS3_CD_CS";
+
+/// The Czech CD's installed folder and its discs' folder (from
+/// `ATLANTIS3_CD_CS`); its absence never fails a test ([`optional_dir`]).
+pub fn cd_cs() -> Option<(PathBuf, PathBuf)> {
+    let dir = optional_dir(CD_CS_VAR)?;
+    Some((dir.join("installed"), dir))
+}
+
 /// The installed game's folder from `ATLANTIS3_DATA`, or `None` after
 /// [`missing`].
 pub fn install_dir() -> Option<PathBuf> {
@@ -109,6 +205,90 @@ pub fn a5_dvd_fr() -> Option<PathBuf> {
             let thread = std::thread::current();
             let test = thread.name().unwrap_or("?");
             let _ = writeln!(std::io::stderr(), "SKIPPED {test}: {A5_DVD_FR_VAR} not set");
+            None
+        }
+    }
+}
+
+/// The variable naming the international DVD's folder: a copy of the
+/// pressed disc's files (`datas.cab`, `datas_english.cab`, ...).
+pub const A5_DVD_INT_VAR: &str = "ATLANTIS5_DVD_INT";
+
+/// The international DVD's folder from `ATLANTIS5_DVD_INT`; as
+/// [`a5_dvd_fr`], its absence never fails a test.
+pub fn a5_dvd_int() -> Option<PathBuf> {
+    match std::env::var_os(A5_DVD_INT_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(
+                std::io::stderr(),
+                "SKIPPED {test}: {A5_DVD_INT_VAR} not set"
+            );
+            None
+        }
+    }
+}
+
+/// The variable naming the North-American CDs' folder: a copy of each
+/// disc's files in `CD1`, `CD2` and `CD3`.
+pub const A5_CD_US_VAR: &str = "ATLANTIS5_CD_US";
+
+/// The North-American CDs' folder from `ATLANTIS5_CD_US`; as
+/// [`a5_dvd_fr`], its absence never fails a test.
+pub fn a5_cd_us() -> Option<PathBuf> {
+    match std::env::var_os(A5_CD_US_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(std::io::stderr(), "SKIPPED {test}: {A5_CD_US_VAR} not set");
+            None
+        }
+    }
+}
+
+/// The variable naming the Italian *Atlantis Collection*'s installed
+/// folder (`The Secrets of Atlantis.exe` beside `datas`).
+pub const A5_IT_COLLECTION_VAR: &str = "ATLANTIS5_IT_COLLECTION";
+
+/// The Italian *Atlantis Collection*'s installed folder from
+/// `ATLANTIS5_IT_COLLECTION`; as [`a5_dvd_fr`], its absence never fails a
+/// test.
+pub fn a5_it_collection() -> Option<PathBuf> {
+    match std::env::var_os(A5_IT_COLLECTION_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(
+                std::io::stderr(),
+                "SKIPPED {test}: {A5_IT_COLLECTION_VAR} not set"
+            );
+            None
+        }
+    }
+}
+
+/// The variable naming *Atlantis Evolution*'s Italian *Atlantis
+/// Collection* installed folder (the 2004 program: `Atlantis
+/// Evolution.exe` beside `cd0` .. `cd4`, as its Inno Setup installer lays
+/// them out).
+pub const A4_IT_COLLECTION_VAR: &str = "ATLANTIS4_IT_COLLECTION";
+
+/// That folder from `ATLANTIS4_IT_COLLECTION`; as [`a5_dvd_fr`], its
+/// absence never fails a test.
+pub fn a4_it_collection() -> Option<PathBuf> {
+    match std::env::var_os(A4_IT_COLLECTION_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(
+                std::io::stderr(),
+                "SKIPPED {test}: {A4_IT_COLLECTION_VAR} not set"
+            );
             None
         }
     }

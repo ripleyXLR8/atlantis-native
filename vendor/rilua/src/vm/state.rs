@@ -93,6 +93,11 @@ pub struct Gc {
     /// Every table allocated here takes Lua 5.0.3's layout (Native patch
     /// 8), so `next` walks it in 5.0.3's order; false (5.1's) by default.
     pub table_lua50: bool,
+    /// Source compiled here is Lua 5.0 source (Native patch 11): a generic
+    /// `for` starts with 5.0's `TFORPREP` (`TForPrep50`), so `for k, v in t`
+    /// over a table iterates it with `next` as Lua 5.0 does. False (5.1's
+    /// compiler unchanged) by default.
+    pub compile_lua50: bool,
     /// Per-type metatables. Indexed by type tag (see `metatable::type_tag`).
     /// Tables and userdata have per-instance metatables; other types use these.
     pub type_metatables: [Option<GcRef<Table>>; NUM_TYPE_TAGS],
@@ -117,6 +122,7 @@ impl Gc {
             current_white: Color::White0,
             table_max_bits: super::table::MAXBITS,
             table_lua50: false,
+            compile_lua50: false,
             type_metatables: [None; NUM_TYPE_TAGS],
             tm_names: [None; TM_N],
             gc_state: super::gc::collector::GcState::new(),

@@ -61,7 +61,7 @@ use crate::atlantis5_camera::{
     euler_quat, forward, look_at_direction, look_rotation, quat_matrix, quat_mul, Quat, Turn,
 };
 use crate::atlantis5_dialog::{self as dlg, Act, FilmSubtitles, Fonts, Kind, MenuState, Player};
-use crate::atlantis5_menu::{self as menus, Config, Effect, Menus};
+use crate::atlantis5_menu::{self as menus, Config, Effect, MenuPicture, Menus};
 use crate::atlantis5_poker::{self as poker, Poker};
 use crate::audio::{Audio, CHANNEL_CINEMA, CHANNEL_MUSIC_2004, CHANNEL_SOUND, CHANNEL_VOICE};
 use crate::film2004::{Film, FilmSound};
@@ -458,24 +458,110 @@ struct MusicChannel {
     queued: Vec<u8>,
 }
 
-/// A music stream: an Ogg file decoded ahead into an audio channel.
+/// A music stream: a track's file decoded ahead into an audio channel.
 struct MusicStream {
-    dec: VorbisStream,
+    dec: TrackDecoder,
     data: Vec<u8>,
     pushed: u64,
     done: bool,
+}
+
+/// A track's decoder. The original opens every track with FMOD's
+/// `FSOUND_Stream_Open(path, 0x22002, 0, 0)` (@ 0x0045acf0), which reads
+/// the file's own format with no test of its name: Ogg Vorbis, or RIFF
+/// WAVE PCM (11 of the French DVD's `Music` files, the only track of 15
+/// lists).
+enum TrackDecoder {
+    Vorbis(Box<VorbisStream>),
+    Pcm(PcmStream),
+}
+
+impl TrackDecoder {
+    fn open(data: &[u8]) -> Option<TrackDecoder> {
+        if data.starts_with(b"RIFF") {
+            return PcmStream::new(data).map(TrackDecoder::Pcm);
+        }
+        VorbisStream::new(data.to_vec())
+            .ok()
+            .map(|d| TrackDecoder::Vorbis(Box::new(d)))
+    }
+
+    fn rate(&self) -> u32 {
+        match self {
+            TrackDecoder::Vorbis(d) => d.rate(),
+            TrackDecoder::Pcm(d) => d.rate,
+        }
+    }
+
+    fn channels(&self) -> u16 {
+        match self {
+            #[allow(clippy::cast_possible_truncation)]
+            TrackDecoder::Vorbis(d) => d.channels() as u16,
+            TrackDecoder::Pcm(d) => d.channels,
+        }
+    }
+}
+
+impl MusicDecoder for TrackDecoder {
+    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize {
+        match self {
+            TrackDecoder::Vorbis(d) => d.read(out, max_frames),
+            TrackDecoder::Pcm(d) => d.read_frames(out, max_frames),
+        }
+    }
+}
+
+/// A RIFF WAVE file's PCM samples (8-bit unsigned or 16-bit signed),
+/// read frame by frame.
+struct PcmStream {
+    samples: std::sync::Arc<[u8]>,
+    pos: usize,
+    channels: u16,
+    rate: u32,
+    bytes: usize,
+}
+
+impl PcmStream {
+    fn new(data: &[u8]) -> Option<PcmStream> {
+        let i = atlantis4_data::audio::wav_info(data).ok()?;
+        if i.format != 1 || !(i.bits == 8 || i.bits == 16) || i.channels == 0 {
+            return None;
+        }
+        let bytes = usize::from(i.bits / 8);
+        let frame = bytes * usize::from(i.channels);
+        let len = i.data_len - i.data_len % frame;
+        Some(PcmStream {
+            samples: data[i.data_offset..i.data_offset + len].into(),
+            pos: 0,
+            channels: i.channels,
+            rate: i.sample_rate,
+            bytes,
+        })
+    }
+
+    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize {
+        let frame = self.bytes * usize::from(self.channels);
+        let n = ((self.samples.len() - self.pos) / frame).min(max_frames);
+        let part = &self.samples[self.pos..self.pos + n * frame];
+        if self.bytes == 2 {
+            out.extend(
+                part.as_chunks::<2>()
+                    .0
+                    .iter()
+                    .map(|&b| i16::from_le_bytes(b)),
+            );
+        } else {
+            out.extend(part.iter().map(|&b| (i16::from(b) - 128) << 8));
+        }
+        self.pos += n * frame;
+        n
+    }
 }
 
 /// A source of a music stream's frames (interleaved, as `ov_read`).
 trait MusicDecoder {
     /// Up to `max_frames` frames appended to `out`; 0 at the end.
     fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize;
-}
-
-impl MusicDecoder for VorbisStream {
-    fn read_frames(&mut self, out: &mut Vec<i16>, max_frames: usize) -> usize {
-        self.read(out, max_frames)
-    }
 }
 
 /// A music stream fed until `until` frames are pushed: at the file's end
@@ -566,6 +652,13 @@ struct SubjectMenu {
     picked: Option<Vec<u8>>,
     /// The menu has ended (its process returned 1).
     closed: bool,
+    /// +0xc/+0x10: the menu's own mouse, set at the mode's open (the
+    /// screen's centre, @ 0x0041b780) and by its moves in state 1
+    /// (@ 0x0040d920 → 0x0040d890); state 2 puts the mouse back there.
+    at: (i32, i32),
+    /// Opened since the menus' last frame: the drawn cursor is moved to
+    /// the centre then.
+    fresh: bool,
 }
 
 /// The inventory (`CMenu_Inventory`, mode 8).
@@ -575,9 +668,15 @@ struct InventoryMenu {
     size: usize,
     items: Vec<Option<Vec<u8>>>,
     background: Option<Bank>,
-    /// Left and right buttons: normal, focused.
+    /// Left and right buttons (`CIE_Button`s, +0x2c and +0x28, made by
+    /// @ 0x0044ee40): the click's file, the focus's file.
     left: [Option<Bank>; 2],
     right: [Option<Bank>; 2],
+    /// The two buttons' states, left then right (+0x98 of each).
+    arrows: [ArrowButton; 2],
+    /// The mouse at the last move the buttons saw (`None` before the
+    /// mode's opening move).
+    last_mouse: Option<(i32, i32)>,
     icons: Vec<Option<Bank>>,
     hand_icon: Option<Bank>,
     closed: bool,
@@ -589,6 +688,39 @@ struct InventoryMenu {
     /// The hand's item's description (`handled_object_name` and its
     /// shadow, +0x3c and +0x40).
     hand_name: String,
+}
+
+/// A page button's state (`CIE_Button`, @ 0x0044f0e0 / @ 0x0044f210):
+/// 0 the click's frame 0; 1 (a move put the mouse on it) the focus looped;
+/// 2 (a left press at 1) the click played once, the press then taken; its
+/// end is the button's click (event 2), back to 1 when the mouse is on
+/// it. Both at 15 frames a second.
+#[derive(Clone, Copy, Default)]
+struct ArrowButton {
+    state: u8,
+    time: f64,
+}
+
+impl ArrowButton {
+    /// The bank drawn (click, focus) and its picture: at 1 the focus
+    /// looped, at 2 the click played once, else the click's frame 0.
+    fn shown(self, banks: &[Option<Bank>; 2]) -> Option<(&Bank, usize)> {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let u = (self.time * 15.0) as usize;
+        let bank = if self.state == 1 {
+            &banks[1]
+        } else {
+            &banks[0]
+        };
+        let bank = bank.as_ref()?;
+        let n = bank.len().max(1);
+        let frame = match self.state {
+            1 => u % n,
+            2 => u.min(n - 1),
+            _ => 0,
+        };
+        Some((bank, frame))
+    }
 }
 
 /// The inventory's texts' font (@ 0x004144a0: every one of its four
@@ -678,6 +810,9 @@ pub struct Stage {
     /// `Frames` − 1): the loop draws that frame once more, then ends at
     /// the next update.
     film_ending: bool,
+    /// A film opened since the last update: its clock starts again at the
+    /// next ([`Stage::film_update`]).
+    film_opened: bool,
     /// The film's subtitles (`kinematic_subtitles.xml`).
     film_subtitles: Option<FilmSubtitles>,
     /// The text tables of the language.
@@ -795,6 +930,7 @@ impl Stage {
             film: None,
             film_bink_sound: false,
             film_ending: false,
+            film_opened: false,
             film_subtitles: None,
             dialogs: None,
             kinematic: None,
@@ -908,6 +1044,21 @@ impl Stage {
             .collect()
     }
 
+    /// The camera's yaw and pitch speeds (+0x14, +0x18; tests).
+    #[doc(hidden)]
+    pub fn camera_speed(&self) -> [f32; 2] {
+        self.speed
+    }
+
+    /// The seconds played by `object`'s sprite (tests).
+    #[doc(hidden)]
+    pub fn sprite_time(&self, object: &[u8]) -> Option<f64> {
+        self.sprites
+            .iter()
+            .find(|s| s.object == object)
+            .map(|s| s.time)
+    }
+
     /// The film playing, by its name.
     pub fn film_name(&self) -> Option<String> {
         self.film.as_ref().map(|(f, _)| f.name().to_string())
@@ -955,6 +1106,9 @@ impl Stage {
         else {
             return Err(ViewError::Bad("faces in another format".into()));
         };
+        // Faces of another size would stop the renderer (its 768² raster):
+        // refused here, the view kept as on any bad file.
+        crate::atlantis5::check_faces(&path, &faces)?;
         let wam_path = format!("datas/scenes/{scene_s}.wam");
         let zones = self
             .read(&wam_path)
@@ -1232,15 +1386,15 @@ impl Stage {
             log::warn!("{file}: not found");
             return;
         };
-        let Ok(dec) = VorbisStream::new(data.clone()) else {
-            log::warn!("{file}: not Ogg Vorbis");
+        let Some(dec) = TrackDecoder::open(&data) else {
+            log::warn!("{file}: neither Ogg Vorbis nor PCM WAVE");
             return;
         };
         if let Some(audio) = &self.audio {
             audio.start_stream(
                 CHANNEL_MUSIC_2004 + ch,
                 dec.rate(),
-                dec.channels() as u16,
+                dec.channels(),
                 if self.music_muted {
                     0.0
                 } else {
@@ -1356,7 +1510,7 @@ impl Stage {
                     &mut s.done,
                     &mut c.plays_left,
                     played + 44_100,
-                    || VorbisStream::new(data.clone()).ok(),
+                    || TrackDecoder::open(data),
                     |buf| audio.push(CHANNEL_MUSIC_2004 + ch, buf),
                 );
                 // @ 0x0045a640: each channel at master × its volume ×
@@ -1506,6 +1660,7 @@ impl Stage {
         });
         self.film = Some((film, sound));
         self.film_ending = false;
+        self.film_opened = true;
         // The loop's first iteration steps the film before its first draw
         // (@ 0x0040c990, @ 0x0043d6a0: the step @ 0x0042b0f0, then the draw
         // @ 0x0042b220): the first picture is the film's first frame.
@@ -1518,6 +1673,23 @@ impl Stage {
     /// decoded last was drawn once (`evidence/m5/video-play-rect.c`: step,
     /// sound, draw, flip, then the loop's test).
     fn film_update(&mut self) {
+        // The film is paced by Bink's own clock from its open (the step
+        // @ 0x00456cb0 is `BinkWait`, then `BinkDoFrame`; play.md § 7),
+        // not by the game's frame time (@ 0x00467fe0), and the voice is
+        // played at the open (@ 0x0042aa90: the film opened through its
+        // +0xc, then the voice loaded and played @ 0x004593d0,
+        // @ 0x00459630), so picture and voice start together; Bink reads
+        // the file as it plays [INFERRED: RAD's API]. Native reads the
+        // whole film and its voice in the call, and the next update's
+        // frame time holds that load: the film's clock starts at that
+        // update instead, so the picture does not run ahead of the voice
+        // by the load time (frame 1, drawn at the open, is at its time 0).
+        if std::mem::take(&mut self.film_opened) {
+            let now = self.clock;
+            if let Some((film, _)) = &mut self.film {
+                film.restart_clock(now);
+            }
+        }
         if !self.film_ending {
             self.film_step();
         }
@@ -1820,7 +1992,7 @@ impl Stage {
     /// music (@ 0x00459fd0), film.
     fn update(&mut self, dt: f64, play: bool, scene: bool) {
         self.update_start(dt, play);
-        self.update_scene(dt, scene);
+        self.update_scene(dt, scene.then_some(dt), true);
     }
 
     /// The frame's first part: the film's end, the camera, an animated
@@ -1856,8 +2028,14 @@ impl Stage {
     /// (@ 0x00459fd0), after the frame's scripts: state 4 (@ 0x0042f000
     /// case 4) runs the events and the timers, then the pick and the
     /// cursor, and only then the scene's update, so a sprite a click or a
-    /// timer made is stepped once before it is first drawn.
-    fn update_scene(&mut self, dt: f64, scene: bool) {
+    /// timer made is stepped once before it is first drawn. Without
+    /// `sound` neither runs (the frame a menu chain ends, @ 0x0041b780
+    /// returns 1 before both). `scene` is the sprites' step time, none
+    /// when they are not stepped.
+    fn update_scene(&mut self, dt: f64, scene: Option<f64>, sound: bool) {
+        if !sound {
+            return;
+        }
         // A randomized sprite's missing file throws out of the sprites'
         // step; `CGameManager::Process`'s catch (@ 0x0042f3c6) logs it
         // (`CGameManager :: Process -> %s`, 0x0066cc4c) and goes on after
@@ -1869,7 +2047,23 @@ impl Stage {
         // @ 0x0042b220, the flip) never call the scene's update
         // @ 0x0044c380: the sprites, the persistent records' times and the
         // randomize draws are frozen for the film's length.
-        let thrown = scene && self.film.is_none() && !self.sprites_step(dt);
+        //
+        // `Atl_Dialog_Play`'s loop (@ 0x00407ac0, both its branches:
+        // `evidence/m2/dialog-player.c`, dialogs.md § 2 step 5) runs the
+        // sound @ 0x00459fd0 before the scene's update @ 0x0044c380, in
+        // one try: a throw out of the sprites' step comes after that
+        // frame's sound update.
+        if self.dialog.is_some() && self.film.is_none() {
+            self.music_update(dt);
+            if let Some(t) = scene {
+                self.sprites_step(t);
+            }
+            return;
+        }
+        let thrown = match scene {
+            Some(t) if self.film.is_none() => !self.sprites_step(t),
+            _ => false,
+        };
         if !thrown {
             self.music_update(dt);
         }
@@ -2320,13 +2514,10 @@ impl Stage {
         }
         if let Some(run) = &mut self.dialog {
             if let Some(f) = &mut run.portrait {
-                // The 2D talker's film (the player's +0x14 step, case 2).
-                while f.due(self.clock) {
-                    f.do_frame();
-                    if !f.next_frame() {
-                        break;
-                    }
-                }
+                // The 2D talker's film: the player's +0x14 step (its base
+                // class's vtable 0x006559ac, @ 0x00456cb0) in case 2, its
+                // return not tested: one frame at most, looping.
+                f.bink_step(self.clock);
             }
         }
     }
@@ -2506,6 +2697,19 @@ impl Stage {
         self.dialog.is_some()
     }
 
+    /// The 2D talker's film (`FrameNum`, `Frames`), for tests.
+    pub fn dialog_portrait(&self) -> Option<(u32, u32)> {
+        self.dialog
+            .as_ref()
+            .and_then(|d| d.portrait.as_ref())
+            .map(|f| (f.frame_num, f.frames()))
+    }
+
+    /// The text of the tirade shown, for tests.
+    pub fn dialog_text(&self) -> Option<&str> {
+        self.dialog.as_ref().map(|d| d.text.as_str())
+    }
+
     /// The tirade shown (dialog id, tirade, state), for tests.
     pub fn dialog_state(&self) -> Option<(u32, usize, u32)> {
         self.dialog
@@ -2611,23 +2815,67 @@ impl Stage {
         }
     }
 
-    /// The subject menu opens (mode 9, @ 0x00410f80(name), the menu's
-    /// Initialize @ 0x004117f0): the character's sprite turns to face
-    /// (`facing`, its priority kept, its record held), state 0.
-    fn menu_open(&mut self, character: &[u8]) {
-        // The menu's start holds the half music level (@ 0x0041197e).
-        self.music_duck(0.5);
-        self.hold_randomized(character, true);
-        self.replace_anim(character, b"facing", Mode::Stop);
+    /// The subject menu asked by a click (@ 0x004300d0): only the
+    /// character's name kept (@ 0x00410f80, a string assign) and mode 9
+    /// queued (@ 0x0041b5d0); the click's frame goes on in play with the
+    /// character's sprite as it was. The menus' next frame opens it
+    /// ([`Stage::menu_initialize`]).
+    fn menu_ask(&mut self, character: &[u8]) {
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
         self.menu = Some(SubjectMenu {
             character: character.to_vec(),
-            state: MenuState::Facing,
+            state: MenuState::Asked,
             subjects: Vec::new(),
             bubble: None,
             images: Vec::new(),
             picked: None,
             closed: false,
+            at: centre,
+            fresh: false,
         });
+    }
+
+    /// Whether the subject menu is asked and not yet opened (the
+    /// manager's mode 0xd with mode 9 queued).
+    pub fn menu_asked(&self) -> bool {
+        self.menu
+            .as_ref()
+            .is_some_and(|m| m.state == MenuState::Asked)
+    }
+
+    /// The subject menu opens (the menus' frame @ 0x0041b780 with mode 9
+    /// queued, before the mode's process): the mouse at the screen's
+    /// centre (0x0040d890(W >> 1, H >> 1) and a move there), the menu's
+    /// Initialize (@ 0x004117f0): the character's sprite turns to face
+    /// (`facing`, its priority kept, @ 0x00443650: its record held), the
+    /// music at half (@ 0x0045caf0(0.5)), state 0.
+    pub(crate) fn menu_initialize(&mut self) {
+        let Some(m) = &self.menu else { return };
+        if m.state != MenuState::Asked {
+            return;
+        }
+        let character = m.character.clone();
+        #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+        let centre = (VIEW_WIDTH as i32 / 2, VIEW_HEIGHT as i32 / 2);
+        self.mouse = centre;
+        // The menu's start holds the half music level (@ 0x0041197e).
+        self.music_duck(0.5);
+        self.hold_randomized(&character, true);
+        self.replace_anim(&character, b"facing", Mode::Stop);
+        if let Some(m) = &mut self.menu {
+            m.state = MenuState::Facing;
+            m.at = centre;
+            m.fresh = true;
+        }
+    }
+
+    /// Whether the subject menu opened since the menus' last frame (its
+    /// mouse put at the centre); taken once.
+    pub(crate) fn menu_take_fresh(&mut self) -> bool {
+        self.menu
+            .as_mut()
+            .is_some_and(|m| std::mem::take(&mut m.fresh))
     }
 
     /// The subject menu's character whose subjects it needs now (its
@@ -2667,16 +2915,26 @@ impl Stage {
     /// image `sprites2d/dialog/subjects/<name>.spr` (`proxy_subject.spr`
     /// when missing), drawn at half its alpha when disabled
     /// (@ 0x00412b60: 0.5), and its 64 × 64 area. No subject: none, and
-    /// the menu stays.
+    /// the menu stays. Made after the facing (state 0) the menu's mouse is
+    /// still the open's centre (the facing's moves reached only the
+    /// global mouse, [`Play::mouse_at`]); made again after a subject's script (state 2,
+    /// @ 0x00410f90: 0x0040d890(+0xc, +0x10)) the mouse goes back to the
+    /// menu's own, where it was at the click, the moves made during the
+    /// script dropped.
     pub fn menu_set_subjects(&mut self, subjects: Vec<(Vec<u8>, bool)>) {
         let Some(m) = &self.menu else { return };
-        let _ = m;
-        let bubble = self
-            .read(&format!(
+        let back = (m.state == MenuState::Rebuild).then_some(m.at);
+        // No subject: @ 0x00411a90 leaves before it makes any element, the
+        // bubble's too (its `subject_bubble_8.spr` for 0 is dead code).
+        let bubble = if subjects.is_empty() {
+            None
+        } else {
+            self.read(&format!(
                 "datas/sprites2d/dialog/{}",
                 dlg::subject_bubble(subjects.len())
             ))
-            .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok());
+            .and_then(|d| Bank::parse(&d, Depth::Xrgb8888).ok())
+        };
         let images: Vec<Option<Bank>> = subjects
             .iter()
             .map(|(name, _)| {
@@ -2694,10 +2952,9 @@ impl Stage {
             m.images = images;
             m.state = MenuState::Open;
         }
-        self.mouse = (
-            i32::try_from(VIEW_WIDTH).unwrap_or(0) / 2,
-            i32::try_from(VIEW_HEIGHT).unwrap_or(0) / 2,
-        );
+        if let Some(at) = back {
+            self.mouse = at;
+        }
     }
 
     /// The subject menu's bubble hot spot.
@@ -2757,6 +3014,7 @@ impl Stage {
             Some(i) => {
                 m.picked = Some(m.subjects[i].0.clone());
                 m.state = MenuState::Rebuild;
+                m.at = (x, y);
             }
             None => m.state = MenuState::Closing,
         }
@@ -2809,6 +3067,28 @@ impl Stage {
     /// Whether the subject menu is open.
     pub fn menu_open_now(&self) -> bool {
         self.menu.is_some()
+    }
+
+    /// Whether the subject menu's character plays `facing` (state 0: the
+    /// menu's events are not run, @ 0x00410f90).
+    pub fn menu_facing(&self) -> bool {
+        self.menu
+            .as_ref()
+            .is_some_and(|m| m.state == MenuState::Facing)
+    }
+
+    /// Whether the subject menu's elements are up and take presses (state
+    /// 1: made after the facing, or made again after a subject's script).
+    pub fn menu_shown(&self) -> bool {
+        self.menu
+            .as_ref()
+            .is_some_and(|m| m.state == MenuState::Open)
+    }
+
+    /// Whether the subject menu's bubble is made (none without subjects,
+    /// @ 0x00411a90).
+    pub fn menu_has_bubble(&self) -> bool {
+        self.menu.as_ref().is_some_and(|m| m.bubble.is_some())
     }
 
     /// The subject menu over the view (@ 0x00411790: not in states 2
@@ -2878,6 +3158,8 @@ impl Stage {
                 spr(&format!("{dir}/button_right_focus.spr")),
             ],
             icons,
+            arrows: [ArrowButton::default(); 2],
+            last_mouse: None,
             closed: false,
             hover: None,
             info: String::new(),
@@ -2895,12 +3177,108 @@ impl Stage {
         }
     }
 
-    /// The elements made again (@ 0x00415fe0) after a click.
+    /// The elements made again (@ 0x00415fe0) after a click. The page
+    /// buttons are not among them: they keep their states.
     pub fn inventory_refresh(&mut self, size: usize, items: Vec<Option<Vec<u8>>>, hand: Vec<u8>) {
-        let offset = self.inventory.as_ref().map_or(0, |i| i.offset);
-        if self.inventory.is_some() {
-            self.inventory = Some(self.inventory_build(size, items, hand, offset));
+        let Some(old) = &self.inventory else { return };
+        let (offset, arrows, last_mouse) = (old.offset, old.arrows, old.last_mouse);
+        let mut inv = self.inventory_build(size, items, hand, offset);
+        inv.arrows = arrows;
+        inv.last_mouse = last_mouse;
+        self.inventory = Some(inv);
+    }
+
+    /// The page buttons on a move of the mouse (@ 0x0044f0e0, an event of
+    /// kind 2; the mode's opening move at the centre first): at 0 under
+    /// the mouse 1 (the focus from frame 0), at 1 away from it 0.
+    pub fn inventory_buttons_hover(&mut self, wheel: bool) {
+        let hit = self.inventory_hit();
+        let mouse = self.mouse;
+        let Some(inv) = &mut self.inventory else {
+            return;
+        };
+        // A move event (the mouse moved, or the wheel turned: lZ).
+        if inv.last_mouse == Some(mouse) && !wheel {
+            return;
         }
+        inv.last_mouse = Some(mouse);
+        for (b, which) in inv
+            .arrows
+            .iter_mut()
+            .zip([InventoryHit::Left, InventoryHit::Right])
+        {
+            let inside = hit == Some(which);
+            match b.state {
+                0 if inside => {
+                    b.state = 1;
+                    b.time = 0.0;
+                }
+                1 if !inside => b.state = 0,
+                _ => {}
+            }
+        }
+    }
+
+    /// A left press the page buttons take (@ 0x0044f0e0): a button at 1
+    /// turns 2 (its click played once from frame 0); one at 2 takes it
+    /// and nothing else happens.
+    pub fn inventory_buttons_press(&mut self) -> bool {
+        let Some(inv) = &mut self.inventory else {
+            return false;
+        };
+        for b in &mut inv.arrows {
+            match b.state {
+                1 => {
+                    b.state = 2;
+                    b.time = 0.0;
+                    return true;
+                }
+                2 => return true,
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// The page buttons' players (@ 0x0044f210): a click whose picture
+    /// ended (t > n / 15) is the button's click, `true` for the right one
+    /// (back to 1 when the mouse is still on it; else it stays at 2 and
+    /// clicks again each frame, as the original's).
+    pub fn inventory_buttons_step(&mut self, dt: f64) -> Vec<bool> {
+        let hit = self.inventory_hit();
+        let Some(inv) = &mut self.inventory else {
+            return Vec::new();
+        };
+        let mut out = Vec::new();
+        for (i, b) in inv.arrows.iter_mut().enumerate() {
+            b.time += dt;
+            if b.state != 2 {
+                continue;
+            }
+            let bank = if i == 0 { &inv.left[0] } else { &inv.right[0] };
+            let n = bank.as_ref().map_or(1, Bank::len).max(1);
+            #[allow(clippy::cast_precision_loss)]
+            if b.time > n as f64 / 15.0 {
+                let which = if i == 0 {
+                    InventoryHit::Left
+                } else {
+                    InventoryHit::Right
+                };
+                if hit == Some(which) {
+                    b.state = 1;
+                    b.time = 0.0;
+                }
+                out.push(i == 1);
+            }
+        }
+        out
+    }
+
+    /// A page button's state (tests): 0, 1 or 2.
+    pub fn inventory_button_state(&self, right: bool) -> Option<u8> {
+        self.inventory
+            .as_ref()
+            .map(|i| i.arrows[usize::from(right)].state)
     }
 
     /// Whether the inventory is open.
@@ -2952,9 +3330,11 @@ impl Stage {
                 return Some(InventoryHit::Slot(c + inv.offset));
             }
         }
+        // `CIE_Button`s: the element's hit test (@ 0x00452020) includes
+        // both ends, x..=x + w and y..=y + h.
         let inside = |b: &Option<Bank>, bx: i32, by: i32| {
             b.as_ref().and_then(|b| b.info(0)).is_some_and(|i| {
-                (bx..bx + i32::from(i.w)).contains(&x) && (by..by + i32::from(i.h)).contains(&y)
+                (bx..=bx + i32::from(i.w)).contains(&x) && (by..=by + i32::from(i.h)).contains(&y)
             })
         };
         if inside(&inv.left[0], lx, ly) {
@@ -2998,25 +3378,22 @@ impl Stage {
     }
 
     /// The inventory over the view (@ 0x00414b70): its background +4 with
-    /// its children, the grid and buttons (a button's focus picture under
-    /// the mouse [INFERRED]) and the icons in their cells. The cursor's
+    /// its children, the grid and buttons (each as its state shows it,
+    /// [`ArrowButton`]) and the icons in their cells. The cursor's
     /// children come after the cursor
     /// ([`Stage::draw_inventory_over_cursor`]).
     fn draw_inventory(&self, out: &mut [u32]) {
         let Some(inv) = &self.inventory else { return };
         let ((gx, gy), (lx, ly), (rx, ry)) = Self::inventory_layout(inv);
-        let hit = self.inventory_hit();
         let mut t = Target::screen(out, VIEW_WIDTH, VIEW_HEIGHT);
         if let Some(b) = &inv.background {
             b.draw(&mut t, Some(gx), gy, 0);
         }
-        let lb = usize::from(hit == Some(InventoryHit::Left));
-        if let Some(b) = inv.left[lb].as_ref().or(inv.left[0].as_ref()) {
-            b.draw(&mut t, Some(lx), ly, 0);
+        if let Some((b, f)) = inv.arrows[0].shown(&inv.left) {
+            b.draw(&mut t, Some(lx), ly, f);
         }
-        let rb = usize::from(hit == Some(InventoryHit::Right));
-        if let Some(b) = inv.right[rb].as_ref().or(inv.right[0].as_ref()) {
-            b.draw(&mut t, Some(rx), ry, 0);
+        if let Some((b, f)) = inv.arrows[1].shown(&inv.right) {
+            b.draw(&mut t, Some(rx), ry, f);
         }
         for c in 0..10usize {
             if let Some(Some(icon)) = inv.icons.get(c + inv.offset) {
@@ -3555,7 +3932,7 @@ impl Engine for Stage {
                     d.remove(atlantis5_script::save::AUTOSLOT);
                 }
             }
-            Request::SubjectMenu { character } => self.menu_open(character),
+            Request::SubjectMenu { character } => self.menu_ask(character),
             Request::GameEnded => {
                 // @ 0x0042ffd0's engine part, then the credits (mode 1).
                 self.end_game();
@@ -3630,7 +4007,17 @@ impl Engine for Stage {
             attr_f32(&mut e, "time", *time as f32);
             ps.children.push(e);
         }
-        vec![conf, self.camera_mover_section(), cam, sound, ps]
+        let mut out = vec![conf, self.camera_mover_section(), cam];
+        // `SOUND` made only at the first channel with a playlist's name
+        // (@ 0x0043a4f0: none, LAB_0043a57e without it);
+        // `PERSISTANT_SPRITES` only when the list is not empty
+        // (@ 0x00439f10, its size +0x2c).
+        for section in [sound, ps] {
+            if !section.children.is_empty() {
+                out.push(section);
+            }
+        }
+        out
     }
 
     fn load_sections(&mut self, root: &atlantis4_data::xml::Element) {
@@ -3668,19 +4055,25 @@ impl Engine for Stage {
             self.pitch = f("pitch");
             self.yaw = f("yaw");
         }
-        if let Some(ps) = root.child("PERSISTANT_SPRITES") {
-            self.persistent = ps
-                .children_named("PS")
-                .filter_map(|e| {
-                    let name = atlantis4_data::xml::to_cp1252(e.attr("name")?);
-                    Some((name, get_f64(e, "time").unwrap_or(0.0)))
-                })
-                .collect();
+        // `PERSISTANT_SPRITES` and `SOUND` are written only with content
+        // (@ 0x00439f10, @ 0x0043a4f0): a file without them is read as
+        // with them empty (the readers @ 0x0043a170 and @ 0x0043a880 are
+        // not dumped; Native's choice, as its saves read before).
+        self.persistent = root
+            .child("PERSISTANT_SPRITES")
+            .map(|ps| {
+                ps.children_named("PS")
+                    .filter_map(|e| {
+                        let name = atlantis4_data::xml::to_cp1252(e.attr("name")?);
+                        Some((name, get_f64(e, "time").unwrap_or(0.0)))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        for ch in 0..MUSIC_CHANNELS {
+            self.music_stop(ch, 0.0);
         }
         if let Some(snd) = root.child("SOUND") {
-            for ch in 0..MUSIC_CHANNELS {
-                self.music_stop(ch, 0.0);
-            }
             for p in snd.children_named("PLAYLIST") {
                 #[allow(clippy::cast_possible_truncation)]
                 let ch = get_f64(p, "channel").unwrap_or(-1.0) as i32;
@@ -3824,6 +4217,27 @@ pub enum Hover {
     Sprite(Vec<u8>, Vec<u8>),
 }
 
+/// The picture last composed by [`Play::render_cached`] and how many
+/// times it composed.
+#[derive(Debug, Default)]
+pub struct PictureCache {
+    shown: Option<MenuPicture>,
+    composed: u64,
+}
+
+impl PictureCache {
+    /// The picture is to be composed at the next frame (its buffer was
+    /// written otherwise).
+    pub fn invalidate(&mut self) {
+        self.shown = None;
+    }
+
+    /// How many pictures were composed.
+    pub fn composed(&self) -> u64 {
+        self.composed
+    }
+}
+
 /// A game being played.
 pub struct Play {
     pub game: Game,
@@ -3834,6 +4248,25 @@ pub struct Play {
     moves: (f32, f32),
     /// Left clicks since the last frame.
     clicks: usize,
+    /// The left presses made with the right button up: the play state's
+    /// clicks (@ 0x004300d0 compares the event's buttons, which hold both
+    /// buttons' state, @ 0x0043bbc0, for equality with 1).
+    play_clicks: usize,
+    /// The buttons held, as the front end last told them
+    /// ([`Play::set_buttons`]).
+    left_held: bool,
+    right_held: bool,
+    /// A turn of the wheel since the last frame: the original's move
+    /// handler runs when lX, lY or lZ is not 0 (@ 0x0047c8a0), so a wheel
+    /// turn with a still mouse is a mouse move event (kind 2, lX = lY = 0).
+    wheel: bool,
+    /// This frame has a mouse move event made by the wheel alone (the
+    /// hover tests run on it although the mouse did not move).
+    wheel_now: bool,
+    /// The inventory opened by a right press since the last frame: the
+    /// next frame is its mode's opening (@ 0x0041b780), whose events are
+    /// dropped.
+    inventory_fresh: bool,
     hover: Option<Hover>,
     /// The menus (the manager's other modes).
     pub menus: Menus,
@@ -3841,6 +4274,12 @@ pub struct Play {
     sound_held: bool,
     /// The poker board (mode 12) when it is up.
     poker: Option<Poker>,
+    /// The global mouse (0x006b0b38 / 0x006b0b3c) when it went apart from
+    /// the subject menu's own (+0xc/+0x10): moved while the character
+    /// plays `facing`, whose state (@ 0x00410f90 case 0) never runs the
+    /// menu's events (@ 0x0040d920), until the first move once the
+    /// elements are up, which takes the menu's mouse there.
+    menu_global: Option<(i32, i32)>,
     src: Arc<dyn FileSource>,
     /// The logos still to play before the main menu ([`Play::boot`]).
     logos: Vec<&'static str>,
@@ -3921,10 +4360,17 @@ impl Play {
             stage,
             moves: (0.0, 0.0),
             clicks: 0,
+            play_clicks: 0,
+            left_held: false,
+            right_held: false,
+            wheel: false,
+            wheel_now: false,
+            inventory_fresh: false,
             hover: None,
             menus,
             sound_held: false,
             poker: None,
+            menu_global: None,
             src,
             logos: Vec::new(),
             in_logos: false,
@@ -4062,7 +4508,9 @@ impl Play {
         if self.logos_playing() {
             // The logos' loop (@ 0x0043d6a0): the film's steps only.
             self.clicks = 0;
+            self.play_clicks = 0;
             self.moves = (0.0, 0.0);
+            self.wheel = false;
             self.stage.borrow_mut().update(dt, false, true);
             let ended = std::mem::take(&mut self.stage.borrow_mut().wait_ended);
             if ended && !self.stage().film_playing() {
@@ -4072,14 +4520,18 @@ impl Play {
         }
         self.game.set_fov(self.stage.borrow().fov);
         let play = self.game.state() == 4 && !self.game.busy();
+        self.wheel_now = std::mem::take(&mut self.wheel);
         let (dx, dy) = std::mem::take(&mut self.moves);
         let clicks = std::mem::take(&mut self.clicks);
+        let play_clicks = std::mem::take(&mut self.play_clicks);
         // One move event a frame at most (@ 0x0047c8a0: one
         // `GetDeviceState` of the mouse, the move handler called once when
         // lX, lY or lZ is not 0), so the look's rule (a third of a speed
         // against the move taken off, the ±6 clamp, @ 0x0042cdc0) runs
         // once on the frame's whole move, whatever the mouse's report rate.
-        if play && (dx != 0.0 || dy != 0.0) {
+        // A wheel turn alone is a move event too: @ 0x0042cdc0 zeroes the
+        // damping clock with the speeds unchanged.
+        if play && (dx != 0.0 || dy != 0.0 || self.wheel_now) {
             #[allow(clippy::cast_possible_truncation)]
             self.stage.borrow_mut().look(dx, dy, dt as f32);
         }
@@ -4089,12 +4541,33 @@ impl Play {
         // first, then the scene's update (@ 0x0044c380 → the sprites'
         // step @ 0x00441c30) for modes 8, 9 and 0xc only (the inventory,
         // the subject menu, poker: the 3D view stays under them), then the
-        // sound (@ 0x00459fd0); the other modes freeze the sprites.
+        // sound (@ 0x00459fd0); the other modes freeze the sprites. In the
+        // frame the mode's process returns 1 the mode is 0xd: with nothing
+        // queued @ 0x0041b780 returns 1 before both (the manager's case 3
+        // falls into case 0), with a mode queued only the sound runs.
         let mut scene = true;
+        let mut sound = true;
         if self.game.state() == 3 && !self.game.busy() {
-            let before = self.scene_under_menu();
-            self.menu_frame(clicks, dt);
-            scene = before || self.scene_under_menu();
+            match self.menu_frame(clicks, clicks - play_clicks, dt) {
+                Some(queued) => {
+                    scene = false;
+                    sound = queued;
+                }
+                None => scene = self.scene_under_menu(),
+            }
+        } else if self.menus.closing() {
+            // A menu closed by its click in the last frame, whose effect
+            // took the manager out of state 3 at once (Native runs a new
+            // game, a load or the game's end at the click; the original's
+            // manager stays in state 3 until the menu's process returns
+            // 1): its end frame still runs, as in state 3.
+            let queued = self.menus_step(dt).unwrap_or(false);
+            scene = false;
+            sound = queued;
+        } else if let Some(p) = &mut self.poker {
+            // The board's film or dialog runs in its own loop: the board's
+            // process (and its cursor) does not see the moves.
+            p.held_frame(self.menus.mouse);
         }
         // A dialog takes the frame's clicks (`Atl_Dialog_Play`'s loop).
         if self.stage.borrow().dialog_running() {
@@ -4104,17 +4577,20 @@ impl Play {
         if std::mem::take(&mut self.stage.borrow_mut().wait_ended) {
             self.game.finish_wait();
         }
-        if play {
-            for _ in 0..clicks {
-                match self.hover.clone() {
-                    Some(Hover::Zone(id, name)) => {
-                        self.game.click_zone(id, &name);
-                    }
-                    Some(Hover::Sprite(object, animation)) => {
-                        self.game.click_sprite(&object, &animation);
-                    }
-                    None => {}
+        // One press a frame at most: the original reads the mouse once a
+        // frame (@ 0x0047c8a0, a button going down makes one event) and
+        // picks again after each, so a press never acts on what an earlier
+        // one removed. Native's longer frames can hold more: the rest are
+        // dropped, as the menus do.
+        if play && play_clicks > 0 {
+            match self.hover.clone() {
+                Some(Hover::Zone(id, name)) => {
+                    self.game.click_zone(id, &name);
                 }
+                Some(Hover::Sprite(object, animation)) => {
+                    self.game.click_sprite(&object, &animation);
+                }
+                None => {}
             }
         }
         self.game.update(dt);
@@ -4123,8 +4599,17 @@ impl Play {
         }
         self.cursor_frame(dt);
         // The scene's update and the sound last (@ 0x0042f000 case 4:
-        // after the events, the timers, the pick and the cursor).
-        self.stage.borrow_mut().update_scene(dt, scene);
+        // after the events, the timers, the pick and the cursor). A frame
+        // of a transition's loop (@ 0x00405390: the step, the sound, the
+        // draw) steps the sprites only from the step, and only in the
+        // steps that call the scene's update (@ 0x0042d900): never in the
+        // frame that changes the view by `no_fx` or `centring`, nor in
+        // `zoom_and_fade`'s last.
+        let scene = match self.game.take_transition_scene() {
+            Some(step) => step,
+            None => scene.then_some(dt),
+        };
+        self.stage.borrow_mut().update_scene(dt, scene, sound);
         // Then, on the normal path and after the catch alike
         // (0x0042f464..0x0042f471), a sprite found by the pick (+0x3c)
         // is picked again (@ 0x00430b70, which clears +0x3c first) on the
@@ -4138,6 +4623,7 @@ impl Play {
                 self.stage.borrow_mut().cursor = Some(cursor);
             }
         }
+        self.inventory_fresh = false;
     }
 
     /// The modes the scripts asked (`Atl_GameOver`, `Atl_ExamineItem`,
@@ -4295,14 +4781,25 @@ impl Play {
         st.inventory_open_now() || st.menu_open_now() || self.poker.is_some()
     }
 
-    fn menu_frame(&mut self, clicks: usize, dt: f64) {
+    /// `held_clicks`: how many of the `clicks` were made with the right
+    /// button held.
+    ///
+    /// `Some(queued)` when the mode's process returned 1 this frame (the
+    /// mode 0xd then), `queued` when another mode waits for the next
+    /// frame.
+    fn menu_frame(&mut self, clicks: usize, held_clicks: usize, dt: f64) -> Option<bool> {
         if self.stage.borrow().inventory_open_now() {
-            self.inventory_frame(clicks);
-            return;
+            return self.inventory_frame(clicks, held_clicks, dt);
         }
         if !self.stage.borrow().menu_open_now() {
-            self.menus_frame(clicks, dt);
-            return;
+            return self.menus_frame(clicks, dt);
+        }
+        // The mode's open (@ 0x0041b780, the frame after the click that
+        // asked it): its Initialize, then the drawn cursor at the centre
+        // with the menu's mouse.
+        self.stage.borrow_mut().menu_initialize();
+        if self.stage.borrow_mut().menu_take_fresh() {
+            self.cursor_to_stage_mouse();
         }
         // The menu's process (@ 0x00410f90): state 5 (asked by a click
         // elsewhere or `Atl_TerminateDialog` since its last frame) ends it.
@@ -4312,10 +4809,11 @@ impl Play {
             // subject's script): the manager stays in state 3 and opens it
             // at the next frame (@ 0x0041b780).
             self.take_menu_requests();
-            if !self.menus.active() {
+            let queued = self.menus.active();
+            if !queued {
                 self.game.menu_closed();
             }
-            return;
+            return Some(queued);
         }
         let wants = self.stage.borrow_mut().menu_wants_subjects();
         if let Some(c) = wants {
@@ -4328,6 +4826,21 @@ impl Play {
             };
             self.stage.borrow_mut().menu_set_subjects(list);
             self.cursor_to_stage_mouse();
+            // No press is taken in the frame the elements are made: state
+            // 0 returns after making them, state 2 empties the frame's
+            // events but its own move (@ 0x00410f90).
+            return None;
+        }
+        // A wheel turn is a move event too (kind 2, @ 0x0047c8a0 calls the
+        // move handler when lX, lY or lZ is not 0; play.md § 2), carrying
+        // the global mouse (@ 0x0043bde0): after moves made during the
+        // facing, it takes the menu's mouse and its cursor there
+        // (@ 0x0040d920 → 0x0040d890, for every kind-2 event; dialogs.md
+        // § 4), before the frame's press is tested.
+        if self.wheel_now && !self.stage.borrow().menu_facing() {
+            if let Some((x, y)) = self.menu_global {
+                self.mouse_at(x, y);
+            }
         }
         for _ in 0..clicks {
             self.stage.borrow_mut().menu_click();
@@ -4337,6 +4850,7 @@ impl Play {
                 break;
             }
         }
+        None
     }
 
     /// The menus' frame (@ 0x0041b780): the next mode made when none is
@@ -4344,7 +4858,7 @@ impl Play {
     /// what it asks done; at its end with nothing queued, the music goes
     /// on and the manager takes its next request. With no menu up nor
     /// queued, state 3 ends at once (logged).
-    fn menus_frame(&mut self, clicks: usize, dt: f64) {
+    fn menus_frame(&mut self, clicks: usize, dt: f64) -> Option<bool> {
         if self.poker.is_none() && self.menus.take_next(menus::POKER) {
             // The mode opens (@ 0x0041b780): the mouse at the screen's
             // centre, the board's init (state 0, @ 0x00425890).
@@ -4376,21 +4890,27 @@ impl Play {
                     stage: &self.stage,
                     menus: &self.menus,
                 };
-                poker.frame(&mut host, mouse, clicks, &measure)
+                poker.frame(&mut host, mouse, clicks, self.wheel_now, &measure)
             };
+            // States 2, 0xa, 0xc: the mouse back at the cursor's place
+            // (@ 0x0040d890).
+            if let Some((x, y)) = poker.take_mouse() {
+                self.mouse_at(x, y);
+            }
             if closed {
                 // Its process returned 1: mode 0xd; with a mode queued
                 // (the death panel of `Atl_GameOver`, which the board's
                 // `OnLose` may have asked in this very frame) the manager
                 // stays in state 3, else it takes its next request.
                 self.take_menu_requests();
-                if !self.menus.active() {
+                let queued = self.menus.active();
+                if !queued {
                     self.game.menu_closed();
                 }
-            } else {
-                self.poker = Some(poker);
+                return Some(queued);
             }
-            return;
+            self.poker = Some(poker);
+            return None;
         }
         // Mode 8 queued (after the examine view of an inventory item): the
         // inventory again.
@@ -4400,21 +4920,35 @@ impl Play {
             self.stage.borrow_mut().inventory_open(size, items, hand);
             self.cursor_to_stage_mouse();
             self.inventory_hand_name();
-            return;
+            return None;
         }
         if !self.menus.active() {
             log::info!("menu of state 3: none asked, closed");
             self.game.menu_closed();
-            return;
+            return None;
         }
         for _ in 0..clicks {
             self.menus.click();
         }
+        if self.wheel_now {
+            self.menus.move_event();
+        }
+        self.menus_step(dt)
+    }
+
+    /// The menus' process (@ 0x0041b780 on the mode's), what it asked
+    /// done, and its end: `Some(queued)` the frame it returned 1 (a mode
+    /// queued or not), else `None`.
+    fn menus_step(&mut self, dt: f64) -> Option<bool> {
+        let was_up = self.menus.current().is_some();
         let ended = {
             let mut st = self.stage.borrow_mut();
             let st = &mut *st;
             self.menus.step(dt, &st.fonts, &mut st.config)
         };
+        // Its process returned 1 with a mode queued: the menu dropped, the
+        // next one made at the next frame.
+        let ended_queued = was_up && ended.is_none() && self.menus.current().is_none();
         if let Some(m) = self.menus.current() {
             if menus::pauses_sound(m) && !self.sound_held {
                 self.sound_held = true;
@@ -4439,16 +4973,18 @@ impl Play {
             }
             self.menu_effect(e);
         }
-        if let (true, Some(mode)) = (load_failed, ended) {
+        if load_failed && self.menus.queued().is_empty() {
             // A save that exists but cannot be read (empty, cut short,
             // not an `ATL_FILE`): nothing is queued, and with the menu
             // closed the manager would go round states 0 and 3 with no
             // menu. The original closes the page after its reader
             // whatever the read did (0x00418c29) and leaves the menus with
-            // no mode; Native opens the page again.
-            log::warn!("the save could not be read: its page again");
-            self.menus.request(mode);
-            return;
+            // no mode; Native opens the page again (queued now, made the
+            // frame after the page's end).
+            if let Some(mode) = self.menus.current() {
+                log::warn!("the save could not be read: its page again");
+                self.menus.request(mode);
+            }
         }
         if ended.is_some() {
             if self.sound_held {
@@ -4456,7 +4992,9 @@ impl Play {
                 self.stage.borrow_mut().hold_sound(false);
             }
             self.game.menu_closed();
+            return Some(false);
         }
+        ended_queued.then_some(true)
     }
 
     /// What a menu asked.
@@ -4506,7 +5044,7 @@ impl Play {
     /// hand the original opens the inventory (mode 8, state 3), which is
     /// not ported (logged).
     pub fn right_click(&mut self) {
-        if self.game.state() != 4 || self.game.busy() {
+        if self.game.state() != 4 || self.game.busy() || self.left_held {
             return;
         }
         match self.game.script().handled_item() {
@@ -4514,7 +5052,13 @@ impl Play {
                 self.game.run_arrange_handled_object();
             }
             Ok(_) => {
-                // Mode 8, state 3 (@ 0x004305d0).
+                // Mode 8, state 3 (@ 0x004305d0). The mode opens at the
+                // menus' next frame (@ 0x0041b780), which empties that
+                // frame's events and inserts only the move at the centre:
+                // the presses made until then are dropped.
+                self.clicks = 0;
+                self.play_clicks = 0;
+                self.inventory_fresh = true;
                 let (size, items) = self.game.script().inventory();
                 self.game.open_menu();
                 self.stage
@@ -4533,10 +5077,30 @@ impl Play {
     /// item has a detailed picture (`objects_detailed/<item>.spr`): the
     /// item given (@ 0x004137b0), modes 11 then 8 asked, the inventory
     /// ended; elsewhere the inventory ends (@ 0x00414a30 state 2: a mouse
-    /// event with the buttons 4 that no element took).
+    /// event with the buttons 4 that no element took). Not while a
+    /// script waits (a dialog, a film, a transition): the original is in
+    /// that call's loop then, whose frame takes only the left press and
+    /// Space (dialogs.md § 3, 0x004329df..0x00432a47).
     pub fn right_press(&mut self) {
+        // With the left button held the event's buttons are 5
+        // (@ 0x0043bbc0 builds them from both buttons' state, not from the
+        // one that went down): the same event as a left press made with
+        // the right button held. Play ignores it (`== 1` / `== 4`,
+        // @ 0x004300d0); the menus, the dialog player, the subject menu
+        // and the examine view take it as a left press (`& 1`).
+        if self.left_held {
+            self.click();
+            return;
+        }
+        if self.game.busy() {
+            return;
+        }
         if !(self.game.state() == 3 && self.stage.borrow().inventory_open_now()) {
             self.right_click();
+            return;
+        }
+        // In the inventory's opening frame: dropped with its events.
+        if self.inventory_fresh {
             return;
         }
         let hit = self.stage.borrow().inventory_hit();
@@ -4558,29 +5122,55 @@ impl Play {
                     self.stage.borrow_mut().inventory_close();
                 }
             }
-            Some(_) => {}
-            None => self.stage.borrow_mut().inventory_close(),
+            // The page buttons take only a left press (`buttons & 1`,
+            // @ 0x0044f0e0): state 2 (@ 0x00414a30) sees the right press
+            // untaken and ends the inventory, as off the elements.
+            Some(InventoryHit::Left | InventoryHit::Right) | None => {
+                self.stage.borrow_mut().inventory_close();
+            }
         }
     }
 
-    /// The inventory's frame: each left press on a slot (@ 0x00417120)
-    /// or a button; then the elements made again (@ 0x00415fe0) from the
-    /// database; at its end the manager's next request.
-    fn inventory_frame(&mut self, clicks: usize) {
+    /// The inventory's frame: the page buttons on a move; each left press
+    /// on a slot (@ 0x00417120) or taken by a page button; the buttons'
+    /// players, whose ended click pages (@ 0x00417670 → 0x00414d50,
+    /// @ 0x004176a0 → 0x00414d60); after a slot's click or a page the
+    /// elements made again (@ 0x00415fe0) from the database; at its end
+    /// the manager's next request. A left press made with the right
+    /// button held carries the buttons 5: when no element took a press
+    /// that frame, state 2 (@ 0x00414a30: `buttons & 4` on a press event)
+    /// ends the inventory, as a right press off the elements does.
+    fn inventory_frame(&mut self, clicks: usize, held_clicks: usize, dt: f64) -> Option<bool> {
+        // Opened by a right press: this is the mode's opening frame, its
+        // presses dropped (@ 0x0041b780).
+        let (clicks, held_clicks) = if std::mem::take(&mut self.inventory_fresh) {
+            (0, 0)
+        } else {
+            (clicks, held_clicks)
+        };
+        let wheel = self.wheel_now;
+        self.stage.borrow_mut().inventory_buttons_hover(wheel);
+        let mut taken = false;
         for _ in 0..clicks {
             let hit = self.stage.borrow().inventory_hit();
-            match hit {
-                Some(InventoryHit::Slot(s)) => {
-                    self.game.click_inventory(s);
-                }
-                Some(InventoryHit::Left) => self.stage.borrow_mut().inventory_page(false),
-                Some(InventoryHit::Right) => self.stage.borrow_mut().inventory_page(true),
-                None => continue,
+            if let Some(InventoryHit::Slot(s)) = hit {
+                self.game.click_inventory(s);
+                self.inventory_remake();
+                taken = true;
+            } else {
+                taken |= self.stage.borrow_mut().inventory_buttons_press();
             }
-            let (size, items) = self.game.script().inventory();
-            let hand = self.game.script().handled_item().unwrap_or_default();
-            self.stage.borrow_mut().inventory_refresh(size, items, hand);
-            self.inventory_hand_name();
+        }
+        if held_clicks > 0 && !taken {
+            self.stage.borrow_mut().inventory_close();
+        }
+        let pages = self.stage.borrow_mut().inventory_buttons_step(dt);
+        for right in pages {
+            if !self.stage.borrow().inventory_open_now() {
+                break;
+            }
+            self.stage.borrow_mut().inventory_page(right);
+            self.inventory_remake();
         }
         // The bubble (@ 0x00416c50, after the events).
         if self.stage.borrow().inventory_open_now() {
@@ -4589,9 +5179,14 @@ impl Play {
         }
         // Its end: the manager's next mode (the examine view), or the
         // game manager's next request.
-        if self.stage.borrow_mut().inventory_take_closed() && !self.menus.active() {
-            self.game.menu_closed();
+        if self.stage.borrow_mut().inventory_take_closed() {
+            let queued = self.menus.active();
+            if !queued {
+                self.game.menu_closed();
+            }
+            return Some(queued);
         }
+        None
     }
 
     /// Whether a menu is up (the manager's state 3): the mouse moves a
@@ -4600,17 +5195,38 @@ impl Play {
         self.game.state() == 3
     }
 
-    /// The mouse at (x, y) on the 1024 × 576 picture (menus).
+    /// The mouse at (x, y) on the 1024 × 576 picture (menus). While the
+    /// subject menu's character plays `facing` only the global mouse
+    /// moves: the menu's own mouse and its cursor stay at the centre the
+    /// open set (@ 0x0041b780), and the first move once the elements are
+    /// up takes them to the mouse (@ 0x0040d920 → 0x0040d890).
     pub fn mouse_at(&mut self, x: i32, y: i32) {
+        let facing = {
+            let st = self.stage.borrow();
+            if !st.menu_open_now() {
+                self.menu_global = None;
+            }
+            st.menu_facing()
+        };
+        if facing {
+            #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
+            let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
+            self.menu_global = Some((x.clamp(0, w), y.clamp(0, h)));
+            return;
+        }
+        self.menu_global = None;
         self.stage.borrow_mut().mouse = (x, y);
         self.menus.mouse_at(x, y);
     }
 
     /// A relative move of the mouse in a menu (DirectInput's lX, lY,
-    /// @ 0x0047c8a0): the menus' mouse moved by it and kept within
-    /// 0..=1024, 0..=576 (@ 0x0040d890).
+    /// @ 0x0047c8a0): the global mouse moved by it and kept within
+    /// 0..=1024, 0..=576, then the menus' mouse there (@ 0x0040d890).
     pub fn mouse_by(&mut self, dx: i32, dy: i32) {
-        let (x, y) = self.menus.mouse;
+        if !self.stage.borrow().menu_open_now() {
+            self.menu_global = None;
+        }
+        let (x, y) = self.menu_global.unwrap_or(self.menus.mouse);
         #[allow(clippy::cast_possible_wrap, clippy::cast_possible_truncation)]
         let (w, h) = (VIEW_WIDTH as i32, VIEW_HEIGHT as i32);
         self.mouse_at(
@@ -4620,9 +5236,10 @@ impl Play {
     }
 
     /// The drawn cursor moved where the stage put the mouse: a mode's
-    /// initialize puts it at the screen's centre (menus.md: the subject
-    /// menu's state 2, the inventory's open), where both the hit tests
-    /// and the cursor then are.
+    /// open puts it at the screen's centre (@ 0x0041b780: the subject
+    /// menu's, the inventory's), the subject menu's state 2 back at the
+    /// menu's own mouse (@ 0x00410f90), where both the hit tests and the
+    /// cursor then are.
     fn cursor_to_stage_mouse(&mut self) {
         let (x, y) = self.stage.borrow().mouse;
         self.menus.mouse_at(x, y);
@@ -4663,6 +5280,54 @@ impl Play {
     /// is under the screen centre.
     pub fn click(&mut self) {
         self.clicks += 1;
+        if !self.right_held {
+            self.play_clicks += 1;
+        }
+    }
+
+    /// A press of the mouse's third or fourth button: @ 0x0047c8a0 reads
+    /// four buttons (DirectInput's `DIMOUSESTATE`, 16 bytes) and calls the
+    /// same press handler for each that went down; @ 0x0043bbc0 builds the
+    /// event's buttons from the left (1) and right (4) buttons' state
+    /// only. So with the left button held it is a left press (buttons 1,
+    /// or 5 with the right one held too), with the right alone a right
+    /// press (4), and alone (0) nothing takes it.
+    pub fn other_press(&mut self) {
+        if self.left_held {
+            self.click();
+        } else if self.right_held {
+            self.right_press();
+        }
+    }
+
+    /// A turn of the mouse's wheel (DirectInput's lZ), taken at the next
+    /// frame as a mouse move event with no move (@ 0x0047c8a0 calls the
+    /// move handler when lX, lY or lZ is not 0, @ 0x0043bde0 makes the
+    /// event of kind 2): the menus' hover tests run on it, and in play
+    /// @ 0x0042cdc0 zeroes the damping clock.
+    pub fn wheel(&mut self) {
+        self.wheel = true;
+    }
+
+    /// The sound output was lost while the game played (the front end's
+    /// device went away and none could be opened again): the engine goes
+    /// on as without an output from the start, a voice, a sound or a film
+    /// timed by its length and the clock (the mixer's queues would drain
+    /// no more, so a voiced tirade would never end by itself).
+    pub fn drop_audio(&mut self) {
+        self.stage.borrow_mut().audio = None;
+    }
+
+    /// Both mouse buttons' state now (the front end, at each press and
+    /// release; both up when the window loses the focus). The original's
+    /// press event carries both (@ 0x0047c8a0 sets 0x006b0b04 before the
+    /// press handlers, @ 0x0043bbc0 builds the buttons from it): in play
+    /// (@ 0x004300d0) a left press is a click only with the right button
+    /// up (buttons == 1), a right press acts only with the left one up
+    /// (== 4); the menus test `& 1` / `& 4` and take either.
+    pub fn set_buttons(&mut self, left: bool, right: bool) {
+        self.left_held = left;
+        self.right_held = right;
     }
 
     /// Turns the camera so that the screen centre is on the direction of
@@ -4837,9 +5502,93 @@ impl Play {
 
     /// The picture (1024 × 576 x8r8g8b8): the view, then the menu up
     /// with the cursor (the subject menu and the inventory draw theirs
-    /// over the view, with the menus' cursor).
+    /// over the view, with the menus' cursor). In the frame between two
+    /// chained menus nothing is drawn: `out` keeps what it held.
     pub fn render(&self, out: &mut [u32]) {
+        self.render_layers(out, true);
+    }
+
+    /// [`Play::render`] drawing every layer, the view under a menu's
+    /// background included (tests: the same picture).
+    #[doc(hidden)]
+    pub fn render_every_layer(&self, out: &mut [u32]) {
+        self.render_layers(out, false);
+    }
+
+    /// What the picture is drawn from when that is a menu whose
+    /// background covers the screen ([`MenuPicture`]); none otherwise
+    /// (play, a film, the inventory, the subject menu, poker: drawn every
+    /// frame).
+    pub fn picture(&self) -> Option<MenuPicture> {
+        if self.game.state() != 3 {
+            return None;
+        }
+        self.menus.picture()
+    }
+
+    /// [`Play::render`] into `out`, unless `out` already holds this
+    /// frame's picture: the last one composed through `cache` had the same
+    /// [`Play::picture`] (a menu with nothing drawn changed). True when it
+    /// was composed. The port's own saving (the original composes every
+    /// frame, the picture is the same); the game's step still runs every
+    /// frame. `out` must not be written otherwise between the calls, or
+    /// the cache be [`PictureCache::invalidate`]d.
+    pub fn render_cached(&self, out: &mut [u32], cache: &mut PictureCache) -> bool {
+        // Nothing drawn this frame: `out` keeps the last picture.
+        if self.draws_nothing() && out.len() == VIEW_WIDTH * VIEW_HEIGHT {
+            return false;
+        }
+        let key = self.picture();
+        if key.is_some() && key == cache.shown && out.len() == VIEW_WIDTH * VIEW_HEIGHT {
+            return false;
+        }
+        self.render(out);
+        cache.shown = key;
+        cache.composed += 1;
+        true
+    }
+
+    /// The menus' display draws nothing this frame: state 3 with the mode
+    /// 0xd (a mode ended, the next one queued and opened at the next
+    /// frame, @ 0x0041b780). @ 0x0041baa0 draws the view only for the
+    /// modes 8, 9 and 0xc and a menu only when the mode is not 0xd, so
+    /// between chained menus (the in-game menu and its pages, the
+    /// examine view and the inventory again, a board after a subject) no
+    /// game view is drawn: the picture before stays.
+    /// The click's frame that asks the subject menu is one too: state 3,
+    /// mode 9 queued.
+    fn draws_nothing(&self) -> bool {
+        if self.game.state() != 3
+            || self.game.busy()
+            || self.poker.is_some()
+            || self.menus.current().is_some()
+        {
+            return false;
+        }
         let st = self.stage.borrow();
+        if st.menu_asked() {
+            return true;
+        }
+        self.menus.active() && !st.inventory_open_now() && !st.menu_open_now()
+    }
+
+    fn render_layers(&self, out: &mut [u32], skip_covered: bool) {
+        if self.draws_nothing() {
+            return;
+        }
+        let st = self.stage.borrow();
+        // A menu whose background covers the screen: nothing drawn under
+        // it shows (`Menus::render` copies the background over the whole
+        // picture), so the view is not rendered under it. The same
+        // picture; the original draws the view first (@ 0x0041baa0).
+        if skip_covered
+            && self.game.state() == 3
+            && self.menus.covers_screen()
+            && out.len() == VIEW_WIDTH * VIEW_HEIGHT
+        {
+            self.menus.render(out, &st.fonts);
+            return;
+        }
         // A script waiting in a handler's loop (a subject's or an
         // inventory click's dialog, film or transition) draws that loop's
         // frame: no menu, no menus' cursor.
@@ -4859,10 +5608,19 @@ impl Play {
             if !self.game.busy() {
                 p.draw(out, &st.fonts);
                 if p.cursor {
-                    self.menus.draw_cursor(out);
+                    // At the cursor element's place: the moves made while
+                    // a run held the board reach it only with the next
+                    // move event (@ 0x0040d920).
+                    let at = p.cursor_place().unwrap_or(self.menus.mouse);
+                    self.menus.draw_cursor_at(out, at);
                 }
             }
-        } else if !busy && (st.inventory_open_now() || st.menu_open_now()) {
+        } else if !busy && (st.inventory_open_now() || st.menu_shown()) {
+            // The subject menu's cursor (+8, a `CIE_Sprite` made hidden,
+            // @ 0x00451b40) is shown only once the facing ends and the
+            // elements are made (@ 0x00410f90 LAB_00411203, again after
+            // state 2's remake), hidden when they are deleted
+            // (@ 0x00412990), and drawn only when shown (@ 0x00411790).
             self.menus.draw_cursor(out);
             st.draw_inventory_over_cursor(out);
         }
@@ -4882,6 +5640,15 @@ impl Play {
     /// The hand name's text after the inventory's elements are made
     /// (@ 0x00414db0 when it opens, @ 0x00415fe0 after a click): the
     /// hand's item's description, empty with an empty hand.
+    /// The inventory's elements made again (@ 0x00415fe0) from the
+    /// database.
+    fn inventory_remake(&mut self) {
+        let (size, items) = self.game.script().inventory();
+        let hand = self.game.script().handled_item().unwrap_or_default();
+        self.stage.borrow_mut().inventory_refresh(size, items, hand);
+        self.inventory_hand_name();
+    }
+
     fn inventory_hand_name(&mut self) {
         let hand = self.game.script().handled_item().unwrap_or_default();
         let text = if hand.is_empty() {
@@ -4946,6 +5713,80 @@ mod tests {
 
     fn stage() -> Stage {
         Stage::new(Arc::new(NoFiles), "french", None)
+    }
+
+    #[test]
+    fn a_panorama_with_other_faces_is_refused() {
+        let good: Vec<Vec<u32>> = (0..6).map(|_| vec![0; FACE * FACE]).collect();
+        assert!(crate::atlantis5::check_faces("p", &good).is_ok());
+        let small: Vec<Vec<u32>> = (0..6).map(|_| vec![0; 512 * 512]).collect();
+        assert!(matches!(
+            crate::atlantis5::check_faces("p", &small),
+            Err(ViewError::Bad(_))
+        ));
+    }
+
+    /// A randomized sprite whose next file is missing throws out of the
+    /// sprites' step: in play (@ 0x0042f000) that frame's sound update is
+    /// skipped; in `Atl_Dialog_Play`'s loop (@ 0x00407ac0) the sound runs
+    /// first, so it is not.
+    #[test]
+    fn a_randomize_throw_skips_the_sound_only_outside_a_dialog() {
+        let mut s = stage();
+        s.view = Some(ViewState {
+            scene: b"scene".to_vec(),
+            view: 1,
+            faces: Default::default(),
+            zones: Vec::new(),
+        });
+        let bank = Bank::parse(b"SPRCRYO \0\0\0\0\0\0\0\0", Depth::Xrgb8888).unwrap();
+        s.sprites.push(Sprite {
+            object: b"thing".to_vec(),
+            animation: b"Gone".to_vec(),
+            bank,
+            mode: Mode::Stop,
+            first: 0,
+            last: 0,
+            priority: 0,
+            time: 0.0,
+            frame: 0,
+            persistent: false,
+        });
+        s.randomized.push(Randomized {
+            object: b"thing".to_vec(),
+            tick1: 0.0,
+            tick2: 0.0,
+            held: false,
+        });
+        let fade = || LevelFade {
+            start: 1.0,
+            target: 0.5,
+            elapsed: 0.0,
+            time: 1.0,
+        };
+        let elapsed = |s: &Stage| s.music_fade.as_ref().map(|f| f.elapsed);
+        s.music_fade = Some(fade());
+        s.update_scene(0.1, Some(0.1), true);
+        assert_eq!(elapsed(&s), Some(0.0), "play: the sound skipped");
+        s.dialog = Some(DialogRun {
+            player: Player::new(1, 1),
+            talkers: Vec::new(),
+            tirades: Vec::new(),
+            facing: false,
+            faced: Vec::new(),
+            voice: None,
+            bubble: None,
+            portrait: None,
+            text_h: 0,
+            text: String::new(),
+            lips: None,
+            lip_banks: Vec::new(),
+        });
+        s.update_scene(0.1, Some(0.1), true);
+        assert!(
+            elapsed(&s).is_some_and(|e| (e - 0.1).abs() < 1e-6),
+            "the dialog's loop: the sound first"
+        );
     }
 
     #[test]

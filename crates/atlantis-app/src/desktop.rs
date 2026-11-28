@@ -390,6 +390,17 @@ pub fn describe(dir: &Path) -> LauncherEntry {
                 copyable = disc && !cfg!(target_os = "android");
                 (label, true)
             }
+            // One of the North-American CDs: copied one after the other.
+            Err(atlantis3_data::atlantis5::OpenError::MissingDiscs(v)) => {
+                copyable = true;
+                (
+                    format!(
+                        "The Secrets of Atlantis (2007), a CD: copy the three CDs to play ({} still needed)",
+                        v.join(", ")
+                    ),
+                    true,
+                )
+            }
             Err(e) => {
                 log::info!("{}: {e}", dir.display());
                 (
@@ -585,6 +596,62 @@ fn copy_from_discs() -> Option<PathBuf> {
         ));
         if !ask2(&text, "Copy", "Cancel") {
             return None;
+        }
+    }
+}
+
+/// Copies The Secrets of Atlantis's three North-American CDs, the one at
+/// `first` first, then each next one the player inserts (in the same
+/// drive or another), into [`crate::a5_copy::cd_copy_dir`]; the game
+/// copied and its folder, or `None` when the player cancels or a copy
+/// fails. A copy cut short goes on from the files copied whole.
+#[cfg(not(target_os = "android"))]
+fn copy_atlantis5_cds(first: &Path) -> Option<(Opened, PathBuf)> {
+    use crate::a5_copy::{cd_copy_dir, free_space, CopyError, Plan, Progress};
+    let dest = cd_copy_dir();
+    let mut from = first.to_path_buf();
+    loop {
+        let r =
+            Plan::of(&from).and_then(|plan| plan.copy_to(&dest, &Progress::default(), free_space));
+        match r {
+            Ok(()) => break,
+            Err(CopyError::NextDisc(missing)) => loop {
+                let text = format!(
+                    "This CD is copied.\n\nInsert the next CD of The Secrets of Atlantis, then \
+                     click Copy (still needed: {}).\n\nThe files go to {}.",
+                    missing.join(", "),
+                    dest.display()
+                );
+                if !ask2(&text, "Copy", "Cancel") {
+                    return None;
+                }
+                // The drive or folder used so far (read again: an image
+                // of the next disc may have been put beside the first's),
+                // else any drive holding a file still needed.
+                let holds = |r: &Path| Plan::of(r).is_ok_and(|p| p.holds_any(&missing));
+                if let Some(r) = std::iter::once(from.clone())
+                    .chain(setup::disc_roots())
+                    .find(|r| holds(r))
+                {
+                    from = r;
+                    break;
+                }
+            },
+            Err(e) => {
+                error_box(&format!(
+                    "The copy from {} failed:\n\n{e}\n\nCheck that the disc is clean and that \
+                     there is room on the computer, then try again.",
+                    from.display()
+                ));
+                return None;
+            }
+        }
+    }
+    match crate::a5::label(&dest) {
+        Ok(label) => Some((Opened::Atlantis5(label), dest)),
+        Err(e) => {
+            error_box(&setup::explain_atlantis5(&dest, &e));
+            None
         }
     }
 }
@@ -794,10 +861,35 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
             }
         };
         if kind == GameKind::Atlantis5 {
+            // A disc of several languages: each its own edition.
+            let places = atlantis5_places(&root);
+            if !places.is_empty() {
+                log::info!("{}: {} languages", root.display(), places.len());
+                return Some(places);
+            }
             match crate::a5::label(&root) {
                 Ok(label) => {
                     log::info!("game folder {} ({label})", root.display());
                     return Some(vec![(Opened::Atlantis5(label), root)]);
+                }
+                // One of the North-American CDs: copy the three.
+                Err(e @ atlantis3_data::atlantis5::OpenError::MissingDiscs(_)) => {
+                    log::info!("{}: {e}", root.display());
+                    let text = format!(
+                        "{}\n\nCopy the three CDs to this computer now (about 1.5 GB; \
+                         each disc takes a few minutes, the next message appears when it is done)?",
+                        setup::explain_atlantis5(&root, &e)
+                    );
+                    match ask(&text, "Copy the CDs", "Choose another folder", give_up) {
+                        Choice::First => {
+                            if let Some(found) = copy_atlantis5_cds(&root) {
+                                return Some(vec![found]);
+                            }
+                        }
+                        Choice::Second => {}
+                        Choice::Third => return None,
+                    }
+                    continue;
                 }
                 Err(e) => {
                     log::warn!("{}: {e}", root.display());
@@ -814,6 +906,17 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
         if kind == GameKind::Atlantis4 {
             match crate::a4::label(&root) {
                 Ok(label) => {
+                    // The 2004 program without disc 2's world data (the
+                    // Italian Atlantis Collection's install): what to add.
+                    if let Some(text) = crate::a3::evolution_2004_incomplete(&root) {
+                        log::warn!("{text}");
+                        match ask(&text, "Choose another folder", "Help", give_up) {
+                            Choice::First => {}
+                            Choice::Second => setup::open_url(setup::HELP_URL_A4),
+                            Choice::Third => return None,
+                        }
+                        continue;
+                    }
                     log::info!("game folder {} ({label})", root.display());
                     return Some(vec![(Opened::Atlantis4(label), root)]);
                 }
@@ -933,11 +1036,39 @@ fn open_dvd_languages(
     (opened, first_error)
 }
 
+/// The places of the languages of The Secrets of Atlantis at `root` that
+/// open, each its own edition, when its data hold several
+/// ([`atlantis3_data::atlantis5::language_places`]: the international
+/// DVD's four); none otherwise.
+pub fn atlantis5_places(root: &Path) -> Vec<(Opened, PathBuf)> {
+    atlantis3_data::atlantis5::language_places(root)
+        .into_iter()
+        .filter_map(|p| match crate::a5::label(&p) {
+            Ok(label) => Some((Opened::Atlantis5(label), p)),
+            Err(e) => {
+                log::warn!("{}: {e}", p.display());
+                None
+            }
+        })
+        .collect()
+}
+
 /// `found` with each of Cryo's DVD's languages met replaced by every
-/// language of its side (or sides) that opens: each its own edition.
+/// language of its side (or sides) that opens, and The Secrets of
+/// Atlantis's disc of several languages by its languages: each its own
+/// edition.
 fn with_every_dvd_language(found: Vec<(PathBuf, Opened)>) -> Vec<(PathBuf, Opened)> {
     let mut out = Vec::new();
     for (dir, opened) in found {
+        if opened.kind() == GameKind::Atlantis5 {
+            let places = atlantis5_places(&dir);
+            if places.is_empty() {
+                out.push((dir, opened));
+            } else {
+                out.extend(places.into_iter().map(|(o, p)| (p, o)));
+            }
+            continue;
+        }
         let Some((_, root)) = dvd_language_of(&dir) else {
             out.push((dir, opened));
             continue;
@@ -1007,7 +1138,8 @@ pub fn game_folders_in(
         .map(|(d, _)| d)
         .collect();
     // Cryo's DVD: every language of a side met (each its own edition),
-    // and the drives holding a side.
+    // and the drives holding a side; The Secrets of Atlantis's disc of
+    // several languages: each of them.
     roots = roots
         .into_iter()
         .flat_map(|r| match dvd_language_of(&r) {
@@ -1019,7 +1151,14 @@ pub fn game_folders_in(
                     all
                 }
             }
-            None => vec![r],
+            None => {
+                let places = atlantis3_data::atlantis5::language_places(&r);
+                if places.is_empty() {
+                    vec![r]
+                } else {
+                    places
+                }
+            }
         })
         .collect();
     for d in discs {

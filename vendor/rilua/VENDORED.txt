@@ -52,7 +52,13 @@ PATCHES
    TForLoop50, TForPrep50 (generic `for` over a table), SetList50,
    SetListO50, NewTable50. Reproducer: crates/atlantis5-script/tests/
    lua50.rs (a chunk compiled by Lua 5.0.3's luac and the output of Lua
-   5.0.3's lua).
+   5.0.3's lua). A corrupt chunk is a load error, never an abort or a
+   panic: a vector's count past the bytes left fails before anything is
+   reserved, and a size whose end wraps (an 8-byte size_t near 2^64)
+   fails as truncated (Lua 5.0's lundump.c raises a memory or
+   end-of-file error there, which the loaders catch). Reproducer: the
+   tests of src/vm/undump50.rs (hand-made chunks, huge counts and sizes,
+   every cut and byte change).
 
 5. src/stdlib/coroutine.rs: `auxresume` made public, so an embedder can
    resume a coroutine from Rust (atlantis5-script runs each script as a
@@ -128,3 +134,29 @@ PATCHES
    crates/atlantis3-engine/tests/atlantis5_puzzles.rs
    `chessboard_path_to_the_same_square_ends_on_a_memory_error` (the
    state's next global set failed with `not enough memory`).
+
+11. src/compiler/codegen.rs, src/vm/state.rs, src/lib.rs, src/api.rs,
+   src/stdlib/base.rs, src/stdlib/package.rs: Lua 5.0 source per state.
+   `Gc::compile_lua50` (false by default) compiles the source loaded in
+   the state with Lua 5.0.3's loops (lparser.c `forstat`, `fornum`,
+   `forlist`, `forbody`): a numeric `for` whose variable is the loop's
+   index (`SUB`, a jump, the body, `ForLoop50`: assigning the variable
+   changes the iteration, closures in the loop share it), a generic `for`
+   that starts with `TForPrep50` (a table as the iterator is walked with
+   `next`) and whose first variable is the control value (`TForLoop50`),
+   one breakable block for the body inside the variables' block, the
+   body's own block inside it (`block`: a local of the body that a
+   closure captures is closed before `ForLoop50`/`TForLoop50`, each
+   iteration, as 5.0.3's `luac` puts `CLOSE` there). Lua 5.1
+   states compile as before. Atlantis V's international DVD ships its
+   scripts as Lua 5.0 source (the French DVD as 5.0 chunks of the same
+   sources); 6 loops iterate a table directly and failed with "attempt
+   to call a table value". atlantis5-script's `Script::new` sets it.
+   Reproducers: crates/atlantis5-script/tests/lua50.rs
+   `a_50_source_runs_as_lua_503_runs_it` (semantics.lua run as source
+   prints what Lua 5.0.3's `lua` prints; as 5.1 source it fails),
+   `closures_over_a_body_local_see_each_iteration` (2 4 6 and 10 20 30,
+   as Lua 5.0.3 prints them) and
+   crates/atlantis5-script/tests/international_dvd.rs (each of the 66
+   scripts' 638 functions has the loop instructions, on the same lines,
+   that Lua 5.0's `luac` put in the French DVD's chunks).

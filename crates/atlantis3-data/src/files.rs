@@ -181,14 +181,33 @@ impl A3Files {
     }
 
     /// The edition's name with the install's language ("Atlantis III,
-    /// GOG.com, English"), when `Game.exe` is a known build.
+    /// GOG.com, English"), when `Game.exe` is a known build. GOG.com's
+    /// 2015 / 2018 `Game.exe` beside the Italian *Atlantis Collection*'s
+    /// launcher is that edition ("Atlantis III, Atlantis Collection,
+    /// Italian").
     pub fn edition_label(&self) -> Result<String, OpenError> {
         let build = self.build()?;
         let (language, _) = crate::install::install_registry(self);
-        Ok(crate::install::edition_label(
-            build,
-            crate::install::Language::from_code(&language),
-        ))
+        let language = crate::install::data_language(self, &language);
+        if self.is_collection() {
+            return Ok(crate::install::named_label(exe::COLLECTION_LABEL, language));
+        }
+        // An edition sharing its build with others is named by its data's
+        // language (`install::LANGUAGE_EDITIONS`).
+        Ok(crate::install::edition_label(build, language))
+    }
+
+    /// Whether the install is the Italian *Atlantis Collection*'s: its
+    /// launcher `Atlantis3.exe` ([`exe::is_collection_launcher`]) beside
+    /// GOG.com's 2015 / 2018 `Game.exe`.
+    pub fn is_collection(&self) -> bool {
+        self.build()
+            .is_ok_and(|b| b.id == "atlantis3-gog-2018-3473408")
+            && self.src.size("Atlantis3.exe") == Some(exe::COLLECTION_LAUNCHER_SIZE)
+            && self
+                .src
+                .read("Atlantis3.exe")
+                .is_some_and(|d| exe::is_collection_launcher(&d))
     }
 
     /// The source of the whole install.

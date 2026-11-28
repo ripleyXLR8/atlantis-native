@@ -1079,7 +1079,7 @@ pub fn lua_dofile(state: &mut LuaState) -> LuaResult<u32> {
     };
 
     // Compile or undump the source.
-    let proto = crate::compile_or_undump(&source, &chunk_name)?;
+    let proto = crate::compile_or_undump_in(&source, &chunk_name, state.gc.compile_lua50)?;
 
     // Patch string constants.
     let mut proto =
@@ -1320,7 +1320,7 @@ fn restore_state(
 /// and pushes either the function or nil+error.
 #[allow(clippy::unnecessary_wraps)]
 fn load_string_impl(state: &mut LuaState, source: &[u8], name: &str) -> LuaResult<u32> {
-    match crate::compile_or_undump(source, name) {
+    match crate::compile_or_undump_in(source, name, state.gc.compile_lua50) {
         Ok(proto) => {
             let mut proto =
                 crate::vm::proto::ProtoRef::try_unwrap(proto).unwrap_or_else(|rc| (*rc).clone());

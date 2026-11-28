@@ -330,14 +330,50 @@ pub fn a4cd_install(paths: &[&str]) -> Option<String> {
 /// shallowest holding the DVD's `datas.cab` (a copy of the disc), an
 /// install or the extracted cabinets (`datas/texts/menu/<language>/
 /// string_resources.xml` beside `datas/scenes` and `datas/warps`), or
-/// `Datas` itself (the same without `datas/`)
-/// ([`atlantis3_data::atlantis5::Atlantis5Source::from_folder`]). The
-/// DVD's image is found by reading it, not from the paths.
-pub fn a5_folder(paths: &[&str]) -> Option<String> {
+/// `Datas` itself (the same without `datas/`), or the North-American
+/// CDs' copies: the folder holding `data1.hdr` (the three discs' files
+/// together), or the folder above it when the other discs' volumes are
+/// in folders beside it (a folder per disc)
+/// ([`atlantis3_data::atlantis5::Atlantis5Source::from_folder`]), when
+/// `cds(folder holding data1.hdr)` says the header there is the game's
+/// (`data1.hdr` is any InstallShield set's name: Atlantis II's and
+/// Atlantis III's CDs have one;
+/// [`atlantis3_data::atlantis5::holds_atlantis5_cds_header`]). The DVD's
+/// image is found by reading it, not from the paths.
+pub fn a5_folder(paths: &[&str], cds: impl Fn(&str) -> bool) -> Option<String> {
     const TEXTS: &str = "texts/menu/";
     const STRINGS: &str = "/string_resources.xml";
     let mut found: Vec<String> = Vec::new();
+    // A volume of the CDs' set (`data<n>.cab`) in folder `dir`.
+    let volume_in = |p: &str, dir: &str| {
+        p.strip_prefix(dir)
+            .and_then(|n| n.strip_prefix("data"))
+            .and_then(|n| n.strip_suffix(".cab"))
+            .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+    };
     for p in paths {
+        if let Some(dir) = p.strip_suffix("data1.hdr") {
+            if !(dir.is_empty() || dir.ends_with('/')) || !cds(dir) {
+                continue;
+            }
+            let parent = dir
+                .strip_suffix('/')
+                .map(|d| d.rfind('/').map_or("", |i| &d[..=i]));
+            let beside = parent.is_some_and(|parent| {
+                paths.iter().any(|q| {
+                    !q.starts_with(dir)
+                        && q.strip_prefix(parent).is_some_and(|rest| {
+                            rest.split_once('/')
+                                .is_some_and(|(sub, _)| volume_in(q, &format!("{parent}{sub}/")))
+                        })
+                })
+            });
+            match parent {
+                Some(parent) if beside => found.push(parent.to_string()),
+                _ => found.push(dir.to_string()),
+            }
+            continue;
+        }
         if let Some(dir) = p.strip_suffix("datas.cab") {
             if dir.is_empty() || dir.ends_with('/') {
                 found.push(dir.to_string());
@@ -409,7 +445,7 @@ pub const A2_DISCS_ONLY: &str = "This folder holds the discs of Atlantis II, not
 /// folder.
 pub const A3_DISCS_ONLY: &str = "This folder holds the discs of Atlantis III, not the \
     installed game.\n\nChoose the folder where Atlantis III is installed (the one with \
-    Atlantis3.exe and Datas), with the images of the three CDs (.iso, .bin, .mdf, .nrg...) \
+    Atlantis3.exe, or Beyond Atlantis 2.exe, and Datas), with the images of the three CDs (.iso, .bin, .mdf, .nrg...) \
     or copies of them in it or in a folder inside it; or a folder that holds both the \
     installed game and the discs.";
 
@@ -779,11 +815,15 @@ mod tests {
     /// extracted cabinets, `Datas` itself; the shallowest.
     #[test]
     fn atlantis5_folders() {
+        let yes = |_: &str| true;
         assert_eq!(
-            a5_folder(&["dvd/datas.cab", "dvd/datas_french.cab", "dvd/setup.exe"]),
+            a5_folder(
+                &["dvd/datas.cab", "dvd/datas_french.cab", "dvd/setup.exe"],
+                yes
+            ),
             Some("dvd/".to_string())
         );
-        assert_eq!(a5_folder(&["datas.cab"]), Some(String::new()));
+        assert_eq!(a5_folder(&["datas.cab"], yes), Some(String::new()));
         let tree = [
             "soa/the secrets of atlantis.exe",
             "soa/datas/scenes/zeppelin.wam",
@@ -791,32 +831,71 @@ mod tests {
             "soa/datas/texts/menu/french/string_resources.xml",
             "soa/datas/texts/menu/string_resources.xsd",
         ];
-        assert_eq!(a5_folder(&tree), Some("soa/".to_string()));
+        assert_eq!(a5_folder(&tree, yes), Some("soa/".to_string()));
         let datas = [
             "datas/scenes/zeppelin.wam",
             "datas/warps/ze0003.jp6",
             "datas/texts/menu/german/string_resources.xml",
         ];
-        assert_eq!(a5_folder(&datas), Some(String::new()));
+        assert_eq!(a5_folder(&datas, yes), Some(String::new()));
         let itself = [
             "x/scenes/zeppelin.wam",
             "x/warps/ze0003.jp6",
             "x/texts/menu/german/string_resources.xml",
         ];
-        assert_eq!(a5_folder(&itself), Some("x/".to_string()));
+        assert_eq!(a5_folder(&itself, yes), Some("x/".to_string()));
         assert_eq!(
-            a5_folder(&["a/b/datas.cab", "c/datas.cab"]),
+            a5_folder(&["a/b/datas.cab", "c/datas.cab"], yes),
             Some("c/".to_string())
         );
         // No warps: not the game; a cabinet of another name neither.
         assert_eq!(
-            a5_folder(&[
-                "g/datas/scenes/a.wam",
-                "g/datas/texts/menu/french/string_resources.xml"
-            ]),
+            a5_folder(
+                &[
+                    "g/datas/scenes/a.wam",
+                    "g/datas/texts/menu/french/string_resources.xml"
+                ],
+                yes
+            ),
             None
         );
-        assert_eq!(a5_folder(&["g/mydatas.cab", "soa-fr.iso"]), None);
+        assert_eq!(a5_folder(&["g/mydatas.cab", "soa-fr.iso"], yes), None);
+        // The North-American CDs: a folder per disc, or together.
+        let discs = [
+            "soa/cd1/data1.hdr",
+            "soa/cd1/data1.cab",
+            "soa/cd1/data2.cab",
+            "soa/cd2/data3.cab",
+            "soa/cd3/data4.cab",
+        ];
+        assert_eq!(a5_folder(&discs, yes), Some("soa/".to_string()));
+        assert_eq!(
+            a5_folder(&["cds/data1.hdr", "cds/data1.cab", "cds/data3.cab"], yes),
+            Some("cds/".to_string())
+        );
+        assert_eq!(a5_folder(&["data1.hdr"], yes), Some(String::new()));
+        assert_eq!(
+            a5_folder(&["x/cd1/data1.hdr", "x/notes.txt"], yes),
+            Some("x/cd1/".to_string())
+        );
+        // Another product's InstallShield header (Atlantis III's CD 1
+        // beside its install): not the game; the game's DVD copy in the
+        // same pick still found.
+        let a3 = [
+            "x/installed/atlantis3.exe",
+            "x/cd1/data1.hdr",
+            "x/cd1/data1.cab",
+        ];
+        assert_eq!(a5_folder(&a3, |_| false), None);
+        assert_eq!(a5_folder(&a3, |d| d != "x/cd1/"), None);
+        assert_eq!(
+            a5_folder(&["x/cd1/data1.hdr", "x/dvd/datas.cab"], |_| false),
+            Some("x/dvd/".to_string())
+        );
+        assert_eq!(
+            a5_folder(&discs, |d| d == "soa/cd1/"),
+            Some("soa/".to_string())
+        );
     }
 
     #[test]
@@ -1105,15 +1184,36 @@ mod tests {
             eprintln!("{}: {name}, {} bytes by parts", real.display(), whole.len());
         }
 
-        /// Atlantis II's CDs (French, Polish, North American): the
-        /// installed folder and the four images, picked together.
+        /// Atlantis II's CDs (French, Polish, German, Spanish, Swedish,
+        /// Czech, North American, the Interwise release's Traditional
+        /// Chinese and English): the installed folder and the four images
+        /// (five for the Interwise release: its two disc 1s), picked
+        /// together.
         #[test]
         fn atlantis2s_cd_images() {
             use atlantis2_data::files::find_exe;
-            for (data, discs, label) in [
-                ("ATLANTIS2_DATA", "ATLANTIS2_DISCS", "French"),
-                ("ATLANTIS2_DATA_PL", "ATLANTIS2_DISCS_PL", "Polish"),
-                ("ATLANTIS2_DATA_US", "ATLANTIS2_DISCS_US", "English"),
+            // The Interwise release's folder holds its two disc 1s: the one
+            // whose installer is in the installed language is taken.
+            for (data, discs, label, disc1) in [
+                ("ATLANTIS2_DATA", "ATLANTIS2_DISCS", "French", ""),
+                ("ATLANTIS2_DATA_PL", "ATLANTIS2_DISCS_PL", "Polish", ""),
+                ("ATLANTIS2_DATA_DE", "ATLANTIS2_DISCS_DE", "German", ""),
+                ("ATLANTIS2_DATA_ES", "ATLANTIS2_DISCS_ES", "Spanish", ""),
+                ("ATLANTIS2_DATA_SV", "ATLANTIS2_DISCS_SV", "Swedish", ""),
+                ("ATLANTIS2_DATA_CS", "ATLANTIS2_DISCS_CS", "Czech", ""),
+                (
+                    "ATLANTIS2_DATA_ZH",
+                    "ATLANTIS2_DISCS_ZH",
+                    "Traditional Chinese",
+                    "XITOYCHA",
+                ),
+                (
+                    "ATLANTIS2_DATA_ZH_EN",
+                    "ATLANTIS2_DISCS_ZH",
+                    "English",
+                    "INGLIZCHA",
+                ),
+                ("ATLANTIS2_DATA_US", "ATLANTIS2_DISCS_US", "English", ""),
             ] {
                 let (Some(data), Some(discs)) = (var(data), var(discs)) else {
                     continue;
@@ -1145,6 +1245,13 @@ mod tests {
                 }
                 // A cinematic of disc 1 read by parts.
                 let origin = files.disc_origin(1).unwrap().to_string();
+                // (The browser's paths are lower case.)
+                assert!(
+                    origin
+                        .to_ascii_lowercase()
+                        .contains(&disc1.to_ascii_lowercase()),
+                    "{origin}"
+                );
                 let img = picked.source(&origin);
                 let film = some_file(img.as_ref(), "", ".hnm", 3).expect("a film");
                 by_parts_as_whole(&picked, img.as_ref(), &picked.real[&origin], &film);

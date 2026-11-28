@@ -18,7 +18,23 @@ pub fn start_with<F>(fill: F) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
 {
-    start_config(fill, None)
+    start_config(fill, None, None)
+}
+
+/// [`start_with`], with `lost` set when the device goes away while the
+/// stream plays (cpal's `StreamError::DeviceNotAvailable`, after which it
+/// calls back no more: WASAPI's `AUDCLNT_E_DEVICE_INVALIDATED`,
+/// CoreAudio's device-alive listener; ALSA reports only backend errors,
+/// which do not set it).
+#[cfg_attr(target_arch = "wasm32", allow(dead_code))]
+pub fn start_watched<F>(
+    fill: F,
+    lost: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> Option<cpal::Stream>
+where
+    F: FnMut(&mut [f32], u32, usize) + Send + 'static,
+{
+    start_config(fill, None, Some(lost))
 }
 
 /// The same, asking the device for `rate` when it offers it (in any of
@@ -28,13 +44,25 @@ pub fn start_with_rate<F>(fill: F, rate: u32) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
 {
-    start_config(fill, Some(rate))
+    start_config(fill, Some(rate), None)
 }
 
-fn start_config<F>(mut fill: F, want: Option<u32>) -> Option<cpal::Stream>
+fn start_config<F>(
+    mut fill: F,
+    want: Option<u32>,
+    lost: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
+) -> Option<cpal::Stream>
 where
     F: FnMut(&mut [f32], u32, usize) + Send + 'static,
 {
+    let on_error = move |e: cpal::StreamError| {
+        if matches!(e, cpal::StreamError::DeviceNotAvailable) {
+            if let Some(l) = &lost {
+                l.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+        log::warn!("audio stream: {e}");
+    };
     let host = cpal::default_host();
     let device = host.default_output_device().or_else(|| {
         log::warn!("no audio output device");
@@ -70,7 +98,7 @@ where
                 let _ = info;
                 fill(out, rate, channels)
             },
-            |e| log::warn!("audio stream: {e}"),
+            on_error,
             None,
         ),
         cpal::SampleFormat::I16 => {
@@ -90,7 +118,7 @@ where
                         *o = (s * 32767.0) as i16;
                     }
                 },
-                |e| log::warn!("audio stream: {e}"),
+                on_error,
                 None,
             )
         }

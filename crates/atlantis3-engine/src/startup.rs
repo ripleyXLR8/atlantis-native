@@ -11,7 +11,8 @@
 //! `goggame-<id>.script` (`Install` = `CD`; `Language` = `fra`, `gbr`,
 //! `ger` or `esp` for its French, English, German and Spanish installs);
 //! without that file the language is the only folder of
-//! `Datas\loc\text\`.
+//! `Datas\loc\text\` (`ita` for the Italian *Atlantis Collection*, whose
+//! installer writes `Language` = `ita`, `Install` = `CD`).
 
 use atlantis3_data::cfg::Config;
 use atlantis3_data::A3Files;
@@ -53,10 +54,18 @@ impl Startup {
                 }
             }
         } else {
-            match files.read("Atlantis3.cfg") {
+            // The reader's name: `Atlantis4.cfg` in GOG.com's 2015 / 2018
+            // `Game.exe` (`fix_cfg_name` reads `Atlantis3.cfg`, the 2022
+            // file's). A missing file leaves the defaults (@ 0x004095a0,
+            // set first; 0x00406fc6 then returns).
+            let name = match files.build() {
+                Ok(b) if !fixes.cfg_name => b.cfg_name,
+                _ => "Atlantis3.cfg",
+            };
+            match files.read(name) {
                 Some(data) => Config::parse(&data),
                 None => {
-                    log::warn!("Datas\\Atlantis3.cfg not found: the defaults");
+                    log::warn!("Datas\\{name} not found: the defaults");
                     Config::default()
                 }
             }

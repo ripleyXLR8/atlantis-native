@@ -74,6 +74,24 @@ thread_local! {
     /// The test plays the Polish CD (`ATLANTIS2_DATA_PL`,
     /// `ATLANTIS2_DISCS_PL`).
     static ON_PL: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the German CD (`ATLANTIS2_DATA_DE`,
+    /// `ATLANTIS2_DISCS_DE`).
+    static ON_DE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the Spanish CD (`ATLANTIS2_DATA_ES`,
+    /// `ATLANTIS2_DISCS_ES`).
+    static ON_ES: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the Swedish CD (`ATLANTIS2_DATA_SV`,
+    /// `ATLANTIS2_DISCS_SV`).
+    static ON_SV: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the Czech CD (`ATLANTIS2_DATA_CS`,
+    /// `ATLANTIS2_DISCS_CS`).
+    static ON_CS: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the Interwise release's Traditional Chinese CD
+    /// (`ATLANTIS2_DATA_ZH`, `ATLANTIS2_DISCS_ZH`).
+    static ON_ZH: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// The test plays the Interwise release's English CD
+    /// (`ATLANTIS2_DATA_ZH_EN`, `ATLANTIS2_DISCS_ZH`).
+    static ON_ZH_EN: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 fn game() -> Option<A2Files> {
@@ -100,6 +118,50 @@ fn game() -> Option<A2Files> {
         let (files, _) =
             A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("the Polish CD");
         return Some(files);
+    }
+    if ON_DE.with(|d| d.get()) {
+        let dir = std::env::var_os("ATLANTIS2_DATA_DE")?;
+        let discs = std::env::var_os("ATLANTIS2_DISCS_DE")?;
+        let (files, _) =
+            A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("the German CD");
+        return Some(files);
+    }
+    if ON_ES.with(|e| e.get()) {
+        let dir = std::env::var_os("ATLANTIS2_DATA_ES")?;
+        let discs = std::env::var_os("ATLANTIS2_DISCS_ES")?;
+        let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)])
+            .expect("the Spanish CD");
+        return Some(files);
+    }
+    if ON_SV.with(|s| s.get()) {
+        let dir = std::env::var_os("ATLANTIS2_DATA_SV")?;
+        let discs = std::env::var_os("ATLANTIS2_DISCS_SV")?;
+        let (files, _) = A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)])
+            .expect("the Swedish CD");
+        return Some(files);
+    }
+    if ON_CS.with(|c| c.get()) {
+        let dir = std::env::var_os("ATLANTIS2_DATA_CS")?;
+        let discs = std::env::var_os("ATLANTIS2_DISCS_CS")?;
+        let (files, _) =
+            A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect("the Czech CD");
+        return Some(files);
+    }
+    for (on, data, what) in [
+        (&ON_ZH, "ATLANTIS2_DATA_ZH", "the Traditional Chinese CD"),
+        (
+            &ON_ZH_EN,
+            "ATLANTIS2_DATA_ZH_EN",
+            "the Interwise release's English CD",
+        ),
+    ] {
+        if on.with(|c| c.get()) {
+            let dir = std::env::var_os(data)?;
+            let discs = std::env::var_os("ATLANTIS2_DISCS_ZH")?;
+            let (files, _) =
+                A2Files::open_dir(&PathBuf::from(dir), &[PathBuf::from(discs)]).expect(what);
+            return Some(files);
+        }
     }
     let (Some(dir), Some(discs)) = (
         std::env::var_os("ATLANTIS2_DATA"),
@@ -512,6 +574,18 @@ impl Run {
                 "it-"
             } else if ON_PL.with(|p| p.get()) {
                 "pl-"
+            } else if ON_DE.with(|d| d.get()) {
+                "de-"
+            } else if ON_ES.with(|e| e.get()) {
+                "es-"
+            } else if ON_SV.with(|s| s.get()) {
+                "sv-"
+            } else if ON_CS.with(|c| c.get()) {
+                "cs-"
+            } else if ON_ZH.with(|c| c.get()) {
+                "zh-"
+            } else if ON_ZH_EN.with(|c| c.get()) {
+                "zh-en-"
             } else {
                 ""
             };
@@ -6143,11 +6217,114 @@ fn the_whole_game_with_the_mouse_on_the_polish_cd() {
     whole_game("a2-flow-whole-game-pl");
 }
 
+/// The whole game on the German CD (`ATLANTIS2_DATA_DE`,
+/// `ATLANTIS2_DISCS_DE`): the French CD's code (1.00) with German texts
+/// and voices, the same play, the same chapters and lines. With
+/// `ATLANTIS2_PNG_DIR` its pictures are written there (`de-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_german_cd() {
+    if std::env::var_os("ATLANTIS2_DATA_DE").is_none()
+        || std::env::var_os("ATLANTIS2_DISCS_DE").is_none()
+    {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA_DE / ATLANTIS2_DISCS_DE not set");
+        return;
+    }
+    ON_DE.with(|d| d.set(true));
+    whole_game("a2-flow-whole-game-de");
+}
+
+/// The whole game on the Spanish CD (`ATLANTIS2_DATA_ES`,
+/// `ATLANTIS2_DISCS_ES`): the Polish CD's code (1.01) with Spanish texts
+/// and voices, the same play, the same chapters and lines. With
+/// `ATLANTIS2_PNG_DIR` its pictures are written there (`es-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_spanish_cd() {
+    if std::env::var_os("ATLANTIS2_DATA_ES").is_none()
+        || std::env::var_os("ATLANTIS2_DISCS_ES").is_none()
+    {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA_ES / ATLANTIS2_DISCS_ES not set");
+        return;
+    }
+    ON_ES.with(|e| e.set(true));
+    whole_game("a2-flow-whole-game-es");
+}
+
+/// The whole game on the Swedish CD (`ATLANTIS2_DATA_SV`,
+/// `ATLANTIS2_DISCS_SV`): 1.01's program with Swedish texts and voices,
+/// the same play, the same chapters and lines. With `ATLANTIS2_PNG_DIR`
+/// its pictures are written there (`sv-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_swedish_cd() {
+    if std::env::var_os("ATLANTIS2_DATA_SV").is_none()
+        || std::env::var_os("ATLANTIS2_DISCS_SV").is_none()
+    {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA_SV / ATLANTIS2_DISCS_SV not set");
+        return;
+    }
+    ON_SV.with(|s| s.set(true));
+    whole_game("a2-flow-whole-game-sv");
+}
+
+/// The whole game on the Czech CD (`ATLANTIS2_DATA_CS`,
+/// `ATLANTIS2_DISCS_CS`): the DreamCatcher CD's program with Czech texts
+/// (Windows-1250) and voices, the same play, the same chapters and lines.
+/// With `ATLANTIS2_PNG_DIR` its pictures are written there (`cs-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_czech_cd() {
+    if std::env::var_os("ATLANTIS2_DATA_CS").is_none()
+        || std::env::var_os("ATLANTIS2_DISCS_CS").is_none()
+    {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA_CS / ATLANTIS2_DISCS_CS not set");
+        return;
+    }
+    ON_CS.with(|c| c.set(true));
+    whole_game("a2-flow-whole-game-cs");
+}
+
+/// The whole game on the Interwise release's Traditional Chinese CD
+/// (`ATLANTIS2_DATA_ZH`, `ATLANTIS2_DISCS_ZH`): the 1.01 patch's program
+/// with Big5 texts (`[CharacterSet] MBCS`) and the English voices, the
+/// same play, the same chapters and lines. With `ATLANTIS2_PNG_DIR` its
+/// pictures are written there (`zh-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_traditional_chinese_cd() {
+    if std::env::var_os("ATLANTIS2_DATA_ZH").is_none()
+        || std::env::var_os("ATLANTIS2_DISCS_ZH").is_none()
+    {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA_ZH / ATLANTIS2_DISCS_ZH not set");
+        return;
+    }
+    ON_ZH.with(|c| c.set(true));
+    whole_game("a2-flow-whole-game-zh");
+}
+
+/// The whole game on the same release's English CD (`ATLANTIS2_DATA_ZH_EN`,
+/// `ATLANTIS2_DISCS_ZH`, whose folder holds both disc 1s): the Polish CD's
+/// program with English texts, its own disc 1 taken. With
+/// `ATLANTIS2_PNG_DIR` its pictures are written there (`zh-en-*.png`).
+#[test]
+fn the_whole_game_with_the_mouse_on_the_taiwanese_english_cd() {
+    if std::env::var_os("ATLANTIS2_DATA_ZH_EN").is_none()
+        || std::env::var_os("ATLANTIS2_DISCS_ZH").is_none()
+    {
+        atlantis2_data::testing::missing("ATLANTIS2_DATA_ZH_EN / ATLANTIS2_DISCS_ZH not set");
+        return;
+    }
+    ON_ZH_EN.with(|c| c.set(true));
+    whole_game("a2-flow-whole-game-zh-en");
+}
+
 fn whole_game(scratch_name: &str) {
     let gog = ON_GOG.with(|g| g.get())
         || ON_US.with(|u| u.get())
         || ON_IT.with(|i| i.get())
-        || ON_PL.with(|p| p.get());
+        || ON_PL.with(|p| p.get())
+        || ON_DE.with(|d| d.get())
+        || ON_ES.with(|e| e.get())
+        || ON_SV.with(|s| s.get())
+        || ON_CS.with(|c| c.get())
+        || ON_ZH.with(|c| c.get())
+        || ON_ZH_EN.with(|c| c.get());
     let started = std::time::Instant::now();
     let dir = scratch(scratch_name);
     let mut r = Run::new(&dir);

@@ -32,6 +32,9 @@
 //!    buffer: `tail`); trailing transparent pixels are dropped, runs are
 //!    collected from the last opaque pixel `k` down to 1 and replayed on the
 //!    index row from its start: an opaque row stores `w - 1` indices.
+//!    That is GOG.com's 2022 program ([`RowScan::W10`]); the 2015 / 2018
+//!    `Game.exe` and the 2001 CD's program scan without the drift and store
+//!    every pixel ([`RowScan::Original`]).
 //!
 //! Two pieces of state are not in the input:
 //! - palette entries past the box count are the previous encode's (static
@@ -65,6 +68,30 @@ pub fn encode_thumbnail(pixels: &[u32], w: usize, h: usize) -> Vec<u8> {
     ThumbEncoder::new().encode(pixels, w, h, w, &[])
 }
 
+/// How the rows' scan counts its pixels: the one instruction GOG.com's
+/// 2022 program adds to the row encoder (atlantis3-re
+/// `binaries/atlantis3-gog-2018-3473408.md`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RowScan {
+    /// GOG.com's 2022 `Game.exe` (atlantis3-gog-fr-3473408): @ 0x0069e3f8
+    /// jumps to 0x00402422, which repeats `lea edi, [ebp + eax*4]`,
+    /// `mov ebp, eax` and adds `dec ebp`: the pixel counter starts at
+    /// `w - 1`, level with the probe pointer, so pixel 0 is never counted
+    /// (an opaque row stores `w - 1` indices) and the row's end leaves the
+    /// probe one pixel further per row (the drift: `y * (pitch + 1)`,
+    /// whose last rows read past the buffer).
+    W10,
+    /// The code as compiled, without that `dec ebp`: GOG.com's 2015 / 2018
+    /// `Game.exe` (atlantis3-gog-2018-3473408, the Italian *Atlantis
+    /// Collection*'s) and the 2001 CD's program (atlantis3-cd-fr-3379200
+    /// @ 0x0069c9f0, the same instructions). The counter starts at `w`,
+    /// one ahead of the probe (pixel `k - 1`): every pixel of a row is
+    /// stored, and the probe of row `y` starts at `y * pitch`, inside the
+    /// buffer. Checked under emulation on the 2018 file (atlantis3-re
+    /// `evidence/golden/a3_thumb_encoder_2018.txt`).
+    Original,
+}
+
 /// The encoder with its static state (0x007d7be0) and the probe's shifts.
 #[derive(Clone)]
 pub struct ThumbEncoder {
@@ -72,6 +99,8 @@ pub struct ThumbEncoder {
     pub mcut: [u8; 0x300],
     /// 0x007d9f89, 0x007d9f8b.
     pub shifts: (u32, u32),
+    /// The build's row scan ([`RowScan::W10`] by default).
+    pub rows: RowScan,
 }
 
 impl Default for ThumbEncoder {
@@ -200,6 +229,7 @@ impl ThumbEncoder {
         ThumbEncoder {
             mcut: [0; 0x300],
             shifts: SCREEN_565_SHIFTS,
+            rows: RowScan::W10,
         }
     }
 
@@ -358,6 +388,20 @@ impl ThumbEncoder {
             }
         };
         let cls = |i: usize| -> u8 { self.opaque(pixel(i)) as u8 };
+        // The probe's pixel for the counter `k` of row `base`. The
+        // original's last probe of a row, with `k` = 0, reads the pixel
+        // before the row (before the buffer on row 0); its class is never
+        // used (the scans stop at `k` = 0).
+        let (start, lag) = match self.rows {
+            RowScan::W10 => (w - 1, 0),
+            RowScan::Original => (w, 1),
+        };
+        let probe = |base: usize, k: usize| -> u8 {
+            match (base + k).checked_sub(lag) {
+                Some(i) => cls(i),
+                None => 0,
+            }
+        };
         out.extend_from_slice(&(w as u16).to_le_bytes());
         out.extend_from_slice(&(h as u16).to_le_bytes());
         out.extend_from_slice(&[0, 0, 0, 0]);
@@ -370,12 +414,15 @@ impl ThumbEncoder {
                 let off = (out.len() - data) as u32;
                 out[tab + 4 * y..tab + 4 * y + 4].copy_from_slice(&off.to_le_bytes());
             }
-            let base = y * (pitch + 1);
-            let mut k = w - 1;
-            let mut c = cls(base + k);
+            let base = match self.rows {
+                RowScan::W10 => y * (pitch + 1),
+                RowScan::Original => y * pitch,
+            };
+            let mut k = start;
+            let mut c = probe(base, k);
             while c == 0 && k != 0 {
                 k -= 1;
-                c = cls(base + k);
+                c = probe(base, k);
             }
             runs.clear();
             runs.push((0, 2)); // 0x007d7f00 = 2: the bottom of the run stack
@@ -385,7 +432,7 @@ impl ThumbEncoder {
                 loop {
                     n += 1;
                     k -= 1;
-                    c = cls(base + k);
+                    c = probe(base, k);
                     if c != rc || k == 0 {
                         break;
                     }
@@ -816,6 +863,83 @@ mod tests {
             (b.len(), md5_hex(&sp).as_str()),
             (1071, "ceae6cdf1bb19b609f8e3c9749db6e2f")
         );
+    }
+
+    /// atlantis3-re `evidence/golden/a3_thumb_encoder_2018.txt`: the
+    /// encoder of atlantis3-gog-2018-3473408 under emulation, fresh state,
+    /// 1024 bytes of `guard` after the pixels: kind, w, h, seed, guard,
+    /// length, md5 of the output, one row per line.
+    const CASES_2018: &str = "\
+        scene 85 65 1 00 7024 9a729e2cdebab98f6484acdaaff83047
+        scene 65 50 2 00 4644 ea5ddef12e0debe0e0506af9e1390d8f
+        scene 52 40 3 00 3364 a9153a32ab1c92b0943d08937f4629f4
+        few 85 65 4 00 7024 e0470fe361b9404f11bfbf31a000bb38
+        few 52 40 5 00 3364 85f930b0e12bae5eb3671d9eee9c022b
+        many 85 65 6 00 7024 c151a4ab3b4ac8e7a838627d0e77ef77
+        many 65 50 7 00 4644 74dc2646e95ef7ee40c0960889b769c4
+        many 52 40 8 00 3364 94046a73029f616ac2d9459c49676431
+        black 85 65 9 00 7024 dfcbcef2e0592e6ebe8ac4f62175c8f9
+        black 52 40 10 00 3364 5de631f00db15a9f61b3406839bad674
+        dark 65 50 11 00 4644 89e07b8fc667f9b42dc8636ae8db3348
+        dark 52 40 12 00 3367 6a92babfb7907f8bf85ab3d3401bc5c2
+        redline 52 40 13 00 3503 8128958adb71e0f10e4aea7798c378b9
+        redline 85 65 14 00 7365 f6d620f976ccf9ddb5b7bc46faa8b03b
+        ramp 85 65 15 00 7034 3cd8816ea5b44921cf9108ceae7878b9
+        ramp 65 50 16 00 4644 6babd549f47e228e5da5d14b7559d17c
+        ramp 52 40 17 00 3370 6a19d2fe84cbd0c2aab1cf45e2bde6a7
+        scene 85 65 18 00 7024 74986ea61005e9bbd624c1bffc371540
+        few 65 50 19 00 4644 0b34d83e4aeb27f684a4d54445a9fc57
+        many 2 2 20 00 1060 115058d37326cd6736faa6d34056c067
+        scene 1 5 21 00 0 d41d8cd98f00b204e9800998ecf8427e
+        scene 9 1 22 00 0 d41d8cd98f00b204e9800998ecf8427e
+        scene 85 65 1 ff 7024 9a729e2cdebab98f6484acdaaff83047
+        scene 65 50 2 ff 4644 ea5ddef12e0debe0e0506af9e1390d8f
+        scene 52 40 3 ff 3364 a9153a32ab1c92b0943d08937f4629f4
+        few 85 65 4 ff 7024 e0470fe361b9404f11bfbf31a000bb38
+        few 52 40 5 ff 3364 85f930b0e12bae5eb3671d9eee9c022b
+        many 85 65 6 ff 7024 c151a4ab3b4ac8e7a838627d0e77ef77
+        many 65 50 7 ff 4644 74dc2646e95ef7ee40c0960889b769c4
+        many 52 40 8 ff 3364 94046a73029f616ac2d9459c49676431
+        black 85 65 9 ff 7024 dfcbcef2e0592e6ebe8ac4f62175c8f9
+        black 52 40 10 ff 3364 5de631f00db15a9f61b3406839bad674
+        dark 65 50 11 ff 4644 89e07b8fc667f9b42dc8636ae8db3348
+        dark 52 40 12 ff 3367 6a92babfb7907f8bf85ab3d3401bc5c2
+        redline 52 40 13 ff 3503 8128958adb71e0f10e4aea7798c378b9
+        redline 85 65 14 ff 7365 f6d620f976ccf9ddb5b7bc46faa8b03b
+        ramp 85 65 15 ff 7034 3cd8816ea5b44921cf9108ceae7878b9
+        ramp 65 50 16 ff 4644 6babd549f47e228e5da5d14b7559d17c
+        ramp 52 40 17 ff 3370 6a19d2fe84cbd0c2aab1cf45e2bde6a7
+        scene 85 65 18 ff 7024 74986ea61005e9bbd624c1bffc371540
+        few 65 50 19 ff 4644 0b34d83e4aeb27f684a4d54445a9fc57
+        many 2 2 20 ff 1060 115058d37326cd6736faa6d34056c067
+        scene 1 5 21 ff 0 d41d8cd98f00b204e9800998ecf8427e
+        scene 9 1 22 ff 0 d41d8cd98f00b204e9800998ecf8427e
+";
+
+    #[test]
+    fn original_row_scan_matches_the_2018_program() {
+        for row in CASES_2018.lines() {
+            let t: Vec<&str> = row.split_whitespace().collect();
+            let n = |i: usize| t[i].parse::<usize>().unwrap();
+            let (kind, w, h, seed, len, out) = (t[0], n(1), n(2), n(3) as u32, n(5), t[6]);
+            let guard = u8::from_str_radix(t[4], 16).unwrap();
+            let mut px = gen_image(kind, w, h, seed);
+            darken_black(&mut px);
+            let mut enc = ThumbEncoder::new();
+            enc.rows = RowScan::Original;
+            let b = enc.encode(&px, w, h, w, &[guard; 1024]);
+            assert_eq!(
+                (b.len(), md5_hex(&b).as_str()),
+                (len, out),
+                "{kind} {w}x{h} seed {seed} guard {guard:02x}"
+            );
+        }
+        // An opaque 85 x 65 row stores its 85 indices, the 2022 build's 84.
+        let px = vec![0x0080_8080u32; 85 * 65];
+        let mut enc = ThumbEncoder::new();
+        let w10 = enc.encode(&px, 85, 65, 85, &[0xff; 1024]).len();
+        enc.rows = RowScan::Original;
+        assert_eq!(enc.encode(&px, 85, 65, 85, &[]).len(), w10 + 65);
     }
 
     #[test]

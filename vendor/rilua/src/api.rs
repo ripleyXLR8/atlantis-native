@@ -252,7 +252,8 @@ pub trait LuaApiMut: LuaApi {
 
     /// Compiles Lua source bytes (or loads a binary chunk) and returns a function handle.
     fn load_bytes(&mut self, source: &[u8], name: &str) -> LuaResult<Function> {
-        let proto = crate::compile_or_undump(source, name)?;
+        let lua50 = self.state().gc.compile_lua50;
+        let proto = crate::compile_or_undump_in(source, name, lua50)?;
         let mut proto = ProtoRef::try_unwrap(proto).unwrap_or_else(|rc| (*rc).clone());
         let state = self.state_mut();
         crate::patch_string_constants(&mut proto, &mut state.gc);
