@@ -36,6 +36,7 @@
 //! back to the library's screen ([`crate::a2::Ended::Library`]), as for
 //! the other games.
 
+#[cfg(not(target_os = "android"))]
 use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -81,7 +82,7 @@ pub fn label(dir: &Path) -> Result<String, OpenError> {
 /// The install with `Datas\Atlantis3.cfg` taken from the player's folder
 /// once the menus wrote it there (the game's folder stays untouched).
 struct WithCfg {
-    install: StdDir,
+    install: Arc<dyn FileSource>,
     cfg: PathBuf,
     /// The settings file's name in the install (`Datas/Atlantis3.cfg`;
     /// the 2004 program's `datas/Atlantis4.cfg`, as
@@ -165,13 +166,54 @@ pub fn open_in_with_discs(
     let cfg_path = base.join("Atlantis3.cfg");
     let files = A3Files::with_discs(
         Arc::new(WithCfg {
-            install: StdDir::new(dir),
+            install: Arc::new(StdDir::new(dir)),
             cfg: cfg_path.clone(),
             name: atlantis3_data::cfg::CFG_PATH,
         }),
         dir,
         discs,
     );
+    open_files_in(files, dir, base, fixes, cfg_path)
+}
+
+/// The game from `install` (a folder chosen on Android: its files read
+/// through `FileSource`) with the retail CD's discs among `discs`, its
+/// saves, `Atlantis3.cfg` and `settings.ini` in `base`; `shown` names the
+/// folder in the errors.
+#[cfg(target_os = "android")]
+pub fn open_source_in(
+    install: Arc<dyn FileSource>,
+    discs: Vec<(String, Arc<dyn FileSource>)>,
+    shown: &Path,
+    base: &Path,
+) -> Result<(Game, String), String> {
+    let _ = std::fs::create_dir_all(base);
+    let fixes = fixes_in(base, false);
+    let cfg_path = base.join("Atlantis3.cfg");
+    let install: Arc<dyn FileSource> = Arc::new(WithCfg {
+        install,
+        cfg: cfg_path.clone(),
+        name: atlantis3_data::cfg::CFG_PATH,
+    });
+    let files = A3Files::new(install.clone());
+    let files = match files.build() {
+        Ok(b) if b.release.disc_test() => A3Files::cd(Arc::new(
+            atlantis3_data::discs::CdSource::new(install, discs),
+        )),
+        _ => files,
+    };
+    open_files_in(files, shown, base, fixes, cfg_path)
+}
+
+/// The game from `files` (in `dir`, named in the errors), its saves in
+/// `base`, with `fixes`, the menus writing `cfg_path`.
+fn open_files_in(
+    files: A3Files,
+    dir: &Path,
+    base: &Path,
+    fixes: Fixes,
+    cfg_path: PathBuf,
+) -> Result<(Game, String), String> {
     let label = files
         .edition_label()
         .map_err(|e| crate::setup::explain_atlantis3(dir, &e))?;
@@ -277,6 +319,9 @@ pub struct A3App {
     alt: bool,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// Android: the window's buffers at the game's size (android_frame.rs).
+    #[cfg(target_os = "android")]
+    frame: Option<crate::android_frame::Frame>,
     _audio: Option<cpal::Stream>,
     /// The game's screen size the window was last given.
     shown: (usize, usize),
@@ -284,6 +329,15 @@ pub struct A3App {
     shift_until: Option<Instant>,
     /// The window ended for the game library's screen.
     to_library: bool,
+    /// The game was started (its intro, logos or start page), at the
+    /// first window.
+    started: bool,
+    /// Where the game's picture was last drawn in the window: x, y,
+    /// width, height (window pixels).
+    view: (usize, usize, usize, usize),
+    /// Android: the fingers on the screen (see [`A3App::touch`]).
+    #[cfg(target_os = "android")]
+    touch: TouchA3,
     /// The 2004 program ([`run_evolution_2004`]): its start-up logos and
     /// start page in place of the intro.
     evolution_2004: bool,
@@ -322,14 +376,120 @@ impl A3App {
             alt: false,
             window: None,
             surface: None,
+            #[cfg(target_os = "android")]
+            frame: None,
             _audio: stream,
             shown,
             shift_until: None,
             to_library: false,
+            started: false,
+            view: (0, 0, 1, 1),
+            #[cfg(target_os = "android")]
+            touch: TouchA3::default(),
             evolution_2004: false,
         }
     }
 
+    /// Android: the picture through [`crate::android_frame`], scaled by
+    /// the system's composer.
+    #[cfg(target_os = "android")]
+    fn present(&mut self) {
+        let Some(window) = &self.window else {
+            return;
+        };
+        if self.frame.is_none() {
+            self.frame = crate::android_frame::Frame::new(window);
+        }
+        let Some(frame) = self.frame.as_mut() else {
+            return;
+        };
+        let size = window.inner_size();
+        let (gw, gh) = (self.game.width(), self.game.height());
+        self.shown = (gw, gh);
+        let window_size = (size.width as usize, size.height as usize);
+        // The bag and menu buttons in the bars, as in Atlantis I (not
+        // during a cinematic or the credits); where a tap presses them,
+        // in the buffer's pixels.
+        let shown = !self.game.skippable() && self.game.credits().is_none();
+        let mut pressed: [Option<crate::android::Rect>; 2] = [None; 2];
+        let bars = |b: crate::android_frame::Bars<'_>| {
+            let (lw, lh) = b.size;
+            let (ox, _, pw, _) = b.picture;
+            let right = ox + pw;
+            for (i, (bar, button)) in [
+                ((right, lw - right), crate::android::Button::Bag),
+                ((0, ox), crate::android::Button::Menu),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let r = crate::android::draw_button(b.px, b.stride, bar, lh, shown, button);
+                // (drawn as 0x00RRGGBB: put in the buffer's byte order)
+                if let Some((x, y, w, h)) = r {
+                    for row in b.px.chunks_exact_mut(b.stride).skip(y).take(h) {
+                        for p in &mut row[x..x + w] {
+                            *p = crate::android_frame::from_xrgb(*p);
+                        }
+                    }
+                }
+                pressed[i] = r;
+            }
+        };
+        let view = match self.game.surface() {
+            Surface::Rgb565(screen) => {
+                let lut = crate::android_frame::rgb565_lut();
+                frame.present(
+                    window_size,
+                    (gw, gh),
+                    |y, out| {
+                        for (o, &p) in out.iter_mut().zip(&screen[y * gw..][..gw]) {
+                            *o = lut[usize::from(p)];
+                        }
+                    },
+                    bars,
+                )
+            }
+            Surface::Xrgb8888(screen) => frame.present(
+                window_size,
+                (gw, gh),
+                |y, out| {
+                    for (o, &p) in out.iter_mut().zip(&screen[y * gw..][..gw]) {
+                        *o = crate::android_frame::from_xrgb(p);
+                    }
+                },
+                bars,
+            ),
+        };
+        if let Some(view) = view {
+            self.view = view;
+            // The buttons' rectangles in window pixels: the buffer's
+            // pixel is the picture's (gw across `view.2` window pixels),
+            // its picture at the view's place.
+            let (vx, vy, vw, vh) = view;
+            let (bw, bh) = frame.buffer_size();
+            let (box_, boy) = ((bw - gw) / 2, (bh - gh) / 2);
+            let to_window = |r: Option<crate::android::Rect>| {
+                r.map(|(x, y, w, h)| {
+                    let sx = |v: usize| {
+                        (vx as f64 + (v as f64 - box_ as f64) * vw as f64 / gw as f64).max(0.0)
+                    };
+                    let sy = |v: usize| {
+                        (vy as f64 + (v as f64 - boy as f64) * vh as f64 / gh as f64).max(0.0)
+                    };
+                    let (x0, y0, x1, y1) = (sx(x), sy(y), sx(x + w), sy(y + h));
+                    (
+                        x0 as usize,
+                        y0 as usize,
+                        (x1 - x0) as usize,
+                        (y1 - y0) as usize,
+                    )
+                })
+            };
+            self.touch.buttons = [to_window(pressed[0]), to_window(pressed[1])];
+        }
+    }
+
+    #[cfg(not(target_os = "android"))]
     fn present(&mut self) {
         let (Some(window), Some(surface)) = (&self.window, self.surface.as_mut()) else {
             return;
@@ -363,6 +523,7 @@ impl A3App {
         };
         let (dw, dh) = (dw.max(1), dh.max(1));
         let (ox, oy) = ((ww - dw) / 2, (wh - dh) / 2);
+        self.view = (ox, oy, dw, dh);
         let xs: Vec<usize> = (0..dw).map(|x| x * gw / dw).collect();
         buf.fill(0);
         match self.game.surface() {
@@ -445,7 +606,19 @@ impl A3App {
 }
 
 impl ApplicationHandler for A3App {
+    /// Android: the activity's window is gone (the app in the
+    /// background); `resumed` makes another.
+    #[cfg(target_os = "android")]
+    fn suspended(&mut self, _el: &ActiveEventLoop) {
+        self.surface = None;
+        self.frame = None;
+        self.window = None;
+        crate::android::pause_audio(&self._audio, true);
+    }
+
     fn resumed(&mut self, el: &ActiveEventLoop) {
+        #[cfg(target_os = "android")]
+        crate::android::pause_audio(&self._audio, false);
         if self.window.is_some() {
             return;
         }
@@ -480,6 +653,13 @@ impl ApplicationHandler for A3App {
         self.window = Some(window);
         self.focused = true;
         self.grab();
+        // Android: a window made again (the app back from the background)
+        // goes on where the game was; only the first starts it.
+        if self.started {
+            self.next_frame = Instant::now();
+            return;
+        }
+        self.started = true;
         self.start = Instant::now();
         self.next_frame = self.start;
         if self.evolution_2004 {
@@ -505,6 +685,23 @@ impl ApplicationHandler for A3App {
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        // Android: the activity is being destroyed.
+        #[cfg(target_os = "android")]
+        if crate::android::destroyed() {
+            el.exit();
+            return;
+        }
+        // Android: Back and the on-screen keyboard's text.
+        #[cfg(target_os = "android")]
+        if let Some(id) = self.window.as_ref().map(|w| w.id()) {
+            let mut typed = crate::android::mode_typed();
+            if std::mem::take(&mut self.touch.escape) {
+                typed.extend(crate::android::escape_press());
+            }
+            for e in typed {
+                self.window_event(el, id, e);
+            }
+        }
         el.set_control_flow(ControlFlow::WaitUntil(self.next_frame));
     }
 
@@ -518,6 +715,21 @@ impl ApplicationHandler for A3App {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        // Android: the touch screen (the game reads the mouse's moves
+        // only, as DirectInput gave them).
+        #[cfg(target_os = "android")]
+        if let WindowEvent::Touch(t) = &event {
+            self.touch(t);
+            return;
+        }
+        // Android: Back as Escape.
+        #[cfg(target_os = "android")]
+        if let Some(events) = crate::android::mode_events(&event) {
+            for e in events {
+                self.window_event(el, _id, e);
+            }
+            return;
+        }
         // The 2004 program: every key press (repeats included, as
         // `WM_KEYDOWN`) and release reaches its key handlers and the
         // mini-games' `GetKeyboardState`.
@@ -579,11 +791,22 @@ impl ApplicationHandler for A3App {
                     _ => {}
                 }
             }
+            // (none before the game's window: the game starts with it)
+            WindowEvent::RedrawRequested if self.window.is_none() => {}
             WindowEvent::RedrawRequested => {
                 if self.shift_until.is_some_and(|t| Instant::now() >= t) {
                     self.shift_until = None;
                 }
                 let now = self.start.elapsed().as_secs_f64();
+                // Android: the touch screen's next button action.
+                #[cfg(target_os = "android")]
+                match self.touch.queue.pop_front() {
+                    Some(Press::Down) => self.game.click(),
+                    Some(Press::Up) => self.game.release(),
+                    Some(Press::Right) => self.game.right_click(),
+                    Some(Press::Skip) => self.game.skip(),
+                    None => {}
+                }
                 self.game.step(now);
                 if !self.intro_done && self.game.mode() == Mode::Idle {
                     self.intro_done = true;
@@ -600,6 +823,184 @@ impl ApplicationHandler for A3App {
                 self.next_frame = (self.next_frame + FRAME).max(t);
             }
             _ => {}
+        }
+    }
+}
+
+/// Android: a finger moving less than this (window pixels) from where it
+/// went down is still a tap.
+#[cfg(target_os = "android")]
+const TAP_SLOP: f64 = 24.0;
+
+/// Android: the fingers on the screen in Atlantis III.
+#[cfg(target_os = "android")]
+#[derive(Default)]
+struct TouchA3 {
+    fingers: Vec<u64>,
+    /// The first finger, where it went down and where it was last.
+    primary: Option<u64>,
+    from: (f64, f64),
+    last: (f64, f64),
+    /// It moved past [`TAP_SLOP`].
+    moved: bool,
+    /// A second finger came: a right click when they lift.
+    two: bool,
+    /// Where a tap presses the bag and the menu buttons (window pixels),
+    /// as last drawn.
+    buttons: [Option<crate::android::Rect>; 2],
+    /// The first finger went down on the bag (0) or menu (1) button.
+    on_button: Option<usize>,
+    /// The menu button was tapped: Escape for the game, as Back.
+    escape: bool,
+    /// The left button is held in the game (a free pointer's press).
+    pressed: bool,
+    /// The game's button actions, one per frame (a press is seen after the
+    /// pointer's move, as the menus hit-test the pointer of the frame
+    /// before; a release after its press).
+    queue: std::collections::VecDeque<Press>,
+}
+
+/// Android: a button action queued for the game.
+#[cfg(target_os = "android")]
+#[derive(Clone, Copy)]
+enum Press {
+    Down,
+    Up,
+    Right,
+    /// Space: the cinematic stops ([`Game::skip`]).
+    Skip,
+}
+
+#[cfg(target_os = "android")]
+impl A3App {
+    /// Whether the game's pointer is free on the screen (the menus, the
+    /// inventory, the subject menu, a dialog, a full-screen puzzle): a
+    /// finger puts it where it is. Elsewhere (the panorama) a drag turns
+    /// the view and a tap clicks where the view points.
+    fn free_pointer(&self) -> bool {
+        matches!(
+            self.game.mode(),
+            Mode::Menu | Mode::Inventory | Mode::Subjects | Mode::Dialog | Mode::Screen
+        )
+    }
+
+    /// Window point (x, y) as the game's screen point.
+    fn to_game(&self, (x, y): (f64, f64)) -> (i32, i32) {
+        let (ox, oy, dw, dh) = self.view;
+        let (gw, gh) = (self.game.width() as f64, self.game.height() as f64);
+        let gx = ((x - ox as f64) * gw / dw.max(1) as f64).floor();
+        let gy = ((y - oy as f64) * gh / dh.max(1) as f64).floor();
+        (
+            (gx as i32).clamp(0, gw as i32 - 1),
+            (gy as i32).clamp(0, gh as i32 - 1),
+        )
+    }
+
+    /// The pointer moved to window point `at` (the free pointer).
+    fn point_at(&mut self, at: (f64, f64)) {
+        let (gx, gy) = self.to_game(at);
+        let (px, py) = self.game.pointer();
+        self.game.mouse_motion(gx - px, gy - py);
+    }
+
+    /// A finger on the screen: on a free pointer a press there (moving it
+    /// while down); on the panorama a drag turns the view, a tap clicks;
+    /// two fingers a right click.
+    fn touch(&mut self, t: &winit::event::Touch) {
+        use winit::event::TouchPhase;
+        let at = (t.location.x, t.location.y);
+        match t.phase {
+            TouchPhase::Started => {
+                self.touch.fingers.retain(|f| *f != t.id);
+                self.touch.fingers.push(t.id);
+                if self.touch.fingers.len() == 1 {
+                    self.touch.primary = Some(t.id);
+                    self.touch.from = at;
+                    self.touch.last = at;
+                    self.touch.moved = false;
+                    self.touch.two = false;
+                    self.touch.on_button = self.touch.buttons.iter().position(|r| {
+                        r.is_some_and(|(x, y, w, h)| {
+                            at.0 >= x as f64
+                                && at.1 >= y as f64
+                                && at.0 < (x + w) as f64
+                                && at.1 < (y + h) as f64
+                        })
+                    });
+                    if self.touch.on_button.is_some() {
+                        // (a button: nothing for the game until it lifts)
+                    } else if self.free_pointer() {
+                        self.point_at(at);
+                        self.touch.queue.push_back(Press::Down);
+                        self.touch.pressed = true;
+                    }
+                } else if !self.touch.two {
+                    self.touch.two = true;
+                    if std::mem::take(&mut self.touch.pressed) {
+                        self.touch.queue.push_back(Press::Up);
+                    }
+                }
+            }
+            TouchPhase::Moved => {
+                if self.touch.primary != Some(t.id)
+                    || self.touch.two
+                    || self.touch.on_button.is_some()
+                {
+                    return;
+                }
+                let (lx, ly) = self.touch.last;
+                self.touch.last = at;
+                let (fx, fy) = self.touch.from;
+                if (at.0 - fx).hypot(at.1 - fy) > TAP_SLOP {
+                    self.touch.moved = true;
+                }
+                if self.touch.pressed {
+                    self.point_at(at);
+                } else if self.touch.moved {
+                    // The view turns with the finger, as with the mouse
+                    // (the game's pixels as mickeys).
+                    let k = self.game.width() as f64 / self.view.2.max(1) as f64;
+                    let (dx, dy) = ((at.0 - lx) * k, (at.1 - ly) * k);
+                    self.game.mouse_motion(dx.round() as i32, dy.round() as i32);
+                }
+            }
+            TouchPhase::Ended | TouchPhase::Cancelled => {
+                self.touch.fingers.retain(|f| *f != t.id);
+                let button = self.touch.on_button.take();
+                if self.touch.primary == Some(t.id) && !self.touch.two && button.is_some() {
+                    // A button lifted where it went down: the bag (the
+                    // right button, as two fingers) or the menu (Escape).
+                    if t.phase == TouchPhase::Ended {
+                        match button {
+                            Some(0) => self.touch.queue.push_back(Press::Right),
+                            _ => self.touch.escape = true,
+                        }
+                    }
+                } else if self.touch.primary == Some(t.id) && !self.touch.two {
+                    if std::mem::take(&mut self.touch.pressed) {
+                        self.touch.queue.push_back(Press::Up);
+                    } else if !self.touch.moved
+                        && t.phase == TouchPhase::Ended
+                        && self.game.skippable()
+                    {
+                        // A tap during a cinematic: Space, the key that
+                        // stops it (the phone has no keyboard; the
+                        // original's click does not stop it).
+                        self.touch.queue.push_back(Press::Skip);
+                    } else if !self.touch.moved && t.phase == TouchPhase::Ended {
+                        // A tap on the panorama: a click where it points.
+                        self.touch.queue.push_back(Press::Down);
+                        self.touch.queue.push_back(Press::Up);
+                    }
+                }
+                if self.touch.fingers.is_empty() {
+                    if self.touch.two && t.phase == TouchPhase::Ended {
+                        self.touch.queue.push_back(Press::Right);
+                    }
+                    self.touch.primary = None;
+                    self.touch.two = false;
+                }
+            }
         }
     }
 }
@@ -632,8 +1033,19 @@ pub fn run_evolution_2004_on(
     fullscreen: bool,
     shift_grace: bool,
 ) -> Result<Ended, String> {
-    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     let game = open_evolution_2004(dir, &evolution_2004_data_dir())?;
+    run_evolution_2004_game_on(el, game, fullscreen, shift_grace)
+}
+
+/// [`run_evolution_2004_on`] for a game already opened (Android: from a
+/// chosen folder, [`open_evolution_2004_in`]).
+pub fn run_evolution_2004_game_on(
+    el: &mut EventLoop<()>,
+    game: Game,
+    fullscreen: bool,
+    shift_grace: bool,
+) -> Result<Ended, String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
     let mut app = A3App::new(game, fullscreen, true);
     app.evolution_2004 = true;
     app.started_from_library(shift_grace.then(|| Instant::now() + SHIFT_GRACE));
@@ -715,9 +1127,15 @@ pub fn evolution_2004_data_dir() -> PathBuf {
 /// [`atlantis3_data::evolution2004::check_disc2`]); `None` when they are
 /// there or the program is not a known build.
 pub fn evolution_2004_incomplete(dir: &Path) -> Option<String> {
-    use atlantis3_data::evolution2004::{check_disc2, identify_dir};
-    let build = identify_dir(dir)?.ok()?;
-    check_disc2(&StdDir::new(dir), build).map(|e| format!("{}: {e}", dir.display()))
+    evolution_2004_incomplete_in(&StdDir::new(dir), dir)
+}
+
+/// [`evolution_2004_incomplete`] for the installation read through
+/// `install` (Android: a chosen folder), named `shown` in the message.
+fn evolution_2004_incomplete_in(install: &dyn FileSource, shown: &Path) -> Option<String> {
+    use atlantis3_data::evolution2004::{check_disc2, identify, EXE_NAME};
+    let build = identify(&install.read(EXE_NAME)?).ok()?;
+    check_disc2(install, build).map(|e| format!("{}: {e}", shown.display()))
 }
 
 /// The 2004 program's game in `dir`, its saves and `Atlantis4.cfg` in
@@ -725,19 +1143,29 @@ pub fn evolution_2004_incomplete(dir: &Path) -> Option<String> {
 /// player's own); refused when disc 2's world data are missing
 /// ([`evolution_2004_incomplete`]).
 pub fn open_evolution_2004(dir: &Path, base: &Path) -> Result<Game, String> {
+    open_evolution_2004_in(Arc::new(StdDir::new(dir)), dir, base)
+}
+
+/// [`open_evolution_2004`] for the installation read through `install`
+/// (Android: a chosen folder), named `shown` in the messages.
+pub fn open_evolution_2004_in(
+    install: Arc<dyn FileSource>,
+    shown: &Path,
+    base: &Path,
+) -> Result<Game, String> {
     use atlantis3_data::evolution2004::Evolution2004Source;
-    if let Some(why) = evolution_2004_incomplete(dir) {
+    if let Some(why) = evolution_2004_incomplete_in(&*install, shown) {
         return Err(why);
     }
     let _ = std::fs::create_dir_all(base);
     let cfg_path = base.join("Atlantis4.cfg");
     let src = Evolution2004Source::new(Arc::new(WithCfg {
-        install: StdDir::new(dir),
+        install,
         cfg: cfg_path.clone(),
         name: "datas/Atlantis4.cfg",
     }));
     let files = A3Files::evolution_2004(Arc::new(src));
-    let mut game = Game::new(files).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let mut game = Game::new(files).map_err(|e| format!("{}: {e}", shown.display()))?;
     game.save_dir = Some(base.join("save"));
     game.menus_mut().cfg_path = Some(cfg_path);
     log::info!(

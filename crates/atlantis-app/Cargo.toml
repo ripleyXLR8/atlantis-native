@@ -21,7 +21,6 @@ atlantis2-engine = { path = "../atlantis2-engine" }
 log = "0.4"
 winit = "0.30"
 softbuffer = "0.4"
-cpal = "0.15"
 web-time = "1"
 # The identifiers of an unknown edition in the report to the project.
 md-5 = "0.10"
@@ -40,12 +39,32 @@ glow = "0.16"
 # for the scripts and commands of its development builds.
 atlantis4 = []
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-env_logger = "0.11"
+# The sound output. Android takes a later cpal (below).
+[target.'cfg(not(target_os = "android"))'.dependencies]
+cpal = "0.15"
+
 # The native folder picker and message boxes. On Linux the XDG desktop
 # portal (libdbus loaded at run time, zenity as the fallback): nothing to
-# link at build time.
+# link at build time. Android has neither (docs/ANDROID.md).
+[target.'cfg(not(any(target_arch = "wasm32", target_os = "android")))'.dependencies]
 rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
+
+# Android (docs/ANDROID.md): winit's NativeActivity glue (no Java), the
+# log to logcat, and cpal 0.16, whose AAudio output is pure Rust (the
+# ndk crate) where 0.15's builds Oboe's C++ (needs API 26, the minimum).
+[target.'cfg(target_os = "android")'.dependencies]
+winit = { version = "0.30", features = ["android-native-activity"] }
+cpal = "0.16"
+android_logger = "0.15"
+# The activity's onDestroy, which winit 0.30 does not pass on (android.rs).
+ndk-sys = "0.6"
+# The window's buffers at the game's size (android_frame.rs).
+ndk = { version = "0.9", default-features = false }
+# The activity's Java helpers (the folder picker, android_saf.rs).
+jni-sys = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+env_logger = "0.11"
 # The OpenGL context of Atlantis Evolution's window.
 glutin = "0.32"
 glutin-winit = "0.5"

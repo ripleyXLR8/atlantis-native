@@ -910,6 +910,15 @@ impl Game {
         self.video.as_ref().is_some_and(|v| v.travel)
     }
 
+    /// Whether Space would stop what plays ([`Game::skip`]): a cinematic
+    /// (not a travel video, which a click ends), or the 2004 program's
+    /// film or logos.
+    pub fn skippable(&self) -> bool {
+        self.film_running_2004()
+            || self.logos_running_2004()
+            || self.video.as_ref().is_some_and(|v| !v.travel)
+    }
+
     /// The screen the in-game menu captured for the save thumbnails.
     #[doc(hidden)]
     pub fn menu_capture(&self) -> Option<&[u16]> {

@@ -31,6 +31,17 @@ pub struct LauncherEntry {
     pub copyable: bool,
 }
 
+/// How an entry's folder is shown: its path; on Android a folder chosen
+/// in the picker as the storage and the folders in it
+/// ([`crate::android::shown_tree`]).
+fn shown_path(path: &std::path::Path) -> String {
+    #[cfg(target_os = "android")]
+    if crate::android::is_tree(path) {
+        return crate::android::shown_tree(path);
+    }
+    path.display().to_string()
+}
+
 /// The keys the screen reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LauncherKey {
@@ -92,7 +103,6 @@ pub enum LauncherAction {
 
 const LIST_X: i32 = 24;
 const LIST_Y: i32 = 116;
-const LIST_W: i32 = SCREEN_W as i32 - 2 * LIST_X;
 const ROW_H: i32 = 40;
 /// The rows shown at once.
 pub const VISIBLE: usize = 6;
@@ -170,11 +180,11 @@ impl Button {
     }
 }
 
-/// The buttons' rectangles (x, y, w, h).
-fn button_rects() -> [(Button, i32, i32, i32, i32); 5] {
+/// The buttons' rectangles (x, y, w, h) on a screen `width` units wide.
+fn button_rects(width: i32) -> [(Button, i32, i32, i32, i32); 5] {
     let total: i32 =
         BUTTONS.iter().map(|b| b.width()).sum::<i32>() + BUTTON_GAP * (BUTTONS.len() as i32 - 1);
-    let mut x = (SCREEN_W as i32 - total) / 2;
+    let mut x = (width - total) / 2;
     BUTTONS.map(|b| {
         let r = (b, x, BUTTON_Y, b.width(), BUTTON_H);
         x += b.width() + BUTTON_GAP;
@@ -183,9 +193,9 @@ fn button_rects() -> [(Button, i32, i32, i32, i32); 5] {
 }
 
 /// The Buy Me a Coffee link's rectangle (x, y, w, h).
-fn support_rect() -> (i32, i32, i32, i32) {
+fn support_rect(width: i32) -> (i32, i32, i32, i32) {
     let w = art::width(&SUPPORT, SUPPORT_TEXT).ceil() as i32;
-    ((SCREEN_W as i32 - w) / 2, SUPPORT_BASE as i32 - 14, w, 19)
+    ((width - w) / 2, SUPPORT_BASE as i32 - 14, w, 19)
 }
 
 /// The screen's state.
@@ -203,6 +213,9 @@ pub struct Launcher {
     message: String,
     /// The row and time of the last click, for the double click.
     last_click: Option<(usize, u64)>,
+    /// The screen's width in units (480 high), when wider than 640: the
+    /// screen fills a wide window (Android).
+    width: usize,
     /// A copy to the computer is running: only Escape (its cancel) and
     /// closing the window are taken.
     busy: bool,
@@ -229,6 +242,22 @@ impl Launcher {
     /// The selected entry's index (0 when the list is empty).
     pub fn selected(&self) -> usize {
         self.selected
+    }
+
+    /// The screen's width in units (480 high): 640, or the wide window's
+    /// share set with [`Launcher::set_width`].
+    pub fn width(&self) -> usize {
+        self.width.max(SCREEN_W)
+    }
+
+    /// Lays the screen out `width` units wide (at least 640): the list,
+    /// the buttons and the lines across a wide window.
+    pub fn set_width(&mut self, width: usize) {
+        self.width = width.max(SCREEN_W);
+    }
+
+    fn list_w(&self) -> i32 {
+        self.width() as i32 - 2 * LIST_X
     }
 
     pub fn set_message(&mut self, text: impl Into<String>) {
@@ -269,7 +298,7 @@ impl Launcher {
         }
         let row = (self.selected - self.scroll) as i32;
         let w = art::width(&COPY_LINK, COPY_TEXT).ceil() as i32;
-        let right = LIST_X + LIST_W - if self.entries.len() > VISIBLE { 18 } else { 12 };
+        let right = LIST_X + self.list_w() - if self.entries.len() > VISIBLE { 18 } else { 12 };
         Some((right - w, LIST_Y + row * ROW_H + 22, w, 16))
     }
 
@@ -386,15 +415,16 @@ impl Launcher {
 
     /// The row of the list under a 640x480 screen point.
     fn row_at(&self, x: i32, y: i32) -> Option<usize> {
-        if !(LIST_X..LIST_X + LIST_W).contains(&x) || !(LIST_Y..LIST_Y + LIST_H).contains(&y) {
+        if !(LIST_X..LIST_X + self.list_w()).contains(&x) || !(LIST_Y..LIST_Y + LIST_H).contains(&y)
+        {
             return None;
         }
         let i = self.scroll + ((y - LIST_Y) / ROW_H) as usize;
         (i < self.entries.len()).then_some(i)
     }
 
-    fn button_at(x: i32, y: i32) -> Option<Button> {
-        button_rects()
+    fn button_at(&self, x: i32, y: i32) -> Option<Button> {
+        button_rects(self.width() as i32)
             .into_iter()
             .find(|&(_, bx, by, bw, bh)| (bx..bx + bw).contains(&x) && (by..by + bh).contains(&y))
             .map(|r| r.0)
@@ -403,12 +433,32 @@ impl Launcher {
     /// The pointer moved to a 640x480 screen point: the button under it
     /// lights up.
     pub fn pointer(&mut self, x: i32, y: i32) {
-        self.hover = Self::button_at(x, y).filter(|_| !self.busy);
+        self.hover = self.button_at(x, y).filter(|_| !self.busy);
     }
 
     /// A left click at a 640x480 screen point at `now_ms`: a row is
     /// selected (a second click on it soon after plays it), a button
     /// pressed.
+    /// A tap on the touch screen at a screen point: on a row, selects it,
+    /// or plays it when it is selected already; elsewhere as a click.
+    #[cfg(target_os = "android")]
+    pub fn tap(&mut self, x: i32, y: i32, now_ms: u64) -> LauncherAction {
+        if let Some(i) = self.row_at(x, y) {
+            if self.selected() == i {
+                self.focus = None;
+                self.last_click = None;
+                return self.play(i);
+            }
+        }
+        self.click(x, y, now_ms)
+    }
+
+    /// The touch screen's drag: the list moved by `rows` (negative: up).
+    #[cfg(target_os = "android")]
+    pub fn row_height() -> i32 {
+        ROW_H
+    }
+
     pub fn click(&mut self, x: i32, y: i32, now_ms: u64) -> LauncherAction {
         if self.busy {
             return LauncherAction::None;
@@ -433,18 +483,18 @@ impl Launcher {
             return LauncherAction::None;
         }
         self.last_click = None;
-        if Self::on_support_link(x, y) {
+        if self.on_support_link(x, y) {
             return LauncherAction::Support;
         }
-        match Self::button_at(x, y) {
+        match self.button_at(x, y) {
             Some(b) => self.press(b),
             None => LauncherAction::None,
         }
     }
 
     /// Whether a screen point is on the Buy Me a Coffee link.
-    fn on_support_link(x: i32, y: i32) -> bool {
-        let (sx, sy, sw, sh) = support_rect();
+    fn on_support_link(&self, x: i32, y: i32) -> bool {
+        let (sx, sy, sw, sh) = support_rect(self.width() as i32);
         (sx..sx + sw).contains(&x) && (sy..sy + sh).contains(&y)
     }
 
@@ -457,25 +507,27 @@ impl Launcher {
         self.scroll = (self.scroll as i64 + i64::from(rows)).clamp(0, max) as usize;
     }
 
-    /// Draws the screen on a 640x480 RGB565 frame, its text and ornaments
-    /// included.
+    /// Draws the screen on an RGB565 frame of [`Launcher::width`] x 480,
+    /// its text and ornaments included.
     pub fn draw(&self, screen: &mut [u16]) {
         for item in self.draw_scene(screen) {
             art::draw(&mut Frame565(screen), &item);
         }
     }
 
-    /// Draws the screen's background on a 640x480 RGB565 frame and gives
+    /// Draws the screen's background on an RGB565 frame of
+    /// [`Launcher::width`] x 480 and gives
     /// its text and ornaments, for the front end to draw over the frame
     /// once it is scaled to the window ([`art::draw`] on an
     /// [`art::Window`]).
     pub fn draw_scene(&self, screen: &mut [u16]) -> Vec<Item> {
         let mut items = Vec::new();
-        let cx = SCREEN_W as f32 / 2.0;
+        let cx = self.width() as f32 / 2.0;
+        let list_w = self.list_w();
         let centred = |style: &Style, t: &str, baseline: f32| {
             Item::text(*style, t, cx - art::width(style, t) / 2.0, baseline)
         };
-        screen.copy_from_slice(art::background());
+        screen.copy_from_slice(&art::background_for(self.width()));
         // The logo, under it the tagline between two spears.
         items.push(centred(&LOGO, "Atlantis", 62.0));
         let t = "Choose a game";
@@ -495,7 +547,7 @@ impl Launcher {
             flip: true,
         });
         // The tablet: the list on a dark veil between double gold rules.
-        let (tx, tw) = (LIST_X, LIST_W);
+        let (tx, tw) = (LIST_X, list_w);
         art::shade(screen, (tx, LIST_Y - 8, tw, LIST_H + 16), art::TABLET, 0.72);
         for y in [
             LIST_Y - 11,
@@ -515,7 +567,7 @@ impl Launcher {
             ));
         }
         let scrolls = self.entries.len() > VISIBLE;
-        let right = LIST_X + LIST_W - if scrolls { 18 } else { 12 };
+        let right = LIST_X + list_w - if scrolls { 18 } else { 12 };
         let text_x = LIST_X + 40;
         let rows = self.entries.iter().enumerate().skip(self.scroll);
         for (i, e) in rows.take(VISIBLE) {
@@ -524,7 +576,7 @@ impl Launcher {
             if sel {
                 art::shade(
                     screen,
-                    (LIST_X + 4, y + 1, LIST_W - 8, ROW_H - 2),
+                    (LIST_X + 4, y + 1, list_w - 8, ROW_H - 2),
                     (60, 100, 170),
                     0.22,
                 );
@@ -589,7 +641,7 @@ impl Launcher {
                     path_w -= lw as f32 + 14.0;
                 }
             }
-            let path = art::fit_left(&PATH, &e.path.display().to_string(), path_w);
+            let path = art::fit_left(&PATH, &shown_path(&e.path), path_w);
             items.push(Item::text(PATH, &path, text_x as f32, (y + 34) as f32));
         }
         // A scroll bar when the list is longer than the tablet.
@@ -598,14 +650,14 @@ impl Launcher {
             let track = LIST_H - 8;
             let bar_h = (track * VISIBLE as i32 / n as i32).max(16);
             let bar_y = LIST_Y + 4 + (track - bar_h) * self.scroll as i32 / (n - VISIBLE) as i32;
-            let x = LIST_X + LIST_W - 9;
+            let x = LIST_X + list_w - 9;
             art::shade(screen, (x, LIST_Y + 4, 2, track), art::GOLD, 0.18);
             art::shade(screen, (x, bar_y, 2, bar_h), art::GOLD, 0.7);
         }
         // The buttons: the gold capitals of the game's menus, the sun
         // beside the one under the pointer.
         let missing = self.selected_missing();
-        for (b, x, y, w, h) in button_rects() {
+        for (b, x, y, w, h) in button_rects(self.width() as i32) {
             let on = self.hover == Some(b) || self.focus == Some(b);
             let enabled = self.enabled(b);
             let style = if enabled { BUTTON } else { BUTTON_OFF };
@@ -624,7 +676,7 @@ impl Launcher {
             }
         }
         if !self.message.is_empty() {
-            let m = art::fit_right(&MESSAGE, &self.message, (SCREEN_W - 32) as f32);
+            let m = art::fit_right(&MESSAGE, &self.message, (self.width() - 32) as f32);
             items.push(centred(&MESSAGE, &m, MESSAGE_Y));
         }
         items.push(centred(&SUPPORT, SUPPORT_TEXT, SUPPORT_BASE));
@@ -672,7 +724,10 @@ mod tests {
     }
 
     fn button_centre(b: Button) -> (i32, i32) {
-        let (_, x, y, w, h) = button_rects().into_iter().find(|r| r.0 == b).unwrap();
+        let (_, x, y, w, h) = button_rects(SCREEN_W as i32)
+            .into_iter()
+            .find(|r| r.0 == b)
+            .unwrap();
         (x + w / 2, y + h / 2)
     }
 
@@ -805,7 +860,7 @@ mod tests {
     #[test]
     fn draws_the_list_and_the_buttons() {
         // The buttons fit across the screen, the sun's room beside each.
-        let rects = button_rects();
+        let rects = button_rects(SCREEN_W as i32);
         assert!(rects[0].1 >= 4 && rects[4].1 + rects[4].3 <= SCREEN_W as i32 - 4);
         for b in BUTTONS {
             for missing in [false, true] {
@@ -910,7 +965,7 @@ mod tests {
         assert_eq!(l.copy_rect(), None);
         l.key(LauncherKey::End);
         let (x, y, w, h) = l.copy_rect().unwrap();
-        assert!(x > LIST_X + LIST_W / 2 && y > row_y(2) && y + h <= LIST_Y + 3 * ROW_H);
+        assert!(x > LIST_X + l.list_w() / 2 && y > row_y(2) && y + h <= LIST_Y + 3 * ROW_H);
         let mut bare = vec![0u16; SCREEN_W * SCREEN_H];
         assert!(texts(&l.draw_scene(&mut bare)).contains(&COPY_TEXT));
         assert_eq!(l.click(x + w / 2, y + h / 2, 0), LauncherAction::Copy(2));
@@ -950,7 +1005,7 @@ mod tests {
         // Where the link would be: no copy.
         let w = art::width(&COPY_LINK, COPY_TEXT).ceil() as i32;
         let (x, y) = (
-            LIST_X + LIST_W - 18 - w / 2,
+            LIST_X + l.list_w() - 18 - w / 2,
             LIST_Y + VISIBLE as i32 * ROW_H + 30,
         );
         assert_ne!(l.click(x, y, 0), LauncherAction::Copy(7));
@@ -961,8 +1016,45 @@ mod tests {
     #[test]
     fn the_support_link() {
         let mut l = Launcher::new(Vec::new());
-        let (x, y, w, h) = support_rect();
+        let (x, y, w, h) = support_rect(SCREEN_W as i32);
         assert_eq!(l.click(x + w / 2, y + h / 2, 0), LauncherAction::Support);
         assert_eq!(l.click(x - 5, y + h / 2, 0), LauncherAction::None);
+    }
+
+    /// A wide window's screen (Android: 2340x1080 gives 1040 units): the
+    /// background, the list and the lines across it, the buttons and the
+    /// link in its middle; 640 is the narrowest. With
+    /// `ATLANTIS_LIBRARY_SHOTS=<folder>` it is saved there
+    /// (`library-wide.png`).
+    #[test]
+    fn a_wide_screen() {
+        let mut l = three();
+        l.set_width(300);
+        assert_eq!(l.width(), SCREEN_W);
+        l.set_width(1040);
+        assert_eq!(l.width(), 1040);
+        let mut s = vec![0u16; 1040 * SCREEN_H];
+        l.draw(&mut s);
+        let (bx, by, bw, bh) = support_rect(1040);
+        assert!((bx + bw / 2 - 520).abs() <= 1);
+        assert_eq!(
+            l.click(bx + bw / 2, by + bh / 2, 0),
+            LauncherAction::Support
+        );
+        // (the list's right end: the third row is there)
+        assert_eq!(l.row_at(1040 - LIST_X - 2, row_y(2)), Some(2));
+        assert_eq!(l.row_at(SCREEN_W as i32 - LIST_X, row_y(2)), Some(2));
+        let rects = button_rects(1040);
+        let mid = (rects[0].1 + rects[4].1 + rects[4].3) / 2;
+        assert!((mid - 520).abs() <= 2);
+        assert_eq!(
+            l.click(rects[4].1 + 4, rects[4].2 + 4, 0),
+            LauncherAction::Quit
+        );
+        assert_eq!(&art::background_for(SCREEN_W)[..], art::background());
+        if let Some(dir) = std::env::var_os("ATLANTIS_LIBRARY_SHOTS") {
+            let png = atlantis2_engine::png::encode_rgb565(&s, 1040, SCREEN_H);
+            std::fs::write(std::path::Path::new(&dir).join("library-wide.png"), png).unwrap();
+        }
     }
 }

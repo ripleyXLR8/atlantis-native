@@ -53,6 +53,8 @@ impl SaveStore for MemStore {
     }
 }
 
+#[cfg(target_os = "android")]
+pub use dir::set_android_data_dir;
 #[cfg(not(target_arch = "wasm32"))]
 pub use dir::{
     data_dir_and_source, per_user_data_dir, portable_bases, portable_data_dir, resolve_data_dir,
@@ -128,6 +130,18 @@ mod dir {
                 })
                 .unwrap_or_default()
         }
+    }
+
+    /// Android's per-user data folder: the app's internal files folder
+    /// (`Context.getFilesDir()`, android-activity's `internal_data_path`).
+    #[cfg(target_os = "android")]
+    static ANDROID_DATA_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
+    /// Sets the folder [`per_user_data_dir`] answers on Android (once, at
+    /// start-up; later calls are ignored).
+    #[cfg(target_os = "android")]
+    pub fn set_android_data_dir(dir: PathBuf) {
+        let _ = ANDROID_DATA_DIR.set(dir);
     }
 
     /// The folder named by `--data-dir` for this run, set once by the
@@ -228,7 +242,13 @@ mod dir {
     /// on Linux and the other Unix systems, `~/Library/Application
     /// Support/atlantis-native` on macOS, `%APPDATA%\atlantis-native` on
     /// Windows.
+    /// On Android, the app's internal files folder, given by the activity
+    /// at start-up (no HOME there).
     pub fn per_user_data_dir() -> Option<PathBuf> {
+        #[cfg(target_os = "android")]
+        if let Some(dir) = ANDROID_DATA_DIR.get() {
+            return Some(dir.join("atlantis-native"));
+        }
         let base = if cfg!(windows) {
             env_path("APPDATA")
         } else if cfg!(target_os = "macos") {

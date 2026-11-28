@@ -1,0 +1,101 @@
+name: android
+
+# The Android APK (docs/ANDROID.md), built and checked on an emulator.
+# Nothing is released: the APKs stay in the run's artifacts.
+on:
+  push:
+    branches: ['android/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,x86_64-linux-android
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android
+      - name: cargo-ndk
+        run: cargo install cargo-ndk --locked
+      - name: Android SDK packages
+        run: |
+          sdkmanager="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses >/dev/null || true
+          "$sdkmanager" --install "platforms;android-36" "build-tools;36.0.0" >/dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> "$GITHUB_ENV"
+      # Without the release key (the repository's secrets, below), the
+      # APKs are signed with a debug key kept from one run to the next
+      # (the cache), so that a build installs over the one before.
+      - name: Debug key
+        uses: actions/cache@v4
+        with:
+          path: ~/.android-debug/debug.keystore
+          key: android-debug-keystore
+      - name: APK (arm64-v8a)
+        env:
+          APK_NAME: atlantis-native-android-arm64.apk
+          BUILD_NUMBER: ${{ github.run_number }}
+          OUT: ${{ github.workspace }}/dist/android
+          DEBUG_KEYSTORE: /home/runner/.android-debug/debug.keystore
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: packaging/android/build-apk.sh arm64-v8a
+      - name: APK (x86_64, for the emulator)
+        env:
+          APK_NAME: atlantis-native-android-x86_64.apk
+          BUILD_NUMBER: ${{ github.run_number }}
+          OUT: ${{ github.workspace }}/dist/android
+          DEBUG_KEYSTORE: /home/runner/.android-debug/debug.keystore
+        run: packaging/android/build-apk.sh x86_64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlantis-native-android-arm64
+          path: dist/android/atlantis-native-android-arm64.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: atlantis-native-android-x86_64
+          path: dist/android/atlantis-native-android-x86_64.apk
+          if-no-files-found: error
+
+  emulator:
+    needs: apk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: atlantis-native-android-x86_64
+          path: apk
+      - name: KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install, start, screenshot
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: packaging/android/smoke-test.sh apk/atlantis-native-android-x86_64.apk smoke
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-emulator-smoke
+          path: smoke/

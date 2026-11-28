@@ -54,6 +54,12 @@ mod a5_bar;
 pub mod a5_copy;
 #[cfg(target_arch = "wasm32")]
 mod a5_web;
+#[cfg(target_os = "android")]
+mod android;
+#[cfg(target_os = "android")]
+mod android_frame;
+#[cfg(target_os = "android")]
+mod android_saf;
 mod audio_out;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod cli;
@@ -96,12 +102,15 @@ const FRAME: Duration = Duration::from_micros(16_667);
 /// An engine step longer than this is logged.
 const SLOW_STEP: Duration = Duration::from_millis(100);
 
-/// Where the 640x480 picture sits in the window.
+/// Where the 640x480 picture sits in the window (the game library's
+/// screen: `w` x 480, wider in a wide window).
 #[derive(Clone, Copy, Default)]
 struct Viewport {
     ox: f64,
     oy: f64,
     scale: f64,
+    /// The screen's width in units (0: 640).
+    w: usize,
 }
 
 impl Viewport {
@@ -111,7 +120,8 @@ impl Viewport {
         }
         let sx = ((x - self.ox) / self.scale).floor() as i32;
         let sy = ((y - self.oy) / self.scale).floor() as i32;
-        (sx.clamp(0, W as i32 - 1), sy.clamp(0, H as i32 - 1))
+        let w = if self.w == 0 { W } else { self.w };
+        (sx.clamp(0, w as i32 - 1), sy.clamp(0, H as i32 - 1))
     }
 
     fn to_window(self, x: i32, y: i32) -> (f64, f64) {
@@ -179,6 +189,14 @@ pub fn version_string() -> String {
 pub struct App {
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// Android: the window's buffers written directly (in place of
+    /// softbuffer's surface, which makes a new screen-sized buffer each
+    /// frame and copies it byte by byte), from `frame_px`, the frame
+    /// drawn at the window's size and kept between frames.
+    #[cfg(target_os = "android")]
+    native: Option<android_frame::Frame>,
+    #[cfg(target_os = "android")]
+    frame_px: Vec<u32>,
     /// The browser: WebGL presents the frames (the 2D canvas, `surface`,
     /// without it), drawn first into `gl_frame` (an HD frame at most
     /// `WEB_MAX_PIXELS`) or `gl_small` (the original's 640x480).
@@ -208,6 +226,8 @@ pub struct App {
     viewport: Viewport,
     /// Source column of each window column, for the current width.
     col_map: Vec<usize>,
+    /// The frame's width `col_map` was made for.
+    col_map_w: usize,
     /// The pointer lock as applied to the window.
     locked: bool,
     /// Alt is held (Alt+Enter: full screen).
@@ -289,6 +309,24 @@ pub struct App {
     /// The support screen, while it is shown (desktop).
     #[cfg(not(target_arch = "wasm32"))]
     support: Option<support::Shown>,
+    /// Android: the touch screen as the mouse, and when the activity
+    /// went to the background (the game's clock stopped since).
+    #[cfg(target_os = "android")]
+    touch: android::TouchState,
+    #[cfg(target_os = "android")]
+    suspended_at: Option<Instant>,
+    /// Android: the bag button in the black bar right of the picture
+    /// (window pixels, as last drawn), when shown.
+    #[cfg(target_os = "android")]
+    bag_button: Option<android::Rect>,
+    /// Android: the options menu's button in the black bar left of the
+    /// picture, when shown.
+    #[cfg(target_os = "android")]
+    menu_button: Option<android::Rect>,
+    /// Android: Atlantis II, III or Evolution found in the chosen folder,
+    /// played once this front end's event loop ends.
+    #[cfg(target_os = "android")]
+    android_other: Option<android::OtherGame>,
 }
 
 impl App {
@@ -357,6 +395,10 @@ impl App {
         App {
             window: None,
             surface: None,
+            #[cfg(target_os = "android")]
+            native: None,
+            #[cfg(target_os = "android")]
+            frame_px: Vec::new(),
             #[cfg(target_arch = "wasm32")]
             gl: None,
             #[cfg(target_arch = "wasm32")]
@@ -378,6 +420,7 @@ impl App {
             next_frame: now,
             viewport: Viewport::default(),
             col_map: Vec::new(),
+            col_map_w: 0,
             locked: false,
             alt: false,
             title: "Atlantis Native".to_string(),
@@ -423,6 +466,16 @@ impl App {
             session: None,
             #[cfg(not(target_arch = "wasm32"))]
             support: None,
+            #[cfg(target_os = "android")]
+            touch: android::TouchState::default(),
+            #[cfg(target_os = "android")]
+            suspended_at: None,
+            #[cfg(target_os = "android")]
+            bag_button: None,
+            #[cfg(target_os = "android")]
+            menu_button: None,
+            #[cfg(target_os = "android")]
+            android_other: None,
         }
     }
 
@@ -831,6 +884,8 @@ impl App {
         if self.menu.is_open() {
             return true; // paused
         }
+        #[cfg(target_os = "android")]
+        self.feed_touch();
         self.step_paced()
     }
 
@@ -1059,7 +1114,11 @@ impl App {
         let gl_on = self.gl.is_some();
         #[cfg(not(target_arch = "wasm32"))]
         let gl_on = false;
+        #[cfg(not(target_os = "android"))]
         let mut soft_buf = None;
+        // (Android: no softbuffer surface; see `native`)
+        #[cfg(target_os = "android")]
+        let soft_buf: Option<softbuffer::Buffer<'_, Rc<Window>, Rc<Window>>> = None;
         #[cfg(target_arch = "wasm32")]
         let buf: &mut [u32] = if gl_on {
             self.gl_frame
@@ -1072,7 +1131,17 @@ impl App {
             surface.resize(nw, nh).unwrap();
             soft_buf.insert(surface.buffer_mut().unwrap())
         };
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(target_os = "android")]
+        let buf: &mut [u32] = {
+            let _ = (nw, nh);
+            if self.native.is_none() {
+                return;
+            }
+            self.frame_px
+                .resize(size.width as usize * size.height as usize, 0);
+            &mut self.frame_px
+        };
+        #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
         let buf: &mut [u32] = {
             let Some(surface) = &mut self.surface else {
                 return;
@@ -1087,6 +1156,19 @@ impl App {
         // menu is open over it).
         #[cfg(not(target_arch = "wasm32"))]
         self.launcher_text.clear();
+        // Android: the game library's screen as wide as the window (640
+        // under the options menu, which is drawn on a 640x480 frame).
+        #[cfg(target_os = "android")]
+        {
+            let wide = if self.menu.is_open() {
+                W
+            } else {
+                (size.width as usize * H / (size.height as usize).max(1)).max(W)
+            };
+            if let Some(l) = self.session.as_mut().and_then(|s| s.launcher_mut()) {
+                l.set_width(wide);
+            }
+        }
         #[cfg(not(target_arch = "wasm32"))]
         let launcher = support::draw_support(self.support.as_ref(), &mut self.launcher_frame)
             || session::draw_launcher(
@@ -1097,14 +1179,28 @@ impl App {
         #[cfg(target_arch = "wasm32")]
         let launcher = false;
         let (sw, sh) = (size.width as usize, size.height as usize);
-        // Nearest scaling keeping the 4:3 aspect, black bars.
-        let scale = (sw as f64 / W as f64).min(sh as f64 / H as f64);
-        let (dw, dh) = ((W as f64 * scale) as usize, (H as f64 * scale) as usize);
-        let (ox, oy) = ((sw - dw) / 2, (sh - dh) / 2);
+        // The height the picture fits in: the window's; on Android the
+        // part above the on-screen keyboard while it is shown.
+        #[cfg(not(target_os = "android"))]
+        let fit_h = sh;
+        #[cfg(target_os = "android")]
+        let fit_h = sh.saturating_sub(android_saf::ime_height()).max(sh / 4);
+        // The frame's width: 640, the game library's screen's own (wider
+        // in a wide window on Android).
+        let fw = if launcher {
+            (self.launcher_frame.len() / H).max(W)
+        } else {
+            W
+        };
+        // Nearest scaling keeping the aspect, black bars.
+        let scale = (sw as f64 / fw as f64).min(fit_h as f64 / H as f64);
+        let (dw, dh) = ((fw as f64 * scale) as usize, (H as f64 * scale) as usize);
+        let (ox, oy) = ((sw - dw) / 2, (fit_h - dh) / 2);
         self.viewport = Viewport {
             ox: ox as f64,
             oy: oy as f64,
             scale,
+            w: fw,
         };
         // The pointer is in window pixels.
         #[cfg(target_arch = "wasm32")]
@@ -1113,6 +1209,7 @@ impl App {
                 ox: ox as f64 * k,
                 oy: oy as f64 * k,
                 scale: scale * k,
+                w: fw,
             };
         }
         // The HD tile the engine draws its next frames at.
@@ -1139,6 +1236,11 @@ impl App {
             &self.pattern
         };
         let hd_mode = tile.is_some();
+        // Android: the bag and menu buttons while a game is played (not over the
+        // library, the options menu, or the on-screen keyboard).
+        #[cfg(target_os = "android")]
+        let bag_shown =
+            !launcher && self.runner.is_some() && !self.menu.is_open() && !self.touch.typing();
         if self.menu.is_open() {
             self.menu_frame.clear();
             self.menu_frame.extend_from_slice(frame);
@@ -1233,6 +1335,25 @@ impl App {
             drop((layer, text, video));
             #[cfg(not(target_arch = "wasm32"))]
             let _ = card;
+            #[cfg(target_os = "android")]
+            {
+                self.bag_button = android::draw_button(
+                    &mut buf[..],
+                    sw,
+                    (ox + dw, sw - ox - dw),
+                    fit_h,
+                    bag_shown,
+                    android::Button::Bag,
+                );
+                self.menu_button = android::draw_button(
+                    &mut buf[..],
+                    sw,
+                    (0, ox),
+                    fit_h,
+                    bag_shown,
+                    android::Button::Menu,
+                );
+            }
             #[cfg(target_arch = "wasm32")]
             if let Some(gl) = &mut self.gl {
                 // The whole frame enlarged to the canvas, over the card's
@@ -1265,6 +1386,8 @@ impl App {
             if let Some(b) = soft_buf {
                 b.present().unwrap();
             }
+            #[cfg(target_os = "android")]
+            post_native(&mut self.native, &self.frame_px, sw, sh);
             return;
         }
         // WebGL: the original's 640x480 pixels go to the graphics card as
@@ -1295,14 +1418,17 @@ impl App {
                 if let Some(b) = soft_buf {
                     b.present().unwrap();
                 }
+                #[cfg(target_os = "android")]
+                post_native(&mut self.native, &self.frame_px, sw, sh);
                 return;
             }
         }
         // RGB565 -> XRGB8888 table and source column per window column,
         // built once (the per-pixel arithmetic was the cost in the browser).
         let lut = hd::rgb565_to_888();
-        if self.col_map.len() != dw {
-            self.col_map = (0..dw).map(|x| x * W / dw).collect();
+        if self.col_map.len() != dw || self.col_map_w != fw {
+            self.col_map = (0..dw).map(|x| x * fw / dw).collect();
+            self.col_map_w = fw;
         }
         let mut prev_src = usize::MAX;
         for y in 0..dh {
@@ -1314,7 +1440,7 @@ impl App {
                 continue;
             }
             prev_src = src_y;
-            let src_row = &frame[src_y * W..][..W];
+            let src_row = &frame[src_y * fw..][..fw];
             for (d, &x) in buf[start..start + dw].iter_mut().zip(&self.col_map) {
                 *d = lut[usize::from(src_row[x])];
             }
@@ -1325,14 +1451,46 @@ impl App {
                 px: &mut buf[..],
                 stride: sw,
                 rect: (ox, oy, dw, dh),
+                width: fw,
             };
             for item in &self.launcher_text {
                 launcher_art::draw(&mut win, item);
             }
             self.launcher_shown = (self.launcher_text.clone(), sw, sh, buf.to_vec());
         }
+        #[cfg(target_os = "android")]
+        {
+            self.bag_button = android::draw_button(
+                &mut buf[..],
+                sw,
+                (ox + dw, sw - ox - dw),
+                fit_h,
+                bag_shown,
+                android::Button::Bag,
+            );
+            self.menu_button = android::draw_button(
+                &mut buf[..],
+                sw,
+                (0, ox),
+                fit_h,
+                bag_shown,
+                android::Button::Menu,
+            );
+        }
         if let Some(b) = soft_buf {
             b.present().unwrap();
+        }
+        #[cfg(target_os = "android")]
+        post_native(&mut self.native, &self.frame_px, sw, sh);
+    }
+}
+
+/// Android: the frame drawn in `px` (the app's `frame_px`) to the window.
+#[cfg(target_os = "android")]
+fn post_native(native: &mut Option<android_frame::Frame>, px: &[u32], sw: usize, sh: usize) {
+    if let Some(n) = native {
+        if !n.post((sw, sh), px) {
+            log::debug!("window took no frame");
         }
     }
 }
@@ -1340,6 +1498,9 @@ impl App {
 fn engine_key(key: &Key) -> Option<EngineKey> {
     Some(match key {
         Key::Named(NamedKey::Escape) => EngineKey::Escape,
+        // Android's Back button.
+        #[cfg(target_os = "android")]
+        Key::Named(NamedKey::BrowserBack) => EngineKey::Escape,
         Key::Named(NamedKey::Enter) => EngineKey::Enter,
         Key::Named(NamedKey::Space) => EngineKey::Space,
         Key::Named(NamedKey::Backspace) => EngineKey::Backspace,
@@ -1370,6 +1531,15 @@ impl ApplicationHandler for App {
         watchdog::enter(watchdog::Phase::Resumed);
         #[cfg(not(target_arch = "wasm32"))]
         let _guard = WatchdogLeave;
+        #[cfg(target_os = "android")]
+        log::info!(
+            "resumed: window {}",
+            if self.window.is_some() {
+                "kept"
+            } else {
+                "made"
+            }
+        );
         if self.window.is_some() {
             return;
         }
@@ -1446,8 +1616,13 @@ impl ApplicationHandler for App {
         }
         #[cfg(target_arch = "wasm32")]
         let soft = self.gl.is_none();
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
         let soft = true;
+        #[cfg(target_os = "android")]
+        let soft = {
+            self.native = android_frame::Frame::new(&window);
+            false
+        };
         if soft {
             let context = softbuffer::Context::new(window.clone()).unwrap();
             self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
@@ -1462,6 +1637,15 @@ impl ApplicationHandler for App {
         if self.runner.is_some() {
             self.start_audio();
         }
+        #[cfg(target_os = "android")]
+        self.android_resume();
+    }
+
+    /// Android: the activity's window is gone (another app, the screen
+    /// off); [`ApplicationHandler::resumed`] makes a new one.
+    #[cfg(target_os = "android")]
+    fn suspended(&mut self, _el: &ActiveEventLoop) {
+        self.android_suspend();
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
@@ -1469,6 +1653,20 @@ impl ApplicationHandler for App {
         watchdog::enter(watchdog::Phase::AboutToWait);
         #[cfg(not(target_arch = "wasm32"))]
         let _guard = WatchdogLeave;
+        // Android: the activity is being destroyed, and waits for the
+        // event loop to end.
+        #[cfg(target_os = "android")]
+        if android::destroyed() {
+            el.exit();
+            return;
+        }
+        // Android: the folder picker's answer, the on-screen keyboard's
+        // text, the Back button.
+        #[cfg(target_os = "android")]
+        {
+            self.poll_picked(el);
+            self.poll_typed(el);
+        }
         // In the browser the redraw loop keeps itself going (see
         // RedrawRequested).
         #[cfg(target_arch = "wasm32")]
@@ -1665,8 +1863,20 @@ impl ApplicationHandler for App {
                     }
                 }
             }
+            #[cfg(target_os = "android")]
+            WindowEvent::Touch(t) => self.touch(t),
             WindowEvent::ModifiersChanged(m) => self.alt = m.state().alt_key(),
             WindowEvent::KeyboardInput { event, .. } => {
+                // Android: Back without a game (the screen saying where to
+                // copy it) leaves the app.
+                #[cfg(target_os = "android")]
+                if self.runner.is_none()
+                    && !self.menu.is_open()
+                    && event.logical_key == Key::Named(NamedKey::BrowserBack)
+                {
+                    el.exit();
+                    return;
+                }
                 let key = engine_key(&event.logical_key);
                 let pressed = event.state == ElementState::Pressed;
                 // A key is a user gesture too: the browser's sound starts

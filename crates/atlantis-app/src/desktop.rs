@@ -80,6 +80,8 @@ pub fn install_panic_hook(boxed: bool) {
 pub fn error_box(text: &str) {
     eprintln!("{text}");
     log::error!("{text}");
+    // (Android: no message box; the log goes to logcat)
+    #[cfg(not(target_os = "android"))]
     rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Error)
         .set_title("Atlantis Native")
@@ -383,7 +385,9 @@ pub fn describe(dir: &Path) -> LauncherEntry {
     let (label, found) = if kind == Some(GameKind::Atlantis5) {
         match crate::a5::edition(dir) {
             Ok((label, disc)) => {
-                copyable = disc;
+                // (not on Android: the copy would go to the app's
+                // internal storage; the disc's image plays as it is)
+                copyable = disc && !cfg!(target_os = "android");
                 (label, true)
             }
             // One of the North-American CDs: copied one after the other.
@@ -481,14 +485,23 @@ pub fn describe(dir: &Path) -> LauncherEntry {
 }
 
 /// The answer to a three-button question.
+#[cfg_attr(target_os = "android", allow(dead_code))]
 enum Choice {
     First,
     Second,
     Third,
 }
 
+/// Android: no message box, the question is closed.
+#[cfg(target_os = "android")]
+fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
+    log::warn!("{text} ({first} / {second} / {third}): no message box");
+    Choice::Third
+}
+
 /// A question in the system's message box with three labelled buttons
 /// (closing the box counts as the third).
+#[cfg(not(target_os = "android"))]
 fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
     let r = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Info)
@@ -509,7 +522,15 @@ fn ask(text: &str, first: &str, second: &str, third: &str) -> Choice {
     }
 }
 
+/// Android: no message box, the question is closed.
+#[cfg(target_os = "android")]
+fn ask2(text: &str, first: &str, second: &str) -> bool {
+    log::warn!("{text} ({first} / {second}): no message box");
+    false
+}
+
 /// A question with two labelled buttons: true for the first.
+#[cfg(not(target_os = "android"))]
 fn ask2(text: &str, first: &str, second: &str) -> bool {
     let r = rfd::MessageDialog::new()
         .set_level(rfd::MessageLevel::Info)
@@ -584,6 +605,7 @@ fn copy_from_discs() -> Option<PathBuf> {
 /// drive or another), into [`crate::a5_copy::cd_copy_dir`]; the game
 /// copied and its folder, or `None` when the player cancels or a copy
 /// fails. A copy cut short goes on from the files copied whole.
+#[cfg(not(target_os = "android"))]
 fn copy_atlantis5_cds(first: &Path) -> Option<(Opened, PathBuf)> {
     use crate::a5_copy::{cd_copy_dir, free_space, CopyError, Plan, Progress};
     let dest = cd_copy_dir();
@@ -743,6 +765,7 @@ pub fn first_start() -> Option<FirstStart> {
 
 /// Opens the project's new-issue page in the browser, filled in with the
 /// identifiers of the edition in `dir` (its files or its disc images).
+#[cfg_attr(target_os = "android", allow(dead_code))]
 fn report_edition(dir: &Path) {
     let names = setup::names_in(dir);
     let report = if names.iter().any(|n| n == "atlantis.exe") {
@@ -757,6 +780,13 @@ fn report_edition(dir: &Path) {
     }
 }
 
+/// Android: no folder picker yet (docs/ANDROID.md).
+#[cfg(target_os = "android")]
+pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
+    log::warn!("no folder picker ({give_up})");
+    None
+}
+
 /// The game folder the player chooses in the system's folder picker (of
 /// any game: the folder itself or one below it, [`setup::find_roots`];
 /// a folder holding two games or more asks which one), with a message saying what to do when the folder is not right (its
@@ -764,6 +794,7 @@ fn report_edition(dir: &Path) {
 /// the folder is a CD drive of the first game. The game and its folder;
 /// for Cryo's DVD, each of its languages found ([`dvd_locations`]), each
 /// its own edition. `None` when the player cancels.
+#[cfg(not(target_os = "android"))]
 pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
     loop {
         let dir = rfd::FileDialog::new()
@@ -977,6 +1008,7 @@ pub fn pick_game_folder(give_up: &str) -> Option<Vec<(Opened, PathBuf)>> {
 
 /// Every language of the side of the DVD's language `root` (none when
 /// `root` is not one): a pick of a folder above the side's copy.
+#[cfg_attr(target_os = "android", allow(dead_code))]
 fn dvd_side_of(root: &Path) -> Vec<PathBuf> {
     dvd_language_of(root)
         .map(|(_, side)| dvd_languages_at(&side))
@@ -985,6 +1017,7 @@ fn dvd_side_of(root: &Path) -> Vec<PathBuf> {
 
 /// The DVD's languages at `languages` that open, and the first error.
 #[allow(clippy::type_complexity)]
+#[cfg_attr(target_os = "android", allow(dead_code))]
 fn open_dvd_languages(
     languages: &[PathBuf],
 ) -> (Vec<(Opened, PathBuf)>, Option<(PathBuf, GameError)>) {

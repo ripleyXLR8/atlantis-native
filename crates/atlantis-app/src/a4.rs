@@ -733,6 +733,16 @@ impl Viewer {
 }
 
 impl ApplicationHandler for Viewer {
+    /// Android: the activity's window is gone (the app in the
+    /// background); `resumed` makes another, with its context.
+    #[cfg(target_os = "android")]
+    fn suspended(&mut self, _el: &ActiveEventLoop) {
+        self.gl = None;
+        self.surface = None;
+        self.window = None;
+        crate::android::pause_audio(&self._audio, true);
+    }
+
     #[cfg(target_arch = "wasm32")]
     fn resumed(&mut self, el: &ActiveEventLoop) {
         self.resumed_web(el);
@@ -740,6 +750,8 @@ impl ApplicationHandler for Viewer {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn resumed(&mut self, el: &ActiveEventLoop) {
+        #[cfg(target_os = "android")]
+        crate::android::pause_audio(&self._audio, false);
         if self.window.is_some() {
             return;
         }
@@ -819,6 +831,25 @@ impl ApplicationHandler for Viewer {
 
     #[cfg(not(target_arch = "wasm32"))]
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        // Android: the activity is being destroyed; in the background
+        // (no window), the game waits.
+        #[cfg(target_os = "android")]
+        {
+            if crate::android::destroyed() {
+                el.exit();
+                return;
+            }
+            if self.window.is_none() {
+                el.set_control_flow(ControlFlow::Wait);
+                return;
+            }
+            // Back and the on-screen keyboard's text.
+            if let Some(id) = self.window.as_ref().map(|w| w.id()) {
+                for e in crate::android::mode_typed() {
+                    self.window_event(el, id, e);
+                }
+            }
+        }
         let now = Instant::now();
         if now >= self.next_frame {
             let t0 = Instant::now();
@@ -845,6 +876,14 @@ impl ApplicationHandler for Viewer {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        // Android: the touch screen as the mouse, Back as Escape.
+        #[cfg(target_os = "android")]
+        if let Some(events) = crate::android::mode_events(&event) {
+            for e in events {
+                self.window_event(el, _id, e);
+            }
+            return;
+        }
         // The page's own events (the redraws, the keys, a hidden page) and
         // the sound's start at the first click.
         #[cfg(target_arch = "wasm32")]
@@ -1154,10 +1193,17 @@ pub fn label(dir: &Path) -> Result<String, atlantis4_data::files::OpenError> {
         });
     }
     let (files, build) = A4Files::open_dir(dir)?;
-    Ok(match language_name(&files.language()) {
+    Ok(files_label(&files, build))
+}
+
+/// The edition of the installation `files` (`build` theirs), as [`label`]
+/// gives it.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn files_label(files: &A4Files, build: &atlantis4_data::exe::Build) -> String {
+    match language_name(&files.language()) {
         Some(name) => format!("{}, {name}", build.label),
         None => build.label.to_string(),
-    })
+    }
 }
 
 /// The name of the port's settings file, in [`data_dir`].
@@ -1317,6 +1363,20 @@ fn open_viewer(
 ) -> Result<Viewer, String> {
     let (files, build) =
         A4Files::open_dir(dir).map_err(|e| crate::setup::explain_atlantis4(dir, &e))?;
+    open_viewer_files(files, build, start_at, render, language, fullscreen, fixes)
+}
+
+/// [`open_viewer`] with the install's files given (`build` theirs).
+#[cfg(not(target_arch = "wasm32"))]
+fn open_viewer_files(
+    files: A4Files,
+    build: &'static atlantis4_data::exe::Build,
+    start_at: Start,
+    render: Render,
+    language: Option<&str>,
+    fullscreen: bool,
+    fixes: Fixes,
+) -> Result<Viewer, String> {
     log::info!(
         "Atlantis Evolution {}, {}; saves and settings in {}",
         build.id,
@@ -1443,6 +1503,35 @@ pub fn run_view(
 /// library (the other games' delay).
 #[cfg(not(target_arch = "wasm32"))]
 const SHIFT_GRACE: Duration = Duration::from_millis(2000);
+
+/// Android: Atlantis Evolution from `files` (a folder chosen in the
+/// picker, read through `FileSource`) on `el`, full screen, until it
+/// ends.
+#[cfg(target_os = "android")]
+pub fn run_files_on(
+    el: &mut EventLoop<()>,
+    files: A4Files,
+    build: &'static atlantis4_data::exe::Build,
+) -> Result<(), String> {
+    use winit::platform::run_on_demand::EventLoopExtRunOnDemand;
+    let settings = load_settings(&settings_path());
+    let render = Render {
+        cpu: settings.cpu,
+        check: false,
+    };
+    let mut app = open_viewer_files(
+        files,
+        build,
+        Start::Menus,
+        render,
+        settings.language.as_deref(),
+        true,
+        settings.fixes,
+    )?;
+    app.desk.settings = Some(settings);
+    el.run_app_on_demand(&mut app)
+        .map_err(|e| format!("The window failed: {e}"))
+}
 
 /// The game at `dir` as the program plays it (a folder on the command
 /// line, or the game library's choice, on its event loop `el`): the

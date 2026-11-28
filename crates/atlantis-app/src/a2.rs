@@ -606,6 +606,38 @@ pub fn boot_files(
     Ok((engine, format!("Game: {label}")))
 }
 
+/// Android: the game from a chosen folder, `install` with its discs
+/// among `discs` (every disc there: the game cannot be given another one
+/// while it runs), booted to the player menu under the start-up intro as
+/// the desktop starts it, its saves in the data folder.
+#[cfg(target_os = "android")]
+pub fn boot_source(
+    install: std::sync::Arc<dyn atlantis_data::FileSource>,
+    discs: Vec<(String, std::sync::Arc<dyn atlantis_data::FileSource>)>,
+) -> Result<(Engine, String), String> {
+    let (exe_name, build, _) = atlantis2_data::files::find_exe(&*install)
+        .map_err(|e| format!("The chosen folder: {e}"))?;
+    let mut files = A2Files::new(install, discs);
+    files.set_exe(exe_name, build);
+    let found = files.disc_numbers();
+    let missing: Vec<String> = (1..=4u8)
+        .filter(|n| !found.contains(n))
+        .map(|n| n.to_string())
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!(
+            "Atlantis II's discs {} are not in the chosen folder: put a copy of each disc \
+             (or its image) in a folder inside it, beside the installed game.",
+            missing.join(", ")
+        ));
+    }
+    let enhancements = stored_settings().enhancements;
+    let (mut engine, label) =
+        boot_files(files, enhancements, |e| e.set_data_dir(Some(data_dir())))?;
+    A2Start::default().begin(&mut engine, false)?;
+    Ok((engine, label))
+}
+
 /// `--headless`: runs `frames` frames of [`PASS`] without input (the 15 Hz
 /// ticks run on the scheduler's clock), prints where the game is, and writes the
 /// screen to `screenshot` (PNG) when given.
@@ -984,6 +1016,10 @@ impl A2App {
             size,
             window: None,
             surface: None,
+            #[cfg(target_os = "android")]
+            native: None,
+            #[cfg(target_os = "android")]
+            frame_px: Vec::new(),
             picture: Picture::new(),
             screen: vec![0u16; w * h],
             shown: Vec::new(),
@@ -1044,6 +1080,14 @@ pub struct A2App {
     size: Option<(u32, u32)>,
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
+    /// Android: the window's buffers written directly (in place of
+    /// softbuffer's surface, which makes a new screen-sized buffer each
+    /// frame and copies it byte by byte), from `frame_px`, the frame
+    /// composed at the window's size and kept between frames.
+    #[cfg(target_os = "android")]
+    native: Option<crate::android_frame::Frame>,
+    #[cfg(target_os = "android")]
+    frame_px: Vec<u32>,
     /// The engine's screen (640 x 480 or 800 x 600).
     screen: Vec<u16>,
     /// The screen with the options menu drawn over it, the menu's text.
@@ -1447,6 +1491,12 @@ impl A2App {
         if self.present_web() {
             return;
         }
+        #[cfg(target_os = "android")]
+        {
+            self.present_native();
+            return;
+        }
+        #[allow(unreachable_code)]
         let (Some(window), Some(surface)) = (&self.window, &mut self.surface) else {
             return;
         };
@@ -1477,6 +1527,51 @@ impl A2App {
         self.picture
             .compose_with_text(&self.engine, screen, &self.menu_text, &mut buf, ww, wh);
         let _ = buf.present();
+    }
+}
+
+#[cfg(target_os = "android")]
+impl A2App {
+    /// Android: the frame composed into `frame_px` at the window's size,
+    /// then written once into the window's buffers.
+    fn present_native(&mut self) {
+        let Some(window) = &self.window else {
+            return;
+        };
+        if self.native.is_none() {
+            self.native = crate::android_frame::Frame::new(window);
+        }
+        let size = window.inner_size();
+        let (ww, wh) = (size.width as usize, size.height as usize);
+        if ww == 0 || wh == 0 {
+            return;
+        }
+        self.frame_px.resize(ww * wh, 0);
+        let screen = if draw_menu(
+            &self.menu,
+            &self.engine,
+            &self.screen,
+            &mut self.shown,
+            &self.font,
+            &mut self.menu_text,
+        ) {
+            &self.shown
+        } else {
+            &self.screen
+        };
+        self.picture.compose_with_text(
+            &self.engine,
+            screen,
+            &self.menu_text,
+            &mut self.frame_px,
+            ww,
+            wh,
+        );
+        if let Some(n) = &mut self.native {
+            if !n.post((ww, wh), &self.frame_px) {
+                log::debug!("window took no frame");
+            }
+        }
     }
 }
 
@@ -1676,7 +1771,19 @@ fn menu_key(key: &Key) -> Option<MenuKey> {
 }
 
 impl ApplicationHandler for A2App {
+    /// Android: the activity's window is gone (the app in the
+    /// background); `resumed` makes another.
+    #[cfg(target_os = "android")]
+    fn suspended(&mut self, _el: &ActiveEventLoop) {
+        self.surface = None;
+        self.native = None;
+        self.window = None;
+        crate::android::pause_audio(&self._audio, true);
+    }
+
     fn resumed(&mut self, el: &ActiveEventLoop) {
+        #[cfg(target_os = "android")]
+        crate::android::pause_audio(&self._audio, false);
         if self.window.is_some() {
             return;
         }
@@ -1706,8 +1813,11 @@ impl ApplicationHandler for A2App {
         self.web.attach(&window, &mut self.engine);
         #[cfg(target_arch = "wasm32")]
         let soft = self.web.gl.is_none();
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(any(target_arch = "wasm32", target_os = "android")))]
         let soft = true;
+        // (Android: the window's buffers directly, `native`)
+        #[cfg(target_os = "android")]
+        let soft = false;
         if soft {
             let context = softbuffer::Context::new(window.clone()).unwrap();
             self.surface = Some(softbuffer::Surface::new(&context, window.clone()).unwrap());
@@ -1727,6 +1837,19 @@ impl ApplicationHandler for A2App {
     }
 
     fn about_to_wait(&mut self, el: &ActiveEventLoop) {
+        // Android: the activity is being destroyed.
+        #[cfg(target_os = "android")]
+        if crate::android::destroyed() {
+            el.exit();
+            return;
+        }
+        // Android: Back and the on-screen keyboard's text.
+        #[cfg(target_os = "android")]
+        if let Some(id) = self.window.as_ref().map(|w| w.id()) {
+            for e in crate::android::mode_typed() {
+                self.window_event(el, id, e);
+            }
+        }
         // In the browser the redraws keep themselves going (see
         // RedrawRequested).
         #[cfg(target_arch = "wasm32")]
@@ -1760,6 +1883,14 @@ impl ApplicationHandler for A2App {
     }
 
     fn window_event(&mut self, el: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
+        // Android: the touch screen as the mouse, Back as Escape.
+        #[cfg(target_os = "android")]
+        if let Some(events) = crate::android::mode_events(&event) {
+            for e in events {
+                self.window_event(el, _id, e);
+            }
+            return;
+        }
         if let Some(t) = self.shift_until {
             if Instant::now() >= t {
                 self.shift_until = None;

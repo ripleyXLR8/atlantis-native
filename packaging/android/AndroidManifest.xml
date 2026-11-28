@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Atlantis Native on Android (docs/ANDROID.md): a NativeActivity
+     running the Rust code, subclassed for the folder picker and the
+     immersive full screen (java/.../AtlantisActivity.java). The SDK
+     levels, the version and the debug flag are given
+     to aapt2 by build-apk.sh. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.github.ripleyxlr8.atlantisnative">
+
+    <application
+        android:label="Atlantis Native"
+        android:icon="@mipmap/ic_launcher"
+        android:hasCode="true"
+        android:extractNativeLibs="false"
+        android:appCategory="game"
+        android:isGame="true"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.NoTitleBar.Fullscreen">
+        <activity
+            android:name=".AtlantisActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="sensorLandscape"
+            android:windowSoftInputMode="adjustNothing|stateUnchanged"
+            android:configChanges="mcc|mnc|locale|touchscreen|keyboard|keyboardHidden|navigation|screenLayout|fontScale|uiMode|orientation|density|screenSize|smallestScreenSize|layoutDirection|colorMode|fontWeightAdjustment|grammaticalGender"
+            android:resizeableActivity="true">
+            <!-- The cdylib android-activity starts: libatlantis_app.so. -->
+            <meta-data android:name="android.app.lib_name" android:value="atlantis_app" />
+            <!-- Its entry point: android-activity's, with onDestroy
+                 watched (src/android.rs). -->
+            <meta-data android:name="android.app.func_name" android:value="atlantis_native_on_create" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
