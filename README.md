@@ -330,7 +330,7 @@ For *Atlantis II*:
 
 | Release | Languages | What to point it at |
 |---|---|---|
-| CD (1999, version 1.00) | French | the folder of the installed game (with `atlantis2.exe`), the images of its four CDs (or copies of the CDs) in it or in a folder inside it; in the browser too (the images read a part at a time), or the folder holding both the installed game and the images |
+| CD (1999, version 1.00) | French | the folder of the installed game (with `atlantis2.exe`), the images of its four CDs (ISO or raw 2352-byte images such as the Internet Archive's, under any name, or copies of the CDs) in it or in a folder inside it; in the browser too (the images read a part at a time), or the folder holding both the installed game and the images |
 | CD with the official patch 1.01 | French or English (one executable for both; tested with the French CD) | the same, with the patched `atlantis2.exe` |
 | CD, North American release (*Beyond Atlantis*, DreamCatcher, 2000, 4 CDs; its own program, version 1.01's code) | English | the same as the French CD |
 | CD, German release (1999, 4 CDs, also in the compilation *Die Legende Atlantis I & II*, 2000; the French CD's program, version 1.00, inside a copy protection, which Atlantis Native does not run) | German | the same as the French CD (the installed folder, with the images or copies of the four CDs) |

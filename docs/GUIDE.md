@@ -630,7 +630,11 @@ holds "atlantis" (*Atlantis 2*, *Atlantis II*, *Beyond Atlantis*...).
 - CD: the folder of the installed game (the one holding `atlantis2.exe`,
   `wam`, `scenar`...), with the images of the four CDs (`.iso`, `.bin`,
   `.img`, `.mdf`, `.nrg`) or copies of the CDs in it or in a folder inside
-  it (for example `Atlantis 2\CD\CD1.iso` to `CD4.iso`). The library
+  it (for example `Atlantis 2\CD\CD1.iso` to `CD4.iso`). The images are
+  read as they are, under any name: ISO images (2048-byte sectors) or raw
+  ones (2352-byte sectors, as the Internet Archive's
+  `Cryo-AtlantisII-FrenchVersion-CD1of4.iso` to `CD4of4.iso` and Redump's
+  `.bin` are); nothing needs converting. The library
   keeps one folder per game: put the discs there. (Without them the
   library shows the folder as *not found* and says what is missing.)
 

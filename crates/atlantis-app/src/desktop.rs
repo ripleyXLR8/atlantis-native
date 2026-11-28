@@ -1651,6 +1651,28 @@ mod tests {
             link(&discs.join(&iso), &installed.join("CD").join(&iso));
         }
         assert_eq!(describe(&installed).label, "Atlantis II, French CD (1999)");
+        // The discs' raw images alone (2352-byte sectors, as the Internet
+        // Archive's copies: sizes no multiple of 2048), when the folder has
+        // them beside the ISO copies.
+        let raw: Vec<PathBuf> = std::fs::read_dir(&discs)
+            .unwrap()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| {
+                p.extension().is_some_and(|e| e.eq_ignore_ascii_case("iso"))
+                    && std::fs::metadata(p).is_ok_and(|m| m.len() % 2048 != 0)
+            })
+            .collect();
+        if raw.len() == 4 {
+            let from_raw = make("Atlantis II raw", &cd.join("atlantis2.exe"));
+            for p in &raw {
+                link(p, &from_raw.join("CD").join(p.file_name().unwrap()));
+            }
+            assert_eq!(describe(&from_raw).label, "Atlantis II, French CD (1999)");
+            assert!(matches!(open_any(&from_raw), Ok(Opened::Atlantis2(_))));
+        } else {
+            eprintln!("no raw images in ATLANTIS2_DISCS: raw images not checked");
+        }
         let patched = make("Atlantis II 1.01", &patch);
         link(&installed.join("CD"), &patched.join("CD"));
         assert_eq!(

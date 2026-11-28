@@ -562,3 +562,104 @@ fn dialog_texts_and_fonts() {
     let d = f.font("AtlFT_Dialog").unwrap();
     assert_eq!((d.file.as_str(), d.height), ("Atl_Font.ttf", 12));
 }
+
+/// The discs read from their raw images (2352-byte sectors, Mode 2 Form 1,
+/// as the Internet Archive's copies of the French CD are) as from their
+/// ISO copies (2048-byte sectors): a folder holding only the raw images
+/// opens the game, the four discs found, and their files read the same
+/// bytes. Needs both kinds of image in `ATLANTIS2_DISCS` (an image whose
+/// size is no multiple of 2048 is a raw one); skipped otherwise.
+#[test]
+fn raw_disc_images_read_as_their_iso_copies() {
+    use atlantis_data::disc_image::DiscImage;
+    use atlantis_data::FileSource;
+    let Some(dir) = install() else { return };
+    let Some(discs) = std::env::var_os("ATLANTIS2_DISCS").map(PathBuf::from) else {
+        atlantis2_data::testing::missing("ATLANTIS2_DISCS not set");
+        return;
+    };
+    let mut images: Vec<(PathBuf, u64)> = std::fs::read_dir(&discs)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e.eq_ignore_ascii_case("iso")))
+        .map(|p| {
+            let size = std::fs::metadata(&p).unwrap().len();
+            (p, size)
+        })
+        .collect();
+    images.sort();
+    let raw: Vec<&PathBuf> = images
+        .iter()
+        .filter(|(_, s)| s % 2048 != 0)
+        .map(|(p, _)| p)
+        .collect();
+    let iso: Vec<&PathBuf> = images
+        .iter()
+        .filter(|(_, s)| s % 2048 == 0)
+        .map(|(p, _)| p)
+        .collect();
+    if raw.len() != 4 || iso.len() != 4 {
+        atlantis2_data::testing::missing("ATLANTIS2_DISCS: not both the raw and the ISO images");
+        return;
+    }
+    // A folder holding only the raw images (links to them).
+    let alone = std::env::temp_dir().join(format!("atlantis2-raw-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&alone);
+    std::fs::create_dir_all(&alone).unwrap();
+    for p in &raw {
+        let link = alone.join(p.file_name().unwrap());
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(p, &link).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_file(p, &link).unwrap();
+    }
+    let (files, build) = A2Files::open_dir(&dir, &[alone.clone()]).expect("game folder");
+    assert_eq!(build.id, "atlantis2-cd-fr-2199552");
+    assert_eq!(files.disc_numbers(), vec![1, 2, 3, 4]);
+    for n in 1..=4u8 {
+        let origin = files.disc_origin(n).unwrap();
+        assert!(origin.starts_with(&alone.display().to_string()), "{origin}");
+    }
+    // Each raw image against its ISO copy: the same tree, the same bytes
+    // for the first files of each folder of datas_a2.
+    let open = |p: &PathBuf| DiscImage::open(p).unwrap_or_else(|| panic!("{}", p.display()));
+    let numbers = |img: &DiscImage| atlantis2_data::files::disc_numbers_of(img);
+    for (r, i) in raw.iter().zip(&iso) {
+        let (r, i) = (open(r), open(i));
+        assert_eq!(numbers(&r), numbers(&i));
+        let mut compared = 0;
+        for folder in [
+            "",
+            "datas_a2",
+            "datas_a2/hnm",
+            "datas_a2/warp",
+            "datas_a2/apc",
+            "datas_a2/spw",
+        ] {
+            let names = i.list(folder);
+            assert_eq!(r.list(folder), names, "{folder}");
+            for name in names
+                .iter()
+                .filter(|n| !i.has_dir(&format!("{folder}/{n}")))
+                .take(3)
+            {
+                let path = format!("{folder}/{name}");
+                let a = r.read(&path).unwrap();
+                assert_eq!(Some(&a), i.read(&path).as_ref(), "{path}");
+                compared += 1;
+            }
+        }
+        assert!(compared >= 6, "{compared}");
+    }
+    // Through the game's files: a disc's file as from the ISO copies.
+    let (copies, _) = A2Files::open_dir(&dir, &[discs]).expect("game folder");
+    for n in 1..=4u8 {
+        let a = files.read_from_disc(n, Folder::Warp, "ti0002.hnm").unwrap();
+        assert_eq!(
+            Some(a),
+            copies.read_from_disc(n, Folder::Warp, "ti0002.hnm")
+        );
+    }
+    let _ = std::fs::remove_dir_all(&alone);
+}
