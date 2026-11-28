@@ -333,6 +333,23 @@ impl Config {
         self.subtitle_on = true;
     }
 
+    /// What the 2004 program's start-up (atlantis4-cd-en-3022848
+    /// FUN_004a1630, the collection's FUN_004a1710) does after its
+    /// reader: `Version` := the registry's `Install`; an empty `Langue`
+    /// (no line in `Atlantis4.cfg`) := the registry's `Language`
+    /// (@ 0x004a1c7d..0x004a1ce2), an empty `SousTitre` := `LanguageST`
+    /// (@ 0x004a1d97..0x004a1e3a); a language the file names is kept, and
+    /// `SubTitleOn` is the file's (atlantis4-re `subsystems/cd2004-cfg.md`).
+    pub fn apply_install_2004(&mut self, language: &[u8], language_st: &[u8], install: &[u8]) {
+        self.version = install.to_vec();
+        if self.langue.is_empty() {
+            self.langue = language.to_vec();
+        }
+        if self.sous_titre.is_empty() {
+            self.sous_titre = language_st.to_vec();
+        }
+    }
+
     /// The size of the warp view ([`Config::view`], used @ 0x0040d0a3).
     pub fn warp_view(&self) -> (i32, i32) {
         self.view
@@ -470,6 +487,29 @@ SFXVolume = 120\r\nMusicVolume = -4\r\nCursor = maybe\r\nTime 1 2 3\r\nUnknown =
         assert_eq!(
             c.write(b"fra"),
             b"WarpRes\t\t= 512\r\nTime\t\t0 0 0 0 0\r\n"
+        );
+    }
+
+    /// The 2004 start-up: the registry's languages fill an empty `Langue`
+    /// and `SousTitre` only; `SubTitleOn` stays the file's.
+    #[test]
+    fn install_2004() {
+        let mut c = Config {
+            subtitle_on: false,
+            ..Config::default()
+        };
+        c.apply_install_2004(b"gbr", b"tch", b"FLA");
+        assert_eq!(
+            (&c.langue[..], &c.sous_titre[..]),
+            (&b"gbr"[..], &b"tch"[..])
+        );
+        assert_eq!((&c.version[..], c.subtitle_on), (&b"FLA"[..], false));
+        c.langue = b"ita".to_vec();
+        c.sous_titre = b"gbr".to_vec();
+        c.apply_install_2004(b"gbr", b"tch", b"FLA");
+        assert_eq!(
+            (&c.langue[..], &c.sous_titre[..]),
+            (&b"ita"[..], &b"gbr"[..])
         );
     }
 

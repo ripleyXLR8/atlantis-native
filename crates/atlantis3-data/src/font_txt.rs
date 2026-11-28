@@ -73,6 +73,15 @@ impl FontDef {
     /// configuration's value itself): `gre` Greek, `chi` Big5, `isr`
     /// Hebrew, `rus` Russian, else ANSI (0).
     pub fn charset(&self, subtitle_language: &str) -> u8 {
+        self.charset_in(subtitle_language, false)
+    }
+
+    /// [`FontDef::charset`] in a program whose chain has the `tch` case
+    /// as well when `tch_east_europe`: `tch` Central European (0xee
+    /// `EASTEUROPE_CHARSET`), the 2004 program's 2004-10-07 rebuild
+    /// (atlantis4-collection-it-3022848 FUN_0041e500, which the Czech
+    /// *Level* DVD ships; the CD's FUN_0041e480 has no such case).
+    pub fn charset_in(&self, subtitle_language: &str, tch_east_europe: bool) -> u8 {
         match self.charset_name.as_str() {
             "DEFAULT_CHARSET" => 1,
             "SYMBOL_CHARSET" => 2,
@@ -97,6 +106,7 @@ impl FontDef {
                 b"chi" => 0x88,
                 b"isr" => 0xb1,
                 b"rus" => 0xcc,
+                b"tch" if tch_east_europe => 0xee,
                 _ => 0,
             },
         }
@@ -346,6 +356,10 @@ F_C Other 60 0 heavy x\r\nF_A Again 10 0 FW_THIN false ANSI_CHARSET",
         );
         assert_eq!((a.weight(), a.italic), (400, false));
         assert_eq!((a.charset("fra"), a.charset("RUS")), (0, 0xcc));
+        // `tch`: ANSI in the CD's 2004 program and in *Atlantis III*,
+        // Central European in the 2004-10-07 rebuild.
+        assert_eq!((a.charset("tch"), a.charset_in("TCH", true)), (0, 0xee));
+        assert_eq!(a.charset_in("rus", true), 0xcc);
         assert_eq!(a.scaled_height(640), Some(18));
         assert_eq!(a.scaled_height(800), Some(21));
         assert_eq!(a.scaled_height(1024), Some(23));

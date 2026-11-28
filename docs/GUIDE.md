@@ -1322,6 +1322,19 @@ Italian voices then take their subtitle timings from the English disc
 second disc may have differed there). Then add the folder to the
 library again.
 
+#### The Czech Level DVD (2004 program)
+
+*Atlantis Evolution CZ* came as a full game on the DVD of the Czech
+magazine *Level* 153 (CINEMAX, 2007), in its `Atlantis Evolution`
+folder as an installer (`setup.exe` and `setup-1.bin` to `setup-7.bin`):
+the 2004 program (the same file as the Italian collection's), with
+Czech texts and the English voices and films. Install it (on Windows,
+or with Wine), then add the folder its installer created (by default
+`C:\Program Files\Atlantis4`) to the library: it shows as *Atlantis
+Evolution (2004), Level DVD (CINEMAX), Czech* and plays as the CD does
+(above). All four CDs' files are installed; the DVD is not needed to
+play.
+
 ## The Secrets of Atlantis
 
 *The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,

@@ -683,11 +683,10 @@ fn evolution_2004_build(
 ) -> Option<
     Result<&'static atlantis3_data::evolution2004::Build, atlantis3_data::evolution2004::ExeError>,
 > {
-    use atlantis3_data::evolution2004::{identify, EXE_NAME};
     if !src.has_dir("cd0/datas/scenar") {
         return None;
     }
-    Some(identify(&src.read(EXE_NAME)?))
+    atlantis3_data::evolution2004::identify_install(src)
 }
 
 /// The game in the chosen folder `tree` or in a folder directly inside it

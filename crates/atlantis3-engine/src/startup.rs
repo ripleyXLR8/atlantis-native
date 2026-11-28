@@ -28,6 +28,11 @@ pub struct Startup {
     /// The registry's `Language` (`fra`), kept apart (DAT_00789c40) for the
     /// file's writer.
     pub install_language: Vec<u8>,
+    /// The registry's `LanguageST` of the 2004 program (`tch` for the
+    /// Czech *Level* DVD), which `Atlantis4.cfg`'s writer compares
+    /// `SousTitre` with; [`Startup::install_language`] for *Atlantis III*,
+    /// whose registry has one language.
+    pub install_language_st: Vec<u8>,
 }
 
 impl Startup {
@@ -70,18 +75,29 @@ impl Startup {
                 }
             }
         };
-        let (language, mut install) = install_registry(files);
-        if evolution {
-            // Its installer writes `Install = FLA` (MSI `Registry` table,
-            // atlantis4-re subsystems/cd2004-files.md).
+        let (mut language, mut install) = install_registry(files);
+        let mut language_st = language.clone();
+        if let Some(src) = files.evolution_2004_source() {
+            // Its installers write `Install = FLA` (MSI `Registry` table,
+            // atlantis4-re subsystems/cd2004-files.md; the Inno Setup
+            // installers of the Italian collection and the Czech Level
+            // DVD likewise), and two languages, `Language` for the voices
+            // and `LanguageST` for the texts (`gbr` / `tch` on the Czech
+            // DVD).
             install = b"FLA".to_vec();
+            (language, language_st) = src.install_languages();
         }
         log::info!(
-            "install: language {}, medium {}",
+            "install: language {}, subtitles {}, medium {}",
             String::from_utf8_lossy(&language),
+            String::from_utf8_lossy(&language_st),
             String::from_utf8_lossy(&install)
         );
-        config.apply_install(&language, &install);
+        if evolution {
+            config.apply_install_2004(&language, &language_st, &install);
+        } else {
+            config.apply_install(&language, &install);
+        }
         // The fixes are *Atlantis III*'s (`fix_warpres_cd`: its GOG.com
         // installs' 512 folders); the 2004 program's WarpRes is its file's.
         if !evolution {
@@ -90,6 +106,7 @@ impl Startup {
         Startup {
             config,
             install_language: language,
+            install_language_st: language_st,
         }
     }
 

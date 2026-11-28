@@ -931,6 +931,10 @@ pub struct Texts {
     glyphs: Option<Glyphs>,
     /// `SousTitre`, which picks the charset of `ANSI_CHARSET` fonts.
     language: String,
+    /// Whether the program's charset chain has the `tch` case (the 2004
+    /// program's 2004-10-07 rebuild,
+    /// `atlantis3_data::evolution2004::Build::tch_east_europe`).
+    tch_east_europe: bool,
     fonts: atlantis3_data::font_txt::FontTxt,
     dial: HashMap<(i32, i32), Vec<u8>>,
     /// The face of the `CHINESEBIG5_CHARSET` fonts ([`Texts::big5_face`]),
@@ -995,17 +999,22 @@ impl Texts {
                 .collect()
             })
             .unwrap_or_default();
+        let tch_east_europe = files
+            .evolution_2004_source()
+            .and_then(|s| s.build())
+            .is_some_and(|b| b.tch_east_europe);
         let big5 = FONT_IDS
             .iter()
             .any(|id| {
                 fonts
                     .font(id.name())
-                    .is_some_and(|d| d.charset(language) == CHARSET_BIG5)
+                    .is_some_and(|d| d.charset_in(language, tch_east_europe) == CHARSET_BIG5)
             })
             .then(|| Texts::big5_face(files));
         Texts {
             glyphs,
             language: language.to_string(),
+            tch_east_europe,
             fonts,
             dial,
             big5,
@@ -1048,7 +1057,7 @@ impl Texts {
     pub fn gdi(&self, id: FontId, width: usize) -> Option<&'static GdiFont> {
         let def = self.fonts.font(id.name())?;
         let h = def.scaled_height(width as u32)?;
-        let charset = def.charset(&self.language);
+        let charset = def.charset_in(&self.language, self.tch_east_europe);
         if charset == CHARSET_BIG5 {
             return self.big5.as_ref().map(|f| GdiFont::big5_cached(f, h));
         }

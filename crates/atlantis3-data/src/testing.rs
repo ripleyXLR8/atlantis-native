@@ -294,6 +294,26 @@ pub fn a4_it_collection() -> Option<PathBuf> {
     }
 }
 
+/// The variable naming *Atlantis Evolution CZ*'s installed folder, the
+/// Czech magazine *Level* 153's DVD (CINEMAX, 2007; the 2004 program:
+/// `Atlantis Evolution.exe` beside `cd0` .. `cd4`, as its Inno Setup
+/// installer lays them out).
+pub const A4_DVD_CS_VAR: &str = "ATLANTIS4_DVD_CS";
+
+/// That folder from `ATLANTIS4_DVD_CS`; as [`a5_dvd_fr`], its absence
+/// never fails a test.
+pub fn a4_dvd_cs() -> Option<PathBuf> {
+    match std::env::var_os(A4_DVD_CS_VAR) {
+        Some(d) if !d.is_empty() => Some(PathBuf::from(d)),
+        _ => {
+            let thread = std::thread::current();
+            let test = thread.name().unwrap_or("?");
+            let _ = writeln!(std::io::stderr(), "SKIPPED {test}: {A4_DVD_CS_VAR} not set");
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

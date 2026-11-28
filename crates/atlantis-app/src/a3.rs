@@ -1133,8 +1133,8 @@ pub fn evolution_2004_incomplete(dir: &Path) -> Option<String> {
 /// [`evolution_2004_incomplete`] for the installation read through
 /// `install` (Android: a chosen folder), named `shown` in the message.
 fn evolution_2004_incomplete_in(install: &dyn FileSource, shown: &Path) -> Option<String> {
-    use atlantis3_data::evolution2004::{check_disc2, identify, EXE_NAME};
-    let build = identify(&install.read(EXE_NAME)?).ok()?;
+    use atlantis3_data::evolution2004::{check_disc2, identify_install};
+    let build = identify_install(install)?.ok()?;
     check_disc2(install, build).map(|e| format!("{}: {e}", shown.display()))
 }
 
@@ -1317,6 +1317,51 @@ mod tests {
             assert!(!game.logos_running_2004());
             assert_eq!(game.mode(), Mode::Menu);
         }
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// *Atlantis Evolution CZ*, the Czech *Level* 153 DVD's install
+    /// (`ATLANTIS4_DVD_CS`): named in the library by its install (the
+    /// Italian collection's program), complete, its texts Czech and its
+    /// voices English, opened and started to the start page.
+    #[test]
+    fn the_czech_level_dvd_of_evolution_2004() {
+        let Some(dir) = atlantis3_data::testing::a4_dvd_cs() else {
+            return;
+        };
+        let label = "Atlantis Evolution (2004), Level DVD (CINEMAX), Czech";
+        assert_eq!(crate::a4::label(&dir).unwrap(), label);
+        assert_eq!(evolution_2004_label(&dir).unwrap(), label);
+        assert_eq!(evolution_2004_incomplete(&dir), None);
+        // The registry's `Language` = `gbr`, `LanguageST` = `tch`, no
+        // `Atlantis4.cfg`: the defaults.
+        let src =
+            atlantis3_data::evolution2004::Evolution2004Source::new(Arc::new(StdDir::new(&dir)));
+        let startup =
+            atlantis3_engine::startup::Startup::read(&A3Files::evolution_2004(Arc::new(src)));
+        assert_eq!(
+            (startup.text_language(), startup.voice_language()),
+            ("tch".to_string(), "gbr".to_string())
+        );
+        assert_eq!(startup.install_language_st, b"tch");
+        assert_eq!(startup.config.resolution, (1024, 768));
+        assert!(startup.config.subtitle_on && startup.config.full_screen);
+        let base = std::env::temp_dir().join(format!("atlantis-a4cs-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let mut game = open_evolution_2004(&dir, &base.join("data")).unwrap();
+        game.start_logos_2004();
+        let mut t = 0.0;
+        while game.logos_running_2004() && t < 60.0 {
+            game.skip();
+            t += 0.04;
+            game.step(t);
+        }
+        for _ in 0..25 {
+            t += 0.04;
+            game.step(t);
+        }
+        assert!(!game.logos_running_2004());
+        assert_eq!(game.mode(), Mode::Menu);
         let _ = std::fs::remove_dir_all(&base);
     }
 

@@ -19,6 +19,14 @@
 //! `binaries/README.md`), with Italian `loc\` data and the same `FLA`
 //! layout, but its installer leaves out disc 2's places, films and music
 //! ([`missing_disc2`]).
+//!
+//! The Czech *Atlantis Evolution CZ* of the magazine *Level* 153's DVD
+//! (CINEMAX, 2007) installs that rebuilt program too, byte for byte, with
+//! the CD's English voices and films, Czech texts (`loc\text\tch\`,
+//! Windows-1250) and disc 2 complete; its installer writes the registry's
+//! `Language` = `gbr` and `LanguageST` = `tch` (atlantis4-re
+//! `discs/dvd-cs-level153.md`). One program standing for two editions,
+//! the edition comes from the install ([`identify_install`]).
 
 use md5::{Digest, Md5};
 
@@ -34,19 +42,27 @@ pub struct Build {
     pub id: &'static str,
     /// The edition, for people.
     pub label: &'static str,
-    /// The language of its texts and voices (the installer's `gbr`).
+    /// The language of its texts (the installer's `LanguageST`: `gbr`,
+    /// `ita`, `tch`), as the label names it.
     pub language: &'static str,
     pub size: u64,
     /// The PE header's `TimeDateStamp`.
     pub pe_timestamp: u32,
     /// MD5 of the whole file.
     pub md5: [u8; 16],
+    /// Whether the font file's character-set chain has the `tch` case:
+    /// `ANSI_CHARSET` with `SousTitre` = `tch` gives `EASTEUROPE_CHARSET`
+    /// (0xee) in the 2004-10-07 rebuild (FUN_0041e500), ANSI in the CD's
+    /// program (FUN_0041e480; atlantis4-re experiment 2026-11-26-01).
+    pub tch_east_europe: bool,
 }
 
 /// The builds this port knows: the North American CD's, which the European
-/// CD ships too (the same `Data1.cab`), and the Italian *Atlantis
-/// Collection* DVD's.
-pub const KNOWN_BUILDS: [Build; 2] = [
+/// CD ships too (the same `Data1.cab`), the Italian *Atlantis Collection*
+/// DVD's, and the Czech *Level* DVD's, the collection's file under the
+/// edition's own id ([`identify_install`]; [`identify`] gives the
+/// collection's row, the first with that MD5).
+pub const KNOWN_BUILDS: [Build; 3] = [
     Build {
         id: "atlantis4-cd-en-3022848",
         label: "Atlantis Evolution (2004), CD",
@@ -58,6 +74,7 @@ pub const KNOWN_BUILDS: [Build; 2] = [
             0x21, 0x99, 0xbc, 0x93, 0xd2, 0xac, 0x3f, 0x8b, 0x42, 0x79, 0xe0, 0xdb, 0x89, 0x85,
             0x59, 0xe8,
         ],
+        tch_east_europe: false,
     },
     // The Italian *Atlantis Collection* DVD's (Inno Setup installer of
     // 2014, one language; its registry `Language` is `ita`): the CD's
@@ -73,11 +90,31 @@ pub const KNOWN_BUILDS: [Build; 2] = [
             0x13, 0xc5, 0x7a, 0x67, 0x50, 0xa2, 0xe5, 0x6e, 0xf1, 0x87, 0x11, 0x6a, 0x9c, 0x03,
             0x1a, 0xc5,
         ],
+        tch_east_europe: true,
+    },
+    // The Czech *Atlantis Evolution CZ* of the magazine *Level* 153's DVD
+    // (Inno Setup installer of CINEMAX, 2007; registry `Language` = `gbr`,
+    // `LanguageST` = `tch`): the collection's program, byte for byte.
+    Build {
+        id: DVD_CS_BUILD,
+        label: "Atlantis Evolution (2004), Level DVD (CINEMAX)",
+        language: "Czech",
+        size: 3_022_848,
+        pe_timestamp: 0x4165_4813,
+        md5: [
+            0x13, 0xc5, 0x7a, 0x67, 0x50, 0xa2, 0xe5, 0x6e, 0xf1, 0x87, 0x11, 0x6a, 0x9c, 0x03,
+            0x1a, 0xc5,
+        ],
+        tch_east_europe: true,
     },
 ];
 
 /// The Italian *Atlantis Collection*'s program's id in [`KNOWN_BUILDS`].
 pub const COLLECTION_BUILD: &str = "atlantis4-collection-it-3022848";
+
+/// The Czech *Level* 153 DVD's edition's id in [`KNOWN_BUILDS`]: an alias
+/// of [`COLLECTION_BUILD`] (the same file).
+pub const DVD_CS_BUILD: &str = "atlantis4-dvd-cs-3022848";
 
 /// The folders of disc 2's world data (`cd2\datas\<folder>`) in the CD's
 /// installation, 1142 files: the folders the Italian *Atlantis
@@ -222,18 +259,64 @@ pub fn identify(exe: &[u8]) -> Result<&'static Build, ExeError> {
         })
 }
 
+/// The edition of the install `src` whose program is `build`: the
+/// collection's program with Czech texts (`cd0\datas\loc\text\tch\`,
+/// which the Italian collection does not have) is the Czech *Level* DVD's
+/// ([`DVD_CS_BUILD`]); any other stays `build`.
+pub fn edition_of(src: &dyn atlantis_data::FileSource, build: &'static Build) -> &'static Build {
+    if build.id == COLLECTION_BUILD && !src.list("cd0/datas/loc/text/tch").is_empty() {
+        if let Some(cs) = KNOWN_BUILDS.iter().find(|b| b.id == DVD_CS_BUILD) {
+            return cs;
+        }
+    }
+    build
+}
+
+/// The edition of the install `src`: its program identified
+/// ([`identify`]), then told apart by the install ([`edition_of`]);
+/// `None` when there is no program.
+pub fn identify_install(
+    src: &dyn atlantis_data::FileSource,
+) -> Option<Result<&'static Build, ExeError>> {
+    let exe = src.read(EXE_NAME)?;
+    Some(identify(&exe).map(|b| edition_of(src, b)))
+}
+
+/// The registry values `Language` and `LanguageST` the installers write
+/// (the start-up reads both, FUN_004a1710; `Langue` and `SousTitre` come
+/// from them when `Atlantis4.cfg` names none): the folder of
+/// `cd0\datas\loc\voix\` and that of `cd0\datas\loc\text\`, the
+/// install's only ones (`gbr` / `gbr` for the CD, `ita` / `ita` for the
+/// Italian collection, `gbr` / `tch` for the Czech *Level* DVD). A
+/// missing folder takes the other's.
+pub fn install_languages(src: &dyn atlantis_data::FileSource) -> (Vec<u8>, Vec<u8>) {
+    let only = |dir: &str| {
+        let folders = src.list(dir);
+        if folders.len() > 1 {
+            log::warn!("no single install language: {dir} holds {folders:?}");
+        }
+        folders.first().cloned()
+    };
+    let voices = only("cd0/datas/loc/voix");
+    let texts = only("cd0/datas/loc/text");
+    let language = voices.clone().or(texts.clone()).unwrap_or_default();
+    let language_st = texts.or(voices).unwrap_or_default();
+    (language.into_bytes(), language_st.into_bytes())
+}
+
 /// The build of the program in the install `dir` (its `Atlantis
-/// Evolution.exe`); `None` when there is no program.
+/// Evolution.exe`), as [`identify_install`]; `None` when there is no
+/// program.
 pub fn identify_dir(dir: &std::path::Path) -> Option<Result<&'static Build, ExeError>> {
-    let exe = std::fs::read(dir.join(EXE_NAME)).ok()?;
-    Some(identify(&exe))
+    identify_install(&atlantis_data::StdDir::new(dir))
 }
 
 /// The edition's name for the game library and the window: the game, the
 /// year of its program, the medium and the language (atlantis4-re decision
 /// 0008: "Atlantis Evolution (2004), CD, English"; the Italian collection's
 /// as *Atlantis III*'s, "Atlantis Evolution (2004), Atlantis Collection,
-/// Italian").
+/// Italian"; the Czech *Level* DVD's "Atlantis Evolution (2004), Level DVD
+/// (CINEMAX), Czech").
 pub fn edition_label(build: &Build) -> String {
     format!("{}, {}", build.label, build.language)
 }
@@ -404,6 +487,7 @@ pub fn folder_of(rest: &str) -> Option<Folder> {
 pub struct Evolution2004Source {
     src: std::sync::Arc<dyn atlantis_data::FileSource>,
     disc: std::sync::atomic::AtomicU32,
+    build: std::sync::OnceLock<Option<&'static Build>>,
 }
 
 impl Evolution2004Source {
@@ -411,7 +495,22 @@ impl Evolution2004Source {
         Evolution2004Source {
             src,
             disc: std::sync::atomic::AtomicU32::new(1),
+            build: std::sync::OnceLock::new(),
         }
+    }
+
+    /// The install's edition ([`identify_install`], read once); `None`
+    /// when its program is missing or not a known build.
+    pub fn build(&self) -> Option<&'static Build> {
+        *self
+            .build
+            .get_or_init(|| identify_install(&*self.src).and_then(Result::ok))
+    }
+
+    /// The registry's `Language` and `LanguageST` for this install
+    /// ([`install_languages`]).
+    pub fn install_languages(&self) -> (Vec<u8>, Vec<u8>) {
+        install_languages(&*self.src)
     }
 
     /// The current disc.
@@ -490,6 +589,43 @@ mod tests {
             edition_label(it),
             "Atlantis Evolution (2004), Atlantis Collection, Italian"
         );
+    }
+
+    /// One program, two editions: the Italian collection's file with Czech
+    /// texts is the Czech *Level* DVD's; the registry's two languages from
+    /// the voices' and the texts' folders.
+    #[test]
+    fn the_czech_dvd_by_its_install() {
+        use atlantis_data::files::MemFiles;
+        let it = &KNOWN_BUILDS[1];
+        let cs = &KNOWN_BUILDS[2];
+        assert_eq!(
+            (it.md5, it.size, it.pe_timestamp),
+            (cs.md5, cs.size, cs.pe_timestamp)
+        );
+        assert_eq!(cs.id, DVD_CS_BUILD);
+        assert!(!KNOWN_BUILDS[0].tch_east_europe && it.tch_east_europe && cs.tch_east_europe);
+        assert_eq!(
+            edition_label(cs),
+            "Atlantis Evolution (2004), Level DVD (CINEMAX), Czech"
+        );
+        let mut m = MemFiles::new();
+        m.insert("cd0/datas/loc/text/ita/dial.txt", vec![0]);
+        m.insert("cd0/datas/loc/voix/ita/a.ogg", vec![0]);
+        assert_eq!(edition_of(&m, it).id, COLLECTION_BUILD);
+        assert_eq!(install_languages(&m), (b"ita".to_vec(), b"ita".to_vec()));
+        let mut m = MemFiles::new();
+        m.insert("cd0/datas/loc/text/tch/dial.txt", vec![0]);
+        m.insert("cd0/datas/loc/voix/gbr/a.ogg", vec![0]);
+        assert_eq!(edition_of(&m, it).id, DVD_CS_BUILD);
+        // The CD's program stays the CD's whatever its texts.
+        assert_eq!(edition_of(&m, &KNOWN_BUILDS[0]).id, KNOWN_BUILDS[0].id);
+        assert_eq!(install_languages(&m), (b"gbr".to_vec(), b"tch".to_vec()));
+        // No voices: the texts' language for both.
+        let mut m = MemFiles::new();
+        m.insert("cd0/datas/loc/text/gbr/dial.txt", vec![0]);
+        assert_eq!(install_languages(&m), (b"gbr".to_vec(), b"gbr".to_vec()));
+        assert_eq!(identify_install(&m), None);
     }
 
     /// Disc 2's world data: all there, all missing (the collection's

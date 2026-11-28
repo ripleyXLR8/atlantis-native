@@ -72,6 +72,10 @@ in Italian, *Atlantis Evolution (2004), Atlantis Collection, Italian*;
 its installer leaves out the second CD's places, films and music, which
 the English CD's installation provides (see
 [The Italian Atlantis Collection](docs/GUIDE.md#the-italian-atlantis-collection-2004-program)).
+The Czech magazine *Level* 153's DVD (CINEMAX, 2007) installs it with
+Czech texts and English voices, complete, *Atlantis Evolution (2004),
+Level DVD (CINEMAX), Czech* (see
+[The Czech Level DVD](docs/GUIDE.md#the-czech-level-dvd-2004-program)).
 
 *The Secrets of Atlantis: The Sacred Legacy* (*Atlantis V*, Nobilis,
 2006), the last game of Cryo's *Atlantis III* engine, plays from start
@@ -184,7 +188,8 @@ Atlantis Native contains none of them.</sub>
   skips a film (a bug fix: the original has only its skip button); on
   the desktop and in the browser. Its original 2004 CD program is in the game library
   too, as a preview, with the Italian *Atlantis Collection* DVD's
-  (2014; the second CD's files taken from the English CD).
+  (2014; the second CD's files taken from the English CD) and the Czech
+  *Level* magazine DVD's (2007).
 - 🏛️ **The Secrets of Atlantis**: the French and international DVDs
   (2006) and the North-American CDs (2007), read from the discs, their
   files, their images or the installation, nothing unpacked; the
@@ -406,6 +411,7 @@ For *Atlantis Evolution*:
 | [GOG.com](https://www.gog.com/) (`Atlantis Evolution.exe` of 2,363,910 bytes, MD5 `f2de382af52f1d89e32ed7c286be8b4f`; one program for all five languages) | English, French, German, Italian, Spanish (the one GOG.com's client installed, or another chosen in `settings.ini`) | the installation folder (the one holding `Atlantis Evolution.exe` and `3D`) |
 | The 2004 CD of The Adventure Company, four discs, and the European English CD, whose discs hold the same files (`Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `2199bc93d2ac3f8b4279e0db898559e8`; **a preview**, not yet played through from start to end) | English | the folder where its installer put the game (the one holding `Atlantis Evolution.exe` and `cd0` to `cd4`; by default `C:\Program Files\The Adventure Company\Atlantis Evolution`) |
 | *Atlantis Collection*, Italian DVD compilation (2014; its `Atlantis 4\setup.exe`, an Inno Setup installer, installs the 2004 program rebuilt on 2004-10-07: `Atlantis Evolution.exe` of 3,022,848 bytes, MD5 `13c57a6750a2e56ef187116a9c031ac5`; **a preview**) | Italian | the folder its installer created (by default `C:\Program Files\Adventure Productions\Atlantis Evolution`), **with the `cd2` folder of the English CD's installation copied into it**: the collection's installer leaves out the second CD's places, films and music, and Atlantis Native refuses the folder without them, saying so |
+| *Atlantis Evolution CZ*, on the DVD of the Czech magazine *Level* 153 (CINEMAX, 2007; its `Atlantis Evolution\setup.exe`, an Inno Setup installer, installs the same program as the Italian collection, MD5 `13c57a6750a2e56ef187116a9c031ac5`; **a preview**) | Czech texts, English voices | the folder its installer created (by default `C:\Program Files\Atlantis4`) |
 
 GOG.com's edition is a 2012 program (Tetraedge Engine); the CD's is the
 original 2004 program, played by the *Atlantis III* engine. The CDs

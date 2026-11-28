@@ -4916,8 +4916,8 @@ program but for three changes (atlantis4-re `binaries/README.md`): its
 version line, a key test in the logos (Escape or Space ends the logo
 playing, as Native already does for the CD), and Czech (`tch`) among the
 languages whose font character set follows the language. The language
-comes from `loc\text\ita\` alone (`install::install_registry`), as for
-the CD. Its installer leaves out disc 2's world data: `cd2\datas\`
+comes from `loc\voix\ita\` and `loc\text\ita\` alone
+(`evolution2004::install_languages`), as for the CD. Its installer leaves out disc 2's world data: `cd2\datas\`
 holds only `loc\bink\ita\`, not the 1142 files of `spw`, `warp`,
 `binkdial`, `bink`, `music`, `binktraj`, `spf` and `map`, which the
 scripts need from chapter 10 (`changecd=2`).
@@ -4932,6 +4932,39 @@ timing file): the player copies its `cd2` folder into the collection's,
 and the merged folder opens (`tests/evolution2004_it_collection.rs`, the
 app's `the_italian_collection_of_evolution_2004`, with
 `ATLANTIS4_IT_COLLECTION` and `ATLANTIS4_CD`).
+
+**The Czech *Level* 153 DVD (CINEMAX, 2007).** *Atlantis Evolution CZ*,
+a full game on the DVD of the Czech magazine *Level* 153, is an Inno
+Setup installer of the same `FLA` layout (default folder `Atlantis4`)
+whose `Atlantis Evolution.exe` is the Italian collection's file byte for
+byte, with the CD's English voices and films, Czech texts
+(`loc\text\tch\`, Windows-1250), disc 2 complete, no
+`datas\Atlantis4.cfg`, and registry values `Language` = `gbr`,
+`LanguageST` = `tch` (atlantis4-re `discs/dvd-cs-level153.md`). One
+program standing for two editions, `evolution2004::identify` gives the
+collection's row and `identify_install` / `edition_of` tell the edition
+by the install: the collection's program with `cd0\datas\loc\text\tch\`
+is atlantis4-dvd-cs-3022848, the third entry of `KNOWN_BUILDS`,
+*Atlantis Evolution (2004), Level DVD (CINEMAX), Czech*. The start-up
+reads both registry languages (FUN_004a1710): `install_languages` takes
+`Language` from the folder of `loc\voix\` and `LanguageST` from that of
+`loc\text\`, and `cfg::Config::apply_install_2004` gives them to an
+empty `Langue` and `SousTitre` only (a language `Atlantis4.cfg` names is
+kept, `SubTitleOn` stays the file's: no start-up code writes it), so
+this install plays English voices and films with Czech texts; the
+writer compares `SousTitre` with `LanguageST`
+(`Startup::install_language_st`). Its fonts are all `ANSI_CHARSET`,
+which the rebuilt program's chain (FUN_0041e500) turns into
+`EASTEUROPE_CHARSET` for `tch`: `font_txt::FontDef::charset_in` has
+that case when the build's `tch_east_europe` is set (the collection's
+and this DVD's, not the CD's), and `Texts` then measures with the
+Central European Arial table and reads the texts as Windows-1250. With
+no `Atlantis4.cfg` the defaults apply; the rebuilt program's defaults
+function (FUN_0040d020) is the CD's FUN_0040cfa0 instruction for
+instruction, constants and strings included, so
+`evolution2004_cfg::Config::default` serves both
+(`tests/evolution2004_dvd_cs.rs` and the app's
+`the_czech_level_dvd_of_evolution_2004`, with `ATLANTIS4_DVD_CS`).
 
 **In the browser.** `web_layout::a4cd_install` finds the install among
 the picked files (`atlantis evolution.exe` beside `cd0/datas/scenar/`),

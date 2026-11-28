@@ -139,6 +139,11 @@ impl A3Files {
         self.evolution_2004.is_some()
     }
 
+    /// The 2004 program's source, when the install is one.
+    pub fn evolution_2004_source(&self) -> Option<&crate::evolution2004::Evolution2004Source> {
+        self.evolution_2004.as_deref()
+    }
+
     /// The 2004 program's current disc (`cd<n>\`, 0x0070d1a0) := `n`
     /// (`Menu_TestChangeCD` @ 0x0045d580, an `FLA` install); nothing for
     /// *Atlantis III*.

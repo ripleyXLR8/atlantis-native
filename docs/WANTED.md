@@ -119,7 +119,9 @@ in progress) and the European English CD (ATLEENCD1 … 4, Redump
 the North American discs' files byte for byte (checked on a dump that
 matches Redump's), and the Italian *Atlantis Collection* DVD (2014),
 whose installer leaves out the second CD's world data (supported with
-the English CD's second disc).
+the English CD's second disc), and *Atlantis Evolution CZ* on the DVD of
+the Czech magazine *Level* 153 (CINEMAX, 2007; Czech texts, English
+voices).
 
 | Priority | Title on the box | Country, publisher | Year | Medium | How to recognise it |
 |---|---|---|---|---|---|

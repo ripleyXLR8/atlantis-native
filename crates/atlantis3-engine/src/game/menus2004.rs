@@ -276,12 +276,11 @@ impl Game {
     /// counted first.
     pub(super) fn cfg_text_2004(&mut self) -> Vec<u8> {
         self.play_time_count();
-        let lang = &self.startup.install_language;
         atlantis3_data::evolution2004_cfg::write(
             &self.startup.config,
             &self.puzzles_2004,
-            lang,
-            lang,
+            &self.startup.install_language,
+            &self.startup.install_language_st,
         )
     }
 }

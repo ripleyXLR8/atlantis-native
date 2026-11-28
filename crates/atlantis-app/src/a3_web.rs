@@ -189,13 +189,15 @@ pub fn start_evolution_2004(
     store: Rc<dyn SaveStore>,
 ) -> Result<(), JsValue> {
     use atlantis3_data::evolution2004::{
-        check_disc2, edition_label, identify, Evolution2004Source, EXE_NAME,
+        check_disc2, edition_label, edition_of, identify, Evolution2004Source, EXE_NAME,
     };
     let exe = install
         .read(EXE_NAME)
         .ok_or_else(|| JsValue::from(format!("Atlantis Evolution (2004): no {EXE_NAME}")))?;
     let build =
         identify(&exe).map_err(|e| JsValue::from(format!("Atlantis Evolution (2004): {e}")))?;
+    // The Czech Level DVD's install has the Italian collection's program.
+    let build = edition_of(&*install, build);
     // The Italian Atlantis Collection's install lacks disc 2's world data.
     if let Some(e) = check_disc2(&*install, build) {
         return Err(JsValue::from(e.to_string()));
